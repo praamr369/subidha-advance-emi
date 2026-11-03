@@ -5,11 +5,12 @@ import { formatRupee } from "@/lib/utils/currency";
 import Link from "next/link";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { Download, RefreshCw, Search, SlidersHorizontal, X, Layers, ExternalLink, ChevronRight, ChevronDown, GitBranch, CheckCircle2, AlertCircle, Star, Package2, CircleHelp, QrCode, Boxes } from "lucide-react";
+import { Download, RefreshCw, Search, SlidersHorizontal, X, Layers, ExternalLink, ChevronRight, ChevronDown, GitBranch, CheckCircle2, AlertCircle, Star, Package2, CircleHelp, QrCode, Boxes, Sparkles } from "lucide-react";
 import PimHelpGuideTab from "@/components/admin/help/PimHelpGuideTab";
 import PimPurchaseStockPanel from "@/components/admin/pim/PimPurchaseStockPanel";
 import { pimService, type PimProduct, type PimCategory, type PimTreeSummary } from "@/services/pim";
 import QRLabelPrintModal, { type QRLabelItem } from "@/components/inventory/QRLabelPrintModal";
+import PimQuickEditModal from "@/components/admin/pim/PimQuickEditModal";
 
 import ProductQuickActions from "@/components/admin/products/ProductQuickActions";
 import { useWorkflowLauncher } from "@/components/workflows/WorkflowProvider";
@@ -256,6 +257,7 @@ function PimProductRow({
   selected = false,
   onSelect,
   onPrintQR,
+  onQuickEdit,
 }: {
   p: PimProduct;
   isChild?: boolean;
@@ -265,6 +267,7 @@ function PimProductRow({
   selected?: boolean;
   onSelect?: (selected: boolean) => void;
   onPrintQR?: (p: PimProduct) => void;
+  onQuickEdit?: (p: PimProduct) => void;
 }) {
   const hasChildren = !isChild && (childCount ?? 0) > 0;
 
@@ -379,12 +382,21 @@ function PimProductRow({
           >
             <QrCode className="h-3 w-3 text-primary" /> QR Label
           </button>
+          <button
+            type="button"
+            onClick={() => onQuickEdit?.(p)}
+            className="inline-flex items-center gap-1 text-primary text-xs hover:underline font-semibold cursor-pointer text-left"
+            title="Quick edit this product, attributes and variants in a pop up window"
+          >
+            <Sparkles className="h-3 w-3 text-primary" /> PIM Editor (Pop-up)
+          </button>
           <Link
             href={`/admin/pim/products/${p.id}/edit`}
             onClick={() => rememberProductsWorkspaceState({ tab: "pim", scrollY: window.scrollY })}
-            className="inline-flex items-center gap-1 text-primary text-xs hover:underline font-medium"
+            className="inline-flex items-center gap-1 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white text-xs hover:underline font-medium"
+            title="Open full page editor window"
           >
-            PIM Editor <ExternalLink className="h-3 w-3" />
+            Full Page Window <ExternalLink className="h-3 w-3" />
           </Link>
           {!isChild && (
             <Link
@@ -511,6 +523,7 @@ function PimPanel({ onSwitchTab }: { onSwitchTab?: (tab: "subscription" | "pim" 
   const [bulkPublishResult, setBulkPublishResult] = useState<string | null>(null);
   const [qrModalItem, setQrModalItem] = useState<QRLabelItem | null>(null);
   const [qrModalItems, setQrModalItems] = useState<QRLabelItem[] | null>(null);
+  const [quickEditPimProduct, setQuickEditPimProduct] = useState<PimProduct | null>(null);
   const tableTopRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -842,6 +855,7 @@ function PimPanel({ onSwitchTab }: { onSwitchTab?: (tab: "subscription" | "pim" 
                         setQrModalItem(pimProductToQRLabel(prod));
                         setQrModalItems(null);
                       }}
+                      onQuickEdit={(prod) => setQuickEditPimProduct(prod)}
                     />
                     {isExpanded && node.children.map((child) => (
                       <PimProductRow
@@ -852,6 +866,7 @@ function PimPanel({ onSwitchTab }: { onSwitchTab?: (tab: "subscription" | "pim" 
                           setQrModalItem(pimProductToQRLabel(prod));
                           setQrModalItems(null);
                         }}
+                        onQuickEdit={(prod) => setQuickEditPimProduct(prod)}
                       />
                     ))}
                   </Fragment>
@@ -867,6 +882,7 @@ function PimPanel({ onSwitchTab }: { onSwitchTab?: (tab: "subscription" | "pim" 
                     setQrModalItem(pimProductToQRLabel(prod));
                     setQrModalItems(null);
                   }}
+                  onQuickEdit={(prod) => setQuickEditPimProduct(prod)}
                 />
               ))}
             </tbody>
@@ -883,6 +899,17 @@ function PimPanel({ onSwitchTab }: { onSwitchTab?: (tab: "subscription" | "pim" 
           onClose={() => {
             setQrModalItem(null);
             setQrModalItems(null);
+          }}
+        />
+      )}
+
+      {quickEditPimProduct && (
+        <PimQuickEditModal
+          productId={quickEditPimProduct.parent_id || quickEditPimProduct.id}
+          initialProduct={quickEditPimProduct}
+          onClose={() => setQuickEditPimProduct(null)}
+          onSaved={() => {
+            void loadPimProducts();
           }}
         />
       )}

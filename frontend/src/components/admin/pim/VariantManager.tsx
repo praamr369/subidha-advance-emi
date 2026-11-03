@@ -12,6 +12,7 @@ import { patchVariantPublishControl } from "@/services/product-pim";
 import { type AttributeValues, templateValuesFor } from "./DynamicAttributeForm";
 import AttributeValuePicker from "./AttributeValuePicker";
 import { formatRupee } from "@/lib/utils/currency";
+import { cn } from "@/lib/utils";
 import QRLabelPrintModal, { type QRLabelItem } from "@/components/inventory/QRLabelPrintModal";
 import RelatedProductsSection from "../products/RelatedProductsSection";
 
@@ -223,8 +224,17 @@ function CopyVariantModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
-      <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150">
+    <div
+      className="fixed inset-0 z-[85] flex items-center justify-center bg-black/65 p-4 backdrop-blur-xs"
+      onClick={(e) => {
+        e.stopPropagation();
+        onClose();
+      }}
+    >
+      <div
+        className="w-full max-w-lg rounded-2xl border border-border bg-card p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between pb-3 border-b">
           <div className="flex items-center gap-2">
             <div className="rounded-lg bg-amber-500/10 p-2 text-amber-600 dark:text-amber-400">
@@ -537,6 +547,7 @@ function VariantEditModal({
   const [synced, setSynced] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [addAttrOpen, setAddAttrOpen] = useState(false);
+  const [activeSection, setActiveSection] = useState<"attributes" | "pricing" | "branding" | "warranty" | "all">("attributes");
 
   useEffect(() => {
     setState(parseVariantToState(variant));
@@ -681,16 +692,19 @@ function VariantEditModal({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
         handleClose?.();
       } else if ((e.ctrlKey || e.metaKey) && e.key === "s") {
         e.preventDefault();
+        e.stopPropagation();
         if (!saving && state.price) {
           void handleSave(true);
         }
       }
     };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
   }, [handleClose, saving, state.price, handleSave]);
 
   // A plain render function, not a nested component: a component declared inside
@@ -730,8 +744,9 @@ function VariantEditModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto"
+      className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-5 bg-black/65 backdrop-blur-xs overflow-y-auto"
       onClick={(e) => {
+        e.stopPropagation();
         if (e.target === e.currentTarget && !saving) handleClose?.();
       }}
       role="dialog"
@@ -739,16 +754,28 @@ function VariantEditModal({
       aria-labelledby="modal-variant-title"
     >
       <div
-        className="relative w-full max-w-4xl max-h-[92vh] flex flex-col rounded-2xl border border-border bg-card shadow-2xl animate-in fade-in zoom-in-95 duration-150 overflow-hidden my-auto"
+        className="relative w-full max-w-5xl max-h-[92vh] flex flex-col rounded-2xl border-2 border-primary/20 bg-card shadow-2xl animate-in fade-in zoom-in-95 duration-150 overflow-hidden my-auto ring-1 ring-black/10"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Sticky Header */}
         <div className="flex items-center justify-between border-b border-border px-6 py-4 bg-muted/40 shrink-0 flex-wrap gap-2">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary shrink-0">
-              <Pencil className="h-4.5 w-4.5" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary shrink-0 shadow-2xs">
+              <Pencil className="h-5 w-5" />
             </div>
             <div className="min-w-0">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1 flex-wrap">
+                <span className="font-medium text-foreground flex items-center gap-1">
+                  <Package className="h-3.5 w-3.5 text-primary" /> {productName || "Base Product"}
+                </span>
+                <ChevronRight className="h-3 w-3 text-muted-foreground" />
+                <span className="font-semibold text-primary font-mono bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20">
+                  {variant.sku}
+                </span>
+                <span className="inline-flex items-center rounded-full bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300 px-2 py-0.5 text-[10px] font-semibold border border-violet-200 dark:border-violet-800">
+                  <Sparkles className="h-2.5 w-2.5 mr-1" /> Pop-up Over Pop-up • Variant Attributes
+                </span>
+              </div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 id="modal-variant-title" className="text-base font-bold text-foreground">
                   Edit Variant: <span className="font-mono text-primary">{variant.sku}</span>
@@ -794,11 +821,87 @@ function VariantEditModal({
           </div>
         </div>
 
+        {/* Quick Segmented Navigation Bar */}
+        <div className="flex items-center gap-1.5 px-6 py-2 bg-muted/20 border-b border-border/80 overflow-x-auto text-xs shrink-0">
+          <button
+            type="button"
+            onClick={() => setActiveSection("attributes")}
+            className={cn(
+              "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer",
+              activeSection === "attributes"
+                ? "bg-primary text-primary-foreground shadow-xs"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted"
+            )}
+          >
+            <Layers className="h-3.5 w-3.5" />
+            Attributes &amp; Specs
+            <span className={cn(
+              "rounded-full px-1.5 py-0.2 text-[10px]",
+              activeSection === "attributes" ? "bg-white/20 text-white" : "bg-muted text-muted-foreground"
+            )}>
+              {activeAttrs.length}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveSection("pricing")}
+            className={cn(
+              "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer",
+              activeSection === "pricing"
+                ? "bg-primary text-primary-foreground shadow-xs"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted"
+            )}
+          >
+            <span>₹ Pricing &amp; Stock</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveSection("branding")}
+            className={cn(
+              "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer",
+              activeSection === "branding"
+                ? "bg-primary text-primary-foreground shadow-xs"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted"
+            )}
+          >
+            <Tag className="h-3.5 w-3.5" />
+            Title &amp; Brand
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveSection("warranty")}
+            className={cn(
+              "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer",
+              activeSection === "warranty"
+                ? "bg-primary text-primary-foreground shadow-xs"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted"
+            )}
+          >
+            <ShieldCheck className="h-3.5 w-3.5" />
+            Warranty &amp; BOM
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveSection("all")}
+            className={cn(
+              "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer ml-auto",
+              activeSection === "all"
+                ? "bg-foreground text-background shadow-xs font-semibold"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted"
+            )}
+          >
+            View All Sections
+          </button>
+        </div>
+
         {/* Scrollable Content Body */}
         <div className="overflow-y-auto flex-1 p-6 space-y-6">
 
-      {/* Variant Brand Override */}
-      <div className="rounded-lg border border-border/70 bg-background/80 p-3.5 space-y-2">
+        {/* Brand & Title Variation Control (When Branding or All) */}
+        {(activeSection === "branding" || activeSection === "all") && (
+          <div className="space-y-4">
+            {/* Variant Brand Override */}
+            <div className="rounded-lg border border-border/70 bg-background/80 p-3.5 space-y-2">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
             <Tag className="h-3.5 w-3.5 text-primary" />
@@ -902,14 +1005,71 @@ function VariantEditModal({
           Custom identity title for this SKU. If blank, system automatically displays: <span className="font-medium text-foreground">{computeStructuredName()}</span>
         </p>
       </div>
+    </div>
+  )}
+
+  {/* Attributes & Specifications Section (When Attributes or All) */}
+  {(activeSection === "attributes" || activeSection === "all") && (
+    <div className="space-y-5">
+      {/* Active Variant Attribute Combination Strip */}
+      <div className="rounded-xl border border-primary/20 bg-primary/5 p-3.5 space-y-2">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" />
+            <span className="text-xs font-bold uppercase tracking-wide text-primary">
+              Active Variant Attribute Combination
+            </span>
+          </div>
+          <span className="text-[11px] text-muted-foreground">
+            {variantDefining.length} key identity attributes · {nonDefining.length} specs · {locked.length} locked
+          </span>
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {variantDefining.map((a) => {
+            const val = state.attrValues[a.id]?.trim();
+            return (
+              <span
+                key={a.id}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium border shadow-2xs",
+                  val
+                    ? "bg-card text-foreground border-primary/40 font-semibold"
+                    : "bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300"
+                )}
+              >
+                <span className="text-muted-foreground font-normal">{a.name}:</span>
+                <strong className={val ? "text-primary" : "italic text-amber-600"}>
+                  {val || "Not set"}
+                </strong>
+              </span>
+            );
+          })}
+          {nonDefining.map((a) => {
+            const val = state.attrValues[a.id]?.trim();
+            if (!val) return null;
+            return (
+              <span
+                key={a.id}
+                className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs text-muted-foreground bg-muted/60 border border-border"
+              >
+                <span>{a.name}:</span>
+                <span className="font-medium text-foreground">{val}</span>
+              </span>
+            );
+          })}
+        </div>
+      </div>
 
       {/* Locked parent attributes — read-only */}
       {locked.length > 0 && (
-        <div>
-          <div className="flex items-center gap-1.5 mb-3">
-            <Lock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-            <span className="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400">
+        <div className="rounded-xl border border-amber-200 dark:border-amber-900/60 bg-amber-50/30 dark:bg-amber-950/20 p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Lock className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+            <span className="text-xs font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400">
               Inherited from Base Product (locked)
+            </span>
+            <span className="text-[10px] text-muted-foreground">
+              These blueprint attributes cascade to all variants
             </span>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
@@ -926,54 +1086,96 @@ function VariantEditModal({
 
       {/* Variant-defining attributes (identity) — editable with delete control */}
       {variantDefining.length > 0 && (
-        <div>
-          <div className="flex items-center justify-between gap-1.5 mb-3">
-            <div className="flex items-center gap-1.5">
-              <Layers className="h-3.5 w-3.5 text-primary" />
-              <span className="text-xs font-semibold uppercase tracking-wide text-primary">Variant Identity Attributes</span>
+        <div className="rounded-xl border border-violet-200 dark:border-violet-900 bg-violet-50/20 dark:bg-violet-950/10 p-4 space-y-3">
+          <div className="flex items-center justify-between gap-1.5 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Layers className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+              <span className="text-xs font-bold uppercase tracking-wide text-violet-700 dark:text-violet-300">
+                Variant Identity Attributes
+              </span>
+              <span className="rounded-full bg-violet-100 text-violet-800 dark:bg-violet-900/60 dark:text-violet-300 px-2 py-0.2 text-[10px] font-bold">
+                Defines SKU
+              </span>
             </div>
-            <span className="text-[11px] text-muted-foreground">Attributes defining this SKU variant</span>
+            <span className="text-[11px] text-muted-foreground">
+              Attributes defining this specific SKU variant
+            </span>
           </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {variantDefining.map((attr) => (
-              <div key={attr.id} className="rounded-lg border border-border/60 bg-background/60 p-2.5 shadow-2xs space-y-1">
-                <div className="flex items-center justify-between gap-1">
-                  <label className="text-xs font-semibold text-foreground truncate" title={attr.name}>{attr.name}</label>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveAttribute(attr.id)}
-                    title={`Remove ${attr.name} from this variant`}
-                    className="text-muted-foreground/60 hover:text-destructive hover:bg-destructive/10 p-1 rounded transition-colors"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {variantDefining.map((attr) => {
+              const val = state.attrValues[attr.id]?.trim();
+              return (
+                <div
+                  key={attr.id}
+                  className={cn(
+                    "rounded-xl border p-3 shadow-xs space-y-1.5 transition-all bg-card",
+                    val
+                      ? "border-violet-300 dark:border-violet-700 ring-1 ring-violet-500/10"
+                      : "border-border/80 hover:border-violet-300"
+                  )}
+                >
+                  <div className="flex items-center justify-between gap-1.5">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <label className="text-xs font-bold text-foreground truncate" title={attr.name}>
+                        {attr.name}
+                      </label>
+                      <span className="rounded bg-violet-100 text-violet-800 dark:bg-violet-900/50 dark:text-violet-300 px-1.5 py-0.2 text-[9px] font-bold">
+                        KEY
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveAttribute(attr.id)}
+                      title={`Remove ${attr.name} from this variant`}
+                      className="text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 p-1 rounded transition-colors"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  {renderAttrInput(attr)}
                 </div>
-                {renderAttrInput(attr)}
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
 
       {/* Non-defining attributes — editable with delete control */}
       {nonDefining.length > 0 && (
-        <div>
-          <div className="flex items-center justify-between gap-1.5 mb-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Specification Attributes</p>
-            <span className="text-[11px] text-muted-foreground">Additional SKU specifications</span>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-1.5">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                Specification Attributes
+              </span>
+              <span className="text-[10px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full font-medium">
+                {nonDefining.length} specs
+              </span>
+            </div>
+            <span className="text-[11px] text-muted-foreground">Additional SKU specs</span>
           </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {nonDefining.map((attr) => (
-              <div key={attr.id} className="rounded-lg border border-border/60 bg-background/60 p-2.5 shadow-2xs space-y-1">
-                <div className="flex items-center justify-between gap-1">
-                  <label className="text-xs font-medium text-foreground truncate" title={attr.name}>{attr.name}</label>
+              <div
+                key={attr.id}
+                className="rounded-xl border border-border/80 bg-card p-3 shadow-2xs space-y-1.5 hover:border-border transition-colors"
+              >
+                <div className="flex items-center justify-between gap-1.5">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <label className="text-xs font-semibold text-foreground truncate" title={attr.name}>
+                      {attr.name}
+                    </label>
+                    <span className="rounded bg-muted px-1.5 py-0.2 text-[9px] font-medium text-muted-foreground">
+                      {attr.data_type}
+                    </span>
+                  </div>
                   <button
                     type="button"
                     onClick={() => handleRemoveAttribute(attr.id)}
                     title={`Remove ${attr.name} from this variant`}
-                    className="text-muted-foreground/60 hover:text-destructive hover:bg-destructive/10 p-1 rounded transition-colors"
+                    className="text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 p-1 rounded transition-colors"
                   >
-                    <X className="h-3 w-3" />
+                    <X className="h-3.5 w-3.5" />
                   </button>
                 </div>
                 {renderAttrInput(attr)}
@@ -987,26 +1189,39 @@ function VariantEditModal({
       {unassignedAttrs.length > 0 && (
         <div className="pt-1">
           {addAttrOpen ? (
-            <div className="flex items-center gap-2 max-w-md bg-background border rounded-lg p-2 shadow-xs">
+            <div className="flex items-center gap-2 max-w-lg bg-card border rounded-xl p-2.5 shadow-sm">
               <select
                 autoFocus
-                className="flex-1 rounded border bg-background px-2.5 py-1.5 text-xs outline-none"
+                className="flex-1 rounded-lg border bg-background px-3 py-1.5 text-xs outline-none focus:ring-1 focus:ring-primary"
                 defaultValue=""
                 onChange={(e) => {
                   if (e.target.value) handleAddAttribute(Number(e.target.value));
                 }}
               >
                 <option value="" disabled>Choose an attribute to add to this variant...</option>
-                {unassignedAttrs.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name} ({a.is_variant_defining ? "Variant Key" : a.data_type})
-                  </option>
-                ))}
+                <optgroup label="Variant Key Attributes">
+                  {unassignedAttrs
+                    .filter((a) => a.is_variant_defining)
+                    .map((a) => (
+                      <option key={a.id} value={a.id}>
+                        ★ {a.name} (Key Variant)
+                      </option>
+                    ))}
+                </optgroup>
+                <optgroup label="Specification Attributes">
+                  {unassignedAttrs
+                    .filter((a) => !a.is_variant_defining)
+                    .map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name} ({a.data_type})
+                      </option>
+                    ))}
+                </optgroup>
               </select>
               <button
                 type="button"
                 onClick={() => setAddAttrOpen(false)}
-                className="rounded px-2 py-1 text-xs text-muted-foreground hover:bg-muted"
+                className="rounded-lg px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-muted font-medium"
               >
                 Cancel
               </button>
@@ -1015,53 +1230,86 @@ function VariantEditModal({
             <button
               type="button"
               onClick={() => setAddAttrOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-primary/40 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-dashed border-primary/50 bg-primary/5 px-3.5 py-2 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors shadow-2xs cursor-pointer"
             >
-              <Plus className="h-3.5 w-3.5" /> Add Attribute to this Variant
+              <Plus className="h-3.5 w-3.5" /> + Add Attribute to this Variant
             </button>
           )}
         </div>
       )}
+    </div>
+  )}
 
-      {/* Pricing + inventory */}
-      <div>
-        <div className="mb-3">
-          <label className="text-xs font-medium">SKU / Product ID *</label>
-          <input type="text" className="mt-1 w-full rounded-lg border bg-background px-3 py-1.5 text-sm font-mono font-semibold"
-            value={state.sku} onChange={(e) => set("sku", e.target.value)} />
-          <p className="mt-1 text-[11px] text-muted-foreground">Changing this updates the linked PIM and operational product identifiers.</p>
+  {/* Pricing & Inventory (When Pricing or All) */}
+  {(activeSection === "pricing" || activeSection === "all") && (
+    <div className="space-y-4">
+      <div className="mb-2">
+        <label className="text-xs font-medium">SKU / Product ID *</label>
+        <input
+          type="text"
+          className="mt-1 w-full rounded-lg border bg-background px-3 py-1.5 text-sm font-mono font-semibold"
+          value={state.sku}
+          onChange={(e) => set("sku", e.target.value)}
+        />
+        <p className="mt-1 text-[11px] text-muted-foreground">Changing this updates the linked PIM and operational product identifiers.</p>
+      </div>
+      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pricing &amp; Inventory</p>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div>
+          <label className="text-xs font-medium">Selling Price *</label>
+          <div className="relative mt-1">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">₹</span>
+            <input
+              type="number"
+              step="0.01"
+              className="w-full rounded-lg border bg-background pl-6 pr-3 py-1.5 text-sm"
+              value={state.price}
+              onChange={(e) => set("price", e.target.value)}
+            />
+          </div>
         </div>
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Pricing & Inventory</p>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div>
-            <label className="text-xs font-medium">Selling Price *</label>
-            <div className="relative mt-1">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">₹</span>
-              <input type="number" step="0.01" className="w-full rounded-lg border bg-background pl-6 pr-3 py-1.5 text-sm"
-                value={state.price} onChange={(e) => set("price", e.target.value)} />
-            </div>
+        <div>
+          <label className="text-xs font-medium">Cost Price</label>
+          <div className="relative mt-1">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">₹</span>
+            <input
+              type="number"
+              step="0.01"
+              className="w-full rounded-lg border bg-background pl-6 pr-3 py-1.5 text-sm"
+              value={state.cost_price}
+              onChange={(e) => set("cost_price", e.target.value)}
+              placeholder="0.00"
+            />
           </div>
-          <div>
-            <label className="text-xs font-medium">Cost Price</label>
-            <div className="relative mt-1">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">₹</span>
-              <input type="number" step="0.01" className="w-full rounded-lg border bg-background pl-6 pr-3 py-1.5 text-sm"
-                value={state.cost_price} onChange={(e) => set("cost_price", e.target.value)} placeholder="0.00" />
-            </div>
-          </div>
-          <div>
-            <label htmlFor={`f-barcode-${variant.id}`} className="text-xs font-medium">Barcode</label>
-            <input id={`f-barcode-${variant.id}`} type="text" className="mt-1 w-full rounded-lg border bg-background px-3 py-1.5 text-sm font-mono"
-              value={state.barcode} onChange={(e) => set("barcode", e.target.value)} placeholder="EAN/UPC" />
-          </div>
-          <div>
-            <label htmlFor="f-reorder-level" className="text-xs font-medium">Reorder Level</label>
-            <input id="f-reorder-level" type="number" className="mt-1 w-full rounded-lg border bg-background px-3 py-1.5 text-sm"
-              value={state.reorder_level} onChange={(e) => set("reorder_level", e.target.value)} />
-          </div>
+        </div>
+        <div>
+          <label htmlFor={`f-barcode-${variant.id}`} className="text-xs font-medium">Barcode</label>
+          <input
+            id={`f-barcode-${variant.id}`}
+            type="text"
+            className="mt-1 w-full rounded-lg border bg-background px-3 py-1.5 text-sm font-mono"
+            value={state.barcode}
+            onChange={(e) => set("barcode", e.target.value)}
+            placeholder="EAN/UPC"
+          />
+        </div>
+        <div>
+          <label htmlFor="f-reorder-level" className="text-xs font-medium">Reorder Level</label>
+          <input
+            id="f-reorder-level"
+            type="number"
+            className="mt-1 w-full rounded-lg border bg-background px-3 py-1.5 text-sm"
+            value={state.reorder_level}
+            onChange={(e) => set("reorder_level", e.target.value)}
+          />
         </div>
       </div>
+    </div>
+  )}
 
+  {/* Warranty, Description & Relations (When Warranty or All) */}
+  {(activeSection === "warranty" || activeSection === "all") && (
+    <div className="space-y-4">
       {/* Variant Warranty Information Override */}
       <div className="rounded-lg border border-border/70 bg-background/80 p-3.5 space-y-3">
         <div className="flex items-center justify-between flex-wrap gap-2">
@@ -1225,6 +1473,8 @@ function VariantEditModal({
           />
         </div>
       )}
+    </div>
+  )}
 
       {saveError && (
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs font-medium text-destructive">

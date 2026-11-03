@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Save,
@@ -26,6 +27,7 @@ import {
   Sparkles,
   Puzzle,
   Package,
+  ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getVariantPublishControl, patchVariantPublishControl } from "@/services/product-pim";
@@ -1482,6 +1484,17 @@ export default function PimProductForm({
             <RefreshCw className={`h-3.5 w-3.5 ${refreshingTaxonomy ? "animate-spin text-primary" : "text-muted-foreground"}`} />
             {refreshingTaxonomy ? "Syncing…" : "Sync"}
           </button>
+          {activeProductId && variant === "drawer" && (
+            <Link
+              href={`/admin/pim/products/${activeProductId}/edit`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-2.5 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10 shadow-sm transition-colors"
+              title="Open full page editor window in new tab"
+            >
+              <ExternalLink className="h-3.5 w-3.5" /> Full Page Window
+            </Link>
+          )}
         </div>
       </div>
 
@@ -2772,7 +2785,7 @@ export default function PimProductForm({
 
       {/* Global Category & Attribute Management Modal */}
       {manageWorkbenchOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto">
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto">
           <div className="relative w-full max-w-5xl rounded-2xl border border-border bg-card shadow-2xl overflow-hidden max-h-[92vh] flex flex-col my-auto animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between border-b px-6 py-4 bg-muted/40 shrink-0">
               <div className="flex items-center gap-2.5">
