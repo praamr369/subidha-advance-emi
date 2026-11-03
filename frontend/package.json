@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "NEXT_TELEMETRY_DISABLED=1 next dev",
     "build": "node scripts/run-next-build.mjs",
     "build:smoke": "node scripts/run-next-build.mjs --smoke",
     "start": "next start",
