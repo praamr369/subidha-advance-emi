@@ -167,6 +167,11 @@ export type DirectSale = {
   active_receipt_total?: string;
   void_receipt_total?: string;
   receipt_status?: string;
+  authorized_signature?: string | null;
+  authorized_signed_at?: string | null;
+  customer_signature?: string | null;
+  customer_signed_at?: string | null;
+  signature_metadata?: Record<string, any>;
   lines: DirectSaleLine[];
 };
 
@@ -876,3 +881,74 @@ export function getBillingDailyBook(params: Record<string, QueryValue> = {}) {
 export function getBillingCashBook(params: Record<string, QueryValue> = {}) {
   return apiFetch<BillingCashBookReport>(`/billing/cashbook/${buildQuery(params)}`);
 }
+
+export type DirectSaleSigningPayload = {
+  success: boolean;
+  direct_sale_id: number;
+  sale_no: string;
+  billing_invoice_no: string;
+  sale_date: string;
+  customer_name: string;
+  customer_phone?: string;
+  tax_mode?: string;
+  grand_total: string;
+  received_total: string;
+  balance_total: string;
+  token: string;
+  signing_path: string;
+  signing_url?: string;
+  has_signature: boolean;
+  authorized_signed: boolean;
+  authorized_signed_at?: string | null;
+  customer_signed: boolean;
+  customer_signed_at?: string | null;
+  authorized_signature?: string | null;
+  customer_signature?: string | null;
+  lines?: Array<{
+    id?: number;
+    description: string;
+    quantity: string;
+    unit_price: string;
+    line_total: string;
+  }>;
+};
+
+export async function getDirectSaleSigningLink(saleId: number | string): Promise<DirectSaleSigningPayload> {
+  return apiFetch<DirectSaleSigningPayload>(`/billing/direct-sales/${saleId}/signing-link/`);
+}
+
+export async function signDirectSale(
+  saleId: number | string,
+  payload: {
+    signature_data?: string;
+    signer_type?: "AUTHORIZED" | "CUSTOMER" | "BOTH";
+    signer_name?: string;
+  }
+): Promise<DirectSaleSigningPayload> {
+  return apiFetch<DirectSaleSigningPayload>(`/billing/direct-sales/${saleId}/sign/`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getPublicDirectSaleSigningSummary(token: string): Promise<DirectSaleSigningPayload> {
+  return apiFetch<DirectSaleSigningPayload>(`/public/direct-sales/sign/${encodeURIComponent(token)}/`);
+}
+
+export async function submitPublicDirectSaleSignature(
+  token: string,
+  payload: {
+    signature_data?: string;
+    signer_type?: "AUTHORIZED" | "CUSTOMER" | "BOTH";
+    signer_name?: string;
+  }
+): Promise<{ success: boolean; message: string; details?: any }> {
+  return apiFetch<{ success: boolean; message: string; details?: any }>(
+    `/public/direct-sales/sign/${encodeURIComponent(token)}/`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }
+  );
+}
+

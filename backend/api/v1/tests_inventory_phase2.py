@@ -29,6 +29,7 @@ from inventory.services.stock_movement_service import (
     post_delivery_out,
 )
 from inventory.services.demand_service import get_purchase_suggestions, get_shortage_for_product
+from inventory.services.stock_on_hand_service import build_stock_on_hand_summary, get_stock_on_hand_items
 from subscriptions.models import Customer, DeliveryStatus, Product
 
 
@@ -120,6 +121,22 @@ class StockReservationTests(TestCase):
         self.item.refresh_from_db()
         assert self.item.reserved_qty() == Decimal("0.000")
         assert self.item.available_qty() == Decimal("10.000")
+
+    def test_stock_on_hand_summary_live_atp(self):
+        reserve_stock_for_subscription(
+            inventory_item=self.item,
+            quantity=Decimal("3.000"),
+            subscription_id=99,
+        )
+        summary_data = build_stock_on_hand_summary()
+        summary = summary_data["summary"]
+        assert Decimal(summary["total_reserved_qty"]) >= Decimal("3.000")
+        items_res = get_stock_on_hand_items(search=self.item.sku)
+        assert items_res["count"] >= 1
+        found = next(r for r in items_res["results"] if r["inventory_item_id"] == self.item.id)
+        assert Decimal(found["reserved_qty"]) == Decimal("3.000")
+        assert Decimal(found["physical_qty"]) == Decimal("10.000")
+        assert Decimal(found["available_qty"]) == Decimal("7.000")
 
     def test_reserve_raises_when_insufficient_stock(self):
         with self.assertRaises(ValueError):

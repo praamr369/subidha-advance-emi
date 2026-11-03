@@ -6,6 +6,7 @@ import { Activity, CheckCircle, AlertTriangle, ShieldCheck } from "lucide-react"
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ErrorState from "@/components/feedback/ErrorState";
 import EnterpriseDailyClosePanel from "@/components/admin/daily-close/EnterpriseDailyClosePanel";
+import { openEodReconciliationDrawer } from "@/components/admin/finance/EodReconciliationDrawer";
 import { ROUTES } from "@/lib/routes";
 
 type DailyCloseTab = "solo" | "enterprise";
@@ -74,6 +75,13 @@ export default function SolopreneurDailyClosePage() {
           ? { label: result.status, tone: result.status === "SUCCESS" ? "success" : "warning" }
           : undefined
       }
+      actions={[
+        {
+          label: "1-Click EOD Drawer",
+          onClick: () => openEodReconciliationDrawer(),
+          variant: "secondary",
+        },
+      ]}
     >
       <div className="space-y-6">
         {/* Tab switcher — solopreneur one-click close + enterprise readiness (additive merge) */}

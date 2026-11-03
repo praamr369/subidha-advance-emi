@@ -145,13 +145,94 @@ export type CriticalShortage = {
   product_code: string;
   product_name: string;
   sku: string;
+  barcode?: string;
+  qr_code?: string;
+  item_type?: string;
+  item_type_display?: string;
+  category?: string;
+  subcategory?: string;
+  unit_of_measure?: string;
+  attributes?: Array<{ name: string; value: string }>;
+  attributes_map?: Record<string, string>;
   physical_qty: string;
   reserved_qty: string;
+  available_qty?: string;
   reorder_point: string;
   shortage_qty: string;
+  standard_cost?: string;
+  selling_price?: string;
+  valuation_total?: string;
+  stock_status?: "HEALTHY" | "LOW_STOCK" | "OUT_OF_STOCK" | string;
   stock_tracking_enabled?: boolean;
   stock_tracking_status?: string;
   is_active?: boolean;
+};
+
+export type StockOnHandItem = CriticalShortage;
+
+export type StockOnHandFacets = {
+  item_types: Array<{ code: string; label: string; count: number }>;
+  categories: Array<{ name: string; count: number }>;
+  subcategories: string[];
+  attributes: Record<string, string[]>;
+};
+
+export type StockOnHandCalculationDetail = {
+  inventory_item_id: number;
+  sku: string;
+  product_name: string;
+  product_code: string;
+  category: string;
+  unit_of_measure: string;
+  standard_cost: string;
+  selling_price: string;
+  valuation_total: string;
+  attributes: Record<string, string>;
+  calculation: {
+    opening_stock_qty: string;
+    total_inflows: string;
+    total_outflows: string;
+    physical_qty: string;
+    reserved_qty: string;
+    available_qty: string;
+    reorder_level_qty: string;
+    inflows_breakdown: {
+      purchases: string;
+      production: string;
+      returns: string;
+      adjustments_in: string;
+    };
+    outflows_breakdown: {
+      direct_sales: string;
+      deliveries: string;
+      production_consumption: string;
+      adjustments_out: string;
+    };
+  };
+  recent_movements: Array<{
+    id: number;
+    created_at: string;
+    movement_type: string;
+    movement_type_display: string;
+    quantity_in: string;
+    quantity_out: string;
+    running_balance: string;
+    reference_model?: string;
+    reference_id?: string;
+    notes?: string;
+  }>;
+};
+
+export type StockOnHandFilterParams = {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  item_type?: string;
+  category?: string;
+  subcategory?: string;
+  attribute_key?: string;
+  attribute_value?: string;
+  stock_status?: string;
 };
 
 export type StockOnHandSummaryResponse = {
@@ -201,10 +282,39 @@ export function getCriticalShortages(
   });
 }
 
-export function getStockOnHandItems(page = 1, pageSize = 50, search = ""): Promise<CriticalShortagesListResponse> {
-  const params = new URLSearchParams({ filter: "all", page: String(page), page_size: String(pageSize) });
-  if (search) params.set("search", search);
-  return apiFetch<CriticalShortagesListResponse>(`/admin/inventory/stock-on-hand/?${params.toString()}`);
+export function getStockOnHandItems(
+  pageOrParams: number | StockOnHandFilterParams = 1,
+  pageSize = 50,
+  search = ""
+): Promise<CriticalShortagesListResponse> {
+  const query = new URLSearchParams({ filter: "all" });
+
+  if (typeof pageOrParams === "object") {
+    const p = pageOrParams;
+    if (p.page) query.set("page", String(p.page));
+    if (p.pageSize) query.set("page_size", String(p.pageSize));
+    if (p.search) query.set("search", p.search);
+    if (p.item_type && p.item_type !== "ALL") query.set("item_type", p.item_type);
+    if (p.category && p.category !== "ALL") query.set("category", p.category);
+    if (p.subcategory && p.subcategory !== "ALL") query.set("subcategory", p.subcategory);
+    if (p.attribute_key) query.set("attribute_key", p.attribute_key);
+    if (p.attribute_value) query.set("attribute_value", p.attribute_value);
+    if (p.stock_status && p.stock_status !== "all") query.set("stock_status", p.stock_status);
+  } else {
+    query.set("page", String(pageOrParams));
+    query.set("page_size", String(pageSize));
+    if (search) query.set("search", search);
+  }
+
+  return apiFetch<CriticalShortagesListResponse>(`/admin/inventory/stock-on-hand/?${query.toString()}`);
+}
+
+export function getStockOnHandFacets(): Promise<StockOnHandFacets> {
+  return apiFetch<StockOnHandFacets>("/admin/inventory/stock-on-hand/facets/");
+}
+
+export function getStockOnHandCalculation(itemId: number | string): Promise<StockOnHandCalculationDetail> {
+  return apiFetch<StockOnHandCalculationDetail>(`/admin/inventory/stock-on-hand/${itemId}/calculation/`);
 }
 
 // ============================================================================

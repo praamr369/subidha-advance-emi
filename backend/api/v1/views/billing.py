@@ -230,7 +230,7 @@ class DirectSaleViewSet(AdminBillingModelViewSet):
             return DirectSaleDeliveredSerializer
         if self.action == "collect_payment":
             return DirectSaleCollectionSerializer
-        if self.action == "finalize_invoice":
+        if self.action in {"finalize_invoice", "signing_link", "sign_sale"}:
             return EmptyBillingActionSerializer
         if self.action == "cancel_sale":
             return OperationalCancellationActionSerializer
@@ -358,6 +358,45 @@ class DirectSaleViewSet(AdminBillingModelViewSet):
             build_finalize_invoice_api_response(
                 sale=sale, updated=updated, request=request
             )
+        )
+
+    @action(detail=True, methods=["get"], url_path="signing-link")
+    def signing_link(self, request, pk=None):
+        sale = self.get_object()
+        from billing.services.direct_sale_signing_service import get_direct_sale_signing_payload
+
+        return Response(get_direct_sale_signing_payload(sale, request=request))
+
+    @action(detail=True, methods=["post"], url_path="sign")
+    def sign_sale(self, request, pk=None):
+        sale = self.get_object()
+        from billing.services.direct_sale_signing_service import (
+            get_direct_sale_signing_payload,
+            save_direct_sale_signature,
+        )
+
+        signature_data = request.data.get("signature_data")
+        signature_file = request.FILES.get("signature_image")
+        signer_type = (request.data.get("signer_type") or "AUTHORIZED").upper()
+        signer_name = request.data.get("signer_name", "").strip()
+        ip_addr = request.META.get("REMOTE_ADDR", "")
+
+        try:
+            save_direct_sale_signature(
+                sale,
+                signature_data=signature_data,
+                signature_file=signature_file,
+                signer_type=signer_type,
+                signer_name=signer_name,
+                ip_address=ip_addr,
+            )
+        except ValueError as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
+
+        sale.refresh_from_db()
+        return Response(
+            get_direct_sale_signing_payload(sale, request=request),
+            status=status.HTTP_200_OK,
         )
 
 

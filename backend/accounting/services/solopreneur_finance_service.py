@@ -13,6 +13,7 @@ from accounting.services.bridge_run_service import (
     run_emi_subscription_bridges,
     run_commission_settlement_bridges,
     run_inventory_posting_bridges,
+    run_payout_batch_bridges,
 )
 from subscriptions.services.audit_service import log_audit
 from subscriptions.models import AuditLog
@@ -52,6 +53,7 @@ def run_solopreneur_daily_close(*, as_of: date | None = None, performed_by=None,
         ("emi_payments", run_emi_payment_bridges),
         ("emi_waivers", run_emi_waiver_bridges),
         ("commission_settlements", run_commission_settlement_bridges),
+        ("payout_batches", run_payout_batch_bridges),
         ("inventory_postings", run_inventory_posting_bridges),
     ]
 

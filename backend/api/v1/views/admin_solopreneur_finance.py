@@ -68,10 +68,12 @@ class AdminSolopreneurLedgerHealthView(APIView):
 
     def get(self, request: Request) -> Response:
         cache_key = "solopreneur:ledger-health"
-        cached_data = cache.get(cache_key)
-        
-        if cached_data:
-            return Response(cached_data, status=status.HTTP_200_OK)
+        force_refresh = request.query_params.get("refresh") in ("1", "true", "True")
+
+        if not force_refresh:
+            cached_data = cache.get(cache_key)
+            if cached_data:
+                return Response(cached_data, status=status.HTTP_200_OK)
             
         from accounting.services.trial_balance_check_service import build_trial_balance_check
         

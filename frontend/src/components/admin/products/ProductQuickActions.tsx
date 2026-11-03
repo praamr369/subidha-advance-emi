@@ -269,7 +269,13 @@ export default function ProductQuickActions({ product, mode = "compact", onChang
               <label className="text-sm text-muted-foreground">Unit<input className={fieldClass()} value={unit} onChange={(event) => setUnit(event.target.value)} /></label>
               <label className="text-sm text-muted-foreground">Category<input className={fieldClass()} value={category} onChange={(event) => setCategory(event.target.value)} /></label>
               <label className="text-sm text-muted-foreground">Subcategory<input className={fieldClass()} value={subcategory} onChange={(event) => setSubcategory(event.target.value)} /></label>
-              <label className="text-sm text-muted-foreground">Base price<input className={fieldClass()} type="number" min="0" step="0.01" value={basePrice} onChange={(event) => setBasePrice(event.target.value)} required /></label>
+              <label className="text-sm text-muted-foreground">
+                Base price
+                <input className={fieldClass()} type="number" min="0" step="0.01" value={basePrice} onChange={(event) => setBasePrice(event.target.value)} required />
+                <span className="mt-1 block text-xs text-sky-700 dark:text-sky-400 font-medium">
+                  💡 Updating base price automatically cascades to child variant SKUs that share the blueprint base price.
+                </span>
+              </label>
               <label className="text-sm text-muted-foreground">Default plan<select className={fieldClass()} value={planTypeDefault} onChange={(event) => setPlanTypeDefault(event.target.value as "EMI" | "RENT" | "LEASE")}><option value="EMI">EMI</option><option value="RENT">Rent</option><option value="LEASE">Lease</option></select></label>
             </div>
             <div className="grid gap-2 md:grid-cols-2">{checkboxLabel("Active", active, setActive)}{checkboxLabel("EMI", emi, setEmi)}{checkboxLabel("Rent", rent, setRent)}{checkboxLabel("Lease", lease, setLease)}{checkboxLabel("Direct Sale", directSale, setDirectSale)}</div>

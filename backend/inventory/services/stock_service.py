@@ -822,6 +822,17 @@ def post_stock_adjustment(*, stock_adjustment_id: int, posted_by):
         created_count += 1 if created else 0
         existing_count += 0 if created else 1
 
+        # Sync linked ProductVariant quantity if present
+        core_prod = line.inventory_item.product
+        if core_prod:
+            try:
+                from products_pim.models import ProductVariant
+                line.inventory_item._physical_stock_cache = None
+                new_qty = int(line.inventory_item.current_stock_quantity())
+                ProductVariant.objects.filter(operational_product=core_prod).update(quantity_on_hand=new_qty)
+            except Exception:
+                pass
+
     adjustment.status = StockAdjustmentStatus.POSTED
     adjustment.posted_by = posted_by
     adjustment.posted_at = timezone.now()

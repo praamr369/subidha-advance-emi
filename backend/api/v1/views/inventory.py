@@ -61,7 +61,13 @@ from inventory.services.stock_service import (
 from inventory.services.stock_reservation_list_service import build_stock_reservations_list
 from inventory.services.purchase_needs_list_service import build_purchase_needs_list
 from inventory.services.lot_tracking_list_service import build_lot_tracking_list, export_lots_csv
-from inventory.services.stock_on_hand_service import build_stock_on_hand_summary, get_critical_shortages, get_stock_on_hand_items
+from inventory.services.stock_on_hand_service import (
+    build_stock_on_hand_summary,
+    get_critical_shortages,
+    get_stock_on_hand_items,
+    get_stock_on_hand_facets,
+    get_stock_item_calculation_details,
+)
 from inventory.services.stock_ledger_service import build_stock_ledger_list, export_ledger_csv
 from billing.services.reversal_service import _location_quantity
 from subscriptions.models import AuditLog
@@ -1511,7 +1517,7 @@ class AdminStockOnHandView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
     def get(self, request):
-        """Get stock on hand summary with KPI aggregation and critical shortages"""
+        """Get stock on hand summary with KPI aggregation, filtering, and critical shortages"""
         filter_type = request.query_params.get("filter", "").lower()
 
         try:
@@ -1527,17 +1533,43 @@ class AdminStockOnHandView(APIView):
         if filter_type == "critical":
             # Return only critical shortages (paginated)
             payload = get_critical_shortages(page=page, page_size=page_size)
-        elif filter_type == "all":
+        elif filter_type == "all" or any(request.query_params.get(k) for k in ("item_type", "category", "subcategory", "attribute_key", "attribute_value", "stock_status", "search", "q")):
             payload = get_stock_on_hand_items(
                 page=page,
                 page_size=page_size,
-                search=(request.query_params.get("search") or "").strip(),
+                search=(request.query_params.get("search") or request.query_params.get("q") or "").strip(),
+                item_type=(request.query_params.get("item_type") or "").strip(),
+                category=(request.query_params.get("category") or "").strip(),
+                subcategory=(request.query_params.get("subcategory") or "").strip(),
+                attribute_key=(request.query_params.get("attribute_key") or "").strip(),
+                attribute_value=(request.query_params.get("attribute_value") or "").strip(),
+                stock_status=(request.query_params.get("stock_status") or "all").strip(),
             )
         else:
             # Return full summary with critical shortages list
             payload = build_stock_on_hand_summary()
 
         return Response(payload)
+
+
+class AdminStockOnHandFacetsView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        """Get categories, subcategories, item types, and variant attribute facets for stock on hand"""
+        return Response(get_stock_on_hand_facets())
+
+
+class AdminStockOnHandCalculationView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request, pk):
+        """Get detailed stock calculation formula and recent ledger movements for an inventory item"""
+        try:
+            data = get_stock_item_calculation_details(int(pk))
+            return Response(data, status=status.HTTP_200_OK)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_404_NOT_FOUND)
 
 
 class AdminStockLedgerListView(APIView):

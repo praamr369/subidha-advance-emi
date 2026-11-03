@@ -70,6 +70,7 @@ export type InventoryRequirementsParams = {
 };
 
 export const financeAccountKeys = {
+  all: ["finance-accounts"] as const,
   /** Accounts scoped for payment/direct-sale collection pickers */
   collectionList: () => ["finance-accounts", "collection"] as const,
 };

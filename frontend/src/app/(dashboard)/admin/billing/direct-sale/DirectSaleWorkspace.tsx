@@ -42,6 +42,7 @@ import {
 } from "@/services/direct-sale-workspace";
 import { recheckStockNeed } from "@/services/inventory-ops";
 import AccessorySelectionPanel, { type AccessorySelectionResult } from "@/components/inventory/AccessorySelectionPanel";
+import DirectSaleSignatureModal from "@/components/billing/DirectSaleSignatureModal";
 import SearchCombobox, { SearchComboboxRow, CodeBadge } from "@/components/ui/SearchCombobox";
 import MobileHandoverModal from "@/components/handover/MobileHandoverModal";
 import { extractCustomerQuery } from "@/services/mobile-handover";
@@ -341,6 +342,7 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
   const [notice, setNotice] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [collectSaleId, setCollectSaleId] = useState<number | null>(null);
+  const [signatureModalSaleId, setSignatureModalSaleId] = useState<number | null>(null);
   const [cancelSaleTarget, setCancelSaleTarget] = useState<DirectSale | null>(null);
   const [cancelSubmitting, setCancelSubmitting] = useState(false);
   const [eligibilityLoadingSaleId, setEligibilityLoadingSaleId] = useState<number | null>(null);
@@ -624,12 +626,30 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
             >
               {row.billing_invoice_no || `Invoice ${row.billing_invoice_id}`}
             </Link>
-            <Link
-              href={buildAdminDirectSalePrintRoute(row.id)}
-              className="text-xs font-semibold text-muted-foreground underline-offset-4 hover:text-primary hover:underline"
-            >
-              Invoice PDF
-            </Link>
+            <div className="flex items-center gap-2">
+              <Link
+                href={buildAdminDirectSalePrintRoute(row.id)}
+                className="text-xs font-semibold text-muted-foreground underline-offset-4 hover:text-primary hover:underline"
+              >
+                Invoice PDF
+              </Link>
+              <button
+                type="button"
+                onClick={() => setSignatureModalSaleId(row.id)}
+                className={`text-[11px] font-semibold underline-offset-4 hover:underline ${
+                  row.authorized_signature || row.customer_signature
+                    ? "text-emerald-700 font-bold"
+                    : "text-amber-700 font-medium"
+                }`}
+                title={
+                  row.authorized_signature || row.customer_signature
+                    ? "Digitally signed — click to view or re-sign"
+                    : "Unsigned — click to sign via phone QR or counter"
+                }
+              >
+                {row.authorized_signature || row.customer_signature ? "✓ Signed" : "✍️ Sign"}
+              </button>
+            </div>
           </div>
         ) : (
           "Draft"
@@ -1427,11 +1447,13 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
     createAttemptKey.current = createAttemptKey.current || makeIdempotencyKey();
     try {
       const payload = buildSubmitPayload();
+      let createdSaleId: number | null = null;
       if (orchestrationCreate) {
         const envelope = await createAdminDirectSaleOrchestrated(payload, {
           idempotencyKey: createAttemptKey.current,
         });
         const created = envelope.sale;
+        createdSaleId = created.id ?? null;
         const invNo = created.billing_invoice_no?.trim();
         const reqCount = typeof created.requirement_count === "number" ? created.requirement_count : null;
         const deliveryLabel = created.delivery_display?.trim();
@@ -1452,6 +1474,7 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
         const created = await createDirectSale(payload, {
           idempotencyKey: createAttemptKey.current,
         });
+        createdSaleId = created.id;
         const invNo = created.billing_invoice_no?.trim();
         const reqCount = typeof created.requirement_count === "number" ? created.requirement_count : null;
         const deliveryLabel = created.delivery_display?.trim();
@@ -1465,7 +1488,14 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
       }
       await invalidateAfterDirectSaleCreate(queryClient);
       resetCreateForm();
-      router.push(pathname);
+      if (createdSaleId) {
+        setSignatureModalSaleId(createdSaleId);
+        if (createMode) {
+          router.push(`${pathname}?focus_sale=${createdSaleId}`);
+        }
+      } else {
+        router.push(pathname);
+      }
     } catch (err) {
       if (err instanceof ApiError) {
         const parsedFromFields = Object.entries(err.fieldErrors || {}).flatMap(([field, values]) =>
@@ -2806,6 +2836,18 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
           }}
         />
       )}
+
+      {/* Direct Sale Digital Signature Modal */}
+      {signatureModalSaleId && (
+        <DirectSaleSignatureModal
+          saleId={signatureModalSaleId}
+          isOpen={Boolean(signatureModalSaleId)}
+          onClose={() => setSignatureModalSaleId(null)}
+          onSignatureSaved={async () => {
+            await salesQuery.refetch();
+          }}
+        />
+      )}
     </ERPPageShell>
     );
   }
@@ -3144,6 +3186,18 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
             if (term) {
               handleCustomerSearch(term);
             }
+          }}
+        />
+      )}
+
+      {/* Direct Sale Digital Signature Modal */}
+      {signatureModalSaleId && (
+        <DirectSaleSignatureModal
+          saleId={signatureModalSaleId}
+          isOpen={Boolean(signatureModalSaleId)}
+          onClose={() => setSignatureModalSaleId(null)}
+          onSignatureSaved={async () => {
+            await salesQuery.refetch();
           }}
         />
       )}

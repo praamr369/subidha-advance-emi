@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { BookOpen, CircleHelp, MessageCircle, Settings } from "lucide-react";
+import { BookOpen, CircleHelp, MessageCircle, Settings, ShieldCheck } from "lucide-react";
 
 import {
   Menubar,
@@ -15,6 +15,7 @@ import type { NavigationRole } from "@/config/navigation";
 import { ROUTES } from "@/lib/routes";
 import { openWhatsAppDirectModal } from "@/components/whatsapp/WhatsAppDirectSenderModal";
 import { openAdminHelp } from "@/components/admin/help/AdminHelpDrawer";
+import { openEodReconciliationDrawer } from "@/components/admin/finance/EodReconciliationDrawer";
 
 type AdminWorkspaceMenubarProps = {
   role: NavigationRole;
@@ -59,6 +60,13 @@ export default function AdminWorkspaceMenubar({
             <Link href={ROUTES.admin.deliveryCreate}>New Delivery</Link>
           </MenubarItem>
           <MenubarSeparator />
+          <MenubarItem
+            onClick={() => openEodReconciliationDrawer()}
+            className="gap-2 text-primary font-medium cursor-pointer"
+          >
+            <ShieldCheck className="size-3.5 text-primary" />
+            1-Click Solopreneur EOD Close…
+          </MenubarItem>
           <MenubarItem
             onClick={() => openWhatsAppDirectModal()}
             className="gap-2 text-emerald-700 dark:text-emerald-400 font-medium"
@@ -194,6 +202,15 @@ export default function AdminWorkspaceMenubar({
       </div>
 
       <div className="flex items-center gap-2 pr-2">
+        <button
+          type="button"
+          onClick={() => openEodReconciliationDrawer()}
+          className="flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-semibold text-primary hover:text-primary/90 bg-primary/10 hover:bg-primary/20 border border-primary/20 transition cursor-pointer"
+          title="1-Click Solopreneur EOD Reconciliation & Ledger Close"
+        >
+          <ShieldCheck className="size-3.5" />
+          <span>EOD Close</span>
+        </button>
         <button
           type="button"
           onClick={() => openWhatsAppDirectModal()}

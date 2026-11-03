@@ -710,6 +710,7 @@ class PublicWinnersView(PublicWinnerHistoryView):
 from api.v1.views.whatsapp_catalog import WhatsAppCatalogFeedView  # noqa: E402
 from api.v1.views.admin_pod import public_pod_handover_view  # noqa: E402
 from api.v1.views.public_contract_sign import public_contract_sign_view  # noqa: E402
+from api.v1.views.public_direct_sale_sign import public_direct_sale_sign_view  # noqa: E402
 from api.v1.views.mobile_handover import (  # noqa: E402
     create_handover_session_view,
     get_handover_session_view,
@@ -756,6 +757,7 @@ urlpatterns = [
     path("lucky-draws/<int:draw_id>/winner/", PublicLuckyDrawWinnerView.as_view(), name="public-lucky-draw-winner"),
     path("delivery/handover/<str:token>/", public_pod_handover_view, name="public-delivery-handover"),
     path("contracts/sign/<str:token>/", public_contract_sign_view, name="public-contract-sign"),
+    path("direct-sales/sign/<str:token>/", public_direct_sale_sign_view, name="public-direct-sale-sign"),
     path("mobile-handover/sessions/", create_handover_session_view, name="public-handover-session-create"),
     path("mobile-handover/sessions/<str:session_id>/", get_handover_session_view, name="public-handover-session-detail"),
     path("mobile-handover/sessions/<str:session_id>/submit/", submit_handover_session_view, name="public-handover-session-submit"),

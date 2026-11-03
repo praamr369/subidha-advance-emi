@@ -39,6 +39,8 @@ export async function invalidateAfterSubscriptionPaymentMutation(queryClient: Qu
     queryClient.invalidateQueries({ queryKey: emiKeys.root }),
     queryClient.invalidateQueries({ queryKey: emiKeys.overdue() }),
     queryClient.invalidateQueries({ queryKey: emiKeys.pending() }),
+    queryClient.invalidateQueries({ queryKey: financeAccountKeys.all }),
+    queryClient.invalidateQueries({ queryKey: financeAccountKeys.collectionList() }),
     queryClient.invalidateQueries({ queryKey: notificationKeys.all }),
     invalidateDashboardCollectionsSubscriptions(queryClient),
   ]);
@@ -64,6 +66,8 @@ export async function invalidateAfterDirectSaleCollect(queryClient: QueryClient)
     queryClient.invalidateQueries({ queryKey: [...inventoryKeys.all, "workspace"] }),
     queryClient.invalidateQueries({ queryKey: [...inventoryKeys.all, "items"] }),
     queryClient.invalidateQueries({ queryKey: paymentsKeys.root }),
+    queryClient.invalidateQueries({ queryKey: financeAccountKeys.all }),
+    queryClient.invalidateQueries({ queryKey: financeAccountKeys.collectionList() }),
     queryClient.invalidateQueries({ queryKey: notificationKeys.all }),
     invalidateDashboardCollectionsSubscriptions(queryClient),
   ]);

@@ -2586,8 +2586,9 @@ export type LedgerHealthResponse = {
   checks: { key: string; passed: boolean; count?: number }[];
 };
 
-export async function fetchSolopreneurLedgerHealth(): Promise<LedgerHealthResponse> {
-  return apiFetch<LedgerHealthResponse>("/admin/accounting/ledger-health/");
+export async function fetchSolopreneurLedgerHealth(refresh: boolean = false): Promise<LedgerHealthResponse> {
+  const endpoint = refresh ? "/admin/accounting/ledger-health/?refresh=1" : "/admin/accounting/ledger-health/";
+  return apiFetch<LedgerHealthResponse>(endpoint);
 }
 
 export type SolopreneurCloseResponse = {

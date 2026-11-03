@@ -3,13 +3,14 @@
 import { MessageCircle } from "lucide-react";
 import { documentCopyLabels, type DocumentCopyLabel } from "@/lib/documents/document-theme";
 
-export type PrintDocumentFormat = "A4" | "THERMAL_80MM";
+export type PrintDocumentFormat = "A4" | "THERMAL_80MM" | "A4_EXPANDED";
 
 export function PrintToolbar({
   copyLabel,
   onCopyLabelChange,
   backHref,
   onWhatsAppShare,
+  onSignClick,
   format = "A4",
   onFormatChange,
 }: {
@@ -17,6 +18,7 @@ export function PrintToolbar({
   onCopyLabelChange: (value: DocumentCopyLabel) => void;
   backHref?: string;
   onWhatsAppShare?: () => void;
+  onSignClick?: () => void;
   format?: PrintDocumentFormat;
   onFormatChange?: (format: PrintDocumentFormat) => void;
 }) {
@@ -45,7 +47,8 @@ export function PrintToolbar({
                 onChange={(event) => onFormatChange(event.target.value as PrintDocumentFormat)}
                 className="h-10 rounded-xl border border-border bg-card px-2.5 text-xs font-semibold text-foreground"
               >
-                <option value="A4">A4 Standard</option>
+                <option value="A4">A4 (Single Page)</option>
+                <option value="A4_EXPANDED">A4 (Expanded Cards)</option>
                 <option value="THERMAL_80MM">80mm POS Slip</option>
               </select>
             </label>
@@ -64,6 +67,16 @@ export function PrintToolbar({
               ))}
             </select>
           </label>
+          {onSignClick ? (
+            <button
+              type="button"
+              onClick={onSignClick}
+              className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-[#8a5a22]/30 bg-[#8a5a22]/10 hover:bg-[#8a5a22]/20 px-3.5 text-sm font-semibold text-[#8a5a22] transition cursor-pointer"
+              title="Capture digital signature via mobile QR or counter"
+            >
+              <span>✍️ Sign Invoice</span>
+            </button>
+          ) : null}
           {onWhatsAppShare ? (
             <button
               type="button"

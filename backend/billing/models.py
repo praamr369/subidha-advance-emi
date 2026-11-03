@@ -236,6 +236,11 @@ class DirectSale(BillingTimeStampedModel):
     idempotency_payload_hash = models.CharField(max_length=64, blank=True, default="")
     tax_profile_snapshot = models.JSONField(null=True, blank=True)
     notes = models.TextField(blank=True, default="")
+    authorized_signature = models.TextField(blank=True, default="")
+    authorized_signed_at = models.DateTimeField(null=True, blank=True)
+    customer_signature = models.TextField(blank=True, default="")
+    customer_signed_at = models.DateTimeField(null=True, blank=True)
+    signature_metadata = models.JSONField(default=dict, blank=True)
 
     class Meta:
         db_table = "billing_direct_sales"

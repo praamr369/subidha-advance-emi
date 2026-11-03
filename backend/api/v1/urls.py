@@ -63,6 +63,8 @@ from api.v1.views.inventory import (
     AdminPurchaseNeedsListView,
     AdminLotTrackingListView,
     AdminStockOnHandView,
+    AdminStockOnHandFacetsView,
+    AdminStockOnHandCalculationView,
     AdminStockLedgerListView,
     StockAdjustmentViewSet,
     StockLocationViewSet,
@@ -166,6 +168,8 @@ urlpatterns = [
     path("admin/inventory/reservations/", AdminStockReservationListView.as_view()),
     path("admin/inventory/requirements/", AdminPurchaseNeedsListView.as_view()),
     path("admin/inventory/stock-on-hand/", AdminStockOnHandView.as_view()),
+    path("admin/inventory/stock-on-hand/facets/", AdminStockOnHandFacetsView.as_view()),
+    path("admin/inventory/stock-on-hand/<int:pk>/calculation/", AdminStockOnHandCalculationView.as_view()),
     path("admin/inventory/ledger/", AdminStockLedgerListView.as_view()),
     # Accessory variant groups
     path("admin/inventory/accessory-variant-groups/", AdminAccessoryVariantGroupListCreateView.as_view()),

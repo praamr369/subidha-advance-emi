@@ -111,6 +111,10 @@ const AdminHelpDrawer = dynamic(
   () => import("@/components/admin/help/AdminHelpDrawer"),
   { ssr: false }
 );
+const EodReconciliationDrawer = dynamic(
+  () => import("@/components/admin/finance/EodReconciliationDrawer"),
+  { ssr: false }
+);
 import { openAdminHelp } from "@/components/admin/help/AdminHelpDrawer";
 
 const DashboardShellContext = createContext(false);
@@ -1779,6 +1783,7 @@ export default function DashboardShell({ children }: DashboardShellProps) {
             <>
               <WhatsAppDirectSenderModal />
               <AdminHelpDrawer />
+              <EodReconciliationDrawer />
             </>
           ) : null}
         </div>

@@ -162,6 +162,36 @@ function LockedAttrDisplay({ label, value }: { label: string; value: string }) {
   );
 }
 
+function normalizeAttrVal(val: string): string {
+  const v = val.trim().toLowerCase();
+  if (v === "true" || v === "yes" || v === "1") return "true";
+  if (v === "false" || v === "no" || v === "0") return "false";
+  return v;
+}
+
+/** Check if variant attribute matches parent blueprint attribute (inherited vs custom override) */
+function getInheritanceStatus(
+  attrId: number,
+  variantValStr: string | undefined,
+  parentAttrValues?: AttributeValues
+): "inherited" | "overridden" | "none" {
+  if (!parentAttrValues || !variantValStr || variantValStr.trim() === "") return "none";
+  const parentRaw = parentAttrValues[attrId];
+  if (!parentRaw) return "none";
+  const parentStr = (
+    parentRaw.value_text ??
+    (parentRaw.value_number != null
+      ? String(parentRaw.value_number)
+      : parentRaw.value_boolean != null
+      ? (parentRaw.value_boolean ? "Yes" : "No")
+      : "")
+  ).trim();
+  if (!parentStr) return "none";
+  return normalizeAttrVal(parentStr) === normalizeAttrVal(variantValStr)
+    ? "inherited"
+    : "overridden";
+}
+
 /** Modal dialog to copy attributes and relations between variants */
 function CopyVariantModal({
   targetVariant: initialTarget,
@@ -1105,6 +1135,7 @@ function VariantEditModal({
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {variantDefining.map((attr) => {
               const val = state.attrValues[attr.id]?.trim();
+              const inh = getInheritanceStatus(attr.id, val, parentAttrValues);
               return (
                 <div
                   key={attr.id}
@@ -1123,6 +1154,16 @@ function VariantEditModal({
                       <span className="rounded bg-violet-100 text-violet-800 dark:bg-violet-900/50 dark:text-violet-300 px-1.5 py-0.2 text-[9px] font-bold">
                         KEY
                       </span>
+                      {inh === "inherited" && (
+                        <span className="rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-1.5 py-0.2 text-[9px] font-medium border border-slate-200 dark:border-slate-700">
+                          Inherited
+                        </span>
+                      )}
+                      {inh === "overridden" && (
+                        <span className="rounded bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 px-1.5 py-0.2 text-[9px] font-medium border border-amber-300 dark:border-amber-700">
+                          Custom
+                        </span>
+                      )}
                     </div>
                     <button
                       type="button"
@@ -1156,7 +1197,10 @@ function VariantEditModal({
             <span className="text-[11px] text-muted-foreground">Additional SKU specs</span>
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {nonDefining.map((attr) => (
+            {nonDefining.map((attr) => {
+              const val = state.attrValues[attr.id]?.trim();
+              const inh = getInheritanceStatus(attr.id, val, parentAttrValues);
+              return (
               <div
                 key={attr.id}
                 className="rounded-xl border border-border/80 bg-card p-3 shadow-2xs space-y-1.5 hover:border-border transition-colors"
@@ -1169,6 +1213,16 @@ function VariantEditModal({
                     <span className="rounded bg-muted px-1.5 py-0.2 text-[9px] font-medium text-muted-foreground">
                       {attr.data_type}
                     </span>
+                    {inh === "inherited" && (
+                      <span className="rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-1.5 py-0.2 text-[9px] font-medium border border-slate-200 dark:border-slate-700">
+                        Inherited
+                      </span>
+                    )}
+                    {inh === "overridden" && (
+                      <span className="rounded bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 px-1.5 py-0.2 text-[9px] font-medium border border-amber-300 dark:border-amber-700">
+                        Custom
+                      </span>
+                    )}
                   </div>
                   <button
                     type="button"
@@ -1181,7 +1235,8 @@ function VariantEditModal({
                 </div>
                 {renderAttrInput(attr)}
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -2307,10 +2362,22 @@ export default function VariantManager({
                   }
                   return (
                     <div key={attr.id}>
-                      <label className="text-xs font-medium">
-                        {attr.name}
-                        {attr.is_variant_defining && <Layers className="inline h-3 w-3 ml-1 text-primary" />}
-                      </label>
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <label className="text-xs font-medium">
+                          {attr.name}
+                          {attr.is_variant_defining && <Layers className="inline h-3 w-3 ml-1 text-primary" />}
+                        </label>
+                        {(() => {
+                          const inh = getInheritanceStatus(attr.id, form.attrValues[attr.id], parentAttrValues);
+                          if (inh === "inherited") {
+                            return <span className="rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-1.5 py-0.2 text-[9px] font-medium border border-slate-200 dark:border-slate-700">Inherited</span>;
+                          }
+                          if (inh === "overridden") {
+                            return <span className="rounded bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 px-1.5 py-0.2 text-[9px] font-medium border border-amber-300 dark:border-amber-700">Custom</span>;
+                          }
+                          return null;
+                        })()}
+                      </div>
                       <AttributeValuePicker
                         attr={attr}
                         value={form.attrValues[attr.id] ?? ""}
@@ -2427,13 +2494,26 @@ export default function VariantManager({
                                 const display = (a.value_text && a.value_text.trim() !== "")
                                   ? a.value_text
                                   : (a.value_number != null ? String(a.value_number) : a.value_boolean != null ? (a.value_boolean ? "Yes" : "No") : "");
-                                return { id: a.attribute, display, name: a.attribute_name };
+                                const inh = getInheritanceStatus(a.attribute, display, parentAttrValues);
+                                return { id: a.attribute, display, name: a.attribute_name, inh };
                               })
                               .filter((c) => c.display);
                             return chips.length > 0 ? (
                               chips.map((c) => (
-                                <span key={c.id} title={c.name ? `${c.name}: ${c.display}` : c.display} className="inline-flex rounded-md bg-muted px-1.5 py-0.5 text-[11px]">
-                                  {c.display}
+                                <span
+                                  key={c.id}
+                                  title={c.name ? `${c.name}: ${c.display} (${c.inh === "inherited" ? "Inherited from Blueprint" : c.inh === "overridden" ? "Custom Override" : "Variant Specific"})` : c.display}
+                                  className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] border ${
+                                    c.inh === "inherited"
+                                      ? "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700"
+                                      : c.inh === "overridden"
+                                      ? "bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-700 font-medium"
+                                      : "bg-muted text-foreground border-border"
+                                  }`}
+                                >
+                                  <span>{c.display}</span>
+                                  {c.inh === "inherited" && <span className="text-[9px] opacity-70">Inherited</span>}
+                                  {c.inh === "overridden" && <span className="text-[9px] font-semibold text-amber-700 dark:text-amber-400">Custom</span>}
                                 </span>
                               ))
                             ) : (

@@ -99,3 +99,47 @@ export function safeDocumentText(value: string | number | null | undefined, fall
   const text = String(value ?? "").trim();
   return text || fallback;
 }
+
+export function numberToIndianWords(amount: number | string | null | undefined): string {
+  const num = Math.round(Number(amount || 0));
+  if (num <= 0 || !Number.isFinite(num)) return "Zero Rupees Only";
+
+  const a = [
+    "", "One ", "Two ", "Three ", "Four ", "Five ", "Six ", "Seven ", "Eight ", "Nine ",
+    "Ten ", "Eleven ", "Twelve ", "Thirteen ", "Fourteen ", "Fifteen ", "Sixteen ",
+    "Seventeen ", "Eighteen ", "Nineteen ",
+  ];
+  const b = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+
+  function inWords(n: number): string {
+    if (n === 0) return "";
+    let str = "";
+    if (n >= 10000000) {
+      str += inWords(Math.floor(n / 10000000)) + "Crore ";
+      n %= 10000000;
+    }
+    if (n >= 100000) {
+      str += inWords(Math.floor(n / 100000)) + "Lakh ";
+      n %= 100000;
+    }
+    if (n >= 1000) {
+      str += inWords(Math.floor(n / 1000)) + "Thousand ";
+      n %= 1000;
+    }
+    if (n >= 100) {
+      str += inWords(Math.floor(n / 100)) + "Hundred ";
+      n %= 100;
+    }
+    if (n > 0) {
+      if (str !== "") str += "and ";
+      if (n < 20) {
+        str += a[n];
+      } else {
+        str += b[Math.floor(n / 10)] + (n % 10 !== 0 ? " " + a[n % 10] : " ");
+      }
+    }
+    return str;
+  }
+
+  return inWords(num).trim() + " Rupees Only";
+}
