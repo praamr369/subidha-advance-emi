@@ -46,7 +46,7 @@ export default function AuthLayoutShell({
     <section className={cn("auth-stage w-full", className)}>
       <div className="auth-shell grid min-h-[calc(100vh-4rem)] lg:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]">
         <aside className="hidden relative border-r border-border bg-slate-950 lg:block overflow-hidden">
-          <div className="absolute inset-0 pointer-events-none bg-[url('https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-40 mix-blend-luminosity" />
+          <div className="absolute inset-0 pointer-events-none bg-[url('/images/hero_living_room.jpg')] bg-cover bg-center opacity-40 mix-blend-luminosity" />
           <div className="absolute inset-0 pointer-events-none bg-gradient-to-br from-slate-950/90 via-slate-950/60 to-slate-900/90" />
           <div className="relative flex h-full flex-col justify-between p-8 xl:p-10 z-10">
           <div>

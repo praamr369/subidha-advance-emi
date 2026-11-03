@@ -223,6 +223,26 @@ export interface SyncResult {
   total_processed: number;
 }
 
+export interface VariantAuditEntry {
+  id: number;
+  action_type: string;
+  model_name: string;
+  object_id: string | number | null;
+  performed_by: number | null;
+  performed_by_username: string | null;
+  metadata: {
+    event?: string;
+    sku?: string;
+    variant_id?: number;
+    product_id?: number;
+    product_code?: string;
+    changes?: Record<string, { old: unknown; new: unknown }>;
+    snapshot?: Record<string, unknown>;
+    [key: string]: unknown;
+  } | null;
+  created_at: string;
+}
+
 const BASE = "/api/v1/pim";
 
 // DRF global pagination wraps lists in {count, results}. Unwrap safely.
@@ -730,5 +750,15 @@ export const pimService = {
     return request<any>(`${BASE}/products/${productId}/accessories/${accessoryId}/`, {
       method: "DELETE",
     });
-  }
+  },
+
+  // --- Variant Audit & Edit History ---
+  getVariantTimeline: (variantIdOrSku: string | number): Promise<VariantAuditEntry[]> =>
+    request<VariantAuditEntry[]>(`/api/v1/admin/audit-logs/timeline/ProductVariant/${encodeURIComponent(variantIdOrSku)}/`),
+
+  // --- Product (Base & Child) Audit & Edit History ---
+  getProductTimeline: (productIdOrCode: string | number, includeVariants = false): Promise<VariantAuditEntry[]> =>
+    request<VariantAuditEntry[]>(
+      `/api/v1/admin/audit-logs/timeline/PimProduct/${encodeURIComponent(productIdOrCode)}/${includeVariants ? "?include_variants=true" : ""}`
+    ),
 };

@@ -112,6 +112,7 @@ export async function invalidateAfterProductInventoryMutation(
 ): Promise<void> {
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: [...productKeys.all, "list"] }),
+    queryClient.invalidateQueries({ queryKey: ["productRegister"] }),
     queryClient.invalidateQueries({ queryKey: productKeys.billingSearchPrefix }),
     queryClient.invalidateQueries({ queryKey: [...inventoryKeys.all, "items"] }),
     queryClient.invalidateQueries({ queryKey: inventoryKeys.workspace() }),
@@ -141,6 +142,7 @@ export async function invalidateAfterOpeningStockMutation(queryClient: QueryClie
     queryClient.invalidateQueries({ queryKey: [...inventoryKeys.all, "stock-summary"] }),
     queryClient.invalidateQueries({ queryKey: inventoryKeys.workspace() }),
     queryClient.invalidateQueries({ queryKey: [...productKeys.all, "list"] }),
+    queryClient.invalidateQueries({ queryKey: ["productRegister"] }),
     queryClient.invalidateQueries({ queryKey: productKeys.billingSearchPrefix }),
     queryClient.invalidateQueries({ queryKey: notificationKeys.all }),
     invalidateDashboardCollectionsSubscriptions(queryClient),

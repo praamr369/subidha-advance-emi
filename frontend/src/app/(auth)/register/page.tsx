@@ -274,7 +274,7 @@ export default function RegisterPage() {
     <div className="auth-shell grid w-full overflow-hidden bg-background xl:grid-cols-[1fr_1fr] min-h-[calc(100vh-4rem)]">
       {/* Left Panel - Desktop Only */}
       <section className="relative hidden overflow-hidden xl:block bg-slate-950 border-r border-border">
-        <div className="absolute inset-0 pointer-events-none bg-[url('https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&q=80')] bg-cover bg-center opacity-40 mix-blend-luminosity" />
+        <div className="absolute inset-0 pointer-events-none bg-[url('/images/hero_living_room.jpg')] bg-cover bg-center opacity-40 mix-blend-luminosity" />
         <div className="absolute inset-0 pointer-events-none bg-gradient-to-br from-slate-950/90 via-slate-950/60 to-slate-900/90" />
         <div className="relative z-10 flex h-full w-full flex-col justify-between overflow-y-auto p-8 2xl:p-12">
           <div className="space-y-8">

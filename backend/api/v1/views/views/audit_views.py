@@ -108,10 +108,34 @@ class AuditObjectTimelineView(generics.ListAPIView):
         if not model_name:
             return queryset.none()
 
-        return queryset.filter(
-            model_name__iexact=model_name,
-            object_id=str(object_id).strip(),
+        target = str(object_id).strip()
+        include_variants = (
+            getattr(self, "request", None)
+            and self.request.query_params.get("include_variants", "").lower() in ("true", "1")
         )
+        from django.db.models import Q
+        if target.isdigit():
+            tid = int(target)
+            q = (
+                Q(model_name__iexact=model_name, object_id=tid)
+                | Q(model_name__iexact=model_name, metadata__sku=target)
+                | Q(model_name__iexact=model_name, metadata__code=target)
+                | Q(model_name__iexact=model_name, metadata__product_id=tid)
+            )
+            if include_variants and model_name.lower() in ("pimproduct", "product"):
+                q |= Q(model_name__iexact="ProductVariant", metadata__product_id=tid)
+                q |= Q(model_name__iexact="PimProduct", metadata__parent_id=tid)
+            return queryset.filter(q)
+
+        q = (
+            Q(model_name__iexact=model_name, metadata__sku=target)
+            | Q(model_name__iexact=model_name, metadata__code=target)
+            | Q(model_name__iexact=model_name, metadata__product_code=target)
+        )
+        if include_variants and model_name.lower() in ("pimproduct", "product"):
+            q |= Q(model_name__iexact="ProductVariant", metadata__product_code=target)
+            q |= Q(model_name__iexact="PimProduct", metadata__parent_code=target)
+        return queryset.filter(q)
 
 
 class BusinessEventLogSerializer(ModelSerializer):

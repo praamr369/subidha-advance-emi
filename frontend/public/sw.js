@@ -1,6 +1,6 @@
 // SUBIDHA CORE — Lightweight Service Worker
 // Enhances Asansol store offline counter resilience without interfering with financial mutations.
-const CACHE_NAME = "subidha-core-v1";
+const CACHE_NAME = "subidha-core-v2";
 const STATIC_ASSETS = [
   "/brand/logo.png",
   "/manifest.webmanifest",
@@ -36,11 +36,22 @@ self.addEventListener("activate", (event) => {
 // Fetch: Network-first for all API / dynamic data to ensure 100% financial accuracy.
 // Stale-while-revalidate for static assets (images, brand, fonts).
 self.addEventListener("fetch", (event) => {
+  if (event.request.method !== "GET") {
+    return;
+  }
+
   const url = new URL(event.request.url);
+
+  // CRITICAL CSP & PWA GUARD:
+  // Only intercept same-origin requests. Never intercept cross-origin / third-party requests
+  // (e.g., Unsplash, external CDNs, Google Analytics, YouTube embeds, payment gateways).
+  // The browser will handle external requests natively without triggering CSP connect-src violations.
+  if (url.origin !== self.location.origin) {
+    return;
+  }
 
   // Never cache mutation requests (POST, PUT, PATCH, DELETE) or auth endpoints
   if (
-    event.request.method !== "GET" ||
     url.pathname.startsWith("/api/v1/auth/") ||
     url.pathname.includes("/token")
   ) {
@@ -50,8 +61,12 @@ self.addEventListener("fetch", (event) => {
   // Static assets: Cache-first with network fallback
   if (
     url.pathname.startsWith("/brand/") ||
+    url.pathname.startsWith("/images/") ||
     url.pathname.startsWith("/_next/static/") ||
     url.pathname.endsWith(".png") ||
+    url.pathname.endsWith(".jpg") ||
+    url.pathname.endsWith(".jpeg") ||
+    url.pathname.endsWith(".webp") ||
     url.pathname.endsWith(".svg") ||
     url.pathname.endsWith(".ico")
   ) {

@@ -1,5 +1,5 @@
 "use client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatRupee } from "@/lib/utils/currency";
 
 import Link from "next/link";
@@ -11,6 +11,7 @@ import PimPurchaseStockPanel from "@/components/admin/pim/PimPurchaseStockPanel"
 import { pimService, type PimProduct, type PimCategory, type PimTreeSummary } from "@/services/pim";
 import QRLabelPrintModal, { type QRLabelItem } from "@/components/inventory/QRLabelPrintModal";
 import PimQuickEditModal from "@/components/admin/pim/PimQuickEditModal";
+import PimVariantPublishControlModal from "@/components/admin/pim/PimVariantPublishControlModal";
 
 import ProductQuickActions from "@/components/admin/products/ProductQuickActions";
 import { useWorkflowLauncher } from "@/components/workflows/WorkflowProvider";
@@ -258,6 +259,7 @@ function PimProductRow({
   onSelect,
   onPrintQR,
   onQuickEdit,
+  onOpenPublishControl,
 }: {
   p: PimProduct;
   isChild?: boolean;
@@ -268,6 +270,7 @@ function PimProductRow({
   onSelect?: (selected: boolean) => void;
   onPrintQR?: (p: PimProduct) => void;
   onQuickEdit?: (p: PimProduct) => void;
+  onOpenPublishControl?: (p: PimProduct) => void;
 }) {
   const hasChildren = !isChild && (childCount ?? 0) > 0;
 
@@ -399,13 +402,14 @@ function PimProductRow({
             Full Page Window <ExternalLink className="h-3 w-3" />
           </Link>
           {!isChild && (
-            <Link
-              href={`/admin/pim/products/${p.id}/variants/publish-control`}
-              onClick={() => rememberProductsWorkspaceState({ tab: "pim", scrollY: window.scrollY })}
-              className="inline-flex items-center gap-1 text-violet-600 text-xs hover:underline font-medium"
+            <button
+              type="button"
+              onClick={() => onOpenPublishControl?.(p)}
+              className="inline-flex items-center gap-1 text-violet-600 dark:text-violet-400 text-xs hover:underline font-semibold cursor-pointer text-left"
+              title="Quickly control publish status and commercial channels in a pop up window"
             >
-              Publish control <Layers className="h-3 w-3" />
-            </Link>
+              Publish control (Pop-up) <Layers className="h-3 w-3" />
+            </button>
           )}
           {p.code && (
             <Link
@@ -503,7 +507,13 @@ function PimPager({
   );
 }
 
-function PimPanel({ onSwitchTab }: { onSwitchTab?: (tab: "subscription" | "pim" | "cost-stock" | "help") => void } = {}) {
+function PimPanel({
+  onSwitchTab,
+  onSyncRegister,
+}: {
+  onSwitchTab?: (tab: "subscription" | "pim" | "cost-stock" | "help") => void;
+  onSyncRegister?: () => void;
+} = {}) {
   const [pimProducts, setPimProducts] = useState<PimProduct[]>([]);
   const [pimCategories, setPimCategories] = useState<PimCategory[]>([]);
   const [pimLoading, setPimLoading] = useState(true);
@@ -524,6 +534,7 @@ function PimPanel({ onSwitchTab }: { onSwitchTab?: (tab: "subscription" | "pim" 
   const [qrModalItem, setQrModalItem] = useState<QRLabelItem | null>(null);
   const [qrModalItems, setQrModalItems] = useState<QRLabelItem[] | null>(null);
   const [quickEditPimProduct, setQuickEditPimProduct] = useState<PimProduct | null>(null);
+  const [publishControlProduct, setPublishControlProduct] = useState<PimProduct | null>(null);
   const tableTopRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -592,12 +603,13 @@ function PimPanel({ onSwitchTab }: { onSwitchTab?: (tab: "subscription" | "pim" 
       setBulkPublishResult(`${result.affected_products} product records ${published ? "published" : "hidden"} from the public catalogue.`);
       setSelectedPimIds(new Set());
       await loadPimProducts();
+      onSyncRegister?.();
     } catch (error) {
       setBulkPublishResult(error instanceof Error ? error.message : "Bulk publication update failed.");
     } finally {
       setBulkPublishing(false);
     }
-  }, [loadPimProducts, selectedPimIds]);
+  }, [loadPimProducts, onSyncRegister, selectedPimIds]);
 
   const handleRelink = useCallback(async () => {
     setRelinking(true);
@@ -611,12 +623,13 @@ function PimPanel({ onSwitchTab }: { onSwitchTab?: (tab: "subscription" | "pim" 
       if (repair.count > 0) parts.push(repair.message);
       setRelinkResult(parts.join(" · "));
       loadPimProducts();
+      onSyncRegister?.();
     } catch {
       setRelinkResult("Relink failed");
     } finally {
       setRelinking(false);
     }
-  }, [loadPimProducts]);
+  }, [loadPimProducts, onSyncRegister]);
 
   const { roots, orphanChildren } = useMemo(() => buildPimTree(pimProducts), [pimProducts]);
   const visibleRootIds = useMemo(() => roots.map((node) => node.product.id), [roots]);
@@ -856,6 +869,7 @@ function PimPanel({ onSwitchTab }: { onSwitchTab?: (tab: "subscription" | "pim" 
                         setQrModalItems(null);
                       }}
                       onQuickEdit={(prod) => setQuickEditPimProduct(prod)}
+                      onOpenPublishControl={(prod) => setPublishControlProduct(prod)}
                     />
                     {isExpanded && node.children.map((child) => (
                       <PimProductRow
@@ -867,6 +881,7 @@ function PimPanel({ onSwitchTab }: { onSwitchTab?: (tab: "subscription" | "pim" 
                           setQrModalItems(null);
                         }}
                         onQuickEdit={(prod) => setQuickEditPimProduct(prod)}
+                        onOpenPublishControl={(prod) => setPublishControlProduct(prod)}
                       />
                     ))}
                   </Fragment>
@@ -883,6 +898,7 @@ function PimPanel({ onSwitchTab }: { onSwitchTab?: (tab: "subscription" | "pim" 
                     setQrModalItems(null);
                   }}
                   onQuickEdit={(prod) => setQuickEditPimProduct(prod)}
+                  onOpenPublishControl={(prod) => setPublishControlProduct(prod)}
                 />
               ))}
             </tbody>
@@ -910,6 +926,36 @@ function PimPanel({ onSwitchTab }: { onSwitchTab?: (tab: "subscription" | "pim" 
           onClose={() => setQuickEditPimProduct(null)}
           onSaved={() => {
             void loadPimProducts();
+            onSyncRegister?.();
+          }}
+        />
+      )}
+
+      {publishControlProduct && (
+        <PimVariantPublishControlModal
+          productId={publishControlProduct.parent_id || publishControlProduct.id}
+          initialProduct={publishControlProduct}
+          onClose={() => setPublishControlProduct(null)}
+          onSaved={(controlData) => {
+            // Optimistically update the product's is_published status in pimProducts state immediately
+            setPimProducts((prev) =>
+              prev.map((item) =>
+                item.id === controlData.base.id
+                  ? {
+                      ...item,
+                      is_published: controlData.base.is_published,
+                      base_price: controlData.base.base_price ?? "",
+                    }
+                  : item
+              )
+            );
+            void loadPimProducts();
+            onSyncRegister?.();
+          }}
+          onOpenPimEditor={(prodId) => {
+            setPublishControlProduct(null);
+            const found = pimProducts.find((p) => p.id === prodId);
+            setQuickEditPimProduct(found || ({ id: prodId } as PimProduct));
           }}
         />
       )}
@@ -975,6 +1021,8 @@ export default function AdminProductsPage() {
       .catch(() => {/* non-fatal */});
   }, []);
 
+  const queryClient = useQueryClient();
+
   const query = useQuery({
     queryKey: ["productRegister", filters, page, pageSize, showVariantSkus],
     queryFn: () => listProductRegister({
@@ -993,6 +1041,11 @@ export default function AdminProductsPage() {
       page_size: pageSize,
     })
   });
+
+  const handleSyncRegister = useCallback(() => {
+    void query.refetch();
+    void queryClient.invalidateQueries({ queryKey: ["productRegister"] });
+  }, [query, queryClient]);
 
   const payload = query.data || emptyPage();
   const loading = query.isLoading;
@@ -1234,7 +1287,7 @@ export default function AdminProductsPage() {
         {activeTab === "help" && <PimHelpGuideTab />}
 
         {/* PIM panel */}
-        {activeTab === "pim" && <PimPanel onSwitchTab={setActiveTab} />}
+        {activeTab === "pim" && <PimPanel onSwitchTab={setActiveTab} onSyncRegister={handleSyncRegister} />}
 
         {/* Subscription products section */}
         {activeTab === "subscription" && <>

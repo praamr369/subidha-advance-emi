@@ -3,9 +3,10 @@ import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, GitBranch, ExternalLink } from "lucide-react";
+import { ArrowLeft, GitBranch, ExternalLink, History } from "lucide-react";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
+import VariantHistoryDrawer from "@/components/admin/pim/VariantHistoryDrawer";
 
 const PimProductForm = dynamic(() => import("@/components/admin/pim/PimProductForm"), {
   loading: () => <ERPLoadingState label="Loading product editor…" />,
@@ -19,6 +20,7 @@ export default function PimEditProductPage() {
   const router = useRouter();
   const [product, setProduct] = useState<PimProduct | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showHistory, setShowHistory] = useState(false);
 
   useEffect(() => {
     if (!params?.id) return;
@@ -103,6 +105,14 @@ export default function PimEditProductPage() {
               </Link>
               <button
                 type="button"
+                onClick={() => setShowHistory(true)}
+                className="inline-flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-4 py-2.5 text-sm font-semibold text-primary hover:bg-primary/10 transition-colors"
+              >
+                <History className="h-4 w-4" />
+                View SKU Revision History
+              </button>
+              <button
+                type="button"
                 onClick={() => router.back()}
                 className="inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm hover:bg-muted"
               >
@@ -147,6 +157,12 @@ export default function PimEditProductPage() {
             </button>
           </div>
         </div>
+
+        <VariantHistoryDrawer
+          open={showHistory}
+          onClose={() => setShowHistory(false)}
+          product={product}
+        />
       </ERPPageShell>
     );
   }
@@ -163,8 +179,20 @@ export default function PimEditProductPage() {
         { label: `Product #${params.id}` },
       ]}
       statusBadge={{ label: "PIM", tone: "info" as const }}
+      actions={[
+        {
+          label: "Product Revision History",
+          onClick: () => setShowHistory(true),
+          variant: "secondary",
+        },
+      ]}
     >
       <PimProductForm productId={Number(params.id)} />
+      <VariantHistoryDrawer
+        open={showHistory}
+        onClose={() => setShowHistory(false)}
+        product={product}
+      />
     </ERPPageShell>
   );
 }

@@ -7,6 +7,7 @@ function buildRemotePatterns() {
     "http://127.0.0.1:8000",
     "http://localhost:8100",
     "http://127.0.0.1:8100",
+    "https://images.unsplash.com",
     process.env.NEXT_PUBLIC_API_BASE_URL
       ? process.env.NEXT_PUBLIC_API_BASE_URL.replace(/\/api\/v1\/?$/, "")
       : null,
@@ -175,6 +176,11 @@ function securityCspHeaders(): Array<{ key: string; value: string }> {
       // ignore a malformed env value; 'self' still applies.
     }
   }
+  if (process.env.NEXT_PUBLIC_GA_ID) {
+    connectSrc.add("https://*.google-analytics.com");
+    connectSrc.add("https://*.analytics.google.com");
+    connectSrc.add("https://*.googletagmanager.com");
+  }
   const csp = [
     "default-src 'self'",
     "base-uri 'self'",
@@ -182,7 +188,7 @@ function securityCspHeaders(): Array<{ key: string; value: string }> {
     "frame-ancestors 'none'",
     "form-action 'self'",
     "img-src 'self' data: blob: https:",
-    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://www.googletagmanager.com",
     "style-src 'self' 'unsafe-inline'",
     "font-src 'self' data:",
     `connect-src ${Array.from(connectSrc).join(" ")}`,

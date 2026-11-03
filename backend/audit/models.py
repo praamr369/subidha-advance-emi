@@ -121,6 +121,22 @@ class AuditLog(models.Model):
             "PRODUCT_REQUEST_EDITED",
             "Product Request Edited",
         )
+        PRODUCT_VARIANT_CREATED = (
+            "PRODUCT_VARIANT_CREATED",
+            "Product Variant Created",
+        )
+        PRODUCT_VARIANT_UPDATED = (
+            "PRODUCT_VARIANT_UPDATED",
+            "Product Variant Updated",
+        )
+        PIM_PRODUCT_CREATED = (
+            "PIM_PRODUCT_CREATED",
+            "PIM Product Created",
+        )
+        PIM_PRODUCT_UPDATED = (
+            "PIM_PRODUCT_UPDATED",
+            "PIM Product Updated",
+        )
         EMI_PAID = "EMI_PAID", "EMI Paid"
         EMI_WAIVED = "EMI_WAIVED", "EMI Waived"
         DRAW_EXECUTED = "DRAW_EXECUTED", "Draw Executed"

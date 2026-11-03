@@ -5,8 +5,9 @@ import {
   Zap, TrendingUp, Package, AlertTriangle, BarChart3, Settings2,
   RefreshCw, Download, Database, Image as ImageIcon, Upload,
   ChevronDown, ChevronUp, Pencil, RefreshCcw, CheckCircle2, Layers, Lock, QrCode, Sparkles,
-  Copy, ArrowRight, ShieldCheck, Tag
+  Copy, ArrowRight, ShieldCheck, Tag, History
 } from "lucide-react";
+import VariantHistoryDrawer from "./VariantHistoryDrawer";
 import { pimService, type PimVariant, type PimCategoryAttribute, type PimAttributeOption } from "@/services/pim";
 import { patchVariantPublishControl } from "@/services/product-pim";
 import { type AttributeValues, templateValuesFor } from "./DynamicAttributeForm";
@@ -1563,6 +1564,7 @@ export default function VariantManager({
   // Editing variant modal state
   const [editingVariantId, setEditingVariantId] = useState<number | null>(null);
   const [copyModalTarget, setCopyModalTarget] = useState<PimVariant | null>(null);
+  const [historyVariant, setHistoryVariant] = useState<PimVariant | null>(null);
   const [relationsKey, setRelationsKey] = useState(0);
 
   const editingVariant = useMemo(
@@ -2503,6 +2505,13 @@ export default function VariantManager({
                             className="rounded-md border p-1 text-muted-foreground hover:bg-muted hover:text-amber-600 transition">
                             <Copy className="h-3.5 w-3.5" />
                           </button>
+                          <button
+                            type="button"
+                            title="View variant edit history & snapshots"
+                            onClick={() => setHistoryVariant(v)}
+                            className="rounded-md border p-1 text-muted-foreground hover:bg-muted hover:text-indigo-600 transition">
+                            <History className="h-3.5 w-3.5" />
+                          </button>
                           <button type="button" title="Print QR label"
                             onClick={() => setPrintItem(variantToLabel(v))}
                             className="rounded-md border p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition">
@@ -2577,6 +2586,12 @@ export default function VariantManager({
           parentWarranty={parentWarranty}
         />
       )}
+
+      <VariantHistoryDrawer
+        open={Boolean(historyVariant)}
+        onClose={() => setHistoryVariant(null)}
+        variant={historyVariant}
+      />
     </div>
   );
 }

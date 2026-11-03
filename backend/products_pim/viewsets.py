@@ -130,6 +130,99 @@ class PimProductViewSet(viewsets.ModelViewSet):
     # the admin PIM tree show only 20 blueprints and broke its page maths.
     pagination_class = AdminListPagination
 
+    def _build_pim_product_snapshot(self, product):
+        return {
+            "id": product.id,
+            "code": product.code or "",
+            "name": product.name or "",
+            "brand": product.brand or "",
+            "base_price": str(product.base_price) if product.base_price is not None else "0.00",
+            "cost_price": str(product.cost_price) if product.cost_price is not None else None,
+            "description": product.description or "",
+            "is_published": product.is_published,
+            "category_id": product.category_id,
+            "category_name": getattr(getattr(product, "category", None), "name", ""),
+            "subcategory_id": product.subcategory_id,
+            "subcategory_name": getattr(getattr(product, "subcategory", None), "name", ""),
+            "parent_id": product.parent_id,
+            "parent_code": getattr(getattr(product, "parent", None), "code", ""),
+            "is_variant_sku": bool(product.parent_id),
+            "product_type": getattr(product, "product_type", "FINISHED_GOOD"),
+            "warranty_enabled": product.warranty_enabled,
+            "warranty_months_manufacturing": product.warranty_months_manufacturing,
+            "warranty_months_structural": product.warranty_months_structural,
+        }
+
+    def _record_pim_product_audit(self, product, old_snapshot, action_type, user, event_name="PIM_PRODUCT_UPDATED"):
+        try:
+            from subscriptions.services.audit_service import log_audit
+            from audit.models import AuditLog
+
+            new_snapshot = self._build_pim_product_snapshot(product)
+            changes = {}
+            if old_snapshot:
+                for field in [
+                    "code", "name", "brand", "base_price", "cost_price", "description",
+                    "is_published", "category_id", "subcategory_id", "product_type",
+                    "warranty_enabled", "warranty_months_manufacturing", "warranty_months_structural"
+                ]:
+                    old_v = old_snapshot.get(field)
+                    new_v = new_snapshot.get(field)
+                    if str(old_v) != str(new_v):
+                        changes[field] = {"old": old_v, "new": new_v}
+            else:
+                changes = {"initial_state": new_snapshot}
+
+            log_audit(
+                action_type=action_type,
+                instance=product,
+                performed_by=user if getattr(user, "is_authenticated", False) else None,
+                metadata={
+                    "event": event_name,
+                    "code": product.code,
+                    "name": product.name,
+                    "product_id": product.id,
+                    "parent_id": product.parent_id,
+                    "parent_code": getattr(getattr(product, "parent", None), "code", ""),
+                    "is_child_product": bool(product.parent_id),
+                    "changes": changes,
+                    "snapshot": new_snapshot,
+                },
+            )
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning("Failed to record pim product audit log: %s", e)
+
+    def perform_create(self, serializer):
+        from audit.models import AuditLog
+        product = serializer.save()
+        self._record_pim_product_audit(
+            product,
+            old_snapshot=None,
+            action_type=AuditLog.ActionType.PIM_PRODUCT_CREATED,
+            user=self.request.user if getattr(self, "request", None) and self.request.user.is_authenticated else None,
+            event_name="PIM_PRODUCT_CREATED",
+        )
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        old_snapshot = self._build_pim_product_snapshot(instance)
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        from audit.models import AuditLog
+        instance.refresh_from_db()
+        self._record_pim_product_audit(
+            instance,
+            old_snapshot=old_snapshot,
+            action_type=AuditLog.ActionType.PIM_PRODUCT_UPDATED,
+            user=request.user,
+            event_name="PIM_PRODUCT_UPDATED",
+        )
+        return Response(PimProductDetailSerializer(instance, context=self.get_serializer_context()).data)
+
     def perform_update(self, serializer):
         instance = self.get_object()
         old_code = instance.code
@@ -260,10 +353,20 @@ class PimProductViewSet(viewsets.ModelViewSet):
         Returns counts so the frontend can show a meaningful confirmation.
         """
         product = self.get_object()
+        old_snapshot = self._build_pim_product_snapshot(product)
         product.is_published = True
         product.save(update_fields=["is_published"])
         child_count = product.child_pim_products.filter(is_published=False).update(is_published=True)
         variant_count = product.variants.filter(is_active=False).update(is_active=True)
+
+        from audit.models import AuditLog
+        self._record_pim_product_audit(
+            product,
+            old_snapshot=old_snapshot,
+            action_type=AuditLog.ActionType.PIM_PRODUCT_UPDATED,
+            user=request.user,
+            event_name="PIM_PRODUCT_PUBLISHED",
+        )
         return Response({
             "published": True,
             "child_pim_published": child_count,
@@ -278,9 +381,19 @@ class PimProductViewSet(viewsets.ModelViewSet):
         Does NOT deactivate ProductVariant records (keeps operational data intact).
         """
         product = self.get_object()
+        old_snapshot = self._build_pim_product_snapshot(product)
         product.is_published = False
         product.save(update_fields=["is_published"])
         child_count = product.child_pim_products.filter(is_published=True).update(is_published=False)
+
+        from audit.models import AuditLog
+        self._record_pim_product_audit(
+            product,
+            old_snapshot=old_snapshot,
+            action_type=AuditLog.ActionType.PIM_PRODUCT_UPDATED,
+            user=request.user,
+            event_name="PIM_PRODUCT_UNPUBLISHED",
+        )
         return Response({
             "published": False,
             "child_pim_unpublished": child_count,
@@ -1160,6 +1273,76 @@ class ProductVariantViewSet(viewsets.ModelViewSet):
             return ProductVariantCreateSerializer
         return ProductVariantSerializer
 
+    def _build_variant_snapshot(self, variant):
+        attr_vals = {}
+        try:
+            for av in variant.attribute_values.select_related("attribute").all():
+                val = av.value_text or (str(av.value_number) if av.value_number is not None else None)
+                if val is None and av.value_boolean is not None:
+                    val = "Yes" if av.value_boolean else "No"
+                attr_vals[av.attribute.name] = val
+        except Exception:
+            pass
+
+        return {
+            "id": variant.id,
+            "sku": variant.sku or "",
+            "variant_name": variant.variant_name or "",
+            "price": str(variant.price) if variant.price is not None else "0.00",
+            "cost_price": str(variant.cost_price) if variant.cost_price is not None else None,
+            "barcode": variant.barcode or "",
+            "quantity_on_hand": variant.quantity_on_hand,
+            "reorder_level": variant.reorder_level,
+            "is_active": variant.is_active,
+            "brand": variant.brand or "",
+            "image": variant.image or "",
+            "video": variant.video or "",
+            "attributes": attr_vals,
+        }
+
+    def _record_variant_audit(self, variant, old_snapshot, action_type, user, event_name="PRODUCT_VARIANT_UPDATED"):
+        try:
+            from subscriptions.services.audit_service import log_audit
+            from audit.models import AuditLog
+
+            new_snapshot = self._build_variant_snapshot(variant)
+            changes = {}
+            if old_snapshot:
+                for field in [
+                    "sku", "variant_name", "price", "cost_price", "barcode",
+                    "quantity_on_hand", "reorder_level", "is_active", "brand", "image", "video"
+                ]:
+                    old_val = old_snapshot.get(field)
+                    new_val = new_snapshot.get(field)
+                    if str(old_val) != str(new_val):
+                        changes[field] = {"old": old_val, "new": new_val}
+
+                old_attrs = old_snapshot.get("attributes", {})
+                new_attrs = new_snapshot.get("attributes", {})
+                if old_attrs != new_attrs:
+                    changes["attributes"] = {"old": old_attrs, "new": new_attrs}
+            else:
+                changes = {"initial_state": new_snapshot}
+
+            product_code = getattr(getattr(variant, "product", None), "code", "")
+
+            log_audit(
+                action_type=action_type,
+                instance=variant,
+                performed_by=user if getattr(user, "is_authenticated", False) else None,
+                metadata={
+                    "event": event_name,
+                    "sku": variant.sku,
+                    "variant_id": variant.id,
+                    "product_id": variant.product_id,
+                    "product_code": product_code,
+                    "changes": changes,
+                    "snapshot": new_snapshot,
+                },
+            )
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning("Failed to record variant audit log: %s", e)
 
     def _handle_variant_file_uploads(self, request):
         data = request.data.copy() if hasattr(request.data, "copy") else request.data
@@ -1192,10 +1375,23 @@ class ProductVariantViewSet(viewsets.ModelViewSet):
         from rest_framework import status
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
+    def perform_create(self, serializer):
+        from audit.models import AuditLog
+        variant = serializer.save()
+        PIMSyncService.sync_variant_to_operational_product(variant)
+        self._record_variant_audit(
+            variant,
+            old_snapshot=None,
+            action_type=AuditLog.ActionType.PRODUCT_VARIANT_CREATED,
+            user=self.request.user if getattr(self, "request", None) and self.request.user.is_authenticated else None,
+            event_name="PRODUCT_VARIANT_CREATED",
+        )
+
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
         old_sku = instance.sku
+        old_snapshot = self._build_variant_snapshot(instance)
         data = self._handle_variant_file_uploads(request)
         serializer = self.get_serializer(instance, data=data, partial=partial)
         serializer.is_valid(raise_exception=True)
@@ -1205,17 +1401,28 @@ class ProductVariantViewSet(viewsets.ModelViewSet):
             PIMSyncService.sync_variant_to_operational_product(instance)
         if getattr(instance, '_prefetched_objects_cache', None):
             instance._prefetched_objects_cache = {}
+
+        from audit.models import AuditLog
+        instance.refresh_from_db()
+        self._record_variant_audit(
+            instance,
+            old_snapshot=old_snapshot,
+            action_type=AuditLog.ActionType.PRODUCT_VARIANT_UPDATED,
+            user=request.user,
+            event_name="PRODUCT_VARIANT_UPDATED",
+        )
+
         from rest_framework.response import Response
         return Response(serializer.data)
 
     def perform_update(self, serializer):
-
         variant = serializer.save()
         PIMSyncService.sync_variant_to_operational_product(variant)
 
     @action(detail=True, methods=["patch"])
     def update_stock(self, request, pk=None):
         variant = self.get_object()
+        old_snapshot = self._build_variant_snapshot(variant)
         qty = request.data.get("quantity_on_hand")
         reorder = request.data.get("reorder_level")
         if qty is not None:
@@ -1224,6 +1431,15 @@ class ProductVariantViewSet(viewsets.ModelViewSet):
             variant.reorder_level = int(reorder)
         variant.save(update_fields=["quantity_on_hand", "reorder_level"])
         PIMSyncService.sync_variant_to_operational_product(variant)
+
+        from audit.models import AuditLog
+        self._record_variant_audit(
+            variant,
+            old_snapshot=old_snapshot,
+            action_type=AuditLog.ActionType.PRODUCT_VARIANT_UPDATED,
+            user=request.user,
+            event_name="PRODUCT_VARIANT_STOCK_UPDATED",
+        )
 
         # Synchronize with inventory stock ledger if inventory profile exists
         if qty is not None and variant.operational_product:
@@ -1257,6 +1473,7 @@ class ProductVariantViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["patch"])
     def update_pricing(self, request, pk=None):
         variant = self.get_object()
+        old_snapshot = self._build_variant_snapshot(variant)
         price = request.data.get("price")
         cost_price = request.data.get("cost_price")
         if price is not None:
@@ -1265,6 +1482,15 @@ class ProductVariantViewSet(viewsets.ModelViewSet):
             variant.cost_price = cost_price
         variant.save(update_fields=["price", "cost_price"])
         PIMSyncService.sync_variant_to_operational_product(variant)
+
+        from audit.models import AuditLog
+        self._record_variant_audit(
+            variant,
+            old_snapshot=old_snapshot,
+            action_type=AuditLog.ActionType.PRODUCT_VARIANT_UPDATED,
+            user=request.user,
+            event_name="PRODUCT_VARIANT_PRICING_UPDATED",
+        )
         return Response(ProductVariantSerializer(variant).data)
 
     @action(detail=True, methods=["patch"])
@@ -1277,6 +1503,7 @@ class ProductVariantViewSet(viewsets.ModelViewSet):
             with transaction.atomic():
                 variant = self.get_object()
                 old_sku = variant.sku
+                old_snapshot = self._build_variant_snapshot(variant)
                 dirty_fields = []
 
             # Scalar fields with robust type coercion
@@ -1551,6 +1778,15 @@ class ProductVariantViewSet(viewsets.ModelViewSet):
             variant = ProductVariant.objects.prefetch_related(
                 "attribute_values__attribute"
             ).get(pk=variant.pk)
+
+            from audit.models import AuditLog
+            self._record_variant_audit(
+                variant,
+                old_snapshot=old_snapshot,
+                action_type=AuditLog.ActionType.PRODUCT_VARIANT_UPDATED,
+                user=request.user,
+                event_name="PRODUCT_VARIANT_ATTRIBUTES_UPDATED",
+            )
             return Response(ProductVariantSerializer(variant).data)
         except Exception as exc:
             import logging
