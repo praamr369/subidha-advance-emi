@@ -4,6 +4,10 @@ import * as os from "node:os";
 
 import { defineConfig, devices } from "@playwright/test";
 
+// Ensure Ubuntu 26.04+ (resolute) maps to Playwright's compatible Linux runtime
+process.env.PLAYWRIGHT_HOST_PLATFORM_OVERRIDE =
+  process.env.PLAYWRIGHT_HOST_PLATFORM_OVERRIDE || "ubuntu24.04-x64";
+
 const frontendBaseUrl =
   process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:3100";
 const backendRootUrl =
@@ -48,6 +52,21 @@ const resolvePythonExecutable = () => {
   return localMatch || "python3";
 };
 
+const resolveBrowserChannel = () => {
+  if (process.env.PLAYWRIGHT_CHROMIUM_CHANNEL) {
+    return process.env.PLAYWRIGHT_CHROMIUM_CHANNEL;
+  }
+  if (process.platform === "linux" && !existsSync("/opt/google/chrome/chrome")) {
+    return undefined;
+  }
+  return "chrome";
+};
+
+const defaultBrowserDevice = {
+  ...(resolveBrowserChannel() ? { channel: resolveBrowserChannel() } : {}),
+  ...devices["Desktop Chrome"],
+};
+
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: false,
@@ -55,6 +74,10 @@ export default defineConfig({
   timeout: 60_000,
   expect: {
     timeout: 10_000,
+    toHaveScreenshot: {
+      maxDiffPixelRatio: 0.02,
+      animations: "disabled",
+    },
   },
   retries: process.env.CI ? 1 : 0,
   outputDir: "test-results",
@@ -70,7 +93,7 @@ export default defineConfig({
       name: "setup",
       testMatch: /.*\.setup\.ts/,
       use: {
-        channel: "chrome", ...devices["Desktop Chrome"],
+        ...defaultBrowserDevice,
       },
     },
     {
@@ -80,9 +103,10 @@ export default defineConfig({
         /.*\.setup\.ts/,
         /.*real-login-smoke\.spec\.ts/,
         /.*route_load_smoke\.spec\.ts/,
+        /.*visual_regression\.spec\.ts/,
       ],
       use: {
-        channel: "chrome", ...devices["Desktop Chrome"],
+        ...defaultBrowserDevice,
       },
     },
     {
@@ -93,7 +117,7 @@ export default defineConfig({
       dependencies: ["setup"],
       testMatch: /.*route_load_smoke\.spec\.ts/,
       use: {
-        channel: "chrome", ...devices["Desktop Chrome"],
+        ...defaultBrowserDevice,
       },
     },
     {
@@ -101,14 +125,22 @@ export default defineConfig({
       dependencies: ["setup"],
       testMatch: /.*release-smoke\.spec\.ts/,
       use: {
-        channel: "chrome", ...devices["Desktop Chrome"],
+        ...defaultBrowserDevice,
       },
     },
     {
       name: "chromium-auth-smoke",
       testMatch: /.*real-login-smoke\.spec\.ts/,
       use: {
-        channel: "chrome", ...devices["Desktop Chrome"],
+        ...defaultBrowserDevice,
+      },
+    },
+    {
+      name: "chromium-visual",
+      dependencies: ["setup"],
+      testMatch: /.*visual_regression\.spec\.ts/,
+      use: {
+        ...defaultBrowserDevice,
       },
     },
   ],
