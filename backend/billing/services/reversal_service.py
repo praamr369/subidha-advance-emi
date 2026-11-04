@@ -1281,6 +1281,22 @@ def pay_customer_refund(*, refund_id: int, paid_by):
     refund.paid_at = timezone.now()
     refund.posted_journal_entry = posted_journal
     refund.save(update_fields=["status", "paid_by", "paid_at", "posted_journal_entry", "updated_at"])
+
+    try:
+        from subscriptions.services.operational_notification_service import (
+            schedule_customer_refund_notification,
+        )
+
+        schedule_customer_refund_notification(
+            refund_id=refund.id,
+            refund_no=refund.refund_no or f"REF-{refund.id}",
+            customer_name=refund.customer.name if refund.customer else "Customer",
+            amount_str=str(refund.amount),
+            method=refund.method,
+        )
+    except Exception:
+        pass
+
     return refund, True
 
 

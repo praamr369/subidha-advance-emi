@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import EmptyState from "@/components/feedback/EmptyState";
@@ -17,6 +18,8 @@ type Props = {
   breadcrumbs: { label: string; href?: string }[];
   list: (params?: { module?: string; limit?: number }) => Promise<NotificationListResponse>;
   markRead: (id: number) => Promise<SystemNotification>;
+  archive?: (id: number) => Promise<SystemNotification>;
+  dismissAll?: () => Promise<{ archived_count: number }>;
   /**
    * When false, renders only the notification toolbar + list (no title/breadcrumb header),
    * allowing role pages to provide ERPPageHeader without duplicating titles.
@@ -24,7 +27,24 @@ type Props = {
   showHeader?: boolean;
 };
 
-const MODULE_PRESETS = ["", "billing", "accounting", "inventory", "rent", "reports", "system"];
+const MODULE_PRESETS = [
+  "",
+  "payments",
+  "billing",
+  "crm",
+  "products",
+  "subscriptions",
+  "support",
+  "delivery",
+  "inventory",
+  "accounting",
+  "finance",
+  "partners",
+  "rent",
+  "reconciliation",
+  "reports",
+  "system",
+];
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim()) return error.message;
@@ -38,6 +58,8 @@ export default function NotificationCenterPanel({
   breadcrumbs,
   list,
   markRead,
+  archive,
+  dismissAll,
   showHeader = true,
 }: Props) {
   const [module, setModule] = useState("");
@@ -45,6 +67,7 @@ export default function NotificationCenterPanel({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [dismissingAll, setDismissingAll] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -89,6 +112,34 @@ export default function NotificationCenterPanel({
     }
   }
 
+  async function onArchive(id: number) {
+    if (!archive) return;
+    setBusyId(id);
+    try {
+      await archive(id);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("subidha:badges-refresh"));
+      }
+      await load();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function onDismissAll() {
+    if (!dismissAll) return;
+    setDismissingAll(true);
+    try {
+      await dismissAll();
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("subidha:badges-refresh"));
+      }
+      await load();
+    } finally {
+      setDismissingAll(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       {showHeader ? (
@@ -130,6 +181,16 @@ export default function NotificationCenterPanel({
               <ActionButton type="button" variant="secondary" onClick={() => void load()}>
                 Refresh
               </ActionButton>
+              {dismissAll ? (
+                <ActionButton
+                  type="button"
+                  variant="outline"
+                  disabled={dismissingAll || (data?.results?.length ?? 0) === 0}
+                  onClick={() => void onDismissAll()}
+                >
+                  {dismissingAll ? "Dismissing…" : "Dismiss read"}
+                </ActionButton>
+              ) : null}
             </div>
           </div>
           {data !== null && (
@@ -160,6 +221,16 @@ export default function NotificationCenterPanel({
               <ActionButton type="button" variant="secondary" onClick={() => void load()}>
                 Refresh
               </ActionButton>
+              {dismissAll ? (
+                <ActionButton
+                  type="button"
+                  variant="outline"
+                  disabled={dismissingAll || (data?.results?.length ?? 0) === 0}
+                  onClick={() => void onDismissAll()}
+                >
+                  {dismissingAll ? "Dismissing…" : "Dismiss read"}
+                </ActionButton>
+              ) : null}
             </div>
             {data !== null ? (
               <div className="text-xs font-medium text-muted-foreground">
@@ -200,16 +271,36 @@ export default function NotificationCenterPanel({
                   })}
                 </p>
               </div>
-              {!row.read_at ? (
-                <ActionButton
-                  type="button"
-                  variant="secondary"
-                  disabled={busyId === row.id}
-                  onClick={() => void onMarkRead(row.id)}
-                >
-                  Mark read
-                </ActionButton>
-              ) : null}
+              <div className="flex shrink-0 items-center gap-2 self-start pt-1 sm:pt-0">
+                {typeof row.payload?.action_url === "string" && row.payload.action_url.trim() ? (
+                  <Link
+                    href={row.payload.action_url}
+                    className="inline-flex h-9 items-center justify-center rounded-lg border border-border bg-background px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+                  >
+                    Open
+                  </Link>
+                ) : null}
+                {!row.read_at ? (
+                  <ActionButton
+                    type="button"
+                    variant="secondary"
+                    disabled={busyId === row.id}
+                    onClick={() => void onMarkRead(row.id)}
+                  >
+                    Mark read
+                  </ActionButton>
+                ) : null}
+                {archive ? (
+                  <ActionButton
+                    type="button"
+                    variant="ghost"
+                    disabled={busyId === row.id}
+                    onClick={() => void onArchive(row.id)}
+                  >
+                    Dismiss
+                  </ActionButton>
+                ) : null}
+              </div>
             </li>
           ))}
         </ul>

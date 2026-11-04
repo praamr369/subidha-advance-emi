@@ -855,6 +855,20 @@ def finalize_direct_sale_invoice(*, direct_sale_id: int, finalized_by):
             "invoice_no": posted_invoice.document_no,
         },
     )
+    try:
+        from subscriptions.services.operational_notification_service import (
+            schedule_direct_sale_invoice_notification,
+        )
+
+        schedule_direct_sale_invoice_notification(
+            invoice_id=posted_invoice.id,
+            invoice_number=posted_invoice.document_no or f"INV-{posted_invoice.id}",
+            customer_name=refreshed.customer.name or "Customer",
+            amount_str=str(refreshed.total_amount),
+            sale_id=refreshed.id,
+        )
+    except Exception:
+        pass
     return refreshed, True
 
 
@@ -1441,6 +1455,21 @@ def post_billing_credit_note(*, credit_note_id: int, posted_by):
             "stock_existing_count": stock_result["existing_count"],
         },
     )
+    try:
+        from subscriptions.services.operational_notification_service import (
+            schedule_credit_debit_note_notification,
+        )
+
+        schedule_credit_debit_note_notification(
+            note_id=note.id,
+            note_no=note.note_no or f"CRN-{note.id}",
+            note_type="CREDIT",
+            amount_str=str(note.total_adjustment),
+            customer_name=note.customer.name if getattr(note, "customer", None) else "Customer",
+            reason=getattr(note, "reason", ""),
+        )
+    except Exception:
+        pass
     return note, True
 
 
@@ -1497,6 +1526,21 @@ def post_billing_debit_note(*, debit_note_id: int, posted_by):
             "stock_existing_count": stock_result["existing_count"],
         },
     )
+    try:
+        from subscriptions.services.operational_notification_service import (
+            schedule_credit_debit_note_notification,
+        )
+
+        schedule_credit_debit_note_notification(
+            note_id=note.id,
+            note_no=note.note_no or f"DBN-{note.id}",
+            note_type="DEBIT",
+            amount_str=str(note.total_adjustment),
+            customer_name=note.customer.name if getattr(note, "customer", None) else "Customer",
+            reason=getattr(note, "reason", ""),
+        )
+    except Exception:
+        pass
     return note, True
 
 

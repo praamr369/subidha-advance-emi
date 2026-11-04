@@ -18,7 +18,12 @@ def notify_all_active_admins(
     """Create one deduplicated in-app notification per active admin user."""
     payload = payload or {}
     created = 0
-    for user in User.objects.filter(role=UserRole.ADMIN, is_active=True).order_by("id"):
+    from django.db.models import Q
+
+    for user in User.objects.filter(
+        Q(role=UserRole.ADMIN) | Q(is_superuser=True),
+        is_active=True,
+    ).distinct().order_by("id"):
         dedupe_key = f"{dedupe_prefix}:u{user.id}"
         _notif, was_created = emit_notification(
             module=module,

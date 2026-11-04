@@ -151,9 +151,13 @@ def build_admin_navigation_badges(user=None) -> dict:
 
     try:
         if user_id:
-            unread_count = Notification.objects.filter(recipient_id=user_id, read_at__isnull=True).count()
+            unread_count = Notification.objects.filter(
+                recipient_id=user_id, read_at__isnull=True, archived_at__isnull=True
+            ).count()
         else:
-            unread_count = Notification.objects.filter(read_at__isnull=True).count()
+            unread_count = Notification.objects.filter(
+                read_at__isnull=True, archived_at__isnull=True
+            ).count()
     except Exception:
         unread_count = 0
 

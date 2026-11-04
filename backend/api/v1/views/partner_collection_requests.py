@@ -54,7 +54,7 @@ def _create_collection_request(
         raise ValueError("Amount must be greater than zero.")
 
     with transaction.atomic():
-        return PartnerCollectionRequest.objects.create(
+        obj = PartnerCollectionRequest.objects.create(
             partner=partner,
             subscription=subscription,
             customer=subscription.customer,
@@ -65,6 +65,21 @@ def _create_collection_request(
             notes=notes or "",
             status=PartnerCollectionRequestStatus.SUBMITTED,
         )
+        try:
+            from subscriptions.services.operational_notification_service import (
+                schedule_partner_collection_request_notification,
+            )
+
+            schedule_partner_collection_request_notification(
+                request_id=obj.id,
+                partner_username=getattr(partner, "username", "Partner"),
+                customer_name=subscription.customer.name if subscription.customer else "Customer",
+                amount_str=str(amount),
+                reference_no=reference_no,
+            )
+        except Exception:
+            pass
+        return obj
 
 
 def _collection_request_response(request_obj, *, legacy_contract=False):

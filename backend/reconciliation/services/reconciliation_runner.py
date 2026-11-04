@@ -217,6 +217,20 @@ def start_and_run_phase_f(*, request: PhaseFRunRequest, started_by) -> Reconcili
             "last_chunk_status": "completed",
         }
         run.save(update_fields=["total_checked", "total_matched", "total_exceptions", "high_risk_count", "status", "finished_at", "metadata"])
+        try:
+            from subscriptions.services.operational_notification_service import (
+                schedule_reconciliation_completed_notification,
+            )
+
+            schedule_reconciliation_completed_notification(
+                run_id=run.id,
+                total_checked=run.total_checked,
+                total_matched=run.total_matched,
+                total_exceptions=run.total_exceptions,
+                high_risk_count=run.high_risk_count,
+            )
+        except Exception:
+            pass
     except Exception as exc:
         run.status = ReconciliationRunStatus.FAILED
         run.finished_at = timezone.now()

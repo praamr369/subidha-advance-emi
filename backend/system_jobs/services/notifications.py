@@ -1,8 +1,23 @@
 from __future__ import annotations
 
+from typing import Any
 from django.db import transaction
 
 from system_jobs.models import Notification, SystemJobLog
+
+
+def _sanitize_json_payload(data: Any) -> Any:
+    if isinstance(data, dict):
+        return {str(k): _sanitize_json_payload(v) for k, v in data.items()}
+    if isinstance(data, (list, tuple, set)):
+        return [_sanitize_json_payload(v) for v in data]
+    if hasattr(data, "isoformat"):
+        return data.isoformat()
+    if type(data).__name__ == "Decimal":
+        return str(data)
+    if hasattr(data, "hex"):
+        return str(data)
+    return data
 
 
 @transaction.atomic
@@ -21,8 +36,9 @@ def emit_notification(
     Create a user-visible notification. Optional dedupe_key prevents duplicates.
     Returns (notification, created).
     """
-    payload = payload or {}
+    payload = _sanitize_json_payload(payload or {})
     if dedupe_key:
+        dedupe_key = str(dedupe_key).strip()[:220]
         existing = Notification.objects.filter(dedupe_key=dedupe_key).first()
         if existing:
             return existing, False

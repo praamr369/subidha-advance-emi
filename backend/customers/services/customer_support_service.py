@@ -81,6 +81,20 @@ def create_customer_support_request(
         },
     )
 
+    try:
+        from subscriptions.services.operational_notification_service import (
+            schedule_customer_support_request_notification,
+        )
+
+        schedule_customer_support_request_notification(
+            request_id=request.id,
+            customer_name=customer.name or "Customer",
+            category=request.category,
+            message=request.message,
+        )
+    except Exception:
+        pass
+
     return request
 
 

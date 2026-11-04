@@ -89,6 +89,21 @@ def create_online_request(
         notes=f"Request created for {product.name}",
     )
 
+    try:
+        from subscriptions.services.operational_notification_service import (
+            schedule_online_request_notification,
+        )
+
+        schedule_online_request_notification(
+            request_id=request_obj.id,
+            request_number=request_obj.request_number,
+            customer_name=customer.name or "Customer",
+            product_name=product.name or "Product",
+            request_type=request_type,
+        )
+    except Exception:
+        pass
+
     return request_obj
 
 

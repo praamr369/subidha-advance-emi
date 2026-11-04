@@ -125,6 +125,37 @@ def post_movement(
     except Exception:
         pass
 
+    if movement_type in {
+        StockMovementType.DAMAGE,
+        StockMovementType.STOCK_ADJUSTMENT,
+        StockMovementType.ADJUSTMENT_OUT,
+    }:
+        try:
+            from subscriptions.services.operational_notification_service import (
+                schedule_stock_adjustment_notification,
+            )
+
+            prod_name = (
+                inventory_item.product.name
+                if inventory_item.product
+                else inventory_item.sku
+            )
+            loc_name = (
+                entry.stock_location.name
+                if entry.stock_location
+                else "Default location"
+            )
+            schedule_stock_adjustment_notification(
+                ledger_id=entry.id,
+                product_name=prod_name,
+                movement_type=movement_type,
+                quantity_str=str(qty),
+                location_name=loc_name,
+                notes=entry.notes,
+            )
+        except Exception:
+            pass
+
     return entry
 
 

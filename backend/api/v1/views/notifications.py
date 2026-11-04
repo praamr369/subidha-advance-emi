@@ -36,7 +36,7 @@ class AdminUnreadNotificationCountView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
     def get(self, request):
-        qs = Notification.objects.filter(recipient=request.user, read_at__isnull=True)
+        qs = Notification.objects.filter(recipient=request.user, read_at__isnull=True, archived_at__isnull=True)
         module = (request.query_params.get("module") or "").strip()
         if module:
             qs = qs.filter(module=module)
@@ -86,7 +86,10 @@ class CashierNotificationListView(APIView):
 
     def get(self, request):
         module = (request.query_params.get("module") or "").strip()
+        include_archived = str(request.query_params.get("archived") or "").strip().lower() in {"1", "true"}
         qs = Notification.objects.filter(recipient=request.user).order_by("-created_at", "-id")
+        if not include_archived:
+            qs = qs.filter(archived_at__isnull=True)
         if module:
             qs = qs.filter(module=module)
         unread = qs.filter(read_at__isnull=True).count()
@@ -105,7 +108,7 @@ class CashierUnreadNotificationCountView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsCashier]
 
     def get(self, request):
-        qs = Notification.objects.filter(recipient=request.user, read_at__isnull=True)
+        qs = Notification.objects.filter(recipient=request.user, read_at__isnull=True, archived_at__isnull=True)
         module = (request.query_params.get("module") or "").strip()
         if module:
             qs = qs.filter(module=module)
@@ -174,6 +177,7 @@ class NotificationListView(APIView):
         unread_count = Notification.objects.filter(
             recipient=request.user,
             read_at__isnull=True,
+            archived_at__isnull=True,
         ).count()
         limit = _safe_int(request.query_params.get("limit"), 50, max_value=200)
         rows = list(qs[:limit])
@@ -204,6 +208,7 @@ class NotificationMarkAllReadView(APIView):
         unread_qs = Notification.objects.filter(
             recipient=request.user,
             read_at__isnull=True,
+            archived_at__isnull=True,
         ).order_by("-created_at", "-id")
         rows = list(unread_qs[:500])
         for row in rows:
@@ -215,7 +220,7 @@ class NotificationSummaryView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        qs = Notification.objects.filter(recipient=request.user).order_by("-created_at", "-id")
+        qs = Notification.objects.filter(recipient=request.user, archived_at__isnull=True).order_by("-created_at", "-id")
         unread_count = qs.filter(read_at__isnull=True).count()
         high_priority_count = qs.filter(
             read_at__isnull=True,

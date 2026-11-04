@@ -237,6 +237,19 @@ def create_admin_lead(
         },
     )
 
+    try:
+        from subscriptions.services.operational_notification_service import (
+            schedule_lead_created_notification,
+        )
+
+        schedule_lead_created_notification(
+            lead_id=lead.pk,
+            lead_name=lead.name or "Unknown",
+            source=lead.source or "",
+        )
+    except Exception:
+        pass
+
     if assigned_to is not None:
         log_audit(
             action_type=AuditLog.ActionType.LEAD_ASSIGNED,

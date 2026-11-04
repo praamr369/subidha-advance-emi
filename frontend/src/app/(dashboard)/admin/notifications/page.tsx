@@ -3,6 +3,8 @@
 import NotificationCenterPanel from "@/components/notifications/NotificationCenterPanel";
 import { ROUTES } from "@/lib/routes";
 import {
+  archiveAdminNotification,
+  dismissAllAdminNotifications,
   listAdminNotifications,
   markAdminNotificationRead,
 } from "@/services/notifications";
@@ -19,6 +21,8 @@ export default function AdminNotificationsPage() {
       ]}
       list={listAdminNotifications}
       markRead={markAdminNotificationRead}
+      archive={archiveAdminNotification}
+      dismissAll={dismissAllAdminNotifications}
     />
   );
 }

@@ -4,7 +4,7 @@ import NotificationCenterPanel from "@/components/notifications/NotificationCent
 import ERPPageHeader from "@/components/erp/ERPPageHeader";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { ROUTES } from "@/lib/routes";
-import { listVendorNotifications, markNotificationRead } from "@/services/notifications";
+import { archiveNotification, listVendorNotifications, markNotificationRead } from "@/services/notifications";
 
 export default function VendorNotificationsPage() {
   return (
@@ -32,6 +32,7 @@ export default function VendorNotificationsPage() {
           ]}
           list={listVendorNotifications}
           markRead={markNotificationRead}
+          archive={archiveNotification}
           showHeader={false}
         />
       </div>

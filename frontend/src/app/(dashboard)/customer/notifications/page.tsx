@@ -4,6 +4,7 @@ import NotificationCenterPanel from "@/components/notifications/NotificationCent
 import CustomerPageShell from "@/components/layout/CustomerPageShell";
 import { ROUTES } from "@/lib/routes";
 import {
+  archiveNotification,
   listCustomerNotifications,
   markNotificationRead,
 } from "@/services/notifications";
@@ -21,6 +22,7 @@ export default function CustomerNotificationsPage() {
         ]}
         list={listCustomerNotifications}
         markRead={markNotificationRead}
+        archive={archiveNotification}
         showHeader={false}
       />
     </CustomerPageShell>

@@ -435,6 +435,19 @@ def create_kyc_update_request(
             "document_type": document_type,
         },
     )
+    try:
+        from subscriptions.services.operational_notification_service import (
+            schedule_customer_kyc_submitted_notification,
+        )
+
+        schedule_customer_kyc_submitted_notification(
+            customer_id=customer.pk,
+            customer_name=customer.name or "Customer",
+            document_type=document_type,
+            document_id=doc.pk,
+        )
+    except Exception:
+        pass
     return doc
 
 

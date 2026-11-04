@@ -379,6 +379,22 @@ def mark_asset_returned(
         },
     )
 
+    try:
+        from subscriptions.services.operational_notification_service import (
+            schedule_rental_asset_posture_notification,
+        )
+
+        schedule_rental_asset_posture_notification(
+            asset_id=asset.id,
+            asset_code=asset.asset_code,
+            product_name=asset.product.name if asset.product else "Asset",
+            status_label="RETURNED",
+            is_damaged=False,
+            notes=f"Returned from contract #{prev_subscription_id}" if prev_subscription_id else "",
+        )
+    except Exception:
+        pass
+
     return asset
 
 
@@ -431,6 +447,22 @@ def mark_asset_under_repair(
         performed_by=performed_by,
         metadata={"asset_code": asset.asset_code, "reason": reason},
     )
+
+    try:
+        from subscriptions.services.operational_notification_service import (
+            schedule_rental_asset_posture_notification,
+        )
+
+        schedule_rental_asset_posture_notification(
+            asset_id=asset.id,
+            asset_code=asset.asset_code,
+            product_name=asset.product.name if asset.product else "Asset",
+            status_label="UNDER_REPAIR",
+            is_damaged=True,
+            notes=reason,
+        )
+    except Exception:
+        pass
 
     return asset
 

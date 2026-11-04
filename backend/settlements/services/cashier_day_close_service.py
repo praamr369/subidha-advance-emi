@@ -231,6 +231,22 @@ def submit_cashier_day_close(day_close: CashierDayClose, payload: CashierDayClos
     day_close.full_clean()
     day_close.save(update_fields=["status", "closed_by_id", "closed_at", "updated_at"])
 
+    try:
+        from subscriptions.services.operational_notification_service import (
+            schedule_cashier_day_close_notification,
+        )
+
+        schedule_cashier_day_close_notification(
+            day_close_id=day_close.id,
+            cashier_username=getattr(day_close.cashier, "username", f"User #{day_close.cashier_id}"),
+            business_date_str=str(day_close.business_date),
+            counted_cash_str=str(day_close.counted_cash),
+            variance_str=str(day_close.variance),
+            has_variance=day_close.variance != Decimal("0.00"),
+        )
+    except Exception:
+        pass
+
     return day_close
 
 

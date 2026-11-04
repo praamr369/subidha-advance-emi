@@ -145,6 +145,21 @@ class CustomerAdvanceService:
                 "accounting_bridge_posting_deferred": True,
             },
         )
+        try:
+            from subscriptions.services.operational_notification_service import (
+                schedule_customer_advance_notification,
+            )
+
+            schedule_customer_advance_notification(
+                advance_id=advance.id,
+                customer_name=customer.name or "Customer",
+                customer_user_id=getattr(customer, "user_id", None),
+                amount_str=str(advance.amount),
+                method=advance.method,
+                reference_no=advance.reference_no,
+            )
+        except Exception:
+            pass
         return advance
 
     @staticmethod

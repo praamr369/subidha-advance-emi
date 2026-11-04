@@ -247,3 +247,490 @@ class NotificationApiTests(APITestCase):
         self.assertIsNotNone(response.data["read_at"])
         n.refresh_from_db()
         self.assertIsNotNone(n.read_at)
+
+
+class OperationalNotificationsSyncTests(APITestCase):
+    def setUp(self):
+        self.admin = create_admin_user(username="sync_admin", phone="9305000099")
+        self.customer = create_customer_profile(name="Sync Customer", phone="9305000098")
+
+    def test_emi_payment_posted_notifies_admin(self):
+        from subscriptions.services.operational_notification_service import (
+            schedule_emi_payment_posted_notifications,
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            schedule_emi_payment_posted_notifications(
+                payment_id=101,
+                customer_user_id=self.customer.user_id,
+                partner_user_id=None,
+                cashier_user_id=None,
+                subscription_label="SUB-2026-001",
+                amount_str="1500.00",
+            )
+
+        admin_notif = Notification.objects.filter(
+            recipient=self.admin,
+            module="payments",
+            payload__category="PAYMENT_POSTED",
+        ).first()
+        self.assertIsNotNone(admin_notif)
+        self.assertIn("1500.00", admin_notif.body)
+        self.assertEqual(admin_notif.payload.get("action_url"), "/admin/payments")
+
+    def test_direct_sale_receipt_notifies_admin(self):
+        from subscriptions.services.operational_notification_service import (
+            schedule_direct_sale_collection_notifications,
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            schedule_direct_sale_collection_notifications(
+                receipt_id=202,
+                direct_sale_id=303,
+                customer_user_id=self.customer.user_id,
+                amount_str="4500.00",
+                receipt_no="RCP-2026-001",
+                cashier_user_id=None,
+            )
+
+        admin_notif = Notification.objects.filter(
+            recipient=self.admin,
+            module="billing",
+            payload__category="RECEIPT_CREATED",
+        ).first()
+        self.assertIsNotNone(admin_notif)
+        self.assertIn("4500.00", admin_notif.body)
+        self.assertEqual(admin_notif.payload.get("action_url"), "/admin/billing/receipts")
+
+    def test_customer_advance_notifies_admin(self):
+        from subscriptions.services.operational_notification_service import (
+            schedule_customer_advance_notification,
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            schedule_customer_advance_notification(
+                advance_id=505,
+                customer_name="Ramesh Kumar",
+                customer_user_id=self.customer.user_id,
+                amount_str="2000.00",
+                method="UPI",
+                reference_no="UPI-REF-123",
+            )
+
+        admin_notif = Notification.objects.filter(
+            recipient=self.admin,
+            module="payments",
+            payload__category="ADVANCE_COLLECTED",
+        ).first()
+        self.assertIsNotNone(admin_notif)
+        self.assertIn("2000.00", admin_notif.body)
+        self.assertEqual(admin_notif.payload.get("action_url"), "/admin/customer-advances")
+
+    def test_payment_reversal_notifies_admin_with_warning(self):
+        from subscriptions.services.operational_notification_service import (
+            schedule_payment_reversal_notification,
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            schedule_payment_reversal_notification(
+                payment_id=404,
+                reversal_ledger_id=808,
+                amount_str="1200.00",
+                reason="Customer requested chargeback reversal",
+                reversed_by_username="test_cashier",
+            )
+
+        admin_notif = Notification.objects.filter(
+            recipient=self.admin,
+            module="payments",
+            payload__category="PAYMENT_REVERSED",
+        ).first()
+        self.assertIsNotNone(admin_notif)
+        self.assertEqual(admin_notif.payload.get("severity"), "WARNING")
+        self.assertEqual(admin_notif.payload.get("action_url"), "/admin/payments/reversals")
+
+    def test_product_request_notifies_admin(self):
+        from subscriptions.services.operational_notification_service import (
+            schedule_product_request_notification,
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            schedule_product_request_notification(
+                request_id=606,
+                requester_name="Sunil Sharma",
+                product_name="King Size Bed",
+                request_type="EMI",
+                role="customer",
+            )
+
+        admin_notif = Notification.objects.filter(
+            recipient=self.admin,
+            module="products",
+            payload__category="PRODUCT_REQUEST_SUBMITTED",
+        ).first()
+        self.assertIsNotNone(admin_notif)
+        self.assertIn("King Size Bed", admin_notif.body)
+        self.assertEqual(admin_notif.payload.get("action_url"), "/admin/requests/product-requests")
+
+    def test_online_request_notifies_admin(self):
+        from subscriptions.services.operational_notification_service import (
+            schedule_online_request_notification,
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            schedule_online_request_notification(
+                request_id=707,
+                request_number="ORQ-2026-00001",
+                customer_name="Pooja Verma",
+                product_name="Dining Table Set",
+                request_type="RENT",
+            )
+
+        admin_notif = Notification.objects.filter(
+            recipient=self.admin,
+            module="subscriptions",
+            payload__category="ONLINE_REQUEST_SUBMITTED",
+        ).first()
+        self.assertIsNotNone(admin_notif)
+        self.assertIn("ORQ-2026-00001", admin_notif.body)
+        self.assertEqual(admin_notif.payload.get("action_url"), "/admin/requests/online-requests")
+
+    def test_customer_kyc_submitted_notifies_admin(self):
+        from subscriptions.services.operational_notification_service import (
+            schedule_customer_kyc_submitted_notification,
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            schedule_customer_kyc_submitted_notification(
+                customer_id=self.customer.id,
+                customer_name="Sync Customer",
+                document_type="AADHAAR",
+                document_id=888,
+            )
+
+        admin_notif = Notification.objects.filter(
+            recipient=self.admin,
+            module="crm",
+            payload__category="KYC_SUBMITTED",
+        ).first()
+        self.assertIsNotNone(admin_notif)
+        self.assertIn("AADHAAR", admin_notif.body)
+        self.assertEqual(admin_notif.payload.get("action_url"), "/admin/crm/kyc")
+
+    def test_customer_support_request_notifies_admin(self):
+        from subscriptions.services.operational_notification_service import (
+            schedule_customer_support_request_notification,
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            schedule_customer_support_request_notification(
+                request_id=999,
+                customer_name="Sync Customer",
+                category="BILLING_INQUIRY",
+                message="Need clarification on recent payment receipt.",
+            )
+
+        admin_notif = Notification.objects.filter(
+            recipient=self.admin,
+            module="support",
+            payload__category="SUPPORT_REQUEST_CREATED",
+        ).first()
+        self.assertIsNotNone(admin_notif)
+        self.assertIn("BILLING_INQUIRY", admin_notif.body)
+        self.assertEqual(admin_notif.payload.get("action_url"), "/admin/service-desk/tickets")
+
+    def test_sfemi_promotional_benefit_winner_notifies_admin_and_customer(self):
+        from subscriptions.services.operational_notification_service import (
+            schedule_draw_winner_notifications,
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            schedule_draw_winner_notifications(
+                draw_id=111,
+                batch_code="SFEMI-BATCH-A",
+                winner_customer_user_id=self.customer.user_id,
+                winner_customer_name="Sync Customer",
+                lucky_number=42,
+                waived_amount_str="15000.00",
+                waived_count=6,
+            )
+
+        admin_notif = Notification.objects.filter(
+            recipient=self.admin,
+            module="subscriptions",
+            payload__category="SFEMI_BENEFIT_AWARDED",
+        ).first()
+        self.assertIsNotNone(admin_notif)
+        self.assertIn("SFEMI-BATCH-A", admin_notif.body)
+        self.assertIn("15000.00", admin_notif.body)
+
+        cust_notif = Notification.objects.filter(
+            recipient=self.customer.user,
+            module="customer",
+            payload__category="SFEMI_BENEFIT_AWARDED",
+        ).first()
+        self.assertIsNotNone(cust_notif)
+        self.assertIn("15000.00", cust_notif.body)
+
+    def test_goods_receipt_notifies_admin(self):
+        from subscriptions.services.operational_notification_service import (
+            schedule_goods_receipt_notification,
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            schedule_goods_receipt_notification(
+                receipt_id=101,
+                receipt_no="GRN-2026-001",
+                vendor_name="Quality Teak Woodworks",
+                po_no="PO-2026-005",
+                items_count=3,
+            )
+
+        admin_notif = Notification.objects.filter(
+            recipient=self.admin,
+            module="inventory",
+            payload__category="GOODS_RECEIPT_POSTED",
+        ).first()
+        self.assertIsNotNone(admin_notif)
+        self.assertIn("GRN-2026-001", admin_notif.body)
+        self.assertEqual(admin_notif.payload.get("action_url"), "/admin/purchases/receipts")
+
+    def test_vendor_payment_notifies_admin(self):
+        from subscriptions.services.operational_notification_service import (
+            schedule_vendor_payment_notification,
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            schedule_vendor_payment_notification(
+                payment_id=202,
+                payment_no="VPAY-2026-002",
+                vendor_name="Quality Teak Woodworks",
+                amount_str="25000.00",
+                bill_no="BILL-889",
+            )
+
+        admin_notif = Notification.objects.filter(
+            recipient=self.admin,
+            module="accounting",
+            payload__category="VENDOR_PAYMENT_POSTED",
+        ).first()
+        self.assertIsNotNone(admin_notif)
+        self.assertIn("VPAY-2026-002", admin_notif.body)
+        self.assertEqual(admin_notif.payload.get("action_url"), "/admin/accounting/vendor-settlements")
+
+    def test_direct_sale_invoice_notifies_admin(self):
+        from subscriptions.services.operational_notification_service import (
+            schedule_direct_sale_invoice_notification,
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            schedule_direct_sale_invoice_notification(
+                invoice_id=303,
+                invoice_number="INV-2026-009",
+                customer_name="Ravi Shankar",
+                amount_str="18500.00",
+                sale_id=404,
+            )
+
+        admin_notif = Notification.objects.filter(
+            recipient=self.admin,
+            module="billing",
+            payload__category="INVOICE_FINALIZED",
+        ).first()
+        self.assertIsNotNone(admin_notif)
+        self.assertIn("INV-2026-009", admin_notif.body)
+        self.assertEqual(admin_notif.payload.get("action_url"), "/admin/billing/invoices")
+
+    def test_credit_note_notifies_admin(self):
+        from subscriptions.services.operational_notification_service import (
+            schedule_credit_debit_note_notification,
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            schedule_credit_debit_note_notification(
+                note_id=505,
+                note_no="CRN-2026-001",
+                note_type="CREDIT",
+                amount_str="1500.00",
+                customer_name="Ravi Shankar",
+                reason="Damaged item returned",
+            )
+
+        admin_notif = Notification.objects.filter(
+            recipient=self.admin,
+            module="billing",
+            payload__category="CREDIT_NOTE_POSTED",
+        ).first()
+        self.assertIsNotNone(admin_notif)
+        self.assertIn("CRN-2026-001", admin_notif.body)
+        self.assertEqual(admin_notif.payload.get("action_url"), "/admin/billing/credit-notes")
+
+    def test_customer_refund_notifies_admin(self):
+        from subscriptions.services.operational_notification_service import (
+            schedule_customer_refund_notification,
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            schedule_customer_refund_notification(
+                refund_id=606,
+                refund_no="REF-2026-001",
+                customer_name="Ravi Shankar",
+                amount_str="3000.00",
+                method="BANK_TRANSFER",
+            )
+
+        admin_notif = Notification.objects.filter(
+            recipient=self.admin,
+            module="billing",
+            payload__category="REFUND_PAID",
+        ).first()
+        self.assertIsNotNone(admin_notif)
+        self.assertIn("REF-2026-001", admin_notif.body)
+        self.assertEqual(admin_notif.payload.get("action_url"), "/admin/refunds/process")
+
+    def test_cashier_day_close_notifies_admin(self):
+        from subscriptions.services.operational_notification_service import (
+            schedule_cashier_day_close_notification,
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            schedule_cashier_day_close_notification(
+                day_close_id=707,
+                cashier_username="cashier_john",
+                business_date_str="2026-11-04",
+                counted_cash_str="12500.00",
+                variance_str="-200.00",
+                has_variance=True,
+            )
+
+        admin_notif = Notification.objects.filter(
+            recipient=self.admin,
+            module="finance",
+            payload__category="CASHIER_DAY_CLOSE",
+        ).first()
+        self.assertIsNotNone(admin_notif)
+        self.assertEqual(admin_notif.payload.get("severity"), "WARNING")
+        self.assertIn("cashier_john", admin_notif.body)
+        self.assertEqual(admin_notif.payload.get("action_url"), "/admin/settlements/day-closes")
+
+    def test_production_job_completed_notifies_admin(self):
+        from subscriptions.services.operational_notification_service import (
+            schedule_production_job_completed_notification,
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            schedule_production_job_completed_notification(
+                job_id=808,
+                job_no="JOB-2026-042",
+                product_name="Solid Oak Dining Table",
+                completed_qty_str="5.000",
+            )
+
+        admin_notif = Notification.objects.filter(
+            recipient=self.admin,
+            module="inventory",
+            payload__category="PRODUCTION_JOB_COMPLETED",
+        ).first()
+        self.assertIsNotNone(admin_notif)
+        self.assertIn("JOB-2026-042", admin_notif.body)
+        self.assertIn("Solid Oak Dining Table", admin_notif.body)
+        self.assertEqual(admin_notif.payload.get("action_url"), "/admin/operations")
+
+    def test_partner_collection_request_notifies_admin(self):
+        from subscriptions.services.operational_notification_service import (
+            schedule_partner_collection_request_notification,
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            schedule_partner_collection_request_notification(
+                request_id=909,
+                partner_username="partner_sharma",
+                customer_name="Sunil Dutt",
+                amount_str="1200.00",
+                reference_no="PARTNER-REC-01",
+            )
+
+        admin_notif = Notification.objects.filter(
+            recipient=self.admin,
+            module="partners",
+            payload__category="PARTNER_COLLECTION_REQUEST",
+        ).first()
+        self.assertIsNotNone(admin_notif)
+        self.assertIn("partner_sharma", admin_notif.body)
+        self.assertEqual(admin_notif.payload.get("action_url"), "/admin/partners/collection-requests")
+
+    def test_rental_asset_posture_notifies_admin(self):
+        from subscriptions.services.operational_notification_service import (
+            schedule_rental_asset_posture_notification,
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            schedule_rental_asset_posture_notification(
+                asset_id=1010,
+                asset_code="RA-SOFA-001",
+                product_name="Fabric Recliner",
+                status_label="UNDER_REPAIR",
+                is_damaged=True,
+                notes="Leg broken during return",
+            )
+
+        admin_notif = Notification.objects.filter(
+            recipient=self.admin,
+            module="rent",
+            payload__category="RENTAL_ASSET_UPDATED",
+        ).first()
+        self.assertIsNotNone(admin_notif)
+        self.assertEqual(admin_notif.payload.get("severity"), "WARNING")
+        self.assertIn("RA-SOFA-001", admin_notif.body)
+        self.assertEqual(admin_notif.payload.get("action_url"), "/admin/rent-lease/assets")
+
+    def test_reconciliation_completed_notifies_admin(self):
+        from subscriptions.services.operational_notification_service import (
+            schedule_reconciliation_completed_notification,
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            schedule_reconciliation_completed_notification(
+                run_id=1111,
+                total_checked=250,
+                total_matched=248,
+                total_exceptions=2,
+                high_risk_count=1,
+            )
+
+        admin_notif = Notification.objects.filter(
+            recipient=self.admin,
+            module="reconciliation",
+            payload__category="RECONCILIATION_COMPLETED",
+        ).first()
+        self.assertIsNotNone(admin_notif)
+        self.assertEqual(admin_notif.payload.get("severity"), "WARNING")
+        self.assertIn("1111", admin_notif.body)
+        self.assertIn("2 exceptions", admin_notif.body)
+        self.assertEqual(admin_notif.payload.get("action_url"), "/admin/reports/reconciliation")
+
+    def test_stock_adjustment_notifies_admin(self):
+        from subscriptions.services.operational_notification_service import (
+            schedule_stock_adjustment_notification,
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            schedule_stock_adjustment_notification(
+                ledger_id=1212,
+                product_name="Office Chair Ergonomic",
+                movement_type="DAMAGE",
+                quantity_str="2.000",
+                location_name="Main Showroom",
+                notes="Water damage from leak",
+            )
+
+        admin_notif = Notification.objects.filter(
+            recipient=self.admin,
+            module="inventory",
+            payload__category="STOCK_ADJUSTMENT",
+        ).first()
+        self.assertIsNotNone(admin_notif)
+        self.assertEqual(admin_notif.payload.get("severity"), "WARNING")
+        self.assertIn("Office Chair Ergonomic", admin_notif.body)
+        self.assertIn("DAMAGE", admin_notif.body)
+        self.assertEqual(admin_notif.payload.get("action_url"), "/admin/inventory/workspace")

@@ -320,6 +320,23 @@ def reveal_and_execute_draw(draw_id: int, revealed_seed: str, performed_by=None)
     except Exception:  # pragma: no cover - best-effort outbox
         pass
 
+    try:
+        from subscriptions.services.operational_notification_service import (
+            schedule_draw_winner_notifications,
+        )
+
+        schedule_draw_winner_notifications(
+            draw_id=draw.id,
+            batch_code=draw.batch.batch_code,
+            winner_customer_user_id=getattr(winner_subscription.customer, "user_id", None),
+            winner_customer_name=winner_subscription.customer.name,
+            lucky_number=winner_lucky_id.lucky_number,
+            waived_amount_str=str(waived_amount),
+            waived_count=waived_count,
+        )
+    except Exception:
+        pass
+
     if draw.draw_commit_id:
         from lucky_plan.services.batch_draw_coordination_service import (
             post_winner_operational_followup,

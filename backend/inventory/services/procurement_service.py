@@ -247,8 +247,21 @@ def post_goods_receipt(*, goods_receipt_id: int, posted_by=None):
         product_ids={line.inventory_item.product_id for line in receipt.lines.all()},
         actor=posted_by,
     )
-    
 
+    try:
+        from subscriptions.services.operational_notification_service import (
+            schedule_goods_receipt_notification,
+        )
+
+        schedule_goods_receipt_notification(
+            receipt_id=receipt.id,
+            receipt_no=receipt.receipt_no,
+            vendor_name=receipt.purchase_order.vendor.name if receipt.purchase_order and receipt.purchase_order.vendor else "Vendor",
+            po_no=receipt.purchase_order.po_no if receipt.purchase_order else None,
+            items_count=receipt.lines.count(),
+        )
+    except Exception:
+        pass
 
     return receipt, True
 
@@ -402,6 +415,18 @@ def post_vendor_bill(*, vendor_bill_id: int, posted_by=None):
         posted_by=posted_by,
         notes=f"Vendor bill posted via journal {journal_entry.entry_no}.",
     )
+    try:
+        from subscriptions.services.operational_notification_service import (
+            schedule_vendor_bill_notification,
+        )
+
+        schedule_vendor_bill_notification(
+            bill_id=bill.id,
+            vendor_name=bill.vendor.name if bill.vendor else "Vendor",
+            amount=str(bill.grand_total),
+        )
+    except Exception:
+        pass
     return bill, True
 
 
@@ -476,6 +501,20 @@ def post_vendor_payment(*, vendor_payment_id: int, posted_by=None):
         posted_by=posted_by,
         notes=f"Vendor payment posted via journal {journal_entry.entry_no}.",
     )
+    try:
+        from subscriptions.services.operational_notification_service import (
+            schedule_vendor_payment_notification,
+        )
+
+        schedule_vendor_payment_notification(
+            payment_id=payment.id,
+            payment_no=payment.payment_no,
+            vendor_name=payment.vendor.name if payment.vendor else "Vendor",
+            amount_str=str(payment.amount),
+            bill_no=payment.vendor_bill.bill_no if payment.vendor_bill else None,
+        )
+    except Exception:
+        pass
     return payment, True
 
 

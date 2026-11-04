@@ -60,7 +60,7 @@ class RealtimeTicketView(APIView):
 
 
 def _unread_count(user_id: int) -> int:
-    return Notification.objects.filter(recipient_id=user_id, read_at__isnull=True).count()
+    return Notification.objects.filter(recipient_id=user_id, read_at__isnull=True, archived_at__isnull=True).count()
 
 
 def _sse_event(event: str, payload: dict) -> str:

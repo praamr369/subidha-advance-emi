@@ -4,6 +4,7 @@ import NotificationCenterPanel from "@/components/notifications/NotificationCent
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import { ROUTES } from "@/lib/routes";
 import {
+  archiveNotification,
   listCashierNotifications,
   markCashierNotificationRead,
 } from "@/services/notifications";
@@ -22,6 +23,7 @@ export default function CashierNotificationsPage() {
         ]}
         list={listCashierNotifications}
         markRead={markCashierNotificationRead}
+        archive={archiveNotification}
       />
       </ERPSectionShell>
     </div>

@@ -124,6 +124,20 @@ def create_customer_product_request(
         status=ProductRequestStatus.SUBMITTED,
         **_snapshot_customer_fields(customer),
     )
+    try:
+        from subscriptions.services.operational_notification_service import (
+            schedule_product_request_notification,
+        )
+
+        schedule_product_request_notification(
+            request_id=request_obj.id,
+            requester_name=customer.name or "Customer",
+            product_name=product.name or "Product",
+            request_type=request_type,
+            role="customer",
+        )
+    except Exception:
+        pass
     return request_obj
 
 
@@ -178,6 +192,20 @@ def create_partner_product_request(
         })
 
     request_obj = ProductRequest.objects.create(**payload)
+    try:
+        from subscriptions.services.operational_notification_service import (
+            schedule_product_request_notification,
+        )
+
+        schedule_product_request_notification(
+            request_id=request_obj.id,
+            requester_name=getattr(partner, "username", "Partner"),
+            product_name=product.name or "Product",
+            request_type=request_type,
+            role="partner",
+        )
+    except Exception:
+        pass
     return request_obj
 
 

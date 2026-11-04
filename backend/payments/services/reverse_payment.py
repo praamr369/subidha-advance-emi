@@ -87,6 +87,21 @@ def reverse_payment(*, payment_id: int, reversed_by, reason: str = "") -> dict:
                 emi.__class__.objects.filter(pk=emi.pk).update(status=EmiStatus.PENDING)
                 emi_id = emi.pk
 
+    try:
+        from subscriptions.services.operational_notification_service import (
+            schedule_payment_reversal_notification,
+        )
+
+        schedule_payment_reversal_notification(
+            payment_id=payment.pk,
+            reversal_ledger_id=reversal_ledger.pk,
+            amount_str=str(reversal_amount),
+            reason=reason,
+            reversed_by_username=getattr(reversed_by, "username", str(reversed_by or "")),
+        )
+    except Exception:
+        pass
+
     return {
         "payment_id": payment.pk,
         "reversal_ledger_id": reversal_ledger.pk,

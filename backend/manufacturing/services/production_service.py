@@ -1027,6 +1027,24 @@ def complete_production_job(*, job_id: int, performed_by=None):
         event="PRODUCTION_JOB_COMPLETED",
         metadata={"production_job_id": job.id, "job_no": job.job_no},
     )
+    try:
+        from subscriptions.services.operational_notification_service import (
+            schedule_production_job_completed_notification,
+        )
+
+        prod_name = (
+            job.finished_good_inventory_item.product.name
+            if job.finished_good_inventory_item and job.finished_good_inventory_item.product
+            else "Product"
+        )
+        schedule_production_job_completed_notification(
+            job_id=job.id,
+            job_no=job.job_no,
+            product_name=prod_name,
+            completed_qty_str=str(job.completed_output_qty),
+        )
+    except Exception:
+        pass
     return job, True
 
 
