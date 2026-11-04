@@ -316,7 +316,15 @@ class PublicProductSerializer(serializers.ModelSerializer):
 
         req = self.context.get("request")
         variants = []
+        has_child_pim = pim.child_pim_products.exists()
+        published_skus = (
+            set(pim.child_pim_products.filter(is_published=True).values_list("code", flat=True))
+            if has_child_pim
+            else set()
+        )
         for variant in pim.variants.filter(is_active=True):
+            if has_child_pim and variant.sku not in published_skus:
+                continue
             op = getattr(variant, "operational_product", None)
             # Image priority: variant.image → op.image → VARIANT-scoped gallery → ALL_VARIANTS gallery
             img = None

@@ -432,20 +432,18 @@ class PimProductViewSet(viewsets.ModelViewSet):
             found_ids = {product.id for product in products}
             missing_ids = sorted(set(product_ids) - found_ids)
             affected_ids = set(found_ids)
-            for product in products:
-                affected_ids.update(product.child_pim_products.values_list("id", flat=True))
+            cascade = bool(request.data.get("cascade", False))
+            if cascade:
+                for product in products:
+                    affected_ids.update(product.child_pim_products.values_list("id", flat=True))
             changed = PimProduct.objects.filter(id__in=affected_ids).update(is_published=published)
             activated_variants = 0
             if published:
+                from products_pim.models import ProductVariant
+                affected_codes = list(PimProduct.objects.filter(id__in=affected_ids).values_list("code", flat=True))
+                activated_variants += ProductVariant.objects.filter(sku__in=affected_codes, is_active=False).update(is_active=True)
                 for product in products:
                     activated_variants += product.variants.filter(is_active=False).update(is_active=True)
-                parent_ids = list(
-                    PimProduct.objects.filter(id__in=affected_ids, parent__isnull=False)
-                    .values_list("parent_id", flat=True)
-                    .distinct()
-                )
-                if parent_ids:
-                    PimProduct.objects.filter(id__in=parent_ids, is_published=False).update(is_published=True)
 
         return Response({
             "published": published,
@@ -546,10 +544,11 @@ class PimProductViewSet(viewsets.ModelViewSet):
                             child.source_product.save(update_fields=list(mode_fields))
                     if flag:
                         any_published_now = True
-
-                if any_published_now and not pim.is_published:
-                    pim.is_published = True
-                    pim.save(update_fields=["is_published"])
+                        if target_id:
+                            child = PimProduct.objects.filter(pk=target_id).first()
+                            if child:
+                                from products_pim.models import ProductVariant
+                                ProductVariant.objects.filter(sku=child.code, is_active=False).update(is_active=True)
 
                 pim.refresh_from_db(fields=["is_published"])
 

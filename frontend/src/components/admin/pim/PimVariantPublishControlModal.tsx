@@ -226,11 +226,6 @@ export function PimVariantPublishControlEditor({
         return { ...v, is_published: nextPublished };
       })
     );
-    // If a variant is published, base should automatically be marked published
-    const target = localVariants.find((v) => v.id === id);
-    if (target && !target.is_published && !basePublished) {
-      setBasePublished(true);
-    }
     setDirty(true);
   }
 

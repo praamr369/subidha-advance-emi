@@ -322,21 +322,27 @@ class ProductPimVariantPublishControlView(APIView):
             for row in variant_updates:
                 vid = row.get("id")
                 flag = bool(row.get("is_published", False))
+                mode_fields = {key: bool(row[key]) for key in ("is_emi_enabled", "is_rent_enabled", "is_lease_enabled", "is_direct_sale_enabled") if key in row}
                 if vid in child_ids:
                     # Received a child PimProduct ID directly
-                    PimProduct.objects.filter(pk=vid).update(is_published=flag)
+                    PimProduct.objects.filter(pk=vid).update(is_published=flag, **mode_fields)
                 elif vid in variant_to_child:
                     # Received a ProductVariant ID — map to its child PimProduct
-                    PimProduct.objects.filter(pk=variant_to_child[vid]).update(is_published=flag)
+                    PimProduct.objects.filter(pk=variant_to_child[vid]).update(is_published=flag, **mode_fields)
+                target_id = vid if vid in child_ids else variant_to_child.get(vid)
+                if target_id:
+                    child = PimProduct.objects.filter(pk=target_id).select_related("source_product").first()
+                    if child:
+                        if mode_fields and child.source_product_id:
+                            for field, value in mode_fields.items():
+                                setattr(child.source_product, field, value)
+                            child.source_product.save(update_fields=list(mode_fields))
+                        if flag:
+                            ProductVariant.objects.filter(sku=child.code, is_active=False).update(is_active=True)
                 if flag:
                     any_published_now = True
 
-            # If any variant is published, automatically ensure the base blueprint is published
-            if any_published_now and not pim.is_published:
-                pim.is_published = True
-                pim.save(update_fields=["is_published"])
-
-            # Re-read base state in case it changed
+            # Re-read base state
             pim.refresh_from_db(fields=["is_published"])
 
         return Response({

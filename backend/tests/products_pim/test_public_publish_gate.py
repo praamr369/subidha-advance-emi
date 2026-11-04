@@ -4,7 +4,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from products_pim.models import PimProduct
-from tests.helpers import create_product
+from tests.helpers import create_product, create_admin_user
 
 LIST_URL = "/api/v1/public/products/"
 
@@ -151,3 +151,183 @@ class PublicPublishGateTests(APITestCase):
 
         resp_var = self.client.get(f"{LIST_URL}DRAFT-BED-KING/")
         self.assertEqual(resp_var.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_variant_publish_control_allows_draft_base_with_published_variant(self):
+        """Admin can publish a single variant while keeping base blueprint in draft."""
+        from products_pim.models import ProductVariant
+
+        admin = create_admin_user(username="pub_admin", phone="9364000123")
+        self.client.force_authenticate(user=admin)
+
+        blueprint = self._product("SOLO-BED", "Solo Bed Blueprint", published=False)
+        base_pim = blueprint.pim.first()
+        self.assertFalse(base_pim.is_published)
+
+        var_king = PimProduct.objects.create(
+            code="SOLO-BED-KING",
+            name="Solo Bed - King",
+            category=base_pim.category,
+            parent=base_pim,
+            is_published=False,
+            base_price=Decimal("15000.00"),
+        )
+        ProductVariant.objects.create(
+            product=base_pim,
+            sku="SOLO-BED-KING",
+            price=Decimal("15000.00"),
+        )
+        var_queen = PimProduct.objects.create(
+            code="SOLO-BED-QUEEN",
+            name="Solo Bed - Queen",
+            category=base_pim.category,
+            parent=base_pim,
+            is_published=False,
+            base_price=Decimal("12000.00"),
+        )
+        ProductVariant.objects.create(
+            product=base_pim,
+            sku="SOLO-BED-QUEEN",
+            price=Decimal("12000.00"),
+        )
+
+        # PATCH publish control: base_published=False, King=True, Queen=False
+        url = f"/api/v1/pim/products/{base_pim.id}/variants_publish_control/"
+        resp = self.client.patch(
+            url,
+            {
+                "base_published": False,
+                "variants": [
+                    {"id": var_king.id, "is_published": True},
+                    {"id": var_queen.id, "is_published": False},
+                ],
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.data)
+        self.assertFalse(resp.data["base"]["is_published"])
+
+        base_pim.refresh_from_db()
+        var_king.refresh_from_db()
+        var_queen.refresh_from_db()
+
+        self.assertFalse(base_pim.is_published, "Base blueprint must remain in draft")
+        self.assertTrue(var_king.is_published, "King variant must be published")
+        self.assertFalse(var_queen.is_published, "Queen variant must remain in draft")
+
+    def test_bulk_publish_only_selected_variant_preserves_draft_base_and_siblings(self):
+        """Bulk publish with a specific variant ID publishes ONLY that variant."""
+        from products_pim.models import ProductVariant
+
+        admin = create_admin_user(username="bulk_pub_admin", phone="9364000124")
+        self.client.force_authenticate(user=admin)
+
+        blueprint = self._product("BULK-BED", "Bulk Bed Blueprint", published=False)
+        base_pim = blueprint.pim.first()
+
+        var_king = PimProduct.objects.create(
+            code="BULK-BED-KING",
+            name="Bulk Bed - King",
+            category=base_pim.category,
+            parent=base_pim,
+            is_published=False,
+            base_price=Decimal("16000.00"),
+        )
+        ProductVariant.objects.create(product=base_pim, sku="BULK-BED-KING", price=Decimal("16000.00"))
+        var_queen = PimProduct.objects.create(
+            code="BULK-BED-QUEEN",
+            name="Bulk Bed - Queen",
+            category=base_pim.category,
+            parent=base_pim,
+            is_published=False,
+            base_price=Decimal("13000.00"),
+        )
+        ProductVariant.objects.create(product=base_pim, sku="BULK-BED-QUEEN", price=Decimal("13000.00"))
+
+        # Bulk publish ONLY the King variant
+        resp = self.client.post(
+            "/api/v1/pim/products/bulk-publish/",
+            {"product_ids": [var_king.id], "published": True},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.data)
+        self.assertEqual(resp.data["affected_products"], 1)
+
+        base_pim.refresh_from_db()
+        var_king.refresh_from_db()
+        var_queen.refresh_from_db()
+
+        self.assertFalse(base_pim.is_published, "Base blueprint must stay draft")
+        self.assertTrue(var_king.is_published, "Selected King variant must be published")
+        self.assertFalse(var_queen.is_published, "Unselected Queen variant must stay draft")
+
+    def test_variant_publish_activates_product_variant_and_filters_public_detail(self):
+        """Publishing a variant activates its ProductVariant and only shows published variants publicly."""
+        from products_pim.models import ProductVariant
+
+        admin = create_admin_user(username="detail_pub_admin", phone="9364000125")
+        self.client.force_authenticate(user=admin)
+
+        blueprint = self._product("DETAIL-BED", "Detail Bed Blueprint", published=False)
+        base_pim = blueprint.pim.first()
+
+        var_king_prod = create_product(name="Detail Bed - King", product_code="DETAIL-BED-KING", published=False)
+        var_king = PimProduct.objects.filter(source_product=var_king_prod).first()
+        var_king.parent = base_pim
+        var_king.is_published = False
+        var_king.save(update_fields=["parent", "is_published"])
+
+        pv_king = ProductVariant.objects.create(
+            product=base_pim,
+            operational_product=var_king_prod,
+            sku="DETAIL-BED-KING",
+            price=Decimal("17000.00"),
+            is_active=False,
+        )
+
+        var_queen_prod = create_product(name="Detail Bed - Queen", product_code="DETAIL-BED-QUEEN", published=False)
+        var_queen = PimProduct.objects.filter(source_product=var_queen_prod).first()
+        var_queen.parent = base_pim
+        var_queen.is_published = False
+        var_queen.save(update_fields=["parent", "is_published"])
+
+        pv_queen = ProductVariant.objects.create(
+            product=base_pim,
+            operational_product=var_queen_prod,
+            sku="DETAIL-BED-QUEEN",
+            price=Decimal("14000.00"),
+            is_active=True,
+        )
+
+        # Publish King variant via variants_publish_control
+        resp = self.client.patch(
+            f"/api/v1/pim/products/{base_pim.id}/variants_publish_control/",
+            {
+                "base_published": False,
+                "variants": [
+                    {"id": var_king.id, "is_published": True},
+                    {"id": var_queen.id, "is_published": False},
+                ],
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+
+        pv_king.refresh_from_db()
+        self.assertTrue(pv_king.is_active, "ProductVariant must be activated when variant is published")
+
+        # Now test public unauthenticated detail access on base blueprint
+        self.client.force_authenticate(user=None)
+        resp_detail = self.client.get(f"{LIST_URL}DETAIL-BED/")
+        self.assertEqual(resp_detail.status_code, status.HTTP_200_OK)
+
+        pim_variant_skus = {v["sku"] for v in resp_detail.data.get("pim_variants", [])}
+        self.assertIn("DETAIL-BED-KING", pim_variant_skus, "Published variant must be listed under blueprint")
+        self.assertNotIn("DETAIL-BED-QUEEN", pim_variant_skus, "Draft variant must NOT be listed under blueprint")
+
+        # Reachable by published variant directly
+        resp_king = self.client.get(f"{LIST_URL}DETAIL-BED-KING/")
+        self.assertEqual(resp_king.status_code, status.HTTP_200_OK)
+
+        # Unreachable by draft variant directly (stays 404)
+        resp_queen = self.client.get(f"{LIST_URL}DETAIL-BED-QUEEN/")
+        self.assertEqual(resp_queen.status_code, status.HTTP_404_NOT_FOUND)

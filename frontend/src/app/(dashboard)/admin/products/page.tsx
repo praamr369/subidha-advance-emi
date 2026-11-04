@@ -5,7 +5,7 @@ import { formatRupee } from "@/lib/utils/currency";
 import Link from "next/link";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { Download, RefreshCw, Search, SlidersHorizontal, X, Layers, ExternalLink, ChevronRight, ChevronDown, GitBranch, CheckCircle2, AlertCircle, Star, Package2, CircleHelp, QrCode, Boxes, Sparkles } from "lucide-react";
+import { Download, RefreshCw, Search, SlidersHorizontal, X, Layers, ExternalLink, ChevronRight, ChevronDown, GitBranch, CheckCircle2, AlertCircle, Star, Package2, CircleHelp, QrCode, Boxes, Sparkles, Eye, EyeOff } from "lucide-react";
 import PimHelpGuideTab from "@/components/admin/help/PimHelpGuideTab";
 import PimPurchaseStockPanel from "@/components/admin/pim/PimPurchaseStockPanel";
 import { pimService, type PimProduct, type PimCategory, type PimTreeSummary } from "@/services/pim";
@@ -257,6 +257,8 @@ function PimProductRow({
   onToggle,
   selected = false,
   onSelect,
+  togglingId,
+  onTogglePublish,
   onPrintQR,
   onQuickEdit,
   onOpenPublishControl,
@@ -268,6 +270,8 @@ function PimProductRow({
   onToggle?: () => void;
   selected?: boolean;
   onSelect?: (selected: boolean) => void;
+  togglingId?: number | null;
+  onTogglePublish?: (p: PimProduct) => void;
   onPrintQR?: (p: PimProduct) => void;
   onQuickEdit?: (p: PimProduct) => void;
   onOpenPublishControl?: (p: PimProduct) => void;
@@ -279,7 +283,7 @@ function PimProductRow({
       {/* Code + expand toggle */}
       <td className="px-4 py-2.5">
         <div className={`flex items-center gap-1.5 ${isChild ? "pl-6" : ""}`}>
-          {!isChild && onSelect ? (
+          {onSelect ? (
             <input
               type="checkbox"
               aria-label={`Select ${p.full_name || p.name}`}
@@ -355,23 +359,28 @@ function PimProductRow({
         )}
       </td>
 
-      {/* Status — variant SKUs inherit their blueprint's publish status */}
+      {/* Status — interactive toggle */}
       <td className="px-4 py-2.5 text-center">
-        {(() => {
-          const effectivePublished = p.is_published;
-          if (effectivePublished) {
-            return (
-              <span className="text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded-full px-2 py-0.5">
-                Published
-              </span>
-            );
-          }
-          return (
-            <span className="text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
-              Draft
-            </span>
-          );
-        })()}
+        <button
+          type="button"
+          onClick={() => onTogglePublish?.(p)}
+          disabled={togglingId === p.id}
+          className={`inline-flex items-center gap-1 text-xs font-semibold rounded-full px-2.5 py-0.5 border transition cursor-pointer hover:shadow-2xs disabled:opacity-50 ${
+            p.is_published
+              ? "text-emerald-700 bg-emerald-50 border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
+              : "text-amber-700 bg-amber-50 border-amber-200 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800"
+          }`}
+          title={p.is_published ? "Click to set Draft (Private)" : "Click to Publish (Live)"}
+        >
+          {togglingId === p.id ? (
+            <RefreshCw className="h-2.5 w-2.5 animate-spin" />
+          ) : p.is_published ? (
+            <Eye className="h-2.5 w-2.5" />
+          ) : (
+            <EyeOff className="h-2.5 w-2.5" />
+          )}
+          <span>{p.is_published ? "Published" : "Draft"}</span>
+        </button>
       </td>
 
       {/* Manage */}
@@ -401,16 +410,14 @@ function PimProductRow({
           >
             Full Page Window <ExternalLink className="h-3 w-3" />
           </Link>
-          {!isChild && (
-            <button
-              type="button"
-              onClick={() => onOpenPublishControl?.(p)}
-              className="inline-flex items-center gap-1 text-violet-600 dark:text-violet-400 text-xs hover:underline font-semibold cursor-pointer text-left"
-              title="Quickly control publish status and commercial channels in a pop up window"
-            >
-              Publish control (Pop-up) <Layers className="h-3 w-3" />
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => onOpenPublishControl?.(p)}
+            className="inline-flex items-center gap-1 text-violet-600 dark:text-violet-400 text-xs hover:underline font-semibold cursor-pointer text-left"
+            title="Quickly control publish status and commercial channels in a pop up window"
+          >
+            Publish control (Pop-up) <Layers className="h-3 w-3" />
+          </button>
           {p.code && (
             <Link
               href={`/admin/products?q=${encodeURIComponent(p.code)}`}
@@ -531,6 +538,7 @@ function PimPanel({
   const [selectedPimIds, setSelectedPimIds] = useState<Set<number>>(new Set());
   const [bulkPublishing, setBulkPublishing] = useState(false);
   const [bulkPublishResult, setBulkPublishResult] = useState<string | null>(null);
+  const [togglingPimId, setTogglingPimId] = useState<number | null>(null);
   const [qrModalItem, setQrModalItem] = useState<QRLabelItem | null>(null);
   const [qrModalItems, setQrModalItems] = useState<QRLabelItem[] | null>(null);
   const [quickEditPimProduct, setQuickEditPimProduct] = useState<PimProduct | null>(null);
@@ -592,6 +600,22 @@ function PimPanel({
   useEffect(() => {
     setSelectedPimIds(new Set());
   }, [pimSearch, pimCat, pimPage, pimPageSize]);
+
+  const handleToggleSinglePublish = useCallback(async (product: PimProduct) => {
+    setTogglingPimId(product.id);
+    const nextPublished = !product.is_published;
+    try {
+      await pimService.bulkPublish({ product_ids: [product.id], published: nextPublished });
+      setPimProducts((prev) =>
+        prev.map((item) => (item.id === product.id ? { ...item, is_published: nextPublished } : item))
+      );
+      onSyncRegister?.();
+    } catch (error) {
+      setPimError(error instanceof Error ? error.message : "Publication toggle failed.");
+    } finally {
+      setTogglingPimId(null);
+    }
+  }, [onSyncRegister]);
 
   const handleBulkPublish = useCallback(async (published: boolean) => {
     const ids = Array.from(selectedPimIds);
@@ -864,6 +888,8 @@ function PimPanel({
                         if (selected) next.add(node.product.id); else next.delete(node.product.id);
                         return next;
                       })}
+                      togglingId={togglingPimId}
+                      onTogglePublish={handleToggleSinglePublish}
                       onPrintQR={(prod) => {
                         setQrModalItem(pimProductToQRLabel(prod));
                         setQrModalItems(null);
@@ -876,6 +902,14 @@ function PimPanel({
                         key={child.id}
                         p={child}
                         isChild
+                        selected={selectedPimIds.has(child.id)}
+                        onSelect={(selected) => setSelectedPimIds((current) => {
+                          const next = new Set(current);
+                          if (selected) next.add(child.id); else next.delete(child.id);
+                          return next;
+                        })}
+                        togglingId={togglingPimId}
+                        onTogglePublish={handleToggleSinglePublish}
                         onPrintQR={(prod) => {
                           setQrModalItem(pimProductToQRLabel(prod));
                           setQrModalItems(null);
@@ -893,6 +927,14 @@ function PimPanel({
                   key={p.id}
                   p={p}
                   isChild
+                  selected={selectedPimIds.has(p.id)}
+                  onSelect={(selected) => setSelectedPimIds((current) => {
+                    const next = new Set(current);
+                    if (selected) next.add(p.id); else next.delete(p.id);
+                    return next;
+                  })}
+                  togglingId={togglingPimId}
+                  onTogglePublish={handleToggleSinglePublish}
                   onPrintQR={(prod) => {
                     setQrModalItem(pimProductToQRLabel(prod));
                     setQrModalItems(null);
@@ -937,17 +979,25 @@ function PimPanel({
           initialProduct={publishControlProduct}
           onClose={() => setPublishControlProduct(null)}
           onSaved={(controlData) => {
-            // Optimistically update the product's is_published status in pimProducts state immediately
+            // Optimistically update both base and variant is_published statuses in pimProducts state immediately
             setPimProducts((prev) =>
-              prev.map((item) =>
-                item.id === controlData.base.id
-                  ? {
-                      ...item,
-                      is_published: controlData.base.is_published,
-                      base_price: controlData.base.base_price ?? "",
-                    }
-                  : item
-              )
+              prev.map((item) => {
+                if (item.id === controlData.base.id) {
+                  return {
+                    ...item,
+                    is_published: controlData.base.is_published,
+                    base_price: controlData.base.base_price ?? "",
+                  };
+                }
+                const variantMatch = controlData.variants.find((v) => v.id === item.id);
+                if (variantMatch) {
+                  return {
+                    ...item,
+                    is_published: variantMatch.is_published,
+                  };
+                }
+                return item;
+              })
             );
             void loadPimProducts();
             onSyncRegister?.();
