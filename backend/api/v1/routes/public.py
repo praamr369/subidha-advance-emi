@@ -410,12 +410,11 @@ class PublicProductsView(generics.ListAPIView):
     def get_queryset(self):
         # Public site shows sellable finished goods only — raw materials and
         # accessories (manufacturing inputs) are internal, admin-only items.
-        # Products with a linked PimProduct must have it published (or have at least
-        # one published variant); products without any PimProduct are shown as-is.
+        # Products with a linked PimProduct must have it explicitly published.
+        # Draft products (is_published=False) are never shown in the public catalogue.
         public_publish_filter = (
             Q(pim__isnull=True) |
-            Q(pim__is_published=True) |
-            Q(pim__child_pim_products__is_published=True)
+            Q(pim__is_published=True)
         )
         queryset = (
             Product.objects.filter(is_active=True, item_type="FINISHED_GOOD")

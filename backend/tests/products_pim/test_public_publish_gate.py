@@ -88,38 +88,40 @@ class PublicPublishGateTests(APITestCase):
     # ── blueprint + variant publish qualification ─────────────────────────────
 
     def test_blueprint_with_published_variant_is_listed_and_reachable(self):
-        """A blueprint whose base PIM is draft (e.g. BAHU-BED) must be public
-        if any of its child variants (e.g. BAHU-BED-MET-K(FX7F) are published."""
+        """A draft blueprint is NOT listed in the public catalogue, but is reachable
+        by QR code destination URL when it has published variants."""
         from products_pim.models import ProductVariant
 
         blueprint = self._product("BLUE-BED", "Blue Bed Blueprint", published=False)
         base_pim = blueprint.pim.first()
         self.assertFalse(base_pim.is_published)
 
-        # Create child PIM product for variant marked published
-        PimProduct.objects.create(
-            code="BLUE-BED-KING",
-            name="Blue Bed - King",
-            category=base_pim.category,
-            parent=base_pim,
-            is_published=True,
-            base_price=Decimal("15000.00"),
-        )
+        # Create child operational product and PIM product for variant marked published
+        var_prod = self._product("BLUE-BED-KING", "Blue Bed - King", published=True)
+        var_pim = var_prod.pim.first()
+        var_pim.parent = base_pim
+        var_pim.save(update_fields=["parent"])
+
         ProductVariant.objects.create(
             product=base_pim,
+            operational_product=var_prod,
             sku="BLUE-BED-KING",
             price=Decimal("15000.00"),
+            is_active=True,
         )
 
-        # 1. Blueprint must be in public listing
-        self.assertIn("BLUE-BED", self._listed_codes())
+        # 1. Draft blueprint must NOT be in public listing (no dummy ₹0 card)
+        self.assertNotIn("BLUE-BED", self._listed_codes())
 
-        # 2. Blueprint must be reachable by base code (QR code destination)
+        # 2. Published variant MUST be in public listing
+        self.assertIn("BLUE-BED-KING", self._listed_codes())
+
+        # 3. Blueprint is reachable by base code (QR code destination)
         resp = self.client.get(f"{LIST_URL}BLUE-BED/")
         self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.data)
         self.assertEqual(resp.data["product_code"], "BLUE-BED")
 
-        # 3. Reachable by variant SKU directly
+        # 4. Reachable by variant SKU directly
         resp_var = self.client.get(f"{LIST_URL}BLUE-BED-KING/")
         self.assertEqual(resp_var.status_code, status.HTTP_200_OK, resp_var.data)
 
@@ -315,8 +317,14 @@ class PublicPublishGateTests(APITestCase):
         pv_king.refresh_from_db()
         self.assertTrue(pv_king.is_active, "ProductVariant must be activated when variant is published")
 
-        # Now test public unauthenticated detail access on base blueprint
+        # In the public catalogue listing:
         self.client.force_authenticate(user=None)
+        listed = self._listed_codes()
+        self.assertNotIn("DETAIL-BED", listed, "Draft blueprint must NOT appear in public catalogue listing")
+        self.assertIn("DETAIL-BED-KING", listed, "Published King variant MUST appear in public catalogue listing")
+        self.assertNotIn("DETAIL-BED-QUEEN", listed, "Draft Queen variant must NOT appear in public catalogue listing")
+
+        # Now test public unauthenticated detail access on base blueprint
         resp_detail = self.client.get(f"{LIST_URL}DETAIL-BED/")
         self.assertEqual(resp_detail.status_code, status.HTTP_200_OK)
 
