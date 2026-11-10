@@ -14,6 +14,7 @@ from rest_framework.views import APIView
 from billing.models import (
     BillingCreditNote,
     BillingDebitNote,
+    BillingDocumentStatus,
     BillingInstallmentMirror,
     BillingInvoice,
     BillingProfile,
@@ -402,9 +403,11 @@ class DirectSaleViewSet(AdminBillingModelViewSet):
     @action(detail=True, methods=["post"], url_path="resync-stock")
     def resync_stock(self, request, pk=None):
         sale = self.get_object()
-        invoice = sale.billing_invoices.filter(status=BillingDocumentStatus.POSTED).order_by("-id").first()
-        if not invoice:
-            invoice = sale.billing_invoices.order_by("-id").first()
+        invoice = (
+            sale.billing_invoices.filter(status=BillingDocumentStatus.POSTED).order_by("-id").first()
+            or sale.billing_invoices.filter(status=BillingDocumentStatus.APPROVED).order_by("-id").first()
+            or sale.billing_invoices.order_by("-id").first()
+        )
         if not invoice:
             raise ValidationError({"detail": "No billing invoice linked to this direct sale."})
         from inventory.services.stock_service import post_invoice_stock_movements
@@ -543,21 +546,26 @@ class BillingInvoiceViewSet(AdminBillingModelViewSet):
     @action(detail=False, methods=["post"], url_path="resync-all-stock")
     def resync_all_stock(self, request):
         from inventory.services.stock_service import post_invoice_stock_movements
-        invoices = BillingInvoice.objects.filter(status=BillingDocumentStatus.POSTED).order_by("id")
+        invoices = BillingInvoice.objects.filter(
+            status__in=[BillingDocumentStatus.POSTED, BillingDocumentStatus.APPROVED]
+        ).order_by("id")
         total_created = 0
         total_existing = 0
         processed_invoices = 0
         for inv in invoices:
-            res = post_invoice_stock_movements(invoice=inv, posted_by=request.user)
-            total_created += res.get("created_count", 0)
-            total_existing += res.get("existing_count", 0)
-            processed_invoices += 1
+            try:
+                res = post_invoice_stock_movements(invoice=inv, posted_by=request.user)
+                total_created += res.get("created_count", 0)
+                total_existing += res.get("existing_count", 0)
+                processed_invoices += 1
+            except Exception:
+                continue
         return Response({
             "updated": True,
             "invoices_processed": processed_invoices,
             "total_created": total_created,
             "total_existing": total_existing,
-            "message": f"Successfully checked {processed_invoices} posted invoices. Created {total_created} missing stock movements.",
+            "message": f"Successfully checked {processed_invoices} invoices. Created {total_created} missing stock movements.",
         })
 
     @action(detail=True, methods=["get"], url_path="delivery-readiness")

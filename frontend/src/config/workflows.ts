@@ -11,7 +11,8 @@ export type WorkflowId =
   | "admin.collectPayment"
   | "admin.openSupplierPayables"
   | "partner.submitCollection"
-  | "customer.createSubscriptionRequest";
+  | "customer.createSubscriptionRequest"
+  | "admin.openingStock";
 
 export type WorkflowSurface = "drawer" | "route";
 
@@ -43,6 +44,15 @@ export const WORKFLOWS: ReadonlyArray<WorkflowDefinition> = [
     roles: ["ADMIN"],
     icon: "products",
     canonicalHref: "/admin/pim/products/create",
+    surface: "drawer",
+  },
+  {
+    id: "admin.openingStock",
+    label: "Quick Stock Intake",
+    description: "Post opening stock or stock intake for any product without leaving your current workspace.",
+    roles: ["ADMIN"],
+    icon: "billing",
+    canonicalHref: ROUTES.admin.inventoryOpeningStock,
     surface: "drawer",
   },
   {

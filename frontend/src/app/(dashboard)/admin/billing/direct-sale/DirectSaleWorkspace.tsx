@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { AlertCircle, Barcode, Calculator, CheckCircle2, Plus, QrCode, ReceiptText, Search, ShieldAlert, ShieldCheck, Smartphone, Trash2, Zap } from "lucide-react";
+import { AlertCircle, Barcode, Calculator, CheckCircle2, PackagePlus, Plus, QrCode, ReceiptText, Search, ShieldAlert, ShieldCheck, Smartphone, Trash2, Zap } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import AccountingBridgeReadinessIndicator from "@/components/admin/accounting/AccountingBridgeReadinessIndicator";
@@ -21,6 +21,7 @@ import OperationalNextStepsPanel from "@/components/workflows/OperationalNextSte
 import { useWorkflowLauncher } from "@/components/workflows/WorkflowProvider";
 import DirectSaleCollectDrawer from "@/features/direct-sale/components/DirectSaleCollectDrawer";
 import ProductPostureCard, { normalizeProductPosture } from "@/components/customers/ProductPostureCard";
+import QuickOpeningStockDrawer, { type QuickOpeningStockProduct, type StockPostedResult } from "@/components/inventory/QuickOpeningStockDrawer";
 import { apiFetch } from "@/lib/api";
 import { listFinanceAccounts } from "@/services/accounting";
 import { createAdminDirectSaleOrchestrated } from "@/services/admin-sales";
@@ -407,6 +408,12 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
     new_customer_email: "",
   });
   const [lines, setLines] = useState<DraftLine[]>([makeLine()]);
+  const [stockDrawer, setStockDrawer] = useState<{
+    open: boolean;
+    targetLineId: string | null;
+    product: QuickOpeningStockProduct | null;
+  }>({ open: false, targetLineId: null, product: null });
+  const lastActiveLineRef = useRef<string | null>(null);
   const [accessoryPanel, setAccessoryPanel] = useState<{ productId: number; lineId: string } | null>(null);
   const lineSearchTimers = useRef<Record<string, number>>({});
   const customerSearchTimer = useRef<number | null>(null);
@@ -1176,6 +1183,112 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
       setAccessoryPanel({ productId: product.id, lineId });
     }
   }
+
+  const handleStockPosted = useCallback(async (result: StockPostedResult) => {
+    // 1. Update matching lines in memory immediately so UI reflects in real-time
+    setLines((prevLines) =>
+      prevLines.map((l) => {
+        const matchesProduct = l.selected_product?.id === result.productId;
+        if (!matchesProduct) return l;
+
+        const updatedQty = Number(result.newAvailableQty);
+        const lineQty = toNumber(l.quantity);
+        const fulfilled = updatedQty >= lineQty;
+        return {
+          ...l,
+          inventory_item_id: String(result.inventoryItemId),
+          create_requirement: !fulfilled,
+          requirement_quantity: !fulfilled ? quantity(lineQty - updatedQty) : "0.000",
+          selected_product: {
+            ...l.selected_product!,
+            current_stock_qty: String(result.newAvailableQty),
+            inventory_status: {
+              ...l.selected_product!.inventory_status,
+              on_hand: String(result.newAvailableQty),
+              available: String(result.newAvailableQty),
+              is_in_stock: result.newAvailableQty > 0,
+              requires_purchase: !fulfilled,
+            },
+          },
+        };
+      })
+    );
+
+    // 2. Fetch fresh billing product details from server to ensure complete sync
+    try {
+      const searchRes = await searchBillingProducts({
+        q: String(result.productId),
+        include_inventory: true,
+        direct_sale_enabled: true,
+      });
+      const freshProd = searchRes.results.find((p) => p.id === result.productId);
+      if (freshProd) {
+        setLines((prevLines) =>
+          prevLines.map((l) => {
+            if (l.selected_product?.id === result.productId) {
+              const lineQty = toNumber(l.quantity);
+              const avail = Number(freshProd.inventory_status?.available ?? freshProd.current_stock_qty ?? 0);
+              const fulfilled = avail >= lineQty;
+              return {
+                ...l,
+                inventory_item_id: freshProd.inventory_item_id ? String(freshProd.inventory_item_id) : l.inventory_item_id,
+                create_requirement: !fulfilled,
+                requirement_quantity: !fulfilled ? quantity(lineQty - avail) : "0.000",
+                selected_product: freshProd,
+              };
+            }
+            if (stockDrawer.targetLineId === l.id && !l.selected_product) {
+              selectProduct(l.id, freshProd);
+            }
+            return l;
+          })
+        );
+      }
+    } catch {
+      // In-memory update is already applied
+    }
+  }, [stockDrawer.targetLineId]);
+
+  useEffect(() => {
+    async function handlePimProductSaved(event: Event) {
+      const customEvent = event as CustomEvent;
+      const saved = customEvent.detail;
+      if (!saved || !saved.id) return;
+
+      try {
+        const searchRes = await searchBillingProducts({
+          q: saved.product_code || String(saved.id),
+          include_inventory: true,
+          direct_sale_enabled: true,
+        });
+        const match = searchRes.results.find((p) => p.id === saved.id) || searchRes.results[0];
+        if (match) {
+          const targetLineId = lastActiveLineRef.current || lines[0]?.id;
+          if (targetLineId) {
+            selectProduct(targetLineId, match);
+          }
+        }
+      } catch {
+        // Ignored
+      }
+    }
+
+    window.addEventListener("pim-product-saved", handlePimProductSaved);
+    return () => window.removeEventListener("pim-product-saved", handlePimProductSaved);
+  }, [lines]);
+
+  useEffect(() => {
+    function handleGlobalStockPosted(event: Event) {
+      const customEvent = event as CustomEvent;
+      const detail = customEvent.detail as StockPostedResult;
+      if (detail && detail.productId) {
+        void handleStockPosted(detail);
+      }
+    }
+
+    window.addEventListener("opening-stock-posted", handleGlobalStockPosted);
+    return () => window.removeEventListener("opening-stock-posted", handleGlobalStockPosted);
+  }, [handleStockPosted]);
 
   async function handleQuickScanSubmit(e?: React.FormEvent) {
     if (e) e.preventDefault();
@@ -2173,15 +2286,46 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
                                 <label className="text-sm font-medium text-foreground" htmlFor={`product-search-${line.id}`}>
                                   Search Product
                                 </label>
-                                <button
-                                  type="button"
-                                  onClick={() => openWorkflow("admin.createProduct")}
-                                  className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
-                                  title="Create a new PIM product without leaving direct sale"
-                                >
-                                  <Plus className="h-3 w-3" />
-                                  Add Product (Drawer)
-                                </button>
+                                <div className="flex items-center gap-3">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      lastActiveLineRef.current = line.id;
+                                      openWorkflow("admin.createProduct");
+                                    }}
+                                    className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                                    title="Create a new PIM product without leaving direct sale"
+                                  >
+                                    <Plus className="h-3 w-3" />
+                                    Add Product (Drawer)
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      lastActiveLineRef.current = line.id;
+                                      setStockDrawer({
+                                        open: true,
+                                        targetLineId: line.id,
+                                        product: line.selected_product
+                                          ? {
+                                              id: line.selected_product.id,
+                                              name: line.selected_product.name,
+                                              product_code: line.selected_product.product_code || undefined,
+                                              sku: line.selected_product.sku || undefined,
+                                              unit_of_measure: line.selected_product.unit_of_measure || "PCS",
+                                              current_stock_qty: line.selected_product.current_stock_qty ?? line.selected_product.inventory_status?.available ?? 0,
+                                              base_price: line.selected_product.base_price,
+                                            }
+                                          : null,
+                                      });
+                                    }}
+                                    className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:underline"
+                                    title="Add opening stock or stock intake without leaving direct sale"
+                                  >
+                                    <PackagePlus className="h-3 w-3" />
+                                    Opening Stock (Drawer)
+                                  </button>
+                                </div>
                               </div>
                               <div className="relative">
                                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
@@ -2321,14 +2465,43 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
                                       <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${line.selected_product.inventory_status.is_in_stock ? "border-green-400 bg-green-100 text-green-800 dark:border-green-600 dark:bg-green-800 dark:text-green-100" : "border-red-400 bg-red-100 text-red-800 dark:border-red-600 dark:bg-red-800 dark:text-red-100"}`}>
                                         {line.selected_product.inventory_status.is_in_stock ? "✓ In Stock" : "✗ Out of Stock"}
                                       </span>
-                                      <button
-                                        type="button"
-                                        onClick={() => openWorkflow("admin.createProduct", { query: { id: line.selected_product?.id } })}
-                                        className="ml-auto inline-flex items-center gap-1 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-0.5 text-[11px] font-semibold text-primary hover:bg-primary/10"
-                                        title="Edit this product in PIM drawer overlay"
-                                      >
-                                        Edit PIM
-                                      </button>
+                                      <div className="ml-auto flex items-center gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            lastActiveLineRef.current = line.id;
+                                            setStockDrawer({
+                                              open: true,
+                                              targetLineId: line.id,
+                                              product: {
+                                                id: line.selected_product!.id,
+                                                name: line.selected_product!.name,
+                                                product_code: line.selected_product!.product_code || undefined,
+                                                sku: line.selected_product!.sku || undefined,
+                                                unit_of_measure: line.selected_product!.unit_of_measure || "PCS",
+                                                current_stock_qty: line.selected_product!.current_stock_qty ?? line.selected_product!.inventory_status?.available ?? 0,
+                                                base_price: line.selected_product!.base_price,
+                                              },
+                                            });
+                                          }}
+                                          className="inline-flex items-center gap-1 rounded border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-emerald-950/60 px-2 py-0.5 text-[11px] font-semibold text-emerald-800 dark:text-emerald-200 hover:bg-emerald-50 dark:hover:bg-emerald-900/40"
+                                          title="Post stock intake or opening stock for this product"
+                                        >
+                                          <PackagePlus className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                                          + Add / Adjust Stock
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            lastActiveLineRef.current = line.id;
+                                            openWorkflow("admin.createProduct", { query: { id: line.selected_product?.id } });
+                                          }}
+                                          className="inline-flex items-center gap-1 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-0.5 text-[11px] font-semibold text-primary hover:bg-primary/10"
+                                          title="Edit this product in PIM drawer overlay"
+                                        >
+                                          Edit PIM
+                                        </button>
+                                      </div>
                                     </div>
                                     <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-0.5 text-[12px] text-slate-600 dark:text-slate-300">
                                       <span className="font-semibold text-slate-800 dark:text-slate-100">{accountingMoney(line.selected_product.base_price)}</span>
@@ -2884,6 +3057,14 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
           }}
         />
       )}
+
+      {/* Quick Opening Stock Drawer */}
+      <QuickOpeningStockDrawer
+        open={stockDrawer.open}
+        onClose={() => setStockDrawer({ open: false, targetLineId: null, product: null })}
+        initialProduct={stockDrawer.product}
+        onStockPosted={handleStockPosted}
+      />
     </ERPPageShell>
     );
   }
@@ -3263,6 +3444,14 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
           }}
         />
       )}
+
+      {/* Quick Opening Stock Drawer */}
+      <QuickOpeningStockDrawer
+        open={stockDrawer.open}
+        onClose={() => setStockDrawer({ open: false, targetLineId: null, product: null })}
+        initialProduct={stockDrawer.product}
+        onStockPosted={handleStockPosted}
+      />
     </ERPPageShell>
   );
 }

@@ -16,6 +16,7 @@ const SubscriptionCreatePage = dynamic(() => import("@/domains/subscriptions/pag
 const AdminPaymentCollectPage = dynamic(() => import("@/domains/payments/pages/AdminPaymentCollectPage"), { ssr: false });
 const PartnerCollectionCreatePage = dynamic(() => import("@/domains/partner/pages/PartnerCollectionCreatePage"), { ssr: false });
 const CustomerSubscriptionRequestCreatePage = dynamic(() => import("@/domains/subscription-requests/pages/CustomerSubscriptionRequestCreatePage"), { ssr: false });
+const QuickOpeningStockDrawer = dynamic(() => import("@/components/inventory/QuickOpeningStockDrawer"), { ssr: false });
 
 export type WorkflowLaunchContext = {
   query?: Record<string, string | number | boolean | null | undefined>;
@@ -221,6 +222,41 @@ export default function WorkflowProvider({
                     current ? { ...current, resultHref: `/customer/subscription-requests/${requestId}` } : current
                   )
                 }
+              />
+            ) : null}
+
+            {activeWorkflow.id === "admin.openingStock" ? (
+              <QuickOpeningStockDrawer
+                variant="embedded"
+                onClose={closeWorkflow}
+                initialProduct={
+                  activeWorkflow.context.query?.productId
+                    ? {
+                        id: Number(activeWorkflow.context.query.productId),
+                        name: String(activeWorkflow.context.query.productName || "Product"),
+                        product_code: activeWorkflow.context.query.productCode
+                          ? String(activeWorkflow.context.query.productCode)
+                          : undefined,
+                        sku: activeWorkflow.context.query.sku
+                          ? String(activeWorkflow.context.query.sku)
+                          : undefined,
+                        unit_of_measure: activeWorkflow.context.query.uom
+                          ? String(activeWorkflow.context.query.uom)
+                          : "PCS",
+                        current_stock_qty: activeWorkflow.context.query.currentStock
+                          ? Number(activeWorkflow.context.query.currentStock)
+                          : 0,
+                        base_price: activeWorkflow.context.query.basePrice
+                          ? Number(activeWorkflow.context.query.basePrice)
+                          : undefined,
+                      }
+                    : null
+                }
+                onStockPosted={(result) => {
+                  setActiveWorkflow((current) =>
+                    current ? { ...current, resultHref: `/admin/inventory/opening-stock` } : current
+                  );
+                }}
               />
             ) : null}
           </div>

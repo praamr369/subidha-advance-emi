@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle, X } from "lucide-react";
+import { CheckCircle, PackagePlus, Plus, X } from "lucide-react";
 
 import ProductSpecSearch, { type ProductSpecRow } from "@/components/products/ProductSpecSearch";
 
@@ -36,6 +36,9 @@ type ProductSelectorProps = {
   planFilter?: PlanType | null;
   disabled?: boolean;
   placeholder?: string;
+  onOpenStock?: (product: ProductOption) => void;
+  onOpenCreateProduct?: () => void;
+  onOpenOpeningStock?: () => void;
 };
 
 function toMoneyString(value: unknown): string {
@@ -117,50 +120,107 @@ export default function ProductSelector({
   planFilter,
   disabled = false,
   placeholder = "Search product by name, code, SKU, or category…",
+  onOpenStock,
+  onOpenCreateProduct,
+  onOpenOpeningStock,
 }: ProductSelectorProps) {
   if (selected) {
+    const availQty = Number(selected.available_qty ?? selected.on_hand_qty ?? 0);
+    const isInStock = availQty > 0 || selected.stock_status === "IN_STOCK";
     return (
-      <div className="flex items-center justify-between gap-4 rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 dark:border-emerald-800 dark:bg-emerald-950/30">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 dark:border-emerald-800 dark:bg-emerald-950/30">
+        <div className="flex items-center gap-4 min-w-0">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-900 dark:text-emerald-300">
             <CheckCircle className="h-5 w-5" />
           </div>
-          <div>
-            <div className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">{selected.name}</div>
-            <div className="text-xs text-emerald-700 dark:text-emerald-300">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-semibold text-emerald-900 dark:text-emerald-100 truncate">{selected.name}</span>
+              <span
+                className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold ${
+                  isInStock
+                    ? "border-emerald-300 bg-emerald-100 text-emerald-800 dark:border-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-200"
+                    : "border-red-300 bg-red-100 text-red-800 dark:border-red-700 dark:bg-red-900/60 dark:text-red-200"
+                }`}
+              >
+                {isInStock ? `✓ In Stock (${availQty} ${selected.unit_of_measure || "PCS"})` : `✗ Out of Stock (0 ${selected.unit_of_measure || "PCS"})`}
+              </span>
+            </div>
+            <div className="text-xs text-emerald-700 dark:text-emerald-300 mt-0.5">
               {selected.product_code ? `${selected.product_code} • ` : ""}₹{selected.base_price}
               {selected.unit_of_measure ? ` • ${selected.unit_of_measure}` : ""}
             </div>
           </div>
         </div>
-        {!disabled && (
-          <button
-            type="button"
-            onClick={() => onClear?.()}
-            className="flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-white px-3 text-xs font-medium text-emerald-700 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 dark:border-emerald-800 dark:bg-slate-900 dark:text-emerald-300"
-          >
-            <X className="h-3.5 w-3.5" />
-            Clear
-          </button>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {onOpenStock && (
+            <button
+              type="button"
+              onClick={() => onOpenStock(selected)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-emerald-800 shadow-sm transition hover:bg-emerald-100 dark:border-emerald-700 dark:bg-slate-900 dark:text-emerald-200"
+              title="Add or input opening stock for this product"
+            >
+              <PackagePlus className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+              + Add / Adjust Stock
+            </button>
+          )}
+          {!disabled && (
+            <button
+              type="button"
+              onClick={() => onClear?.()}
+              className="flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-emerald-200 bg-white px-3 text-xs font-medium text-emerald-700 transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 dark:border-emerald-800 dark:bg-slate-900 dark:text-emerald-300"
+            >
+              <X className="h-3.5 w-3.5" />
+              Clear
+            </button>
+          )}
+        </div>
       </div>
     );
   }
 
   return (
-    <ProductSpecSearch
-      placeholder={placeholder}
-      disabled={disabled}
-      directSaleOnly={planFilter === "DIRECT_SALE"}
-      filterRow={(row) => {
-        if (row.lifecycle_status === "DISCONTINUED") return false;
-        if (planFilter === "EMI" || planFilter === "ADVANCE_EMI") return Boolean(row.is_emi_enabled);
-        if (planFilter === "RENT") return Boolean(row.is_rent_enabled);
-        if (planFilter === "LEASE") return Boolean(row.is_lease_enabled);
-        if (planFilter === "DIRECT_SALE") return Boolean(row.is_direct_sale_enabled);
-        return true;
-      }}
-      onSelect={(row) => onSelect(rowToOption(row))}
-    />
+    <div className="space-y-2">
+      {(onOpenCreateProduct || onOpenOpeningStock) && (
+        <div className="flex items-center justify-end gap-3 pb-0.5">
+          {onOpenCreateProduct && (
+            <button
+              type="button"
+              onClick={onOpenCreateProduct}
+              className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+              title="Create new product in PIM drawer"
+            >
+              <Plus className="h-3 w-3" />
+              Add Product (Drawer)
+            </button>
+          )}
+          {onOpenOpeningStock && (
+            <button
+              type="button"
+              onClick={onOpenOpeningStock}
+              className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:underline"
+              title="Add opening stock or stock intake in drawer"
+            >
+              <PackagePlus className="h-3 w-3" />
+              Opening Stock (Drawer)
+            </button>
+          )}
+        </div>
+      )}
+      <ProductSpecSearch
+        placeholder={placeholder}
+        disabled={disabled}
+        directSaleOnly={planFilter === "DIRECT_SALE"}
+        filterRow={(row) => {
+          if (row.lifecycle_status === "DISCONTINUED") return false;
+          if (planFilter === "EMI" || planFilter === "ADVANCE_EMI") return Boolean(row.is_emi_enabled);
+          if (planFilter === "RENT") return Boolean(row.is_rent_enabled);
+          if (planFilter === "LEASE") return Boolean(row.is_lease_enabled);
+          if (planFilter === "DIRECT_SALE") return Boolean(row.is_direct_sale_enabled);
+          return true;
+        }}
+        onSelect={(row) => onSelect(rowToOption(row))}
+      />
+    </div>
   );
 }

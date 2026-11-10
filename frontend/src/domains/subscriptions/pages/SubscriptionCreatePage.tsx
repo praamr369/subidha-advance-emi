@@ -20,7 +20,7 @@ import KycReadinessPanel from "@/domains/subscriptions/components/KycReadinessPa
 import type { ContractKycReadiness } from "@/services/kyc-readiness";
 import SignatureCanvas from "@/components/forms/SignatureCanvas";
 import { CustomerSignatureLinkModal } from "@/components/contracts/CustomerSignatureLinkModal";
-import { Barcode, CheckCircle2, Smartphone, Zap } from "lucide-react";
+import { Barcode, CheckCircle2, PackagePlus, Plus, Smartphone, Zap } from "lucide-react";
 import MobileHandoverModal from "@/components/handover/MobileHandoverModal";
 import { dataUrlToFile } from "@/services/mobile-handover";
 import {
@@ -29,6 +29,11 @@ import {
   searchAdminBillingProducts,
   type BillingProductSearchRow,
 } from "@/services/direct-sale-workspace";
+import { useWorkflowLauncher } from "@/components/workflows/WorkflowProvider";
+import QuickOpeningStockDrawer, {
+  type QuickOpeningStockProduct,
+  type StockPostedResult,
+} from "@/components/inventory/QuickOpeningStockDrawer";
 
 type PlanType = "EMI" | "RENT" | "LEASE";
 type SubscriptionCreateVariant = "page" | "drawer";
@@ -51,6 +56,8 @@ type ProductOption = {
   id: number;
   name: string;
   product_code?: string;
+  sku?: string;
+  unit_of_measure?: string;
   base_price?: string;
   category?: string;
   subcategory?: string;
@@ -459,6 +466,91 @@ export default function SubscriptionCreatePage({
   const [batch, setBatch] = useState<BatchOption | null>(null);
   const [luckyId, setLuckyId] = useState<LuckyIdOption | null>(null);
   const [partner, setPartner] = useState<PartnerOption | null>(null);
+
+  let workflowLauncher: ReturnType<typeof useWorkflowLauncher> | null = null;
+  try {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    workflowLauncher = useWorkflowLauncher();
+  } catch {
+    // Outside WorkflowProvider
+  }
+
+  const [stockDrawer, setStockDrawer] = useState<{
+    open: boolean;
+    product: QuickOpeningStockProduct | null;
+  }>({ open: false, product: null });
+  const [productNotice, setProductNotice] = useState<string | null>(null);
+
+  const handleStockPosted = (result: StockPostedResult) => {
+    // 1. If currently selected product matches, update real-time stock
+    setProduct((curr) => {
+      if (!curr || curr.id !== result.productId) return curr;
+      return {
+        ...curr,
+        available_qty: String(result.newAvailableQty),
+        on_hand_qty: String(result.newAvailableQty),
+        stock_status: result.newAvailableQty > 0 ? "IN_STOCK" : "OUT_OF_STOCK",
+      };
+    });
+
+    // 2. If any basket item matches, update its product stock
+    setContractItems((prevItems) =>
+      prevItems.map((itm) => {
+        if (itm.product.id !== result.productId) return itm;
+        return {
+          ...itm,
+          product: {
+            ...itm.product,
+            available_qty: String(result.newAvailableQty),
+            on_hand_qty: String(result.newAvailableQty),
+            stock_status: result.newAvailableQty > 0 ? "IN_STOCK" : "OUT_OF_STOCK",
+          },
+        };
+      })
+    );
+  };
+
+  useEffect(() => {
+    function handleGlobalStockPosted(event: Event) {
+      const customEvent = event as CustomEvent;
+      const detail = customEvent.detail as StockPostedResult;
+      if (detail && detail.productId) {
+        handleStockPosted(detail);
+      }
+    }
+
+    window.addEventListener("opening-stock-posted", handleGlobalStockPosted);
+    return () => window.removeEventListener("opening-stock-posted", handleGlobalStockPosted);
+  }, []);
+
+  useEffect(() => {
+    function handlePimSaved(event: Event) {
+      const customEvent = event as CustomEvent;
+      const saved = customEvent.detail;
+      if (!saved || !saved.id) return;
+      const newOption: ProductOption = {
+        id: saved.id,
+        name: saved.name,
+        product_code: saved.product_code || saved.sku || undefined,
+        base_price: saved.base_price,
+        category: saved.category || undefined,
+        subcategory: saved.subcategory || undefined,
+        is_emi_enabled: true,
+        is_rent_enabled: true,
+        is_lease_enabled: true,
+        is_direct_sale_enabled: true,
+        lifecycle_status: "ACTIVE",
+        available_qty: "0",
+        on_hand_qty: "0",
+        stock_status: "OUT_OF_STOCK",
+      };
+      setProduct(newOption);
+      setProductNotice(`Product "${saved.name}" created. You can now add opening stock or select batch.`);
+    }
+
+    window.addEventListener("pim-product-saved", handlePimSaved);
+    return () => window.removeEventListener("pim-product-saved", handlePimSaved);
+  }, []);
 
   function addProductToBasket(item: ProductOption) {
     setContractItems((prev) => {
@@ -2443,11 +2535,36 @@ export default function SubscriptionCreatePage({
                                       </span>
                                     )}
                                   </div>
-                                  <div className="text-[11px] text-muted-foreground font-mono flex items-center gap-2">
+                                  <div className="text-[11px] text-muted-foreground font-mono flex flex-wrap items-center gap-2">
                                     <span>
                                       {itm.product.product_code || "—"}{" "}
                                       {itm.product.category ? `· ${itm.product.category}` : ""}
                                     </span>
+                                    <span className="text-[10px] text-muted-foreground">
+                                      Stock: <strong>{itm.product.available_qty ?? itm.product.on_hand_qty ?? "0"}</strong>
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setStockDrawer({
+                                          open: true,
+                                          product: {
+                                            id: itm.product.id,
+                                            name: itm.product.name,
+                                            product_code: itm.product.product_code,
+                                            sku: itm.product.product_code,
+                                            unit_of_measure: "PCS",
+                                            current_stock_qty: itm.product.available_qty ?? itm.product.on_hand_qty ?? 0,
+                                            base_price: itm.product.base_price,
+                                          },
+                                        })
+                                      }
+                                      className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 hover:underline"
+                                      title="Open stock intake for this product"
+                                    >
+                                      <PackagePlus className="h-3 w-3" />
+                                      + Stock
+                                    </button>
                                     {((isRentPlan && !itm.product.is_rent_enabled) || (isLeasePlan && !itm.product.is_lease_enabled)) && (
                                       <a
                                         href={`/admin/products/${itm.product.id}/edit`}
@@ -2635,6 +2752,16 @@ export default function SubscriptionCreatePage({
                     <ProductSelector
                       selected={null}
                       planFilter={planType as "ADVANCE_EMI" | "RENT" | "LEASE"}
+                      onOpenCreateProduct={() => {
+                        if (workflowLauncher) {
+                          workflowLauncher.openWorkflow("admin.createProduct");
+                        } else {
+                          window.open("/admin/pim/products/create", "_blank");
+                        }
+                      }}
+                      onOpenOpeningStock={() => {
+                        setStockDrawer({ open: true, product: null });
+                      }}
                       onSelect={(item) => addProductToBasket(item)}
                       onClear={() => {}}
                     />
@@ -2647,9 +2774,61 @@ export default function SubscriptionCreatePage({
                 <div className="text-xs text-muted-foreground mb-2">
                   Search by product name, SKU, or scan QR code for SFEMI Advance EMI.
                 </div>
+                {productNotice && (
+                  <div className="mb-2 flex items-center justify-between rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                      <span>{productNotice}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setProductNotice(null)}
+                      className="text-xs font-semibold hover:underline"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
                 <ProductSelector
                   selected={product}
                   planFilter={planType as "ADVANCE_EMI" | "RENT" | "LEASE"}
+                  onOpenStock={(p) => {
+                    setStockDrawer({
+                      open: true,
+                      product: {
+                        id: p.id,
+                        name: p.name,
+                        product_code: p.product_code,
+                        sku: p.sku,
+                        unit_of_measure: p.unit_of_measure,
+                        current_stock_qty: p.available_qty ?? p.on_hand_qty,
+                        base_price: p.base_price,
+                      },
+                    });
+                  }}
+                  onOpenCreateProduct={() => {
+                    if (workflowLauncher) {
+                      workflowLauncher.openWorkflow("admin.createProduct");
+                    } else {
+                      window.open("/admin/pim/products/create", "_blank");
+                    }
+                  }}
+                  onOpenOpeningStock={() => {
+                    setStockDrawer({
+                      open: true,
+                      product: product
+                        ? {
+                            id: product.id,
+                            name: product.name,
+                            product_code: product.product_code,
+                            sku: product.sku,
+                            unit_of_measure: product.unit_of_measure,
+                            current_stock_qty: product.available_qty ?? product.on_hand_qty,
+                            base_price: product.base_price,
+                          }
+                        : null,
+                    });
+                  }}
                   onSelect={(item) => {
                     nextLuckyRequestToken();
                     setProduct(item);
@@ -4048,6 +4227,14 @@ export default function SubscriptionCreatePage({
           }}
         />
       )}
+
+      {/* Quick Opening Stock Drawer */}
+      <QuickOpeningStockDrawer
+        open={stockDrawer.open}
+        onClose={() => setStockDrawer({ open: false, product: null })}
+        initialProduct={stockDrawer.product}
+        onStockPosted={handleStockPosted}
+      />
     </ERPPageShell>
   );
 }

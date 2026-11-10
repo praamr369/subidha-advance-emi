@@ -57,8 +57,8 @@ export default function AccountingExpensesPage() {
       const [expensesPayload, chartPayload, financePayload, branchesPayload] =
         await Promise.all([
           listExpenses(),
-          listChartOfAccounts(),
-          listFinanceAccounts(),
+          listChartOfAccounts({ account_type: "EXPENSE", page_size: 200 }),
+          listFinanceAccounts({ page_size: 100 }),
           listBranches(),
         ]);
       return {
@@ -354,9 +354,21 @@ export default function AccountingExpensesPage() {
                 </select>
               </label>
 
-              <label className="text-sm font-medium text-foreground">
-                Chart of Account Category
+              <div>
+                <div className="flex items-center justify-between">
+                  <label htmlFor="expense_account_select" className="text-sm font-medium text-foreground">
+                    Chart of Account Category
+                  </label>
+                  <Link
+                    href={ROUTES.admin.accountingChartOfAccounts}
+                    className="text-xs text-primary hover:underline font-medium"
+                    target="_blank"
+                  >
+                    + Manage Categories
+                  </Link>
+                </div>
                 <select
+                  id="expense_account_select"
                   className={fieldClassName()}
                   value={expenseForm.expense_account}
                   onChange={(event) =>
@@ -374,7 +386,7 @@ export default function AccountingExpensesPage() {
                     </option>
                   ))}
                 </select>
-              </label>
+              </div>
 
               <label className="text-sm font-medium text-foreground">
                 Originating Finance Account

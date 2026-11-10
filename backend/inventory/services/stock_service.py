@@ -417,6 +417,12 @@ def post_invoice_stock_movements(*, invoice, posted_by=None) -> dict:
             processed_acc_ids.add(rel_inv.id)
             bundled_qty = line.quantity * Decimal(str(rel.quantity or 1))
             loc = rel_inv.default_stock_location or (line.inventory_item.default_stock_location if line.inventory_item else None)
+            rel_type = (getattr(rel, "relationship_type", None) or "accessory").title()
+            rel_prod_name = (
+                getattr(rel.related_product, "name", None)
+                if getattr(rel, "related_product", None)
+                else getattr(rel_inv, "name", "")
+            ) or "Accessory"
             _, rel_created = create_stock_ledger_entry(
                 inventory_item=rel_inv,
                 movement_type=StockMovementType.SALE_OUT,
@@ -425,7 +431,7 @@ def post_invoice_stock_movements(*, invoice, posted_by=None) -> dict:
                 quantity_out=bundled_qty,
                 reference_model="BillingInvoiceLine",
                 reference_id=f"{invoice.id}:{line.id}:bundled:{rel.id}",
-                notes=f"{invoice.document_no or ''} (Bundled {rel.relationship_type.title()}: {rel.related_product.name})",
+                notes=f"{invoice.document_no or ''} (Bundled {rel_type}: {rel_prod_name})",
                 posted_by=posted_by,
                 posted_journal_entry=invoice.posted_journal_entry,
             )
@@ -549,6 +555,12 @@ def post_credit_note_stock_movements(*, note, posted_by=None) -> dict:
             processed_acc_ids.add(rel_inv.id)
             bundled_qty = line.quantity * Decimal(str(rel.quantity or 1))
             loc = rel_inv.default_stock_location or (line.inventory_item.default_stock_location if line.inventory_item else None)
+            rel_type = (getattr(rel, "relationship_type", None) or "accessory").title()
+            rel_prod_name = (
+                getattr(rel.related_product, "name", None)
+                if getattr(rel, "related_product", None)
+                else getattr(rel_inv, "name", "")
+            ) or "Accessory"
             _, rel_created = create_stock_ledger_entry(
                 inventory_item=rel_inv,
                 movement_type=StockMovementType.SALE_RETURN_IN,
@@ -557,7 +569,7 @@ def post_credit_note_stock_movements(*, note, posted_by=None) -> dict:
                 quantity_in=bundled_qty,
                 reference_model="BillingCreditNoteLine",
                 reference_id=f"{note.id}:{line.id}:bundled:{rel.id}",
-                notes=f"{note.note_no or ''} (Bundled Return {rel.relationship_type.title()}: {rel.related_product.name})",
+                notes=f"{note.note_no or ''} (Bundled Return {rel_type}: {rel_prod_name})",
                 posted_by=posted_by,
                 posted_journal_entry=note.posted_journal_entry,
             )
