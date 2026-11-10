@@ -248,7 +248,7 @@ export async function resyncDirectSaleStock(saleId: number | string): Promise<{
   existing_count: number;
   message: string;
 }> {
-  return apiFetch(`/admin/direct-sales/${saleId}/resync-stock/`, {
+  return apiFetch(`/billing/direct-sales/${saleId}/resync-stock/`, {
     method: "POST",
   });
 }
@@ -260,7 +260,7 @@ export async function resyncAllInvoicesStock(): Promise<{
   total_existing: number;
   message: string;
 }> {
-  return apiFetch(`/admin/billing/invoices/resync-all-stock/`, {
+  return apiFetch(`/billing/invoices/resync-all-stock/`, {
     method: "POST",
   });
 }
