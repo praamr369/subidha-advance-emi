@@ -29,6 +29,7 @@ from subscriptions.services.dashboard_scopes import AdminScope
 from customers.services.risk_service import evaluate_all_active_subscriptions
 from subscriptions.services.financial_health_service import system_financial_health
 from lucky_plan.services.winner_state_service import winner_history_q
+from api.v1.services.admin_dashboard_analytics_service import build_dashboard_business_analytics
 
 
 CACHE_KEY = "admin_dashboard_v1"
@@ -615,6 +616,10 @@ def build_admin_dashboard(*, actor_user=None):
 
         # 📋 Today's attendance snapshot
         "attendance": _build_attendance_snapshot(today),
+
+        # 📈 Enterprise Business Analytics & Mathematical Metrics
+        # (Sales, Inventory & Purchasing, Staff & Manufacturing)
+        "analytics": build_dashboard_business_analytics(today),
     }
 
     # ------------------------------

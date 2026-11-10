@@ -299,3 +299,23 @@ class AdminDashboardApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         due_ids = {row["subscription_id"] for row in response.data.get("due_subscriptions", [])}
         self.assertNotIn(cancelled_subscription.id, due_ids)
+        self.assertIn("analytics", response.data)
+        self.assertIn("sales", response.data["analytics"])
+        self.assertIn("inventory", response.data["analytics"])
+        self.assertIn("staff", response.data["analytics"])
+
+    def test_admin_dashboard_analytics_dedicated_endpoint(self):
+        response = self.client.get("/api/v1/admin/dashboard/analytics/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        data = response.data
+        self.assertIn("sales", data)
+        self.assertIn("inventory", data)
+        self.assertIn("staff", data)
+        self.assertIn("daily_trends", data["sales"])
+        self.assertIn("monthly_trends", data["sales"])
+        self.assertEqual(len(data["sales"]["daily_trends"]), 30)
+        self.assertEqual(len(data["sales"]["monthly_trends"]), 6)
+        self.assertIn("stock_health", data["inventory"])
+        self.assertIn("purchasing", data["inventory"])
+        self.assertIn("attendance", data["staff"])
+        self.assertIn("manufacturing", data["staff"])

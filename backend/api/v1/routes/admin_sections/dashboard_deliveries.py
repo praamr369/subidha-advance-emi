@@ -1,5 +1,5 @@
 from django.urls import include, path
-from api.v1.views.admin_dashboard import AdminDashboardView
+from api.v1.views.admin_dashboard import AdminDashboardAnalyticsView, AdminDashboardView
 from api.v1.views.admin_deliveries import AdminDeliveryCancelView
 from api.v1.views.admin_deliveries import AdminDeliveryDetailView
 from api.v1.views.admin_deliveries import AdminDeliveryListCreateView
@@ -30,6 +30,7 @@ from api.v1.views.admin_navigation import AdminNavigationBadgesView
 urlpatterns = [
     path("ai/", include("ai_assistant.urls")),
     path("dashboard/", AdminDashboardView.as_view()),
+    path("dashboard/analytics/", AdminDashboardAnalyticsView.as_view()),
     path("dashboard/navigation-badges/", AdminNavigationBadgesView.as_view()),
     path("deliveries/", AdminDeliveryListCreateView.as_view()),
     path("deliveries/summary/", AdminDeliverySummaryView.as_view()),

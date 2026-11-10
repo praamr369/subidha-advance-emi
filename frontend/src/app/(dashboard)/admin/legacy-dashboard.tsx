@@ -46,6 +46,7 @@ import ActionButton from "@/components/ui/ActionButton";
 import StatCard from "@/components/ui/StatCard";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
+import BusinessAnalyticsCockpit from "@/components/admin/dashboard/BusinessAnalyticsCockpit";
 
 import {
   buildSettlementPosture,
@@ -1144,6 +1145,13 @@ export default function AdminDashboardPage() {
                 />
               </div>
             ) : null}
+
+            {/* Enterprise Business Analytics & Mathematical Metrics Cockpit */}
+            <BusinessAnalyticsCockpit
+              analytics={legacy.analytics}
+              onRefresh={refreshDashboard}
+              isRefreshing={refreshing}
+            />
 
             {legacy.modules ? (
               <WorkspaceSection

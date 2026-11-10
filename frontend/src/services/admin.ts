@@ -116,6 +116,147 @@ export type AdminDashboardResponse = {
     is_reversed?: boolean;
   }>;
   modules?: AdminDashboardModules;
+  analytics?: DashboardBusinessAnalytics;
+};
+
+export type DashboardSalesStream = {
+  label: string;
+  amount: string;
+  count: number;
+  pct: number;
+};
+
+export type DashboardDailyTrendPoint = {
+  date: string;
+  label: string;
+  sfemi: number;
+  direct_sales: number;
+  rent_lease: number;
+  total_net: number;
+};
+
+export type DashboardMonthlyTrendPoint = {
+  month: string;
+  sfemi: number;
+  direct_sales: number;
+  rent_lease: number;
+  gross: number;
+  reversals: number;
+  net: number;
+};
+
+export type DashboardSalesAnalytics = {
+  current_month_net: string;
+  prev_month_net: string;
+  growth_rate_pct: number;
+  growth_direction: "up" | "down" | "flat";
+  today_net: string;
+  month_due_amount: string;
+  month_collected_amount: string;
+  collection_efficiency_pct: number;
+  aov: string;
+  total_transactions_month: number;
+  streams_breakdown: {
+    sfemi: DashboardSalesStream;
+    direct_sales: DashboardSalesStream;
+    rent: DashboardSalesStream;
+    lease: DashboardSalesStream;
+  };
+  daily_trends: DashboardDailyTrendPoint[];
+  monthly_trends: DashboardMonthlyTrendPoint[];
+  direct_sales_summary: {
+    month_invoiced: string;
+    month_collected: string;
+    month_outstanding: string;
+    recovery_rate_pct: number;
+    sale_count: number;
+  };
+};
+
+export type DashboardFastMovingItem = {
+  product_code: string;
+  product_name: string;
+  quantity_out_30d: number;
+  current_stock: number;
+};
+
+export type DashboardStockAtRiskItem = {
+  item_id: number;
+  product_code: string;
+  product_name: string;
+  on_hand: number;
+  reorder_level: number;
+  status: "LOW_STOCK" | "OUT_OF_STOCK";
+};
+
+export type DashboardInventoryAnalytics = {
+  total_valuation: string;
+  total_skus: number;
+  total_units_on_hand: number;
+  stock_health: {
+    healthy_count: number;
+    healthy_pct: number;
+    low_stock_count: number;
+    low_stock_pct: number;
+    out_of_stock_count: number;
+    out_of_stock_pct: number;
+  };
+  purchasing: {
+    month_po_count: number;
+    open_pos_count: number;
+    pending_grn_count: number;
+    draft_bills_count: number;
+    unpaid_bills_count: number;
+    unpaid_bills_amount: string;
+    inward_qty_30d: number;
+    outward_qty_30d: number;
+  };
+  fast_moving_items: DashboardFastMovingItem[];
+  stock_at_risk: DashboardStockAtRiskItem[];
+};
+
+export type DashboardDepartmentPayroll = {
+  department: string;
+  staff_count: number;
+  total_salary: string;
+  pct_of_payroll: number;
+};
+
+export type DashboardStaffAnalytics = {
+  active_staff_count: number;
+  attendance: {
+    present: number;
+    half_day: number;
+    absent: number;
+    on_leave: number;
+    not_marked: number;
+    attendance_rate_pct: number;
+  };
+  payroll: {
+    monthly_payroll_cost: string;
+    unpaid_salary_sheets_count: number;
+    avg_salary_per_staff: string;
+    labor_to_revenue_ratio_pct: number;
+  };
+  departments: DashboardDepartmentPayroll[];
+  manufacturing: {
+    unposted_labor_lines_count: number;
+    unposted_labor_accrual_amount: string;
+    posted_labor_amount_month: string;
+    active_production_jobs_count: number;
+    total_labor_hours_month: number;
+  };
+  advances: {
+    outstanding_count: number;
+    outstanding_amount: string;
+  };
+};
+
+export type DashboardBusinessAnalytics = {
+  as_of: string;
+  sales: DashboardSalesAnalytics;
+  inventory: DashboardInventoryAnalytics;
+  staff: DashboardStaffAnalytics;
 };
 
 export type AdminDashboardModules = {
@@ -229,6 +370,7 @@ type AdminDashboardPayload = {
     crm?: Record<string, unknown>;
     support?: Record<string, unknown>;
   };
+  analytics?: DashboardBusinessAnalytics;
 };
 
 function toNumber(value: unknown, fallback = 0): number {
@@ -687,7 +829,12 @@ export async function getAdminDashboard(): Promise<AdminDashboardResponse> {
           };
         })
       : [],
+    analytics: dashboard.analytics,
   };
+}
+
+export async function getAdminDashboardAnalytics(): Promise<DashboardBusinessAnalytics> {
+  return await apiFetch<DashboardBusinessAnalytics>("/admin/dashboard/analytics/");
 }
 
 /**
