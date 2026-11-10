@@ -72,6 +72,7 @@ export default function AdminPaymentCollectPage({
         const params = new URLSearchParams(q);
         const sub = params.get("subscription");
         const out = params.get("outstanding");
+        const directSale = params.get("direct_sale") || params.get("direct_sale_id") || params.get("sale_id");
         const ctx = params.get("context");
         
         if (ctx) contextStr = ctx.toUpperCase();
@@ -80,6 +81,8 @@ export default function AdminPaymentCollectPage({
           q = `subscription:${sub}`;
         } else if (out) {
           q = `outstanding:${out}`;
+        } else if (directSale) {
+          q = `direct_sale:${directSale}`;
         } else {
           q = Array.from(params.values())[0] || q;
         }

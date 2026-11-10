@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Download, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { Download, ChevronLeft, ChevronRight, Loader2, RefreshCw, CheckCircle2, AlertCircle } from "lucide-react";
 
 import { accountingDate, accountingErrorMessage } from "@/components/accounting/shared";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { ROUTES } from "@/lib/routes";
+import { resyncAllInvoicesStock } from "@/services/direct-sale-workspace";
 import {
   listStockLedger,
   exportStockLedgerCSV,
@@ -69,7 +70,32 @@ export default function StockLedgerPage() {
   const [data, setData] = useState<StockLedgerListResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
+  const [resyncing, setResyncing] = useState(false);
+  const [resyncNotice, setResyncNotice] = useState<{
+    tone: "success" | "error";
+    message: string;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const handleResyncAllStock = async () => {
+    setResyncing(true);
+    setResyncNotice(null);
+    try {
+      const res = await resyncAllInvoicesStock();
+      setResyncNotice({
+        tone: "success",
+        message: res.message || "Bundled stock movements successfully synchronized.",
+      });
+      await loadLedger();
+    } catch (err: unknown) {
+      setResyncNotice({
+        tone: "error",
+        message: err instanceof Error ? err.message : "Failed to sync stock movements.",
+      });
+    } finally {
+      setResyncing(false);
+    }
+  };
 
   const loadLedger = useCallback(async () => {
     setLoading(true);
@@ -253,8 +279,45 @@ export default function StockLedgerPage() {
           </div>
         )}
 
-        {/* Export Button */}
-        <div className="flex justify-end">
+        {/* Resync Status Banner */}
+        {resyncNotice && (
+          <div
+            className={`flex items-center justify-between rounded-xl border p-4 text-sm font-medium ${
+              resyncNotice.tone === "success"
+                ? "border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200"
+                : "border-destructive/30 bg-destructive/10 text-destructive"
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              {resyncNotice.tone === "success" ? (
+                <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
+              ) : (
+                <AlertCircle className="h-5 w-5 text-destructive shrink-0" />
+              )}
+              <span>{resyncNotice.message}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setResyncNotice(null)}
+              className="text-xs opacity-70 hover:opacity-100"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        <div className="flex justify-end items-center gap-3">
+          <button
+            type="button"
+            onClick={() => void handleResyncAllStock()}
+            disabled={resyncing || loading}
+            title="Scan all posted invoices and deduct missing variant-mapped accessories (e.g. Commercial Plyboard)"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-emerald-500/30 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition dark:bg-emerald-950/30 dark:text-emerald-300"
+          >
+            {resyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            {resyncing ? "Syncing Stock Movements…" : "Sync Invoice Bundled Stock"}
+          </button>
           <button
             onClick={() => void handleExportCSV()}
             disabled={exporting || loading || !rows.length}

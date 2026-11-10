@@ -64,7 +64,7 @@ def _require_admin(actor) -> None:
 
 def _source_url(case: OperationalCancellation) -> str:
     if case.source_type == "DIRECT_SALE" and case.source_id:
-        return f"/admin/billing/direct-sales/{case.source_id}"
+        return f"/admin/billing/direct-sale/{case.source_id}"
     if case.source_type == "BILLING_INVOICE" and case.source_id:
         return f"/admin/billing/invoices/{case.source_id}"
     if case.source_type in {"BILLING_RECEIPT", "RECEIPT"} and case.source_id:

@@ -37,6 +37,7 @@ import { listCrmParties, type PartyListRow } from "@/services/crm";
 import { searchCustomers, type CustomerRecord } from "@/services/customers";
 import {
   listAdminInventoryRequirements,
+  resyncDirectSaleStock,
   searchBillingProducts,
   type BillingProductSearchRow,
 } from "@/services/direct-sale-workspace";
@@ -420,6 +421,32 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
   } | null>(null);
   const quickScanInputRef = useRef<HTMLInputElement>(null);
   const [customerMobileHandoverOpen, setCustomerMobileHandoverOpen] = useState(false);
+  const [syncingSaleId, setSyncingSaleId] = useState<number | null>(null);
+  const [stockSyncNotice, setStockSyncNotice] = useState<{
+    tone: "success" | "error";
+    message: string;
+  } | null>(null);
+
+  async function handleResyncDirectSaleStock(saleId: number) {
+    setSyncingSaleId(saleId);
+    setStockSyncNotice(null);
+    try {
+      const res = await resyncDirectSaleStock(saleId);
+      setStockSyncNotice({
+        tone: "success",
+        message: res.message || "Stock synchronized successfully.",
+      });
+      void queryClient.invalidateQueries({ queryKey: directSalesKeys.all });
+      void queryClient.invalidateQueries({ queryKey: inventoryKeys.all });
+    } catch (err: unknown) {
+      setStockSyncNotice({
+        tone: "error",
+        message: err instanceof Error ? err.message : "Failed to sync stock.",
+      });
+    } finally {
+      setSyncingSaleId(null);
+    }
+  }
 
   useEffect(() => {
     if (!createMode) return;
@@ -756,6 +783,15 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
                 Exchange Product
               </Link>
               {eligibilityButton}
+              <button
+                type="button"
+                onClick={() => handleResyncDirectSaleStock(row.id)}
+                disabled={syncingSaleId === row.id}
+                title="Sync/deduct variant-mapped bundled accessories (e.g. Commercial Plyboard) into stock ledger"
+                className="inline-flex h-9 items-center justify-center rounded-lg border border-emerald-500/30 bg-emerald-50 px-3 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50 dark:bg-emerald-950/30 dark:text-emerald-300"
+              >
+                {syncingSaleId === row.id ? "Syncing…" : "Sync Stock"}
+              </button>
             </div>
           );
         }
@@ -3015,6 +3051,32 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
       {salesLoading ? (
         <DashboardGridSkeleton cards={4} className="motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-200" />
       ) : null}
+
+      {stockSyncNotice && (
+        <div
+          className={`flex items-center justify-between rounded-xl border p-4 text-sm font-medium ${
+            stockSyncNotice.tone === "success"
+              ? "border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200"
+              : "border-destructive/30 bg-destructive/10 text-destructive"
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            {stockSyncNotice.tone === "success" ? (
+              <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
+            ) : (
+              <AlertCircle className="h-5 w-5 text-destructive shrink-0" />
+            )}
+            <span>{stockSyncNotice.message}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setStockSyncNotice(null)}
+            className="text-xs opacity-70 hover:opacity-100"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       <WorkspaceSection
         title="Recent Direct Sales"

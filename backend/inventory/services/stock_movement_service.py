@@ -317,18 +317,47 @@ def check_stock_for_delivery(
 
     # 1. ProductRelationship (PIM catalog)
     product = getattr(inventory_item, "product", None)
-    v_sku = variant_sku or getattr(inventory_item, "sku", None)
+    v_sku = variant_sku or getattr(inventory_item, "sku", None) or getattr(product, "sku", None)
+    
+    from products_core.models import ProductRelationship
+    from django.db.models import Q as _Q
+
+    rel_filter = _Q()
+    if product:
+        rel_filter |= _Q(product=product)
+        try:
+            from products_pim.models import ProductVariant
+            pv = ProductVariant.objects.filter(operational_product_id=product.id).select_related("product").first()
+            if pv and pv.product and pv.product.source_product_id:
+                rel_filter |= _Q(product_id=pv.product.source_product_id)
+        except Exception:
+            pass
+
+    if v_sku:
+        rel_filter |= _Q(parent_variant_sku=v_sku)
+
     candidate_rels = []
-    if product and hasattr(product, "related_products") and product.related_products.exists():
-        candidate_rels = list(product.related_products.select_related("related_product", "related_product__inventory_profile").all())
-    elif v_sku:
-        from products_core.models import ProductRelationship
-        candidate_rels = list(ProductRelationship.objects.filter(parent_variant_sku=v_sku).select_related("related_product", "related_product__inventory_profile").all())
+    if rel_filter:
+        candidate_rels = list(
+            ProductRelationship.objects.filter(rel_filter)
+            .select_related("related_product", "related_product__inventory_profile")
+            .distinct()
+        )
 
     for rel in candidate_rels:
         if rel.parent_variant_sku and v_sku and rel.parent_variant_sku != v_sku:
             continue
-        rel_inv = getattr(rel.related_product, "inventory_profile", None)
+        if rel.parent_variant_sku and not v_sku:
+            continue
+
+        rel_inv = None
+        if rel.related_variant_sku:
+            rel_inv = InventoryItem.objects.filter(sku=rel.related_variant_sku).first()
+        if not rel_inv and rel.related_product:
+            rel_inv = getattr(rel.related_product, "inventory_profile", None)
+        if not rel_inv and rel.related_product_id:
+            rel_inv = InventoryItem.objects.filter(product_id=rel.related_product_id).first()
+
         if not rel_inv or not rel_inv.stock_tracking_enabled:
             continue
         checked_acc_ids.add(rel_inv.id)

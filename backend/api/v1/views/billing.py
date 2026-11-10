@@ -399,6 +399,26 @@ class DirectSaleViewSet(AdminBillingModelViewSet):
             status=status.HTTP_200_OK,
         )
 
+    @action(detail=True, methods=["post"], url_path="resync-stock")
+    def resync_stock(self, request, pk=None):
+        sale = self.get_object()
+        invoice = sale.billing_invoices.filter(status=BillingDocumentStatus.POSTED).order_by("-id").first()
+        if not invoice:
+            invoice = sale.billing_invoices.order_by("-id").first()
+        if not invoice:
+            raise ValidationError({"detail": "No billing invoice linked to this direct sale."})
+        from inventory.services.stock_service import post_invoice_stock_movements
+        result = post_invoice_stock_movements(invoice=invoice, posted_by=request.user)
+        return Response({
+            "updated": True,
+            "direct_sale_id": sale.id,
+            "sale_no": sale.sale_no,
+            "document_no": invoice.document_no,
+            "created_count": result.get("created_count", 0),
+            "existing_count": result.get("existing_count", 0),
+            "message": f"Synchronized stock movements for {sale.sale_no}: {result.get('created_count', 0)} new, {result.get('existing_count', 0)} existing.",
+        })
+
 
 class BillingInvoiceViewSet(AdminBillingModelViewSet):
     queryset = BillingInvoice.objects.select_related(
@@ -505,6 +525,40 @@ class BillingInvoiceViewSet(AdminBillingModelViewSet):
             raise ValidationError({"detail": str(exc)}) from exc
         payload = BillingInvoiceSerializer(invoice, context=self.get_serializer_context())
         return Response({"updated": updated, "invoice": payload.data})
+
+    @action(detail=True, methods=["post"], url_path="resync-stock")
+    def resync_stock(self, request, pk=None):
+        invoice = self.get_object()
+        from inventory.services.stock_service import post_invoice_stock_movements
+        result = post_invoice_stock_movements(invoice=invoice, posted_by=request.user)
+        return Response({
+            "updated": True,
+            "invoice_id": invoice.id,
+            "document_no": invoice.document_no,
+            "created_count": result.get("created_count", 0),
+            "existing_count": result.get("existing_count", 0),
+            "message": f"Synchronized stock movements for {invoice.document_no or invoice.id}: {result.get('created_count', 0)} new, {result.get('existing_count', 0)} existing.",
+        })
+
+    @action(detail=False, methods=["post"], url_path="resync-all-stock")
+    def resync_all_stock(self, request):
+        from inventory.services.stock_service import post_invoice_stock_movements
+        invoices = BillingInvoice.objects.filter(status=BillingDocumentStatus.POSTED).order_by("id")
+        total_created = 0
+        total_existing = 0
+        processed_invoices = 0
+        for inv in invoices:
+            res = post_invoice_stock_movements(invoice=inv, posted_by=request.user)
+            total_created += res.get("created_count", 0)
+            total_existing += res.get("existing_count", 0)
+            processed_invoices += 1
+        return Response({
+            "updated": True,
+            "invoices_processed": processed_invoices,
+            "total_created": total_created,
+            "total_existing": total_existing,
+            "message": f"Successfully checked {processed_invoices} posted invoices. Created {total_created} missing stock movements.",
+        })
 
     @action(detail=True, methods=["get"], url_path="delivery-readiness")
     def delivery_readiness(self, request, pk=None):

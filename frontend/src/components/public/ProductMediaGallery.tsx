@@ -2,8 +2,9 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { Camera, ChevronLeft, ChevronRight, Play } from "lucide-react";
+import { Camera, ChevronLeft, ChevronRight, Maximize2, Play } from "lucide-react";
 
+import ProductImageLightbox from "@/components/public/ProductImageLightbox";
 import PublicProductMedia from "@/components/public/PublicProductMedia";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import {
@@ -203,6 +204,8 @@ export default function ProductMediaGallery({
 }: ProductMediaGalleryProps) {
   const [api, setApi] = useState<CarouselApi>();
   const [activeIndex, setActiveIndex] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
   const baseId = useId();
   const thumbnailContainerRef = useRef<HTMLDivElement>(null);
   const thumbnailRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -210,6 +213,11 @@ export default function ProductMediaGallery({
   const totalCount = items.length;
   const photoCount = useMemo(() => items.filter((i) => i.type === "image").length, [items]);
   const videoCount = useMemo(() => items.filter((i) => i.type === "video").length, [items]);
+
+  const openLightbox = (index: number = activeIndex) => {
+    setLightboxIndex(index);
+    setLightboxOpen(true);
+  };
 
   // Keep active index in sync with Embla carousel
   const onSelect = useCallback(() => {
@@ -288,7 +296,7 @@ export default function ProductMediaGallery({
     const single = items[0];
     return (
       <div className={cn("w-full space-y-3", className)}>
-        <AspectRatio ratio={aspectRatio} className="w-full relative overflow-hidden rounded-[1.7rem] border border-border bg-card shadow-sm">
+        <AspectRatio ratio={aspectRatio} className="w-full relative overflow-hidden rounded-[1.7rem] border border-border bg-card shadow-sm group/stage">
           {single.type === "video" ? (
             <video
               src={single.url}
@@ -298,18 +306,44 @@ export default function ProductMediaGallery({
               className="absolute inset-0 size-full object-contain bg-black rounded-[1.7rem]"
             />
           ) : (
-            <PublicProductMedia
-              src={single.url}
-              alt={productName}
-              badge={badge || category || "Catalogue"}
-              sizes={sizes}
-              priority
-              category={category}
-              subcategory={subcategory}
-              className="absolute inset-0 size-full rounded-[1.7rem]"
-              imageClassName="transition duration-500 hover:scale-[1.02]"
-            />
+            <div
+              onClick={() => openLightbox(0)}
+              className="relative size-full cursor-zoom-in"
+              role="button"
+              tabIndex={0}
+              aria-label={`View full resolution photo of ${productName}`}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  openLightbox(0);
+                }
+              }}
+            >
+              <PublicProductMedia
+                src={single.url}
+                alt={productName}
+                badge={badge || category || "Catalogue"}
+                sizes={sizes}
+                priority
+                category={category}
+                subcategory={subcategory}
+                className="absolute inset-0 size-full rounded-[1.7rem]"
+                imageClassName="transition duration-500 hover:scale-[1.02]"
+              />
+            </div>
           )}
+
+          {/* Floating Expand Button */}
+          <button
+            type="button"
+            onClick={() => openLightbox(0)}
+            aria-label="View full resolution photo"
+            title="View full photo"
+            className="absolute top-3.5 right-3.5 z-20 flex items-center gap-1.5 rounded-full bg-slate-950/75 px-3 py-1.5 text-xs font-medium text-white shadow-md backdrop-blur border border-white/15 transition-all hover:bg-black hover:scale-105 active:scale-95"
+          >
+            <Maximize2 className="size-3.5" />
+            <span className="hidden sm:inline">View full photo</span>
+          </button>
 
           {/* Single media counter badge */}
           <div className="pointer-events-none absolute bottom-3.5 right-3.5 z-10 flex items-center gap-1.5 rounded-full bg-slate-950/75 px-3 py-1 text-xs font-medium text-white shadow-md backdrop-blur border border-white/10">
@@ -317,6 +351,15 @@ export default function ProductMediaGallery({
             <span>1 {single.type === "video" ? "Video" : "Photo"}</span>
           </div>
         </AspectRatio>
+
+        {/* Lightbox Modal */}
+        <ProductImageLightbox
+          isOpen={lightboxOpen}
+          onClose={() => setLightboxOpen(false)}
+          items={items}
+          initialIndex={0}
+          productName={productName}
+        />
       </div>
     );
   }
@@ -350,18 +393,32 @@ export default function ProductMediaGallery({
                       className="absolute inset-0 size-full object-contain bg-black rounded-[inherit]"
                     />
                   ) : (
-                    <PublicProductMedia
-                      src={item.url}
-                      alt={item.title ? `${productName} — ${item.title}` : `${productName} (${index + 1})`}
-                      badge={badge || category || "Catalogue"}
-                      sizes={sizes}
-                      priority={index === 0}
-                      quality={index === 0 ? 80 : 70}
-                      category={category}
-                      subcategory={subcategory}
-                      className="absolute inset-0 size-full rounded-[inherit]"
-                      imageClassName="transition duration-500 hover:scale-[1.02]"
-                    />
+                    <div
+                      onClick={() => openLightbox(index)}
+                      className="relative size-full cursor-zoom-in"
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`View full resolution photo ${index + 1} of ${totalCount}`}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          openLightbox(index);
+                        }
+                      }}
+                    >
+                      <PublicProductMedia
+                        src={item.url}
+                        alt={item.title ? `${productName} — ${item.title}` : `${productName} (${index + 1})`}
+                        badge={badge || category || "Catalogue"}
+                        sizes={sizes}
+                        priority={index === 0}
+                        quality={index === 0 ? 80 : 70}
+                        category={category}
+                        subcategory={subcategory}
+                        className="absolute inset-0 size-full rounded-[inherit]"
+                        imageClassName="transition duration-500 hover:scale-[1.02]"
+                      />
+                    </div>
                   )}
                 </AspectRatio>
               </CarouselItem>
@@ -386,6 +443,18 @@ export default function ProductMediaGallery({
           className="absolute right-3 top-1/2 -translate-y-1/2 z-20 flex size-9 sm:size-10 items-center justify-center rounded-full border border-border/60 bg-background/85 text-foreground shadow-lg backdrop-blur-md transition hover:bg-background hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary opacity-90 sm:opacity-0 sm:group-hover/stage:opacity-100"
         >
           <ChevronRight className="size-5" />
+        </button>
+
+        {/* Floating Expand Full Photo Button */}
+        <button
+          type="button"
+          onClick={() => openLightbox(activeIndex)}
+          aria-label="View full resolution photo"
+          title="View full photo"
+          className="absolute top-3.5 right-3.5 z-20 flex items-center gap-1.5 rounded-full bg-slate-950/75 px-3 py-1.5 text-xs font-medium text-white shadow-md backdrop-blur border border-white/15 transition-all hover:bg-black hover:scale-105 active:scale-95 opacity-90 sm:opacity-0 sm:group-hover/stage:opacity-100"
+        >
+          <Maximize2 className="size-3.5" />
+          <span className="hidden sm:inline">View full photo</span>
         </button>
 
         {/* Floating Counter Chip */}
@@ -525,6 +594,15 @@ export default function ProductMediaGallery({
           )}
         </div>
       </div>
+
+      {/* Full-Screen Lightbox Photo Viewer */}
+      <ProductImageLightbox
+        isOpen={lightboxOpen}
+        onClose={() => setLightboxOpen(false)}
+        items={items}
+        initialIndex={lightboxIndex}
+        productName={productName}
+      />
     </div>
   );
 }

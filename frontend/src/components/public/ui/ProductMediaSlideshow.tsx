@@ -2,11 +2,12 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Play } from "lucide-react";
+import { ChevronLeft, ChevronRight, Maximize2, Play } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 
 import { useI18n } from "@/components/i18n/I18nProvider";
+import ProductImageLightbox from "@/components/public/ProductImageLightbox";
 import ProductImagePlaceholder from "@/components/public/ProductImagePlaceholder";
 import type { ProductSlide } from "@/components/public/ui/product-slides";
 import { shouldBypassNextImageOptimization } from "@/lib/media";
@@ -27,8 +28,10 @@ const ARROW_CLASS =
   "absolute top-1/2 z-10 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-slate-900 shadow-sm transition-opacity hover:bg-white focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/slides:opacity-100";
 
 /**
- * Swipeable photo + video slideshow for product cards. Uses Embla Carousel to
- * support both touch swipe and mouse drag animations.
+ * Swipeable photo + video slideshow for product cards.
+ * - Auto-slideshow on mouse hover when multiple photos exist.
+ * - Dynamic Ken Burns & sheen lighting animation on mouse hover when single photo.
+ * - Quick-view full image lightbox modal on click.
  */
 export default function ProductMediaSlideshow({
   slides,
@@ -40,13 +43,15 @@ export default function ProductMediaSlideshow({
   className,
 }: ProductMediaSlideshowProps) {
   const { t } = useI18n();
-  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: false });
+  const count = slides.length;
+  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: count > 1 });
   const [active, setActive] = useState(0);
   const [inView, setInView] = useState(false);
   const [failed, setFailed] = useState<ReadonlySet<string>>(() => new Set());
-  const count = slides.length;
+  const [lightboxOpen, setLightboxOpen] = useState(false);
   const hasVideo = slides.some((slide) => slide.type === "video");
   const containerRef = useRef<HTMLDivElement>(null);
+  const hoverIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const onSelect = useCallback(() => {
     if (!emblaApi) return;
@@ -72,6 +77,38 @@ export default function ProductMediaSlideshow({
     return () => observer.disconnect();
   }, [hasVideo]);
 
+  // Clean up hover interval on unmount
+  useEffect(() => {
+    return () => {
+      if (hoverIntervalRef.current) {
+        clearInterval(hoverIntervalRef.current);
+        hoverIntervalRef.current = null;
+      }
+    };
+  }, []);
+
+  // Hover slideshow: cycle photos when user hovers mouse over product card
+  const handleMouseEnter = () => {
+    if (count <= 1) return;
+    if (hoverIntervalRef.current) clearInterval(hoverIntervalRef.current);
+    hoverIntervalRef.current = setInterval(() => {
+      if (emblaApi) {
+        emblaApi.scrollNext();
+      }
+    }, 1400);
+  };
+
+  // On hover leave: stop slideshow and return smoothly to first slide
+  const handleMouseLeave = () => {
+    if (hoverIntervalRef.current) {
+      clearInterval(hoverIntervalRef.current);
+      hoverIntervalRef.current = null;
+    }
+    if (count > 1 && emblaApi) {
+      emblaApi.scrollTo(0);
+    }
+  };
+
   const goTo = (index: number) => {
     if (emblaApi) emblaApi.scrollTo(index);
   };
@@ -96,7 +133,9 @@ export default function ProductMediaSlideshow({
   return (
     <div
       ref={containerRef}
-      className={cn("group/slides relative h-full w-full", className)}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      className={cn("group/slides relative h-full w-full overflow-hidden", className)}
       role="region"
       aria-roledescription="carousel"
       aria-label={alt}
@@ -109,7 +148,7 @@ export default function ProductMediaSlideshow({
           {slides.map((slide, index) => (
             <div
               key={slide.src}
-              className="relative h-full w-full min-w-0 shrink-0 grow-0 basis-full"
+              className="relative h-full w-full min-w-0 shrink-0 grow-0 basis-full overflow-hidden"
               aria-roledescription="slide"
               aria-label={`${index + 1} / ${count}`}
             >
@@ -123,18 +162,31 @@ export default function ProductMediaSlideshow({
                   failed.has(slide.src) ? (
                     placeholder
                   ) : (
-                    <Image
-                      src={slide.src}
-                      alt={index === 0 ? alt : `${alt} (${index + 1})`}
-                      fill
-                      sizes={sizes}
-                      quality={70}
-                      loading={index === 0 ? undefined : "lazy"}
-                      className="object-cover"
-                      unoptimized={shouldBypassNextImageOptimization(slide.src)}
-                      onError={() => setFailed((prev) => new Set(prev).add(slide.src))}
-                      draggable={false}
-                    />
+                    <div className="relative h-full w-full overflow-hidden">
+                      <Image
+                        src={slide.src}
+                        alt={index === 0 ? alt : `${alt} (${index + 1})`}
+                        fill
+                        sizes={sizes}
+                        quality={75}
+                        loading={index === 0 ? undefined : "lazy"}
+                        className={cn(
+                          "object-cover will-change-transform",
+                          count <= 1
+                            ? "animate-single-photo group-hover/slides:scale-115"
+                            : "transition-transform duration-500 ease-out group-hover/slides:scale-105"
+                        )}
+                        unoptimized={shouldBypassNextImageOptimization(slide.src)}
+                        onError={() => setFailed((prev) => new Set(prev).add(slide.src))}
+                        draggable={false}
+                      />
+                      {/* Dynamic sheen sweep highlight for single photo on hover */}
+                      {count <= 1 && (
+                        <div className="photo-sheen-overlay">
+                          <div className="photo-sheen-beam" />
+                        </div>
+                      )}
+                    </div>
                   )
                 )
               )}
@@ -142,6 +194,35 @@ export default function ProductMediaSlideshow({
           ))}
         </div>
       </div>
+
+      {/* Quick-expand full image button on hover */}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setLightboxOpen(true);
+        }}
+        aria-label="View full resolution image"
+        title="View full image"
+        className="absolute top-2 right-2 z-30 flex size-8 items-center justify-center rounded-full bg-black/60 text-white shadow-md backdrop-blur-md opacity-0 group-hover/slides:opacity-100 transition-all hover:bg-black/90 hover:scale-110 active:scale-95 focus-visible:opacity-100"
+      >
+        <Maximize2 className="size-3.5" />
+      </button>
+
+      {/* Lightbox Modal */}
+      <ProductImageLightbox
+        isOpen={lightboxOpen}
+        onClose={() => setLightboxOpen(false)}
+        items={slides.map((s, idx) => ({
+          id: `card-slide-${idx}`,
+          type: s.type,
+          url: s.src,
+          title: count > 1 ? `Photo ${idx + 1}` : undefined,
+        }))}
+        initialIndex={active}
+        productName={alt}
+      />
 
       {count > 1 ? (
         <>

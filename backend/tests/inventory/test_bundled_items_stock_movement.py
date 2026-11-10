@@ -406,3 +406,193 @@ class BundledItemsStockMovementTests(TestCase):
         )
         net_out = sum(e.quantity_out - e.quantity_in for e in all_entries)
         self.assertEqual(net_out, Decimal("0.500"))
+
+    def test_post_invoice_stock_movements_deducts_variant_specific_commercial_plyboards(self):
+        """
+        Exact simulation of Hybrid Bed scenario:
+        - Parent Product: Hybrid Square Bed
+        - Variant B (HYBR-SQUA-BED-B): attached 1x COMM-PLYB-7836 + 0.5x COMM-PLYB-7848
+        - Variant C (HYBR-SQUA-BED-C): attached 2x COMM-PLYB-7836
+        When invoice for Variant B is posted, deducts 1.000 of 7836 and 0.500 of 7848.
+        When invoice for Variant C is posted, deducts 2.000 of 7836.
+        """
+        from django.core.management import call_command
+        import io
+
+        # 2nd accessory: 78*48*16mm
+        ply48_product = create_product(
+            name="Commercial Plyboard 78*48*16mm",
+            product_code="COMM-PLYB-7848",
+            base_price=Decimal("1700.00"),
+            published=True,
+        )
+        ply48_inv = InventoryItem.objects.create(
+            product=ply48_product,
+            sku="COMM-PLYB-7848",
+            stock_item_type=InventoryItemType.ACCESSORY,
+            default_stock_location=self.location,
+            stock_tracking_enabled=True,
+            opening_stock_qty=Decimal("10.000"),
+            standard_unit_cost=Decimal("1500.00"),
+        )
+
+        # Operational products for Variant B and Variant C
+        bed_b_prod = create_product(
+            name="Hybrid Square Bed Queen",
+            product_code="HYBR-SQUA-BED-B",
+            base_price=Decimal("12500.00"),
+            published=True,
+        )
+        bed_b_inv = InventoryItem.objects.create(
+            product=bed_b_prod,
+            sku="HYBR-SQUA-BED-B",
+            stock_item_type=InventoryItemType.FINISHED_GOOD,
+            default_stock_location=self.location,
+            stock_tracking_enabled=True,
+            opening_stock_qty=Decimal("5.000"),
+            standard_unit_cost=Decimal("8000.00"),
+        )
+
+        bed_c_prod = create_product(
+            name="Hybrid Square Bed King",
+            product_code="HYBR-SQUA-BED-C",
+            base_price=Decimal("20000.00"),
+            published=True,
+        )
+        bed_c_inv = InventoryItem.objects.create(
+            product=bed_c_prod,
+            sku="HYBR-SQUA-BED-C",
+            stock_item_type=InventoryItemType.FINISHED_GOOD,
+            default_stock_location=self.location,
+            stock_tracking_enabled=True,
+            opening_stock_qty=Decimal("5.000"),
+            standard_unit_cost=Decimal("10000.00"),
+        )
+
+        # Attach relations (stored with base product + parent_variant_sku)
+        ProductRelationship.objects.create(
+            product=self.bed_product,
+            related_product=self.ply_product,
+            parent_variant_sku="HYBR-SQUA-BED-B",
+            relationship_type=ProductRelationshipType.ACCESSORY,
+            quantity=Decimal("1.00"),
+            is_price_included_in_parent=True,
+        )
+        ProductRelationship.objects.create(
+            product=self.bed_product,
+            related_product=ply48_product,
+            parent_variant_sku="HYBR-SQUA-BED-B",
+            relationship_type=ProductRelationshipType.ACCESSORY,
+            quantity=Decimal("0.50"),
+            is_price_included_in_parent=True,
+        )
+        ProductRelationship.objects.create(
+            product=self.bed_product,
+            related_product=self.ply_product,
+            parent_variant_sku="HYBR-SQUA-BED-C",
+            relationship_type=ProductRelationshipType.ACCESSORY,
+            quantity=Decimal("2.00"),
+            is_price_included_in_parent=True,
+        )
+
+        # Invoice for Variant B (simulating Manoj Bauri INV/FY2026-27/00002)
+        inv_b = BillingInvoice.objects.create(
+            document_no="INV/FY2026-27/00002",
+            invoice_date=date(2026, 11, 8),
+            financial_year="2026-27",
+            doc_series=self.doc_series,
+            status=BillingDocumentStatus.APPROVED,
+            customer=self.customer,
+            subtotal=Decimal("12500.00"),
+            taxable_total=Decimal("12500.00"),
+            grand_total=Decimal("12500.00"),
+            received_total=Decimal("12500.00"),
+            balance_total=Decimal("0.00"),
+        )
+        BillingInvoiceLine.objects.create(
+            invoice=inv_b,
+            product=bed_b_prod,
+            inventory_item=bed_b_inv,
+            description="Hybrid Square Bed Queen",
+            quantity=Decimal("1.000"),
+            unit_price=Decimal("12500.00"),
+            taxable_value=Decimal("12500.00"),
+            line_total=Decimal("12500.00"),
+        )
+
+        # Post movements for Variant B
+        res_b = post_invoice_stock_movements(invoice=inv_b)
+        self.assertEqual(res_b["created_count"], 3)  # 1 Bed + 2 bundled plyboards
+
+        # Verify Variant B Bed deducted
+        entry_b = StockLedger.objects.filter(
+            inventory_item=bed_b_inv,
+            movement_type=StockMovementType.SALE_OUT,
+            reference_model="BillingInvoiceLine",
+            reference_id__startswith=f"{inv_b.id}:",
+        ).first()
+        self.assertIsNotNone(entry_b)
+        self.assertEqual(entry_b.quantity_out, Decimal("1.000"))
+
+        # Verify 1.000 of 78*36mm Commercial Plyboard deducted
+        entry_ply36_b = StockLedger.objects.filter(
+            inventory_item=self.ply_inv,
+            movement_type=StockMovementType.SALE_OUT,
+            reference_model="BillingInvoiceLine",
+            reference_id__startswith=f"{inv_b.id}:",
+        ).first()
+        self.assertIsNotNone(entry_ply36_b)
+        self.assertEqual(entry_ply36_b.quantity_out, Decimal("1.000"))
+
+        # Verify 0.500 of 78*48mm Commercial Plyboard deducted
+        entry_ply48_b = StockLedger.objects.filter(
+            inventory_item=ply48_inv,
+            movement_type=StockMovementType.SALE_OUT,
+            reference_model="BillingInvoiceLine",
+            reference_id__startswith=f"{inv_b.id}:",
+        ).first()
+        self.assertIsNotNone(entry_ply48_b)
+        self.assertEqual(entry_ply48_b.quantity_out, Decimal("0.500"))
+
+        # Invoice for Variant C (simulating Umesh Thakur INV/FY2026-27/00003)
+        inv_c = BillingInvoice.objects.create(
+            document_no="INV/FY2026-27/00003",
+            invoice_date=date(2026, 11, 8),
+            financial_year="2026-27",
+            doc_series=self.doc_series,
+            status=BillingDocumentStatus.APPROVED,
+            customer=self.customer,
+            subtotal=Decimal("20000.00"),
+            taxable_total=Decimal("20000.00"),
+            grand_total=Decimal("20000.00"),
+            received_total=Decimal("12000.00"),
+            balance_total=Decimal("8000.00"),
+        )
+        BillingInvoiceLine.objects.create(
+            invoice=inv_c,
+            product=bed_c_prod,
+            inventory_item=bed_c_inv,
+            description="Hybrid Square Bed King",
+            quantity=Decimal("1.000"),
+            unit_price=Decimal("20000.00"),
+            taxable_value=Decimal("20000.00"),
+            line_total=Decimal("20000.00"),
+        )
+
+        res_c = post_invoice_stock_movements(invoice=inv_c)
+        self.assertEqual(res_c["created_count"], 2)  # 1 Bed + 1 bundled plyboard (qty 2)
+
+        entry_ply36_c = StockLedger.objects.filter(
+            inventory_item=self.ply_inv,
+            movement_type=StockMovementType.SALE_OUT,
+            reference_model="BillingInvoiceLine",
+            reference_id__startswith=f"{inv_c.id}:",
+        ).first()
+        self.assertIsNotNone(entry_ply36_c)
+        self.assertEqual(entry_ply36_c.quantity_out, Decimal("2.000"))
+
+        # Test management command resync (idempotent, 0 new created)
+        out = io.StringIO()
+        call_command("resync_invoice_stock_movements", invoice_no="INV/FY2026-27/00002", stdout=out)
+        self.assertIn("created 0 new", out.getvalue().lower())
+        self.assertIn("existing", out.getvalue().lower())

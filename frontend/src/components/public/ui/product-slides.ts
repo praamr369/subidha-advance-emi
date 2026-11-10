@@ -7,15 +7,22 @@ type ProductMediaSource = {
   gallery_images?: string[] | null;
   gallery_videos?: string[] | null;
   video?: string | null;
+  sibling_variants?: Array<{ image?: string | null }> | null;
+  pim_variants?: Array<{ image?: string | null }> | null;
 };
 
 /**
  * Card slideshow order: the product's cover photo first (so cards open on a
- * picture), then the rest of the gallery, then videos — de-duplicated.
+ * picture), then the rest of the gallery, then variant photos, then videos — de-duplicated.
  * Plain module (not "use client") so server components can call it too.
  */
 export function buildProductSlides(product: ProductMediaSource): ProductSlide[] {
-  const images = [product.image, ...(product.gallery_images ?? [])];
+  const variantImages = [
+    ...(product.sibling_variants ?? []).map((v) => v.image),
+    ...(product.pim_variants ?? []).map((v) => v.image),
+  ].filter(Boolean);
+
+  const images = [product.image, ...(product.gallery_images ?? []), ...variantImages];
   // The list API resolves image URLs but returns video paths as stored.
   const videos = [...(product.gallery_videos ?? []), product.video].map((src) => resolveApiMediaUrl(src));
 

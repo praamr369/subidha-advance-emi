@@ -112,6 +112,72 @@ class DirectSaleCollectionSerializer(serializers.Serializer):
         return (value or "").strip()
 
 
+def _resolve_line_bundled_items(obj):
+    items = []
+    product = getattr(obj, "product", None)
+    inv_item = getattr(obj, "inventory_item", None)
+    if not product and inv_item:
+        product = getattr(inv_item, "product", None)
+    variant_sku = (
+        getattr(obj, "sku_snapshot", None)
+        or (getattr(inv_item, "sku", None) if inv_item else None)
+        or (getattr(product, "sku", None) if product else None)
+    )
+
+    from products_core.models import ProductRelationship
+    from django.db.models import Q as _Q
+
+    rel_filter = _Q()
+    if product:
+        rel_filter |= _Q(product=product)
+        try:
+            from products_pim.models import ProductVariant
+            pv = ProductVariant.objects.filter(operational_product_id=product.id).select_related("product").first()
+            if pv and pv.product and pv.product.source_product_id:
+                rel_filter |= _Q(product_id=pv.product.source_product_id)
+        except Exception:
+            pass
+
+    if variant_sku:
+        rel_filter |= _Q(parent_variant_sku=variant_sku)
+
+    if not rel_filter:
+        return items
+
+    candidate_rels = list(
+        ProductRelationship.objects.filter(rel_filter)
+        .select_related("related_product", "related_product__inventory_profile")
+        .distinct()
+    )
+
+    for rel in candidate_rels:
+        if rel.parent_variant_sku and variant_sku and rel.parent_variant_sku != variant_sku:
+            continue
+        if rel.parent_variant_sku and not variant_sku:
+            continue
+        inv = None
+        if rel.related_variant_sku:
+            from inventory.models import InventoryItem
+            inv = InventoryItem.objects.filter(sku=rel.related_variant_sku).first()
+        if not inv and rel.related_product:
+            inv = getattr(rel.related_product, "inventory_profile", None)
+        if not inv and rel.related_product_id:
+            from inventory.models import InventoryItem
+            inv = InventoryItem.objects.filter(product_id=rel.related_product_id).first()
+
+        stock_qty = f"{inv.current_stock_quantity():.2f}" if inv else "0.00"
+        items.append({
+            "id": rel.id,
+            "name": rel.related_product.name if rel.related_product else "Accessory",
+            "code": rel.related_product.product_code if rel.related_product else "",
+            "type": rel.relationship_type,
+            "quantity": str(rel.quantity or Decimal("1.00")),
+            "is_price_included_in_parent": rel.is_price_included_in_parent,
+            "current_stock_qty": stock_qty,
+        })
+    return items
+
+
 class DirectSaleLineSerializer(serializers.ModelSerializer):
     product_code = serializers.CharField(source="product.product_code", read_only=True)
     inventory_item_sku = serializers.CharField(source="inventory_item.sku", read_only=True)
@@ -215,25 +281,7 @@ class DirectSaleLineSerializer(serializers.ModelSerializer):
         return attrs
 
     def get_bundled_items(self, obj):
-        items = []
-        product = getattr(obj, "product", None)
-        if product and hasattr(product, "related_products"):
-            variant_sku = getattr(obj, "sku_snapshot", None)
-            for rel in product.related_products.select_related("related_product", "related_product__inventory_profile").all():
-                if rel.parent_variant_sku and variant_sku and rel.parent_variant_sku != variant_sku:
-                    continue
-                inv = getattr(rel.related_product, "inventory_profile", None)
-                stock_qty = f"{inv.current_stock_quantity():.2f}" if inv else "0.00"
-                items.append({
-                    "id": rel.id,
-                    "name": rel.related_product.name,
-                    "code": rel.related_product.product_code,
-                    "type": rel.relationship_type,
-                    "quantity": str(rel.quantity or Decimal("1.00")),
-                    "is_price_included_in_parent": rel.is_price_included_in_parent,
-                    "current_stock_qty": stock_qty,
-                })
-        return items
+        return _resolve_line_bundled_items(obj)
 
 
 class BillingInvoiceLineSerializer(serializers.ModelSerializer):
@@ -271,22 +319,7 @@ class BillingInvoiceLineSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at", "updated_at"]
 
     def get_bundled_items(self, obj):
-        items = []
-        product = getattr(obj, "product", None)
-        if product and hasattr(product, "related_products"):
-            for rel in product.related_products.select_related("related_product", "related_product__inventory_profile").all():
-                inv = getattr(rel.related_product, "inventory_profile", None)
-                stock_qty = f"{inv.current_stock_quantity():.2f}" if inv else "0.00"
-                items.append({
-                    "id": rel.id,
-                    "name": rel.related_product.name,
-                    "code": rel.related_product.product_code,
-                    "type": rel.relationship_type,
-                    "quantity": str(rel.quantity or Decimal("1.00")),
-                    "is_price_included_in_parent": rel.is_price_included_in_parent,
-                    "current_stock_qty": stock_qty,
-                })
-        return items
+        return _resolve_line_bundled_items(obj)
 
     def get_display_sku(self, obj):
         item = getattr(obj, "inventory_item", None)

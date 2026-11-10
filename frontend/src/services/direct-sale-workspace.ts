@@ -239,6 +239,32 @@ export async function updatePurchaseNeedStatus(
   );
 }
 
+export async function resyncDirectSaleStock(saleId: number | string): Promise<{
+  updated: boolean;
+  direct_sale_id: number;
+  sale_no: string;
+  document_no: string;
+  created_count: number;
+  existing_count: number;
+  message: string;
+}> {
+  return apiFetch(`/admin/direct-sales/${saleId}/resync-stock/`, {
+    method: "POST",
+  });
+}
+
+export async function resyncAllInvoicesStock(): Promise<{
+  updated: boolean;
+  invoices_processed: number;
+  total_created: number;
+  total_existing: number;
+  message: string;
+}> {
+  return apiFetch(`/admin/billing/invoices/resync-all-stock/`, {
+    method: "POST",
+  });
+}
+
 export function extractProductCodeOrSku(raw: string): string {
   const trimmed = (raw || "").trim();
   if (!trimmed) return "";

@@ -105,7 +105,47 @@ export default function AdminOutstandingsPage() {
           </div>
         ),
       },
-      { key: "operation_type", title: "Operation" },
+      {
+        key: "operation_type",
+        title: "Operation",
+        render: (row) => {
+          const operationConfig: Record<string, { label: string; badgeClass: string }> = {
+            direct_sale: {
+              label: "Direct Sale",
+              badgeClass: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800",
+            },
+            advance_emi: {
+              label: "SFEMI (EMI)",
+              badgeClass: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800",
+            },
+            rent: {
+              label: "Rent",
+              badgeClass: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800",
+            },
+            lease: {
+              label: "Lease",
+              badgeClass: "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-800",
+            },
+            billing_invoice: {
+              label: "Standalone Invoice",
+              badgeClass: "bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-900 dark:text-slate-300 dark:border-slate-800",
+            },
+            legacy_receivable: {
+              label: "Legacy Receivable",
+              badgeClass: "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950 dark:text-orange-300 dark:border-orange-800",
+            },
+          };
+          const cfg = operationConfig[row.operation_type] || {
+            label: row.operation_type || "—",
+            badgeClass: "bg-muted text-muted-foreground border-border",
+          };
+          return (
+            <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium ${cfg.badgeClass}`}>
+              {cfg.label}
+            </span>
+          );
+        },
+      },
       {
         key: "reference",
         title: "Reference",
@@ -144,28 +184,46 @@ export default function AdminOutstandingsPage() {
       {
         key: "actions",
         title: "Collection Action",
-        render: (row) => (
-          <div className="flex flex-col gap-1.5">
-            {row.collection_allowed && row.payment_url ? (
-              <Link
-                className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition hover:opacity-90"
-                href={row.payment_url}
-              >
-                Open Collection Workspace
-              </Link>
-            ) : null}
-            {row.customer_url ? (
-              <Link className="text-xs text-muted-foreground hover:underline" href={row.customer_url}>
-                View Customer Profile
-              </Link>
-            ) : null}
-            {row.detail_url ? (
-              <Link className="text-xs text-muted-foreground hover:underline" href={row.detail_url}>
-                View Contract
-              </Link>
-            ) : null}
-          </div>
-        ),
+        render: (row) => {
+          const detailUrl = row.detail_url
+            ? row.detail_url.replace("/admin/billing/direct-sales/", "/admin/billing/direct-sale/")
+            : "";
+          const detailLabel =
+            row.operation_type === "direct_sale"
+              ? "View Direct Sale"
+              : row.operation_type === "billing_invoice"
+              ? "View Invoice"
+              : row.operation_type === "legacy_receivable"
+              ? "View Legacy Balance"
+              : row.operation_type === "rent"
+              ? "View Rent Contract"
+              : row.operation_type === "lease"
+              ? "View Lease Contract"
+              : "View Contract";
+
+          return (
+            <div className="flex flex-col gap-1.5">
+              {row.collection_allowed && row.payment_url ? (
+                <Link
+                  className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition hover:opacity-90"
+                  href={row.payment_url.replace("direct_sale_id=", "sale_id=")}
+                >
+                  Open Collection Workspace
+                </Link>
+              ) : null}
+              {row.customer_url ? (
+                <Link className="text-xs text-muted-foreground hover:underline" href={row.customer_url}>
+                  View Customer Profile
+                </Link>
+              ) : null}
+              {detailUrl ? (
+                <Link className="text-xs text-muted-foreground hover:underline" href={detailUrl}>
+                  {detailLabel}
+                </Link>
+              ) : null}
+            </div>
+          );
+        },
       },
     ],
     []

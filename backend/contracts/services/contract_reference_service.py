@@ -449,6 +449,12 @@ def search_contract_references(
     if query:
         if query.startswith("subscription:") and query[13:].isdigit():
             queryset = queryset.filter(subscription_id=int(query[13:]))
+        elif query.startswith("direct_sale:") and query[12:].isdigit():
+            queryset = queryset.filter(direct_sale_id=int(query[12:]))
+        elif query.startswith("sale:") and query[5:].isdigit():
+            queryset = queryset.filter(direct_sale_id=int(query[5:]))
+        elif query.startswith("outstanding:") and query[12:].isdigit():
+            queryset = queryset.filter(source_object_id=query[12:])
         else:
             search_filter = (
                 Q(reference_no__icontains=query)
@@ -657,7 +663,7 @@ def build_canonical_collection_route(
         )
     if primary_action == CollectionPrimaryAction.OPEN_SALE and ds_id:
         return (
-            f"/admin/billing/direct-sales?focus_sale={ds_id}"
+            f"/admin/billing/direct-sale?focus_sale={ds_id}"
             if not is_cashier
             else f"/cashier/collect?workflow=direct-sale&sale_id={ds_id}"
         )
@@ -675,7 +681,7 @@ def build_canonical_collection_route(
         )
     if ds_id:
         return (
-            f"/admin/billing/direct-sales/{ds_id}"
+            f"/admin/billing/direct-sale/{ds_id}"
             if not is_cashier
             else "/cashier/collect?workflow=direct-sale"
         )

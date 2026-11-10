@@ -276,6 +276,10 @@ export function buildAdminBillingDocumentRoute(id: number | string): string {
   return `${ROUTES.admin.billingDocuments}/${id}`;
 }
 
+export function buildAdminDirectSaleRoute(id: number | string): string {
+  return `${ROUTES.admin.billingDirectSaleWorkspace}/${id}`;
+}
+
 export function buildAdminDirectSalePrintRoute(id: number | string): string {
   return `${ROUTES.admin.billingDirectSaleWorkspace}/${id}/print`;
 }

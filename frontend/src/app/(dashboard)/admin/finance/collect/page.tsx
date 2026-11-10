@@ -4,11 +4,20 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import { ROUTES } from "@/lib/routes";
 
 export default async function AdminFinanceCollectPage(props: {
-  searchParams: Promise<{ workflow?: string; outstanding?: string; subscription?: string; context?: string }>;
+  searchParams: Promise<{
+    workflow?: string;
+    outstanding?: string;
+    subscription?: string;
+    context?: string;
+    sale_id?: string;
+    direct_sale_id?: string;
+    direct_sale?: string;
+  }>;
 }) {
   const searchParams = await props.searchParams;
   const isLegacy = searchParams?.workflow === "legacy-receivable" && searchParams?.outstanding;
-  
+  const directSaleId = searchParams?.sale_id || searchParams?.direct_sale_id || searchParams?.direct_sale;
+
   let initialQueryString = "";
   if (isLegacy) {
     initialQueryString = `?outstanding=${searchParams.outstanding}`;
@@ -17,6 +26,8 @@ export default async function AdminFinanceCollectPage(props: {
     if (searchParams.context) {
       initialQueryString += `&context=${searchParams.context}`;
     }
+  } else if (directSaleId) {
+    initialQueryString = `?direct_sale=${directSaleId}`;
   }
 
   return (

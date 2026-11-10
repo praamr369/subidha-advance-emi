@@ -366,28 +366,62 @@ def post_invoice_stock_movements(*, invoice, posted_by=None) -> dict:
         processed_acc_ids = set()
 
         # 1. ProductRelationship (PIM catalog)
-        product = line.inventory_item.product
-        variant_sku = getattr(line, "sku_snapshot", None) or getattr(product, "sku", None) or getattr(line.inventory_item, "sku", None)
+        product = line.inventory_item.product if line.inventory_item else line.product
+        variant_sku = (
+            getattr(line, "sku_snapshot", None)
+            or getattr(line.inventory_item, "sku", None)
+            or getattr(product, "sku", None)
+        )
+
+        from products_core.models import ProductRelationship
+        from django.db.models import Q as _Q
+
+        rel_filter = _Q()
+        if product:
+            rel_filter |= _Q(product=product)
+            try:
+                from products_pim.models import ProductVariant
+                pv = ProductVariant.objects.filter(operational_product_id=product.id).select_related("product").first()
+                if pv and pv.product and pv.product.source_product_id:
+                    rel_filter |= _Q(product_id=pv.product.source_product_id)
+            except Exception:
+                pass
+
+        if variant_sku:
+            rel_filter |= _Q(parent_variant_sku=variant_sku)
+
         candidate_rels = []
-        if product and hasattr(product, "related_products") and product.related_products.exists():
-            candidate_rels = list(product.related_products.select_related("related_product", "related_product__inventory_profile").all())
-        elif variant_sku:
-            from products_core.models import ProductRelationship
-            candidate_rels = list(ProductRelationship.objects.filter(parent_variant_sku=variant_sku).select_related("related_product", "related_product__inventory_profile").all())
+        if rel_filter:
+            candidate_rels = list(
+                ProductRelationship.objects.filter(rel_filter)
+                .select_related("related_product", "related_product__inventory_profile")
+                .distinct()
+            )
 
         for rel in candidate_rels:
             if rel.parent_variant_sku and variant_sku and rel.parent_variant_sku != variant_sku:
                 continue
-            rel_inv = getattr(rel.related_product, "inventory_profile", None)
+            if rel.parent_variant_sku and not variant_sku:
+                continue
+
+            rel_inv = None
+            if rel.related_variant_sku:
+                rel_inv = InventoryItem.objects.filter(sku=rel.related_variant_sku).first()
+            if not rel_inv and rel.related_product:
+                rel_inv = getattr(rel.related_product, "inventory_profile", None)
+            if not rel_inv and rel.related_product_id:
+                rel_inv = InventoryItem.objects.filter(product_id=rel.related_product_id).first()
+
             if not rel_inv or not rel_inv.stock_tracking_enabled:
                 continue
             processed_acc_ids.add(rel_inv.id)
             bundled_qty = line.quantity * Decimal(str(rel.quantity or 1))
+            loc = rel_inv.default_stock_location or (line.inventory_item.default_stock_location if line.inventory_item else None)
             _, rel_created = create_stock_ledger_entry(
                 inventory_item=rel_inv,
                 movement_type=StockMovementType.SALE_OUT,
                 movement_date=invoice.invoice_date,
-                stock_location=rel_inv.default_stock_location,
+                stock_location=loc,
                 quantity_out=bundled_qty,
                 reference_model="BillingInvoiceLine",
                 reference_id=f"{invoice.id}:{line.id}:bundled:{rel.id}",
@@ -464,28 +498,62 @@ def post_credit_note_stock_movements(*, note, posted_by=None) -> dict:
         processed_acc_ids = set()
 
         # 1. ProductRelationship (PIM catalog)
-        product = line.inventory_item.product
-        variant_sku = getattr(line, "sku_snapshot", None) or getattr(product, "sku", None) or getattr(line.inventory_item, "sku", None)
+        product = line.inventory_item.product if line.inventory_item else line.product
+        variant_sku = (
+            getattr(line, "sku_snapshot", None)
+            or getattr(line.inventory_item, "sku", None)
+            or getattr(product, "sku", None)
+        )
+
+        from products_core.models import ProductRelationship
+        from django.db.models import Q as _Q
+
+        rel_filter = _Q()
+        if product:
+            rel_filter |= _Q(product=product)
+            try:
+                from products_pim.models import ProductVariant
+                pv = ProductVariant.objects.filter(operational_product_id=product.id).select_related("product").first()
+                if pv and pv.product and pv.product.source_product_id:
+                    rel_filter |= _Q(product_id=pv.product.source_product_id)
+            except Exception:
+                pass
+
+        if variant_sku:
+            rel_filter |= _Q(parent_variant_sku=variant_sku)
+
         candidate_rels = []
-        if product and hasattr(product, "related_products") and product.related_products.exists():
-            candidate_rels = list(product.related_products.select_related("related_product", "related_product__inventory_profile").all())
-        elif variant_sku:
-            from products_core.models import ProductRelationship
-            candidate_rels = list(ProductRelationship.objects.filter(parent_variant_sku=variant_sku).select_related("related_product", "related_product__inventory_profile").all())
+        if rel_filter:
+            candidate_rels = list(
+                ProductRelationship.objects.filter(rel_filter)
+                .select_related("related_product", "related_product__inventory_profile")
+                .distinct()
+            )
 
         for rel in candidate_rels:
             if rel.parent_variant_sku and variant_sku and rel.parent_variant_sku != variant_sku:
                 continue
-            rel_inv = getattr(rel.related_product, "inventory_profile", None)
+            if rel.parent_variant_sku and not variant_sku:
+                continue
+
+            rel_inv = None
+            if rel.related_variant_sku:
+                rel_inv = InventoryItem.objects.filter(sku=rel.related_variant_sku).first()
+            if not rel_inv and rel.related_product:
+                rel_inv = getattr(rel.related_product, "inventory_profile", None)
+            if not rel_inv and rel.related_product_id:
+                rel_inv = InventoryItem.objects.filter(product_id=rel.related_product_id).first()
+
             if not rel_inv or not rel_inv.stock_tracking_enabled:
                 continue
             processed_acc_ids.add(rel_inv.id)
             bundled_qty = line.quantity * Decimal(str(rel.quantity or 1))
+            loc = rel_inv.default_stock_location or (line.inventory_item.default_stock_location if line.inventory_item else None)
             _, rel_created = create_stock_ledger_entry(
                 inventory_item=rel_inv,
                 movement_type=StockMovementType.SALE_RETURN_IN,
                 movement_date=note.note_date,
-                stock_location=rel_inv.default_stock_location,
+                stock_location=loc,
                 quantity_in=bundled_qty,
                 reference_model="BillingCreditNoteLine",
                 reference_id=f"{note.id}:{line.id}:bundled:{rel.id}",
