@@ -171,7 +171,7 @@ def update_draft_journal_entry(
 @transaction.atomic
 def post_journal_entry(*, journal_entry_id: int, posted_by) -> tuple[JournalEntry, bool]:
     journal_entry = (
-        JournalEntry.objects.select_for_update()
+        JournalEntry.objects.select_for_update(of=("self",))
         .prefetch_related("lines", "lines__chart_account")
         .get(pk=journal_entry_id)
     )

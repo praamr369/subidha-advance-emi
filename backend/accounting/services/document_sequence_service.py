@@ -318,7 +318,7 @@ def _number_collides(*, document_type: str, number: str) -> bool:
 @transaction.atomic
 def allocate_document_number(document_type: str, document_date: date, branch=None) -> str:
     sequence = validate_document_numbering_ready(document_type, document_date, branch=branch)
-    locked_sequence = DocumentSequence.objects.select_for_update().get(pk=sequence.pk)
+    locked_sequence = DocumentSequence.objects.select_for_update(of=("self",)).get(pk=sequence.pk)
     number = preview_document_number(sequence=locked_sequence, branch=branch)
     attempts = 0
     while _number_collides(document_type=document_type, number=number) and attempts < 1000:

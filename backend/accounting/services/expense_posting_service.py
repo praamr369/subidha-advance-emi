@@ -31,7 +31,7 @@ def _sync_voucher_amounts(voucher: ExpenseVoucher) -> None:
 
 @transaction.atomic
 def approve_expense_voucher(*, expense_voucher_id: int, approved_by):
-    voucher = ExpenseVoucher.objects.select_for_update().get(pk=expense_voucher_id)
+    voucher = ExpenseVoucher.objects.select_for_update(of=("self",)).get(pk=expense_voucher_id)
 
     if voucher.status == ExpenseVoucherStatus.APPROVED:
         return voucher, False
@@ -55,7 +55,7 @@ def approve_expense_voucher(*, expense_voucher_id: int, approved_by):
 @transaction.atomic
 def post_expense_voucher(*, expense_voucher_id: int, posted_by):
     voucher = (
-        ExpenseVoucher.objects.select_for_update()
+        ExpenseVoucher.objects.select_for_update(of=("self",))
         .select_related("expense_account", "finance_account", "finance_account__chart_account")
         .get(pk=expense_voucher_id)
     )
