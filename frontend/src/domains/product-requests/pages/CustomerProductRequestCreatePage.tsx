@@ -391,10 +391,10 @@ function LuckyNumberPicker({
   disabled: boolean;
 }) {
   if (disabled) {
-    return <p className="text-sm text-muted-foreground">Select a batch first to see available lucky numbers.</p>;
+    return <p className="text-sm text-muted-foreground">Select a batch first to see available SFEMI IDs.</p>;
   }
   if (numbers.length === 0) {
-    return <p className="text-sm text-amber-600 dark:text-amber-400">No lucky numbers available in this batch.</p>;
+    return <p className="text-sm text-amber-600 dark:text-amber-400">No SFEMI IDs available in this batch.</p>;
   }
   return (
     <div className="flex flex-wrap gap-2">
@@ -535,7 +535,7 @@ export default function CustomerProductRequestCreatePage({
     if (s === 0 && !productId) return "Please select a product.";
     if (s === 1 && requestType === "ADVANCE_EMI") {
       if (!batchId) return "Please select a batch.";
-      if (!luckyNumber) return "Please pick a lucky number.";
+      if (!luckyNumber) return "Please pick a SFEMI ID.";
     }
     return null;
   }
@@ -743,7 +743,7 @@ export default function CustomerProductRequestCreatePage({
           <div className="space-y-3 rounded-2xl border border-border bg-card p-4 shadow-sm">
             <div>
               <h2 className="font-bold text-foreground">Pick a Batch</h2>
-              <p className="text-xs text-muted-foreground">Choose an open batch with available lucky ID slots</p>
+              <p className="text-xs text-muted-foreground">Choose an open batch with available SFEMI ID slots</p>
             </div>
             <BatchPicker
               batches={options?.batches ?? []}
@@ -754,8 +754,8 @@ export default function CustomerProductRequestCreatePage({
 
           <div className="space-y-3 rounded-2xl border border-border bg-card p-4 shadow-sm">
             <div>
-              <h2 className="font-bold text-foreground">Choose Your Lucky Number</h2>
-              <p className="text-xs text-muted-foreground">Available lucky IDs in the selected batch</p>
+              <h2 className="font-bold text-foreground">Choose Your SFEMI ID</h2>
+              <p className="text-xs text-muted-foreground">Available SFEMI IDs in the selected batch</p>
             </div>
             <LuckyNumberPicker
               numbers={options?.lucky_numbers ?? []}
@@ -796,7 +796,7 @@ export default function CustomerProductRequestCreatePage({
                   : "—",
                 show: requestType === "ADVANCE_EMI"
               },
-              { label: "Lucky Number", value: luckyNumber ? `#${luckyNumber.padStart(2, "0")}` : "—", show: requestType === "ADVANCE_EMI" },
+              { label: "SFEMI ID", value: luckyNumber ? `#${luckyNumber.padStart(2, "0")}` : "—", show: requestType === "ADVANCE_EMI" },
               { label: "Monthly EMI", value: derivedMonthly ? money(derivedMonthly) : "—", show: requestType === "ADVANCE_EMI" },
             ]
               .filter((x) => x.show)

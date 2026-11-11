@@ -17,8 +17,8 @@ import {
 } from "@/lib/public-api";
 
 export const metadata: Metadata = buildPublicMetadata({
-  title: "Fair Draw",
-  description: "Public Lucky Draw trust summary and commitment certificate.",
+  title: "Fair Benefit Selection",
+  description: "Public SFEMI Promotional Benefit trust summary and commitment certificate.",
   path: "/lucky-plan/fair-draw",
 });
 
@@ -109,19 +109,19 @@ export default async function FairDrawPage() {
 
   return (
     <PublicPageShell
-      title="Fair Draw"
+      title="Fair Benefit Selection"
       subtitle="Public trust summary, commitment certificate, and verification explanation."
       heroSlot={
         <DrawTransparencyHero
           mode="fairDraw"
-          title="Fair Draw"
+          title="Fair Benefit Selection"
           subtitle="Understand the public commitment, reveal, verification, privacy, and future-EMI-only benefit boundary without exposing private customer records."
         />
       }
       breadcrumbs={[
         { label: dictionary.common.home, href: ROUTES.public.home },
         { label: dictionary.common.luckyPlan, href: ROUTES.public.luckyPlan },
-        { label: "Fair Draw" },
+        { label: "Fair Selection" },
       ]}
       actions={[
         { label: "SFEMI FAQ", href: ROUTES.public.faq, variant: "secondary" },
@@ -131,12 +131,12 @@ export default async function FairDrawPage() {
       <PublicMarketingBanner
         eyebrow="Public trust"
         title="Commitment hash first, reveal later"
-        description="This page explains the draw in plain language so customers can see the published commitment, later verification, and the future-only waiver rule."
+        description="This page explains the promotional selection in plain language so customers can see the published commitment, later verification, and the future-only waiver rule."
         items={[
           { title: "Sealed envelope", description: "The commitment hash is published before the seed is revealed." },
-          { title: "Later verification", description: "The revealed seed can be checked against the commitment after the draw." },
-          { title: "Privacy-safe public record", description: "Only masked winner details and safe metadata are shown publicly." },
-          { title: "Future EMI waiver only", description: "The winner benefit never rewrites already settled EMI history." },
+          { title: "Later verification", description: "The revealed seed can be checked against the commitment after the selection." },
+          { title: "Privacy-safe public record", description: "Only masked beneficiary details and safe metadata are shown publicly." },
+          { title: "Future EMI waiver only", description: "The promotional benefit waiver never rewrites already settled EMI history." },
         ]}
       />
 
@@ -144,9 +144,9 @@ export default async function FairDrawPage() {
 
       <section className="public-surface space-y-4 p-6">
         <SectionHeader
-          eyebrow="Latest draw"
+          eyebrow="Latest selection"
           title="Published commitment certificate"
-          description="If a draw commitment exists, the latest published draw appears here. No fake data is shown when the backend has no record yet."
+          description="If a selection commitment exists, the latest published selection appears here. No fake data is shown when the backend has no record yet."
         />
         {error ? (
           <div className="rounded-[1.6rem] border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
@@ -156,7 +156,7 @@ export default async function FairDrawPage() {
           <SummaryCard draw={draw} />
         ) : (
           <div className="public-card-sm px-5 py-4 text-sm leading-6 text-muted-foreground">
-            No committed Lucky Draw has been published yet. Once a commitment exists, the trust summary and certificate will appear here.
+            No committed SFEMI Promotional Benefit has been published yet. Once a commitment exists, the trust summary and certificate will appear here.
           </div>
         )}
       </section>
@@ -164,21 +164,21 @@ export default async function FairDrawPage() {
       <PublicMarketingBanner
         eyebrow="Public rule"
         title="What customers should understand"
-        description="The draw is designed for verifiable trust without exposing private customer records. Public pages explain status; they do not perform draw execution."
+        description="Benefit selection is designed for verifiable trust without exposing private customer records. Public pages explain status; they do not perform selection execution."
         items={[
-          { title: "Masked winner display", description: "Names are partially masked; phone numbers, KYC IDs, and internal IDs stay hidden." },
-          { title: "Snapshot count", description: "The published certificate can show how many eligibility records were frozen for the draw." },
+          { title: "Masked recipient display", description: "Names are partially masked; phone numbers, KYC IDs, and internal IDs stay hidden." },
+          { title: "Snapshot count", description: "The published certificate can show how many eligibility records were frozen for the benefit selection." },
           { title: "Verification status", description: "Public pages distinguish committed, revealed, and legacy records without altering the finance ledger." },
         ]}
       />
 
       <CtaBanner
-        title="Review the published draw detail"
-        description="Open a specific draw certificate, verification result, and masked winner view. Public detail remains read-only."
+        title="Review the published benefit detail"
+        description="Open a specific benefit certificate, verification result, and masked recipient view. Public detail remains read-only."
         actions={[
           {
             href: draw?.id ? `${ROUTES.public.fairDraw}/${draw.id}` : ROUTES.public.fairDraw,
-            label: "Open latest draw",
+            label: "Open latest benefit",
             variant: "primary",
           },
           { href: ROUTES.public.faq, label: "SFEMI FAQ", variant: "secondary" },

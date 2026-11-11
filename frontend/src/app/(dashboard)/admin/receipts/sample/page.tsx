@@ -26,8 +26,8 @@ const SAMPLE_LINKS = [
   },
   {
     href: "/admin/receipts/sample/waiver",
-    label: "Waiver / Lucky Draw Benefit",
-    description: "Winner waiver benefit receipt using future-EMI-only language.",
+    label: "Waiver / SFEMI Promotional Benefit",
+    description: "Recipient waiver benefit receipt using future-EMI-only language.",
   },
 ];
 

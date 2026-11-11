@@ -301,7 +301,7 @@ export default function AdminSubscriptionRequestDetailPage() {
       stats={[
         { label: "Requester Role", value: request?.requester_role_snapshot || "—" },
         { label: "Requester", value: request?.requester_username || "—" },
-        { label: "Lucky Number", value: request?.preferred_lucky_number ?? "—" },
+        { label: "SFEMI ID", value: request?.preferred_lucky_number ?? "—" },
         { label: "Approved Subscription", value: request?.approved_subscription_number || "—" },
       ]}
     >
@@ -333,7 +333,7 @@ export default function AdminSubscriptionRequestDetailPage() {
 
             <DetailPanel
               title="Audit and review context"
-              description="Approval must either link an existing customer or create one from the captured request snapshot. Lucky-number overrides remain explicit and auditable."
+              description="Approval must either link an existing customer or create one from the captured request snapshot. SFEMI ID overrides remain explicit and auditable."
             >
               <MobileSafeTable className="border-none bg-transparent">
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -368,7 +368,7 @@ export default function AdminSubscriptionRequestDetailPage() {
             {ACTIONABLE_STATUSES.has(request.status) ? (
               <FormSection
                 title="Review action"
-                description="This action is the only point where a real subscription may be created. No EMI rows, lucky assignment, or payments exist before approval. Use the funnel actions to park a request that can't be approved yet."
+                description="This action is the only point where a real subscription may be created. No EMI rows, SFEMI ID assignment, or payments exist before approval. Use the funnel actions to park a request that can't be approved yet."
               >
 
                 {!request.customer_id ? (
@@ -462,13 +462,13 @@ export default function AdminSubscriptionRequestDetailPage() {
 
                 <div className="mt-5 grid gap-4 md:grid-cols-2">
                   <label className="space-y-2 text-sm text-foreground">
-                    <span className="font-medium">Lucky number override</span>
+                    <span className="font-medium">SFEMI ID override</span>
                     <select
                       value={luckyOverride}
                       onChange={(event) => setLuckyOverride(event.target.value)}
                       className="h-11 w-full rounded-xl border border-border bg-background px-3"
                     >
-                      <option value="">Use preferred lucky number</option>
+                      <option value="">Use preferred SFEMI ID</option>
                       {(options?.lucky_numbers ?? []).map((value) => (
                         <option key={value} value={value}>
                           #{String(value).padStart(2, "0")}
@@ -510,8 +510,8 @@ export default function AdminSubscriptionRequestDetailPage() {
                     },
                     {
                       id: "hold-lucky",
-                      label: "Hold · Lucky ID Unavailable",
-                      description: "Park until a lucky ID frees up in this batch",
+                      label: "Hold · SFEMI ID Unavailable",
+                      description: "Park until a SFEMI ID frees up in this batch",
                       color: "warning" as const,
                       onClick: () => void handleHold("ON_HOLD_LUCKY_UNAVAILABLE"),
                       disabled: actionLoading,
@@ -600,7 +600,7 @@ export default function AdminSubscriptionRequestDetailPage() {
                     <span className="font-semibold text-xs">{request.requester_username || "—"}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Lucky #:</span>
+                    <span className="text-muted-foreground">SFEMI ID:</span>
                     <span className="font-semibold">{request.preferred_lucky_number || "—"}</span>
                   </div>
                 </div>

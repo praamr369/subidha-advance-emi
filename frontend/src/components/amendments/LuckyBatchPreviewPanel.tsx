@@ -36,18 +36,18 @@ export default function LuckyBatchPreviewPanel({ amendment }: { amendment: Amend
   if (!preview) return null;
 
   return (
-    <DetailPanel title="Lucky ID / Batch Change Preview" description="Read-only preview. Execution is deferred until controlled draw-safe workflow exists.">
+    <DetailPanel title="SFEMI ID / Batch Change Preview" description="Read-only preview. Execution is deferred until controlled benefit-safe workflow exists.">
       <div className="space-y-4">
         <div className="grid gap-3 text-sm md:grid-cols-2">
           <div className="rounded-xl border border-border bg-muted/20 p-3">
             <div className="text-xs font-semibold uppercase text-muted-foreground">Current State</div>
             <div className="mt-2 text-muted-foreground">Batch: <span className="font-medium text-foreground">{displayValue(preview.current_batch_code)}</span></div>
-            <div className="mt-1 text-muted-foreground">Lucky Number: <span className="font-medium text-foreground">{displayValue(preview.current_lucky_number)}</span></div>
+            <div className="mt-1 text-muted-foreground">SFEMI ID: <span className="font-medium text-foreground">{displayValue(preview.current_lucky_number)}</span></div>
           </div>
           <div className="rounded-xl border border-border bg-muted/20 p-3">
             <div className="text-xs font-semibold uppercase text-muted-foreground">Requested State</div>
             <div className="mt-2 text-muted-foreground">Batch: <span className="font-medium text-foreground">{displayValue(preview.requested_batch_code)}</span></div>
-            <div className="mt-1 text-muted-foreground">Lucky Number: <span className="font-medium text-foreground">{displayValue(preview.requested_lucky_number)}</span></div>
+            <div className="mt-1 text-muted-foreground">SFEMI ID: <span className="font-medium text-foreground">{displayValue(preview.requested_lucky_number)}</span></div>
           </div>
         </div>
 

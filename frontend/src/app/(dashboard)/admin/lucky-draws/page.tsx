@@ -110,10 +110,10 @@ function formatDrawMonth(value: string | null | undefined): string {
 }
 
 function parseErrorMessage(error: unknown): string {
-  if (!(error instanceof Error)) return "Failed to load Lucky Draw register.";
+  if (!(error instanceof Error)) return "Failed to load SFEMI Benefits register.";
 
   const raw = error.message.trim();
-  if (!raw) return "Failed to load Lucky Draw register.";
+  if (!raw) return "Failed to load SFEMI Benefits register.";
 
   try {
     const parsed = JSON.parse(raw) as Record<string, unknown>;
@@ -562,7 +562,7 @@ export default function AdminLuckyDrawsPage() {
 
         <TableToolbar
           title="Filter register"
-          description="Filter by batch, reveal state, draw month, batch code, recipient SFEMI ID, or linked recipient details."
+          description="Filter by batch, reveal state, selection month, batch code, beneficiary SFEMI ID, or linked beneficiary details."
         >
           <form onSubmit={handleApplyFilters} className="grid gap-4 lg:grid-cols-6">
             <div className="lg:col-span-2">
@@ -630,7 +630,7 @@ export default function AdminLuckyDrawsPage() {
                 htmlFor="lucky-draw-month"
                 className="mb-2 block text-sm font-medium text-foreground"
               >
-                Draw Month
+                Selection Month
               </label>
               <input
                 id="lucky-draw-month"
@@ -672,7 +672,7 @@ export default function AdminLuckyDrawsPage() {
             <button
               type="button"
               disabled={exportRows.length === 0 || loading}
-              onClick={() => downloadCsv("lucky-draw-register-current-view.csv", exportRows)}
+              onClick={() => downloadCsv("sfemi-benefits-register-current-view.csv", exportRows)}
               className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-foreground px-4 text-sm font-medium text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             >
               Export Current View

@@ -261,10 +261,10 @@ function normalizeSubscriptionPreview(
 }
 
 function parseErrorMessage(error: unknown): string {
-  if (!(error instanceof Error)) return "Failed to load Lucky ID detail.";
+  if (!(error instanceof Error)) return "Failed to load SFEMI ID detail.";
 
   const raw = error.message.trim();
-  if (!raw) return "Failed to load Lucky ID detail.";
+  if (!raw) return "Failed to load SFEMI ID detail.";
 
   try {
     const parsed = JSON.parse(raw) as Record<string, unknown>;
@@ -318,7 +318,7 @@ export default function AdminLuckyIdDetailPage() {
   const rqQuery = useQuery({
     queryKey: ['adminLuckyId', luckyIdId],
     queryFn: async () => {
-      if (!luckyIdId) throw new Error("Lucky ID is missing.");
+      if (!luckyIdId) throw new Error("SFEMI ID is missing.");
       const luckyIdPayload = await apiFetch<Record<string, unknown>>(
         `/admin/lucky-ids/${luckyIdId}/`
       );
@@ -431,7 +431,7 @@ export default function AdminLuckyIdDetailPage() {
       ]}
       stats={[
         {
-          label: "Lucky Number",
+          label: "SFEMI ID",
           value: luckyId ? formatLuckyNumber(luckyId.lucky_number) : "—",
         },
         {
@@ -450,7 +450,7 @@ export default function AdminLuckyIdDetailPage() {
         },
       ]}
       statusBadge={{
-        label: luckyId?.status || "Lucky ID Detail",
+        label: luckyId?.status || "SFEMI ID Detail",
         tone:
           luckyId?.status === "ASSIGNED"
             ? "success"
@@ -473,11 +473,11 @@ export default function AdminLuckyIdDetailPage() {
           </button>
         </section>
 
-        {loading ? <ERPLoadingState label="Loading Lucky ID detail..." /> : null}
+        {loading ? <ERPLoadingState label="Loading SFEMI ID detail..." /> : null}
 
         {!loading && error ? (
           <ERPErrorState
-            title="Unable to load Lucky ID detail"
+            title="Unable to load SFEMI ID detail"
             description={error}
             onRetry={() => void loadPage()}
           />
@@ -485,8 +485,8 @@ export default function AdminLuckyIdDetailPage() {
 
         {!loading && !error && !luckyId ? (
           <ERPEmptyState
-            title="Lucky ID not available"
-            description="The requested Lucky ID could not be loaded."
+            title="SFEMI ID not available"
+            description="The requested SFEMI ID could not be loaded."
           />
         ) : null}
 
@@ -495,23 +495,23 @@ export default function AdminLuckyIdDetailPage() {
             {isAssignedState && !hasVisibleLinkage ? (
               <DetailPanel
                 title="Integrity alert"
-                description="This Lucky ID is in an assigned-state status but visible customer or contract linkage is missing."
+                description="This SFEMI ID is in an assigned-state status but visible customer or contract linkage is missing."
               >
                 <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-                  Investigate the subscription assignment flow for this Lucky ID. Assigned statuses should resolve to a linked customer and subscription.
+                  Investigate the subscription assignment flow for this SFEMI ID. Assigned statuses should resolve to a linked customer and subscription.
                 </div>
               </DetailPanel>
             ) : null}
 
             <section className="grid gap-6 xl:grid-cols-2">
               <DetailPanel
-                title="Lucky ID overview"
-                description="Primary Lucky ID record used in batch allocation and contract linkage."
+                title="SFEMI ID overview"
+                description="Primary SFEMI ID record used in batch allocation and contract linkage."
               >
                 <div className="grid gap-4 sm:grid-cols-2">
                   <DetailValue label="Row ID" value={`#${luckyId.id}`} />
                   <DetailValue
-                    label="Lucky Number"
+                    label="SFEMI ID"
                     value={formatLuckyNumber(luckyId.lucky_number)}
                   />
                   <DetailValue label="Batch Code" value={luckyId.batch_code} />
@@ -546,7 +546,7 @@ export default function AdminLuckyIdDetailPage() {
 
               <DetailPanel
                 title="Operational meaning"
-                description="Interpret the current Lucky ID state before making any downstream operational decision."
+                description="Interpret the current SFEMI ID state before making any downstream operational decision."
               >
                 <div className="grid gap-4 sm:grid-cols-2">
                   <DetailValue
@@ -572,7 +572,7 @@ export default function AdminLuckyIdDetailPage() {
             <section className="grid gap-6 xl:grid-cols-2">
               <DetailPanel
                 title="Batch context"
-                description="The batch that owns this Lucky ID."
+                description="The batch that owns this SFEMI ID."
               >
                 {batchPreview ? (
                   <div className="grid gap-4 sm:grid-cols-2">
@@ -605,14 +605,14 @@ export default function AdminLuckyIdDetailPage() {
                 ) : (
                   <ERPEmptyState
                     title="Batch preview unavailable"
-                    description="Batch preview could not be loaded for this Lucky ID."
+                    description="Batch preview could not be loaded for this SFEMI ID."
                   />
                 )}
               </DetailPanel>
 
               <DetailPanel
                 title="Linked contract context"
-                description="The subscription currently linked to this Lucky ID, when available."
+                description="The subscription currently linked to this SFEMI ID, when available."
               >
                 {subscriptionPreview ? (
                   <div className="grid gap-4 sm:grid-cols-2">
@@ -633,7 +633,7 @@ export default function AdminLuckyIdDetailPage() {
                       value={subscriptionPreview.batch_code || "—"}
                     />
                     <DetailValue
-                      label="Lucky Number"
+                      label="SFEMI ID"
                       value={formatLuckyNumber(subscriptionPreview.lucky_number)}
                     />
                     <DetailValue
@@ -658,8 +658,8 @@ export default function AdminLuckyIdDetailPage() {
                     title="No linked contract preview"
                     description={
                       isAssignedState
-                        ? "This Lucky ID appears assigned, but no linked contract preview could be loaded."
-                        : "This Lucky ID does not currently have a linked contract."
+                        ? "This SFEMI ID appears assigned, but no linked contract preview could be loaded."
+                        : "This SFEMI ID does not currently have a linked contract."
                     }
                   />
                 )}

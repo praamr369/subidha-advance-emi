@@ -113,7 +113,7 @@ export default function CustomerPaymentReceiptPage() {
             : "Payment Receipt"
       }
       subtitle="Customer-visible proof for a recorded payment within your own account."
-      helperNote="This receipt reflects recorded payment truth only. Contract settlement, winner benefit, waiver state, and outstanding posture remain on the related subscription routes."
+      helperNote="This receipt reflects recorded payment truth only. Contract settlement, beneficiary waiver state, and outstanding posture remain on the related subscription routes."
       helperTone="info"
       breadcrumbs={[
         { label: "Customer", href: "/customer" },
@@ -239,7 +239,7 @@ export default function CustomerPaymentReceiptPage() {
                 { label: "Advance EMI Amount", value: formatRupee(payment.emi_amount) },
                 { label: "Batch", value: payment.batch_code || "—" },
                 {
-                  label: "Lucky Number",
+                  label: "SFEMI ID",
                   value: typeof payment.lucky_number === "number" ? `#${payment.lucky_number}` : "—",
                 },
                 { label: "Reference Number", value: payment.reference_no || "—" },
@@ -266,7 +266,7 @@ export default function CustomerPaymentReceiptPage() {
                   { label: "Advance EMI context", value: emiContext },
                   { label: "Advance EMI amount", value: formatRupee(payment.emi_amount) },
                   {
-                    label: "Batch / lucky",
+                    label: "Batch / SFEMI ID",
                     value: `${payment.batch_code || "—"} / ${typeof payment.lucky_number === "number" ? `#${payment.lucky_number}` : "—"}`,
                   },
                 ]}

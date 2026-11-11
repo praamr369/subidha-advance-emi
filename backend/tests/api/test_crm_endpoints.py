@@ -221,3 +221,40 @@ class CrmApiTests(APITestCase):
             self.client.force_authenticate(user=user)
             overview = self.client.get("/api/v1/crm/overview/")
             self.assertEqual(overview.status_code, status.HTTP_403_FORBIDDEN, overview.data)
+
+    def test_crm_analytics_funnel_and_product_performance_includes_visitors_and_reactions(self):
+        from crm.models import WebappVisitorEvent, ProductReaction
+        self.client.force_authenticate(user=self.admin)
+
+        # Seed visitor event and reaction
+        WebappVisitorEvent.objects.create(
+            session_id="session-analytics-1",
+            path="/products/CRM-PROD-001",
+            event_type=WebappVisitorEvent.EventType.PAGE_VIEW,
+            product=self.subscription.product,
+            is_registered=True,
+        )
+        ProductReaction.objects.create(
+            product=self.subscription.product,
+            session_id="session-analytics-1",
+            is_like=True,
+        )
+
+        funnel_res = self.client.get("/api/v1/admin/crm/analytics/funnel/")
+        self.assertEqual(funnel_res.status_code, status.HTTP_200_OK)
+        funnel_data = funnel_res.data.get("funnel", {})
+        self.assertIn("public_visits", funnel_data)
+        self.assertIn("unique_visitors", funnel_data)
+        self.assertIn("registered_visitors", funnel_data)
+        self.assertGreaterEqual(funnel_data["public_visits"], 1)
+
+        products_res = self.client.get("/api/v1/admin/crm/analytics/products/")
+        self.assertEqual(products_res.status_code, status.HTTP_200_OK)
+        products_list = products_res.data.get("products", [])
+        self.assertTrue(len(products_list) > 0)
+        prod_entry = next((p for p in products_list if p["product_id"] == self.subscription.product.id), None)
+        self.assertIsNotNone(prod_entry)
+        self.assertIn("views_count", prod_entry)
+        self.assertIn("likes_count", prod_entry)
+        self.assertIn("sentiment", prod_entry)
+        self.assertEqual(prod_entry["likes_count"], 1)

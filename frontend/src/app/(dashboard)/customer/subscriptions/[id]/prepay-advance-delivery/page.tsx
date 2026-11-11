@@ -91,7 +91,7 @@ export default function PrepaymentPage({ params }: { params: Promise<{ id: strin
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-foreground">Unlock Advance Delivery</h1>
         <p className="text-sm text-muted-foreground mt-2">
-          Pay 60-70% of remaining EMIs upfront to skip the lucky draw and get your product delivered immediately.
+          Pay 60-70% of remaining EMIs upfront to unlock immediate advance delivery with the remaining balance paid on schedule.
         </p>
       </div>
 

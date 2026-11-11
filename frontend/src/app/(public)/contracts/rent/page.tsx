@@ -14,7 +14,7 @@ import { ROUTES } from "@/lib/routes";
 export const metadata: Metadata = buildPublicMetadata({
   title: "Rent Contract",
   description:
-    "Understand Subidha Furniture rent contract: purpose, deposit, payment schedule, inspection, return, and refund rules. Rent does not include Lucky ID or draw participation.",
+    "Understand Subidha Furniture rent contract: purpose, deposit, payment schedule, inspection, return, and refund rules. Rent does not include SFEMI ID or promotional benefit participation.",
   path: "/contracts/rent",
 });
 
@@ -39,7 +39,7 @@ export default function ContractsRentPage() {
       <PublicBanner
         eyebrow="Read before applying"
         title="Rent is usage access, not automatic ownership"
-        description="Please read these points before submitting your application so expectations remain transparent. Rent does not create Lucky ID participation, winner eligibility, or EMI waiver benefits."
+        description="Please read these points before submitting your application so expectations remain transparent. Rent does not create SFEMI ID allocation, promotional benefit eligibility, or EMI waiver benefits."
       />
 
       <RentLeaseWorkflowPreview mode="rent" />

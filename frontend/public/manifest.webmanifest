@@ -1,0 +1,22 @@
+{
+  "name": "SUBIDHA CORE — ERP & POS",
+  "short_name": "SUBIDHA CORE",
+  "description": "SUBIDHA CORE Retail Operations, POS, Inventory, and Accounting System",
+  "start_url": "/admin",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#d97706",
+  "icons": [
+    {
+      "src": "/brand/logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/brand/logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

@@ -37,7 +37,7 @@ export default function LeasePolicyPage() {
       <PublicBanner
         eyebrow="Read before applying"
         title="Lease renewal and upgrade are approval-based"
-        description="Please review these points carefully before enrollment. Lease does not create Lucky ID participation, winner eligibility, or EMI waiver benefits."
+        description="Please review these points carefully before enrollment. Lease does not create SFEMI ID participation, promotional benefit eligibility, or EMI waiver benefits."
       />
 
       <RentLeaseWorkflowPreview mode="lease" />

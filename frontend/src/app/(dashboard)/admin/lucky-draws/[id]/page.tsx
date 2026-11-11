@@ -293,10 +293,10 @@ function normalizeSubscriptionPreview(
 }
 
 function parseErrorMessage(error: unknown): string {
-  if (!(error instanceof Error)) return "Failed to load Lucky Draw detail.";
+  if (!(error instanceof Error)) return "Failed to load SFEMI Benefit detail.";
 
   const raw = error.message.trim();
-  if (!raw) return "Failed to load Lucky Draw detail.";
+  if (!raw) return "Failed to load SFEMI Benefit detail.";
 
   try {
     const parsed = JSON.parse(raw) as Record<string, unknown>;
@@ -580,7 +580,7 @@ export default function AdminLuckyDrawDetailPage() {
       ]}
       stats={[
         {
-          label: "Draw Month",
+          label: "Selection Month",
           value: draw ? formatDrawMonth(draw.draw_month) : "—",
         },
         {
@@ -640,7 +640,7 @@ export default function AdminLuckyDrawDetailPage() {
                 description="This unrevealed draw still has a recoverable reveal seed in the current browser session or draw record."
               >
                 <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-                  This draw can proceed to reveal. Copy the seed first, then open the reveal page.
+                  This benefit event can proceed to reveal. Copy the seed first, then open the reveal page.
                 </div>
 
                 <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -650,7 +650,7 @@ export default function AdminLuckyDrawDetailPage() {
                     value={draw.revealed_seed ? "Draw record" : persistedCommit ? "Browser session" : "—"}
                   />
                   <DetailValue label="Hash Preview" value={shortenHash(draw.committed_hash)} />
-                  <DetailValue label="Draw Month" value={formatDrawMonth(draw.draw_month)} />
+                  <DetailValue label="Selection Month" value={formatDrawMonth(draw.draw_month)} />
                 </div>
 
                 <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4">
@@ -703,7 +703,7 @@ export default function AdminLuckyDrawDetailPage() {
                 <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                   <DetailValue label="Draw ID" value={`#${draw.id}`} />
                   <DetailValue label="Batch Code" value={draw.batch_code} />
-                  <DetailValue label="Draw Month" value={formatDrawMonth(draw.draw_month)} />
+                  <DetailValue label="Selection Month" value={formatDrawMonth(draw.draw_month)} />
                   <DetailValue label="Hash Preview" value={shortenHash(draw.committed_hash)} />
                 </div>
 
@@ -728,13 +728,13 @@ export default function AdminLuckyDrawDetailPage() {
 
             <section className="grid gap-6 xl:grid-cols-2">
               <SectionCard
-                title="Draw overview"
-                description="Primary draw record used for commitment and reveal audit."
+                title="Benefit event overview"
+                description="Primary benefit record used for commitment and reveal audit."
               >
                 <div className="grid gap-4 sm:grid-cols-2">
                   <DetailValue label="Draw ID" value={`#${draw.id}`} />
                   <DetailValue label="Batch Code" value={draw.batch_code} />
-                  <DetailValue label="Draw Month" value={formatDrawMonth(draw.draw_month)} />
+                  <DetailValue label="Selection Month" value={formatDrawMonth(draw.draw_month)} />
                   <DetailValue
                     label="Reveal State"
                     value={
@@ -749,7 +749,7 @@ export default function AdminLuckyDrawDetailPage() {
                     }
                   />
                   <DetailValue label="Created At" value={formatDateTime(draw.created_at)} />
-                  <DetailValue label="Draw Date" value={formatDateTime(draw.draw_date)} />
+                  <DetailValue label="Selection Date" value={formatDateTime(draw.draw_date)} />
                   <DetailValue label="Revealed At" value={formatDateTime(draw.revealed_at)} />
                   <DetailValue label="Waiver Scope" value={draw.waiver_scope || "Future EMI waiver only"} />
                 </div>

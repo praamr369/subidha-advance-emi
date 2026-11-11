@@ -22,7 +22,7 @@ import {
 const TYPE_OPTIONS: { value: BrochureType; label: string; title: string }[] = [
   { value: "RENT", label: "Rent", title: "Subidha Furniture Rent Catalog" },
   { value: "LEASE", label: "Lease", title: "Subidha Furniture Lease Catalog" },
-  { value: "LUCKY_EMI", label: "Lucky EMI", title: "Subidha Furniture Lucky EMI Catalog" },
+  { value: "LUCKY_EMI", label: "SFEMI Advance EMI", title: "Subidha Furniture SFEMI Advance EMI Catalog" },
   { value: "DIRECT_SALE", label: "Direct Sale", title: "Subidha Furniture Direct Sale Price List" },
   { value: "CUSTOM", label: "Custom", title: "Subidha Furniture Selected Product Catalog" },
 ];

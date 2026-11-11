@@ -13,8 +13,8 @@ const evidenceCards = [
     icon: FileSearch,
     title: dict.public.DrawEvidenceExplainer_prop1,
     points: [
-      "Batch code and draw month when available.",
-      "Masked winner display name.",
+      "Batch code and benefit cycle month when available.",
+      "Masked recipient display name.",
       "SFEMI ID or approved reference if the public API returns it.",
       "Commitment hash and verification status when published.",
     ],
@@ -26,14 +26,14 @@ const evidenceCards = [
       "Phone number, address, KYC IDs, and private documents.",
       "Internal customer IDs and staff-only workflow notes.",
       "Private financial ledger lines or reconciliation evidence.",
-      "Unpublished draw drafts or non-revealed private data.",
+      "Unpublished benefit drafts or non-revealed private data.",
     ],
   },
   {
     icon: ShieldCheck,
     title: dict.public.DrawEvidenceExplainer_prop3,
     points: [
-      "They cannot select or change a winner.",
+      "They cannot select or change a benefit recipient.",
       "They cannot assign SFEMI IDs or create subscriptions.",
       "They cannot waive EMI or reverse payment history.",
       "They cannot create receipts, invoices, or accounting records.",
@@ -46,7 +46,7 @@ const evidenceCards = [
       <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{dict.public.DrawEvidenceExplainer_text4}</div>
       <h2 className="mt-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">{dict.public.DrawEvidenceExplainer_text5}</h2>
       <p className="mt-3 max-w-4xl text-sm leading-7 text-muted-foreground sm:text-base">
-        Public draw pages explain revealed records without exposing private customer or internal financial data. Operational truth stays in the authenticated system.
+        Public promotional benefit pages explain revealed records without exposing private customer or internal financial data. Operational truth stays in the authenticated system.
       </p>
 
       <div className="mt-5 grid gap-4 lg:grid-cols-3">

@@ -90,7 +90,7 @@ export default function FaqPage() {
       <section className="space-y-4">
         <SectionHeader
           eyebrow="Documents & transparency"
-          title="Documents, draw transparency, and customer portal"
+          title="Documents, selection transparency, and customer portal"
         />
         <FaqBlock items={FULL_PUBLIC_FAQ.filter((_, i) => i >= 12)} />
       </section>

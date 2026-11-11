@@ -63,6 +63,32 @@ export type ResendResetOtpResponse = {
   detail: string;
 };
 
+export type GoogleAuthRequest = {
+  id_token: string;
+  phone?: string;
+};
+
+export type GoogleAuthResponse = {
+  access?: string;
+  refresh?: string;
+  role?: string;
+  user?: {
+    id?: number;
+    username?: string;
+    name?: string;
+    email?: string;
+    phone?: string;
+    role?: string;
+  };
+  requires_phone?: boolean;
+  email?: string;
+  name?: string;
+  id_token?: string;
+  detail?: string;
+  linked_existing_account?: boolean;
+  is_new_customer?: boolean;
+};
+
 function buildApiUrl(path: string): string {
   const apiRoot = API_BASE_URL.replace(/\/api\/v1\/?$/, "");
   return `${apiRoot}/api/v1${path}`;
@@ -250,4 +276,43 @@ export async function resendPasswordResetOtp(
   });
 
   return parseResponse<ResendResetOtpResponse>(response);
+}
+
+export async function googleAuthRequest(
+  payload: GoogleAuthRequest
+): Promise<GoogleAuthResponse> {
+  const response = await fetch(buildApiUrl("/auth/google/"), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      id_token: payload.id_token.trim(),
+      ...(payload.phone ? { phone: payload.phone.trim() } : {}),
+    }),
+  });
+
+  return parseResponse<GoogleAuthResponse>(response);
+}
+
+export type GoogleAuthConfigResponse = {
+  google_client_id: string;
+  is_configured: boolean;
+};
+
+export async function getGoogleAuthConfig(): Promise<GoogleAuthConfigResponse> {
+  try {
+    const response = await fetch(buildApiUrl("/auth/google/config/"), {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+    if (!response.ok) {
+      return { google_client_id: "", is_configured: false };
+    }
+    return (await response.json()) as GoogleAuthConfigResponse;
+  } catch {
+    return { google_client_id: "", is_configured: false };
+  }
 }

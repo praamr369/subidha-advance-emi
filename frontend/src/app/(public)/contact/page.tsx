@@ -48,7 +48,7 @@ export default async function ContactPage() {
       <PublicMarketingBanner
         eyebrow="Trust and policy help"
         title="Need clarity on rules, receipts, warranty, or delivery?"
-        description="Support can explain plan rules, payment safety, winner publication, rent/lease deposit boundaries, warranty support, and delivery/return workflow before and after enrollment."
+        description="Support can explain plan rules, payment safety, beneficiary publication, rent/lease deposit boundaries, warranty support, and delivery/return workflow before and after enrollment."
         items={[
           { title: "Plan and payment explanation", description: "Understand monthly amount, receipt flow, customer self-service access, and what happens only after staff approval." },
           { title: "Warranty / return policy", description: "Get product-level support guidance and escalation path." },

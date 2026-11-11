@@ -207,10 +207,10 @@ async function fetchAllPagedRows(path: string): Promise<Record<string, unknown>[
 }
 
 function parseErrorMessage(error: unknown): string {
-  if (!(error instanceof Error)) return "Failed to load Lucky ID register.";
+  if (!(error instanceof Error)) return "Failed to load SFEMI ID register.";
 
   const raw = error.message.trim();
-  if (!raw) return "Failed to load Lucky ID register.";
+  if (!raw) return "Failed to load SFEMI ID register.";
 
   try {
     const parsed = JSON.parse(raw) as Record<string, unknown>;
@@ -486,7 +486,7 @@ export default function AdminLuckyIdsPage() {
 
         <ERPSectionShell
           title="Filters"
-          description="Narrow by batch, status, lucky number, customer, or subscription for daily administration and reconciliation."
+          description="Narrow by batch, status, SFEMI ID, customer, or subscription for daily administration and reconciliation."
         >
           <ERPDataToolbar
             left={
@@ -586,7 +586,7 @@ export default function AdminLuckyIdsPage() {
                 <button
                   type="button"
                   disabled={exportRows.length === 0 || loading}
-                  onClick={() => downloadCsv("lucky-id-register-current-view.csv", exportRows)}
+                  onClick={() => downloadCsv("sfemi-id-register-current-view.csv", exportRows)}
                   className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-foreground px-4 text-sm font-medium text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   Export Current View

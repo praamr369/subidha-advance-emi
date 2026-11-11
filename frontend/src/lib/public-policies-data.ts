@@ -49,13 +49,13 @@ These Terms and Conditions constitute a legally binding agreement between the cu
 
 1. **Subscription Structure**: SFEMI is a structured advance installment plan for furniture acquisition over an approved tenure (e.g., 10 to 15 months). The product base price constitutes the total contract value, and monthly EMI equals the total contract value divided by the tenure months.
 2. **SFEMI ID Assignment**: Customers are assigned a batch-specific SFEMI ID (00 to 99). Assignment of a SFEMI ID does not guarantee any prize, winning, or financial return.
-3. **Fair Draw Integrity (Commit-then-Reveal)**: Monthly draws are conducted transparently using cryptographic SHA-256 commit-then-reveal procedures. A commitment hash is published prior to the draw, and the revealed winning number must match the hash.
-4. **Winner Benefit Scope (Strictly Future EMI Waiver)**:
-   - If a customer's SFEMI ID is drawn as the winner, remaining unpaid future EMI obligations from the winning month onward are waived 100%.
+3. **Promotional Selection Integrity (Commit-then-Reveal)**: Monthly benefit selections are conducted transparently using cryptographic SHA-256 commit-then-reveal procedures. A commitment hash is published prior to the selection, and the revealed beneficiary number must match the hash.
+4. **Beneficiary Benefit Scope (Strictly Future EMI Waiver)**:
+   - If a customer's SFEMI ID is selected as the beneficiary, remaining unpaid future EMI obligations from the benefit month onward are waived 100%.
    - **Zero Cash Refund**: Under no circumstances is any previously settled EMI refunded in cash, bank transfer, or credit. The benefit is strictly future-facing.
 5. **Advance Delivery & Hire-Purchase Title Retention**:
    - Customers paying an advance prepayment threshold (60% to 80% upfront) qualify for immediate same-day delivery.
-   - Legal title and ownership remain with Subidha Furniture under Hire-Purchase principles until 100% of the contract value is settled (either by completing remaining installments or via an audited draw waiver).
+   - Legal title and ownership remain with Subidha Furniture under Hire-Purchase principles until 100% of the contract value is settled (either by completing remaining installments or via an audited promotional benefit waiver).
    - In case of payment default exceeding thirty (30) days, Subidha Furniture reserves the enforceable legal right to repossess the goods.
 6. **Statutory Non-Gambling Declaration**: SFEMI is a purchase plan backed by physical goods. It is strictly compliant with the Prize Chits and Money Circulation Schemes (Banning) Act, 1978, and the Banning of Unregulated Deposit Schemes (BUDS) Act, 2019.
 
@@ -233,8 +233,8 @@ Subidha Furniture maintains fair, auditable, and transparent standards for order
    - The SFEMI ID link is permanently frozen to preserve legal draw auditability.
    - The subscription may be cancelled, but the SFEMI ID cannot be reassigned.
 3. **Zero Cash Refund for SFEMI Benefit Recipients**:
-   - Winning a draw waives remaining future EMI obligations 100%.
-   - **No cash refund** is ever provided for EMIs or advance down payments settled prior to the winning draw.
+   - Selection as a promotional benefit recipient waives remaining future EMI obligations 100%.
+   - **No cash refund** is ever provided for EMIs or advance down payments settled prior to the benefit selection.
 
 ### C. Rent and Lease Contracts
 1. **Cancellation Prior to Handover**: Security deposit and advance rent refunded in full minus nominal documentation charges.
@@ -280,13 +280,13 @@ This policy governs warehousing, transit, delivery dispatch, and physical asset 
 
 A customer enrolled in the SFEMI Advance EMI program becomes eligible for delivery **only** upon satisfying one of the following three objective conditions:
 
-1. **Condition 1 (Draw Winner)**: The customer's subscription achieves \`WON\` status following an audited monthly draw. Delivery eligibility unlocks immediately upon draw result publication.
+1. **Condition 1 (Promotional Benefit Beneficiary)**: The customer's subscription achieves \`WON\` status following an audited monthly promotional selection. Delivery eligibility unlocks immediately upon selection result publication.
 2. **Condition 2 (Tenure Completion)**: The customer settles 100% of scheduled monthly EMIs, achieving \`COMPLETED\` subscription status.
 3. **Condition 3 (Advance Prepayment Threshold - 60% to 80%)**:
    - Customers paying the contractually provisioned advance prepayment threshold (60% to 80% of total contract value upfront at enrollment) qualify for **Same-Day Enrollment & Same-Day Delivery**.
    - This provision provides immediate asset enjoyment while retaining hire-purchase protections.
 
-**Ineligible Subscriptions**: Customers who have not won a draw, not completed their tenure, and not satisfied the 60%–80% prepayment threshold are strictly ineligible for delivery dispatch.
+**Ineligible Subscriptions**: Customers who have not been selected for a promotional benefit, not completed their tenure, and not satisfied the 60%–80% prepayment threshold are strictly ineligible for delivery dispatch.
 
 ## 3. Admin Override (Force-Release Delivery)
 
@@ -351,24 +351,24 @@ Subidha Furniture's **SFEMI** is a retail installment program enabling household
    - The customer maintains possessory custody as a bailee and must care for the asset.
 3. **30-Day Default Repossession**: In the event of payment default exceeding thirty (30) days on remaining installments, Subidha Furniture reserves the enforceable right to repossess the goods.
 
-## 4. Cryptographic Fair Draw Procedure (Commit-then-Reveal)
+## 4. Cryptographic Promotional Benefit Selection Procedure (Commit-then-Reveal)
 
-1. **Batch Lock**: Prior to draw execution, batch eligibility is locked. An immutable cryptographic snapshot of all active, eligible SFEMI IDs is recorded.
+1. **Batch Lock**: Prior to benefit selection execution, batch eligibility is locked. An immutable cryptographic snapshot of all active, eligible SFEMI IDs is recorded.
 2. **SHA-256 Commitment**:
-   - Before the draw, the system generates a random seed and commitment string, computing its SHA-256 cryptographic hash.
-   - The commitment hash is publicly published on the website prior to the draw event.
+   - Before selection, the system generates a random seed and commitment string, computing its SHA-256 cryptographic hash.
+   - The commitment hash is publicly published on the website prior to the selection event.
 3. **Public Reveal & Verification**:
-   - Following the physical or automated draw selection, the secret seed and winning number are revealed.
-   - Any customer or auditor can verify that \`SHA256(seed + winning_number) == published_hash\`, proving mathematically that the winning number was not altered retrospectively.
-4. **Privacy Protection**: Winner names are masked on public displays (e.g., "Pradip R***, SFEMI ID: 42") in accordance with data privacy standards.
+   - Following selection, the secret seed and selected SFEMI ID are revealed.
+   - Any customer or auditor can verify that \`SHA256(seed + selected_sfemi_id) == published_hash\`, proving mathematically that the selection was not altered retrospectively.
+4. **Privacy Protection**: Benefit recipient names are masked on public displays (e.g., "Pradip R***, SFEMI ID: 42") in accordance with data privacy standards.
 
-## 5. Winner Benefit: Strict Future EMI Waiver Invariant
+## 5. Promotional Benefit: Strict Future EMI Waiver Invariant
 
-1. **Future Obligations Waived**: When a SFEMI ID is verified as the winning slot for a draw month, all remaining unpaid future EMIs from that month forward are **100% waived**.
+1. **Future Obligations Waived**: When a SFEMI ID is verified as the selected slot for a benefit cycle, all remaining unpaid future EMIs from that month forward are **100% waived**.
 2. **Zero Cash Refund Invariant**:
-   - Any EMI or advance down payment settled prior to the winning draw is fully earned, posted, and append-only.
+   - Any EMI or advance down payment settled prior to the promotional benefit selection is fully earned, posted, and append-only.
    - **Under no circumstances is any cash, bank transfer, or monetary refund issued for settled payments.**
-   - The winner receives complete ownership title to the furniture without paying the remaining balance.
+   - The recipient receives complete ownership title to the furniture without paying the remaining balance.
 3. **Contract Settlement**: The contract status transitions to \`WON\`, remaining receivables are extinguished via audited waiver entries, and an official Certificate of Ownership is issued.`,
   },
 
@@ -743,14 +743,14 @@ This policy outlines operational procedures, grace periods, reminder protocols, 
 When an installment remains unpaid past the grace period, automated and staff reminders follow a structured schedule:
 - **Day 11 (Soft Reminder)**: Automated SMS and WhatsApp notice of overdue installment.
 - **Day 18 (Operational Call)**: Showroom customer service call to understand payment constraints and offer digital remittance support.
-- **Day 25 (Draw Eligibility Hold Notice)**: Formal notification that failure to settle prior to month-end results in suspension of promotional benefit selection participation for the upcoming cycle.
+- **Day 25 (Promotional Selection Hold Notice)**: Formal notification that failure to settle prior to month-end results in suspension of promotional benefit selection participation for the upcoming cycle.
 - **Day 31 (Default Notice)**: Formal written Notice of Default issued via registered post / WhatsApp.
 
-## 3. Draw Eligibility Suspension
+## 3. Selection Eligibility Suspension
 
-1. **Current Month Eligibility**: Participation in the monthly fair draw requires the customer's subscription to be in good financial standing, with all accrued EMIs receipted.
-2. **Suspension**: A customer with overdue arrears at the time of batch draw locking is excluded from the active draw snapshot.
-3. **No Retroactive Wins**: A customer cannot clear arrears retrospectively to claim a draw benefit for a draw conducted while they were in default.
+1. **Current Month Eligibility**: Participation in the monthly promotional benefit selection requires the customer's subscription to be in good financial standing, with all accrued EMIs receipted.
+2. **Suspension**: A customer with overdue arrears at the time of batch locking is excluded from the active selection snapshot.
+3. **No Retroactive Benefits**: A customer cannot clear arrears retrospectively to claim a promotional benefit for a selection conducted while they were in default.
 
 ## 4. Hire-Purchase Title Retention & Repossession (Advance Delivery)
 
@@ -769,46 +769,46 @@ For customers who received immediate furniture possession under the Advance Deli
 
   "lucky-draw-rules-fairness": {
     slug: "lucky-draw-rules-fairness",
-    title: "Fair Draw Integrity and Commitment Policy",
+    title: "SFEMI Promotional Benefit Integrity and Commitment Policy",
     category: "LUCKY_PLAN",
     version: "2.3",
     effectiveDate: "2026-08-20",
     summary:
-      "Mathematical and cryptographic verification procedures for monthly fair draws, commitment hashes, public audits, and winner benefit execution.",
-    content: `# Fair Draw Integrity and Commitment Policy
+      "Mathematical and cryptographic verification procedures for monthly promotional benefit selections, commitment hashes, public audits, and waiver benefit execution.",
+    content: `# SFEMI Promotional Benefit Integrity and Commitment Policy
 
 Subidha Furniture operates monthly promotional benefit selections under cryptographic and operational safeguards that prevent retrospective tampering, ensuring absolute transparency.
 
 ## 1. Commit-then-Reveal Cryptographic Protocol
 
-To mathematically prove that draw outcomes are not manipulated:
-1. **The Secret Seed**: Before the draw, an automated system generates a random secret cryptographic seed combined with the draw date and batch identifier.
-2. **Pre-Draw Public Commitment Hash**:
+To mathematically prove that benefit selection outcomes are not manipulated:
+1. **The Secret Seed**: Before the selection event, an automated system generates a random secret cryptographic seed combined with the event date and batch identifier.
+2. **Pre-Event Public Commitment Hash**:
    - The system computes the SHA-256 hash: \`Hash = SHA256(secret_seed + batch_code + draw_month)\`.
-   - This 64-character hexadecimal hash is published on the public website and social channels **prior to the draw event**.
-3. **Physical / Digital Draw Selection**:
-   - The winning SFEMI ID (00 to 99) is determined through an open, public draw conducted at the showroom in the presence of attending customers.
-4. **Post-Draw Secret Reveal**:
+   - This 64-character hexadecimal hash is published on the public website and social channels **prior to the event**.
+3. **Transparent Benefit Selection**:
+   - The selected SFEMI ID (00 to 99) is determined through an open, public process conducted at the showroom in the presence of attending customers.
+4. **Post-Selection Secret Reveal**:
    - Immediately following selection, the secret seed is published.
    - Any customer or public auditor can input the revealed seed into standard SHA-256 tools to confirm that the hash matches the pre-published commitment.
 
 ## 2. Batch Eligibility Freeze & Immutable Snapshots
 
-1. **Eligibility Lock**: Twenty-four (24) hours prior to the draw, the batch is transitioned to \`LOCKED\` status.
-2. **Draw Eligibility Snapshot**:
+1. **Eligibility Lock**: Twenty-four (24) hours prior to the selection, the batch is transitioned to \`LOCKED\` status.
+2. **Eligibility Snapshot**:
    - An immutable snapshot (\`DrawEligibilitySnapshot\`) records every eligible customer, SFEMI ID, subscription reference, and payment status.
    - New enrollments, cancellations, or payment edits are strictly locked out of the snapshot.
-   - The winner selection algorithm evaluates **only** the frozen snapshot, preventing live database manipulation.
+   - The selection algorithm evaluates **only** the frozen snapshot, preventing live database manipulation.
 
-## 3. Winner Benefit Execution Invariants
+## 3. Promotional Benefit Waiver Execution Invariants
 
-1. **100% Future EMI Waiver**: The verified winner has all future remaining EMI installments from the winning month onward waived 100%.
+1. **100% Future EMI Waiver**: The verified recipient has all future remaining EMI installments from the selection month onward waived 100%.
 2. **Zero Cash Refund Invariant**: Past settled EMIs and advance payments are non-refundable. They remain settled retail consideration.
-3. **Title Perfection**: Upon execution of the waiver, full title, ownership, and warranty rights transfer unconditionally to the winning customer.
+3. **Title Perfection**: Upon execution of the waiver, full title, ownership, and warranty rights transfer unconditionally to the recipient customer.
 
-## 4. Public Winner Presentation and Privacy
+## 4. Public Benefit Recipient Presentation and Privacy
 
-1. **Public Display**: Winning numbers, batch codes, draw months, and commitment verification details are displayed on the public Winner Showcase.
+1. **Public Display**: Selected SFEMI IDs, batch codes, benefit months, and commitment verification details are displayed on the public Benefit Showcase.
 2. **Data Masking**: To protect customer privacy under the Digital Personal Data Protection Act, 2023, customer names are masked (e.g., "Amit K***, SFEMI ID: 88").`,
   },
 

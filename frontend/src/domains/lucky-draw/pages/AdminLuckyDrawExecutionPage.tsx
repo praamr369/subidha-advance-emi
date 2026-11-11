@@ -74,9 +74,9 @@ export default function AdminLuckyDrawExecutionPage() {
 
   return (
     <ERPPageShell
-      title="Execute Lucky Draw"
-      subtitle="Operator-controlled flow: select batch, create commitment, then reveal winner with seed."
-      actions={[{ href: "/admin/lucky-draw", label: "Back to Draw List" }]}
+      title="Execute SFEMI Promotional Benefit"
+      subtitle="Operator-controlled flow: select batch, create commitment, then reveal recipient with seed."
+      actions={[{ href: "/admin/lucky-draw", label: "Back to Benefits List" }]}
     >
       <section style={{ display: "grid", gap: 8, maxWidth: 780 }}>
         <select value={batchId} onChange={(event) => setBatchId(event.target.value)}>
@@ -123,11 +123,11 @@ export default function AdminLuckyDrawExecutionPage() {
 
         {result ? (
           <div style={{ border: "1px solid #bbf7d0", background: "#f0fdf4", borderRadius: 8, padding: 12 }}>
-            <h3 style={{ marginTop: 0 }}>Winner Result</h3>
+            <h3 style={{ marginTop: 0 }}>Promotional Benefit Result</h3>
             <p><b>Recipient SFEMI ID:</b> {result.winner_lucky_number ? `#${result.winner_lucky_number}` : "-"}</p>
-            <p><b>Winner Subscription:</b> {result.winner_subscription_id || "-"}</p>
+            <p><b>Recipient Subscription:</b> {result.winner_subscription_id || "-"}</p>
             <p><b>Waived Future EMI Amount:</b> ₹{Number(result.waived_amount || 0).toFixed(2)}</p>
-            <button type="button" onClick={() => router.push(`/admin/lucky-draws/${result.id}`)}>Open Draw Result</button>
+            <button type="button" onClick={() => router.push(`/admin/lucky-draws/${result.id}`)}>Open Benefit Result</button>
           </div>
         ) : null}
 

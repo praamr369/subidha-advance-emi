@@ -157,7 +157,7 @@ export default function AdvanceEMIRequestDetailPage() {
       return;
     }
     if (!luckyOverride && !request.preferred_lucky_number) {
-      setActionError("Must select a lucky number.");
+      setActionError("Must select a SFEMI ID.");
       return;
     }
     setActionLoading(true);
@@ -175,7 +175,7 @@ export default function AdvanceEMIRequestDetailPage() {
         payload.customer_id = Number(selectedCustomerId);
       }
       await decideAdminProductRequest(requestId, payload);
-      setSuccessMessage("EMI request approved. Subscription created with lucky number assignment.");
+      setSuccessMessage("Advance EMI request approved. Subscription created with SFEMI ID assignment.");
       setStep("review");
     } catch (err) {
       setActionError(toErrorMessage(err));
@@ -209,7 +209,7 @@ export default function AdvanceEMIRequestDetailPage() {
     <ERPPageShell
       eyebrow="Subscriptions"
       title={`Advance EMI Request #${request?.id ?? ""}`}
-      subtitle={`EMI with lucky draw • Submitted ${formatDateTime(request?.created_at)}`}
+      subtitle={`SFEMI Advance EMI • Submitted ${formatDateTime(request?.created_at)}`}
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
         { label: "Requests", href: "/admin/requests/product-requests" },
@@ -300,11 +300,11 @@ export default function AdvanceEMIRequestDetailPage() {
                   </FormSection>
                 ) : null}
 
-                {/* Step 2: Batch & Lucky Number */}
+                {/* Step 2: Batch & SFEMI ID */}
                 {(step === "batch" || (step !== "customer" && request.customer_id)) && request.batch_id ? (
                   <FormSection
-                    title="Step 2: Confirm Batch & Lucky Number"
-                    description="The batch and preferred lucky number are already selected. You can override the lucky number if needed."
+                    title="Step 2: Confirm Batch & SFEMI ID"
+                    description="The batch and preferred SFEMI ID are already selected. You can override the SFEMI ID if needed."
                   >
                     <div className="space-y-4">
                       <div className="grid gap-3 md:grid-cols-2">
@@ -316,13 +316,13 @@ export default function AdvanceEMIRequestDetailPage() {
                           </div>
                         </div>
                         <div className="rounded-xl border border-border bg-muted/30 px-4 py-3">
-                          <div className="text-xs uppercase font-semibold text-muted-foreground">Preferred Lucky Number</div>
+                          <div className="text-xs uppercase font-semibold text-muted-foreground">Preferred SFEMI ID</div>
                           <div className="mt-1 text-sm font-bold">#{String(request.preferred_lucky_number).padStart(2, "0")}</div>
                         </div>
                       </div>
 
                       <label className="block space-y-2 text-sm">
-                        <span className="font-medium">Override lucky number (optional)</span>
+                        <span className="font-medium">Override SFEMI ID (optional)</span>
                         <select
                           value={luckyOverride}
                           onChange={(e) => setLuckyOverride(e.target.value)}
@@ -363,7 +363,7 @@ export default function AdvanceEMIRequestDetailPage() {
                           </div>
                         </div>
                         <div className="rounded-xl border border-border bg-muted/30 px-4 py-3">
-                          <div className="text-xs uppercase font-semibold text-muted-foreground">Lucky Number</div>
+                          <div className="text-xs uppercase font-semibold text-muted-foreground">SFEMI ID</div>
                           <div className="mt-1 text-sm font-bold">
                             #{String(luckyOverride || request.preferred_lucky_number).padStart(2, "0")}
                           </div>

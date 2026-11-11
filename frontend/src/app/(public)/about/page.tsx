@@ -63,7 +63,7 @@ export default async function AboutPage() {
       <PublicMarketingBanner
         eyebrow="Customer trust model"
         title="Transparent plan rules and operational proof"
-        description="We publish process explanations for plan rules, winner transparency, payment safety, and delivery workflow."
+        description="We publish process explanations for plan rules, beneficiary transparency, payment safety, and delivery workflow."
         items={[
           { title: "Plan rules", description: "Customers can review eligibility, tenure, and monthly commitment rules before applying." },
           { title: "Customer transparency", description: "Public SFEMI information explains terms, receipts, and customer protections clearly." },

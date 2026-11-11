@@ -106,7 +106,7 @@ function SubscriptionCard({ sub }: { sub: CustomerSubscription }) {
             </span>
             {isWinner ? (
               <span className="rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 text-[10px] font-bold flex items-center gap-1">
-                <Star className="size-2.5" /> Winner
+                <Star className="size-2.5" /> Beneficiary
               </span>
             ) : null}
           </div>
@@ -201,7 +201,7 @@ function SubscriptionCard({ sub }: { sub: CustomerSubscription }) {
         ) : null}
         {sub.lucky_number != null ? (
           <div>
-            <span className="text-muted-foreground">Lucky #</span>
+            <span className="text-muted-foreground">SFEMI ID</span>
             <div className="font-semibold mt-0.5">#{String(sub.lucky_number).padStart(2, "0")}</div>
           </div>
         ) : null}
@@ -228,7 +228,7 @@ function SubscriptionCard({ sub }: { sub: CustomerSubscription }) {
 
       {isWinner && sub.winner_month != null ? (
         <div className="mt-2 rounded-xl bg-amber-50 dark:bg-amber-950/30 px-3 py-1.5 text-xs font-medium text-amber-700 dark:text-amber-400 flex items-center gap-1">
-          <Star className="size-3" /> Winner month {sub.winner_month}
+          <Star className="size-3" /> Beneficiary month {sub.winner_month}
           {Number(sub.waived_amount ?? 0) > 0 ? ` · Waived ${formatRupee(sub.waived_amount)}` : ""}
         </div>
       ) : null}
@@ -334,7 +334,7 @@ export default function CustomerSubscriptionsPage() {
         <CPageStats>
           <CPageStat label="Total" value={count} />
           <CPageStat label="Active" value={activeCount} tone="success" />
-          <CPageStat label="Winners" value={winnerCount} tone="warning" />
+          <CPageStat label="Beneficiaries" value={winnerCount} tone="warning" />
           <CPageStat label="Outstanding" value={formatRupee(outstanding)} tone={outstanding > 0 ? "danger" : "default"} />
         </CPageStats>
       ) : null}

@@ -26,6 +26,20 @@ import { getCrmAnalyticsDashboard, listCrmPipelineLeads, updateCrmPipelineStage 
 
 // Current metrics interface
 interface DashboardMetrics {
+  visitors?: {
+    stage: string;
+    visits: number;
+    unique: number;
+    registered: number;
+    unregistered: number;
+    regConversionRate: number;
+  };
+  productSentiment?: {
+    likes: number;
+    dislikes: number;
+    totalReactions: number;
+    likeRatio: number;
+  };
   leads: { stage: string; count: number };
   onlineRequests: { stage: string; count: number };
   productRequests: { stage: string; count: number };
@@ -208,6 +222,45 @@ export default function CRMAnalyticsPage() {
             description="Real-time stage counts and ROI indicators"
           >
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {/* Webapp Public Visits */}
+              <div className="rounded-lg border border-sky-200 bg-sky-50/50 dark:border-sky-800/40 dark:bg-sky-900/20 p-4">
+                <div className="text-xs text-sky-700 dark:text-sky-300 uppercase tracking-[0.12em] font-semibold">
+                  Public Web Visits
+                </div>
+                <div className="text-3xl font-bold text-sky-600 dark:text-sky-400 mt-2">
+                  {analytics.metrics.visitors?.visits ?? 0}
+                </div>
+                <div className="text-xs text-sky-700 dark:text-sky-300 mt-2">
+                  {analytics.metrics.visitors?.unique ?? 0} unique visitors ({analytics.metrics.visitors?.registered ?? 0} registered)
+                </div>
+              </div>
+
+              {/* Visitor to Registration Conversion */}
+              <div className="rounded-lg border border-indigo-200 bg-indigo-50/50 dark:border-indigo-800/40 dark:bg-indigo-900/20 p-4">
+                <div className="text-xs text-indigo-700 dark:text-indigo-300 uppercase tracking-[0.12em] font-semibold">
+                  Visitor → Register Rate
+                </div>
+                <div className="text-3xl font-bold text-indigo-600 dark:text-indigo-400 mt-2">
+                  {(analytics.metrics.visitors?.regConversionRate ?? 0).toFixed(1)}%
+                </div>
+                <div className="text-xs text-indigo-700 dark:text-indigo-300 mt-2">
+                  {analytics.metrics.visitors?.unregistered ?? 0} anonymous browsing visitors
+                </div>
+              </div>
+
+              {/* Product Like Sentiment */}
+              <div className="rounded-lg border border-rose-200 bg-rose-50/50 dark:border-rose-800/40 dark:bg-rose-900/20 p-4">
+                <div className="text-xs text-rose-700 dark:text-rose-300 uppercase tracking-[0.12em] font-semibold">
+                  Product Approval (Likes)
+                </div>
+                <div className="text-3xl font-bold text-rose-600 dark:text-rose-400 mt-2">
+                  {(analytics.metrics.productSentiment?.likeRatio ?? 0).toFixed(1)}%
+                </div>
+                <div className="text-xs text-rose-700 dark:text-rose-300 mt-2">
+                  👍 {analytics.metrics.productSentiment?.likes ?? 0} likes • 👎 {analytics.metrics.productSentiment?.dislikes ?? 0} dislikes
+                </div>
+              </div>
+
               {/* Leads */}
               <div className="rounded-lg border border-border bg-card p-4">
                 <div className="text-xs text-muted-foreground uppercase tracking-[0.12em]">
@@ -337,10 +390,41 @@ export default function CRMAnalyticsPage() {
           {/* Conversion Funnel */}
           <ERPSectionShell
             title="Conversion Funnel"
-            description="Lead-to-sale journey: how many move through each stage?"
+            description="Visitor-to-sale journey: tracks public visits, registrations, leads, and final conversions"
           >
             <div className="space-y-3">
-              <FunnelStep label="Leads Created" current={funnel.leads_created} />
+              {/* Webapp Visitor Milestones */}
+              <FunnelStep
+                label="Public Web Visits"
+                current={funnel.public_visits ?? 0}
+              />
+              <FunnelStep
+                label="Unique Web Visitors"
+                current={funnel.unique_visitors ?? 0}
+                previous={funnel.public_visits ?? 0}
+                pct={
+                  (funnel.public_visits ?? 0) > 0
+                    ? Math.round(((funnel.unique_visitors ?? 0) / (funnel.public_visits ?? 1)) * 100)
+                    : undefined
+                }
+              />
+              <FunnelStep
+                label="Registered Customer Accounts"
+                current={funnel.registered_visitors ?? 0}
+                previous={funnel.unique_visitors ?? 0}
+                pct={funnel.visitor_to_registered_pct}
+              />
+              <FunnelStep
+                label="Anonymous / Browsing Visitors"
+                current={funnel.unregistered_visitors ?? 0}
+                previous={funnel.unique_visitors ?? 0}
+              />
+              <FunnelStep
+                label="Leads / Enquiries Created"
+                current={funnel.leads_created}
+                previous={funnel.unique_visitors ?? 0}
+                pct={funnel.visitor_to_lead_pct}
+              />
               <FunnelStep
                 label="Leads Contacted (Online Request)"
                 current={funnel.leads_contacted}
@@ -379,13 +463,21 @@ export default function CRMAnalyticsPage() {
             </div>
 
             {/* Conversion Rate Summary */}
-            <div className="mt-6 grid gap-4 md:grid-cols-3 bg-primary/5 rounded-xl p-4 border border-primary/20">
+            <div className="mt-6 grid gap-4 md:grid-cols-4 bg-primary/5 rounded-xl p-4 border border-primary/20">
               <div>
                 <div className="text-xs text-muted-foreground uppercase tracking-[0.12em]">
-                  Lead → Contact Rate
+                  Visitor → Register Rate
+                </div>
+                <div className="text-2xl font-bold text-indigo-600 mt-2">
+                  {funnel.visitor_to_registered_pct ?? 0}%
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground uppercase tracking-[0.12em]">
+                  Visitor → Lead Rate
                 </div>
                 <div className="text-2xl font-bold text-primary mt-2">
-                  {funnel.leads_contacted_pct}%
+                  {funnel.visitor_to_lead_pct ?? 0}%
                 </div>
               </div>
               <div>
@@ -447,48 +539,103 @@ export default function CRMAnalyticsPage() {
             </ERPSectionShell>
           )}
 
-          {/* Product Performance */}
+          {/* Product Performance & Popularity Sentiment */}
           {analytics.products.length > 0 && (
             <ERPSectionShell
-              title="Product Performance"
-              description="Which products drive the most requests and revenue?"
+              title="Product Performance & Customer Sentiment"
+              description="Track views, customer likes/dislikes, approval ratio, and conversion to orders."
             >
               <div className="overflow-auto rounded-xl border border-border">
-                <table className="w-full min-w-[900px] text-left text-sm">
+                <table className="w-full min-w-[1000px] text-left text-sm">
                   <thead className="bg-muted/40 text-xs uppercase tracking-[0.12em] text-muted-foreground">
                     <tr>
                       <th className="px-4 py-3">Product</th>
+                      <th className="px-4 py-3 text-right">Views</th>
+                      <th className="px-4 py-3 text-right">Likes (👍)</th>
+                      <th className="px-4 py-3 text-right">Dislikes (👎)</th>
+                      <th className="px-4 py-3 text-right">Approval %</th>
+                      <th className="px-4 py-3 text-center">Sentiment</th>
                       <th className="px-4 py-3 text-right">Requests</th>
-                      <th className="px-4 py-3 text-right">Approved</th>
                       <th className="px-4 py-3 text-right">Conv. Rate</th>
-                      <th className="px-4 py-3 text-right">Avg Quote</th>
                       <th className="px-4 py-3 text-right">Revenue</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {analytics.products.map((product) => (
-                      <tr key={product.product_id} className="border-t border-border hover:bg-muted/20 transition">
-                        <td className="px-4 py-3 font-medium">
-                          <Link
-                            href={`${ROUTES.admin.products}/${product.product_id}`}
-                            className="text-primary hover:underline"
-                          >
-                            {product.product_name}
-                          </Link>
-                        </td>
-                        <td className="px-4 py-3 text-right tabular-nums">{product.requests_count}</td>
-                        <td className="px-4 py-3 text-right tabular-nums">{product.approved_count}</td>
-                        <td className="px-4 py-3 text-right tabular-nums">
-                          <span className="font-semibold text-emerald-600">{product.conversion_rate}%</span>
-                        </td>
-                        <td className="px-4 py-3 text-right tabular-nums">
-                          {formatRupee(product.avg_quoted_price)}
-                        </td>
-                        <td className="px-4 py-3 text-right tabular-nums font-semibold">
-                          {formatRupee(product.total_revenue)}
-                        </td>
-                      </tr>
-                    ))}
+                    {analytics.products.map((product) => {
+                      const sentiment = product.sentiment || "NO_VOTES";
+                      const sentimentBadge =
+                        sentiment === "HIGHLY_LIKED" ? (
+                          <span className="inline-flex items-center rounded-full bg-emerald-100 dark:bg-emerald-900/40 px-2 py-0.5 text-[11px] font-semibold text-emerald-800 dark:text-emerald-300">
+                            Loved
+                          </span>
+                        ) : sentiment === "POPULAR" ? (
+                          <span className="inline-flex items-center rounded-full bg-blue-100 dark:bg-blue-900/40 px-2 py-0.5 text-[11px] font-semibold text-blue-800 dark:text-blue-300">
+                            Popular
+                          </span>
+                        ) : sentiment === "MIXED" ? (
+                          <span className="inline-flex items-center rounded-full bg-amber-100 dark:bg-amber-900/40 px-2 py-0.5 text-[11px] font-semibold text-amber-800 dark:text-amber-300">
+                            Mixed
+                          </span>
+                        ) : sentiment === "LOW_APPROVAL" ? (
+                          <span className="inline-flex items-center rounded-full bg-rose-100 dark:bg-rose-900/40 px-2 py-0.5 text-[11px] font-semibold text-rose-800 dark:text-rose-300">
+                            Needs Review
+                          </span>
+                        ) : (
+                          <span className="text-[11px] text-muted-foreground">No votes</span>
+                        );
+
+                      return (
+                        <tr key={product.product_id} className="border-t border-border hover:bg-muted/20 transition">
+                          <td className="px-4 py-3 font-medium">
+                            <Link
+                              href={`${ROUTES.admin.products}/${product.product_id}`}
+                              className="text-primary hover:underline"
+                            >
+                              {product.product_name}
+                            </Link>
+                            {product.product_code && (
+                              <span className="ml-2 text-xs text-muted-foreground">
+                                ({product.product_code})
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
+                            {product.views_count ?? 0}
+                          </td>
+                          <td className="px-4 py-3 text-right tabular-nums font-semibold text-emerald-600 dark:text-emerald-400">
+                            {product.likes_count ?? 0}
+                          </td>
+                          <td className="px-4 py-3 text-right tabular-nums text-zinc-500">
+                            {product.dislikes_count ?? 0}
+                          </td>
+                          <td className="px-4 py-3 text-right tabular-nums font-semibold">
+                            {(product.total_reactions ?? 0) > 0 ? (
+                              <span
+                                className={
+                                  (product.like_ratio ?? 0) >= 70
+                                    ? "text-emerald-600"
+                                    : (product.like_ratio ?? 0) >= 40
+                                    ? "text-amber-600"
+                                    : "text-rose-600"
+                                }
+                              >
+                                {product.like_ratio}%
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-center">{sentimentBadge}</td>
+                          <td className="px-4 py-3 text-right tabular-nums">{product.requests_count}</td>
+                          <td className="px-4 py-3 text-right tabular-nums">
+                            <span className="font-semibold text-emerald-600">{product.conversion_rate}%</span>
+                          </td>
+                          <td className="px-4 py-3 text-right tabular-nums font-semibold">
+                            {formatRupee(product.total_revenue)}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

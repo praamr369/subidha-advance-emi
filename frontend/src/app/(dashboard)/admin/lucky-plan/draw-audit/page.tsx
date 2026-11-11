@@ -49,17 +49,17 @@ export default function DrawAuditPage() {
       <div className="space-y-6">
         <WorkspaceSection title="How Fairness Works">
           <ol className="text-sm space-y-1 list-decimal list-inside text-blue-800 dark:text-blue-200">
-            <li>Before draw: SHA-256 commitment hash is published (immutable)</li>
+            <li>Before selection: SHA-256 commitment hash is published (immutable)</li>
             <li>Benefit runs: recipient selected from eligible set using hash + seed</li>
-            <li>After draw: reveal seed is published publicly</li>
+            <li>After selection: reveal seed is published publicly</li>
             <li>Anyone can verify: hash(seed + eligible_ids) must match commit</li>
           </ol>
         </WorkspaceSection>
 
-        <WorkspaceSection title={`${draws.length} Draw Records`}>
+        <WorkspaceSection title={`${draws.length} Selection Records`}>
           {loading && <div className="py-8 text-center text-gray-500">Loading...</div>}
           {!loading && draws.length === 0 && (
-            <div className="py-12 text-center text-gray-500">No draws completed yet.</div>
+            <div className="py-12 text-center text-gray-500">No selections completed yet.</div>
           )}
           {draws.map((d) => {
             const verifyStatus = verifyResult[d.id];
@@ -92,7 +92,7 @@ export default function DrawAuditPage() {
 
                 {d.winner_customer && (
                   <div className="mt-3 p-2 bg-green-50 dark:bg-green-900/20 rounded text-sm">
-                    🏆 Winner: <strong>{d.winner_customer}</strong> (ID: {d.winner_lucky_id}) — Waiver: ₹{d.waiver_amount.toLocaleString("en-IN")}
+                    🎖️ Beneficiary: <strong>{d.winner_customer}</strong> (ID: {d.winner_lucky_id}) — Waiver: ₹{d.waiver_amount.toLocaleString("en-IN")}
                   </div>
                 )}
 

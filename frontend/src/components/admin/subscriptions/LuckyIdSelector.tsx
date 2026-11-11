@@ -30,7 +30,7 @@ export default function LuckyIdSelector({ batchId, value = null, disabled, onSel
       .catch((err: unknown) => {
         if (cancelled) return;
         setSlots([]);
-        setError(err instanceof Error ? err.message : "Failed to load lucky IDs");
+        setError(err instanceof Error ? err.message : "Failed to load SFEMI IDs");
         setFetchedForBatchId(batchId);
       });
 
@@ -63,8 +63,8 @@ export default function LuckyIdSelector({ batchId, value = null, disabled, onSel
         })}
       </div>
 
-      {loading ? <span className="text-xs text-muted-foreground">Loading lucky IDs...</span> : null}
-      {!loading && visibleSlots.length === 0 && !error ? <span className="text-xs text-muted-foreground">No available lucky IDs in this batch.</span> : null}
+      {loading ? <span className="text-xs text-muted-foreground">Loading SFEMI IDs...</span> : null}
+      {!loading && visibleSlots.length === 0 && !error ? <span className="text-xs text-muted-foreground">No available SFEMI IDs in this batch.</span> : null}
       {error ? <span className="text-xs text-red-600">{error}</span> : null}
     </div>
   );

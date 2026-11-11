@@ -48,7 +48,7 @@ export default function AdminLuckyDrawListPage({ historyOnly = false }: { histor
         if (cancelled) return;
         setRows([]);
         setCount(0);
-        setError(err instanceof Error ? err.message : "Failed to load lucky draws");
+        setError(err instanceof Error ? err.message : "Failed to load SFEMI benefits");
         setLoadedKey(requestKey);
       });
 
@@ -62,9 +62,9 @@ export default function AdminLuckyDrawListPage({ historyOnly = false }: { histor
 
   return (
     <ERPPageShell
-      title={historyOnly ? "Lucky Draw History" : "Lucky Draw Operations"}
-      subtitle="Track commitments, reveals, and winner outcomes with explicit draw actions."
-      actions={[{ href: "/admin/lucky-draws/create", label: "Execute Draw" }]}
+      title={historyOnly ? "SFEMI Benefit History" : "SFEMI Benefit Operations"}
+      subtitle="Track commitments, reveals, and promotional benefit outcomes with explicit actions."
+      actions={[{ href: "/admin/lucky-draws/create", label: "Create Benefit Commitment" }]}
     >
       <section style={{ display: "grid", gap: 8, gridTemplateColumns: "1fr 1fr auto", marginBottom: 12 }}>
         <select value={batch} onChange={(event) => setBatch(event.target.value)}>
@@ -89,7 +89,7 @@ export default function AdminLuckyDrawListPage({ historyOnly = false }: { histor
           disabled={rows.length === 0}
           onClick={() =>
             downloadCsv(
-              historyOnly ? "lucky-draw-history.csv" : "lucky-draws.csv",
+              historyOnly ? "sfemi-benefit-history.csv" : "sfemi-benefits.csv",
               [
                 { key: "id", header: "draw_id" },
                 { key: "batch_code", header: "batch", format: (row) => row.batch_code || (row.batch ? `Batch #${row.batch}` : "") },

@@ -90,6 +90,7 @@ export type EmailSMTPSettings = {
   from_email?: string;
   from_name?: string;
   is_enabled?: boolean;
+  google_client_id?: string;
   last_test_at?: string | null;
   last_test_success?: boolean | null;
   last_test_message?: string;

@@ -64,7 +64,7 @@ export default function PlanTemplatesPage() {
                 <th className="px-4 py-3 text-left font-medium">Name</th>
                 <th className="px-4 py-3 text-left font-medium">Type</th>
                 <th className="px-4 py-3 text-left font-medium">Tenure</th>
-                <th className="px-4 py-3 text-left font-medium">Lucky Eligible</th>
+                <th className="px-4 py-3 text-left font-medium">SFEMI Eligible</th>
                 <th className="px-4 py-3 text-left font-medium">Status</th>
               </tr>
             </thead>

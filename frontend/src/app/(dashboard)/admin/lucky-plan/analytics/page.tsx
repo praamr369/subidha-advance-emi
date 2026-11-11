@@ -227,11 +227,11 @@ export default function LuckyPlanAnalyticsPage() {
 
         {/* Info Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <ERPAuditNote title="Draw Statistics">
-            {`Monthly lucky draws with ${analytics.totalWinners} winners. Average EMI waiver per winner: ${formatRupee(analytics.averageWaiverAmount)}`}
+          <ERPAuditNote title="Benefit Statistics">
+            {`Monthly SFEMI promotional benefit cycles with ${analytics.totalWinners} recipients. Average EMI waiver per recipient: ${formatRupee(analytics.averageWaiverAmount)}`}
           </ERPAuditNote>
           <ERPAuditNote title="Business Impact">
-            {`Total customer value created through lucky draw waivers: ${formatRupee(analytics.totalWaivers)}`}
+            {`Total customer value created through promotional benefit waivers: ${formatRupee(analytics.totalWaivers)}`}
           </ERPAuditNote>
         </div>
 
@@ -241,10 +241,10 @@ export default function LuckyPlanAnalyticsPage() {
             <h3 className="text-lg font-semibold">Quick Actions</h3>
             <div className="flex flex-wrap gap-2">
               <ActionButton href="/admin/lucky-plan/winners">
-                View All Winners
+                View All Recipients
               </ActionButton>
               <ActionButton href="/admin/lucky-plan/draws">
-                Manage Draws
+                Manage Benefit Cycles
               </ActionButton>
               <ActionButton href="/admin/lucky-plan/batches">
                 Batch Configuration

@@ -329,7 +329,7 @@ export default function CustomerDeliveryDetailPage() {
                 <DetailItem label="Product" value={delivery.product_name || "—"} />
                 <DetailItem label="Batch" value={delivery.batch_code || "—"} />
                 <DetailItem
-                  label="Lucky Number"
+                  label="SFEMI ID"
                   value={
                     delivery.lucky_number !== null &&
                     delivery.lucky_number !== undefined

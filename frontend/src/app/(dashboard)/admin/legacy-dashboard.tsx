@@ -1284,23 +1284,23 @@ export default function AdminDashboardPage() {
                     ]}
                   />
                   <ModuleOperationalCard
-                    title="Batches & Draws"
+                    title="Batches & Benefit Selections"
                     href={ROUTES.admin.batches}
                     icon={<CalendarClock className="h-4 w-4 text-white" />}
                     iconBg="bg-amber-600 dark:bg-amber-700"
                     kpis={[
                       { value: legacy.batches.live_batches ?? legacy.batches.total_batches, label: "Live", tone: "neutral" },
-                      { value: legacy.batches.total_draws, label: "Draws", tone: "success" },
+                      { value: legacy.batches.total_draws, label: "Benefit Selections", tone: "success" },
                       {
                         value: legacy.batches.next_draw_batch?.days_until_draw != null
                           ? `${legacy.batches.next_draw_batch.days_until_draw}d`
                           : "—",
-                        label: "Next draw",
+                        label: "Next selection",
                         tone: legacy.batches.next_draw_batch?.days_until_draw != null && legacy.batches.next_draw_batch.days_until_draw <= 3 ? "warning" : "neutral",
                       },
                     ]}
                     actions={[
-                      { label: "Run draw", href: ROUTES.admin.batches },
+                      { label: "Run selection", href: ROUTES.admin.batches },
                     ]}
                   />
                   <ModuleOperationalCard
@@ -1396,7 +1396,7 @@ export default function AdminDashboardPage() {
                 {[
                   { label: "Collect EMI", href: ROUTES.admin.payments, icon: "💰", bg: "bg-sky-50 dark:bg-sky-900/20 border-sky-200 dark:border-sky-800/40" },
                   { label: "New Subscription", href: ROUTES.admin.subscriptions, icon: "📋", bg: "bg-violet-50 dark:bg-violet-900/20 border-violet-200 dark:border-violet-800/40" },
-                  { label: "Run Lucky Draw", href: ROUTES.admin.batches, icon: "🎲", bg: "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800/40" },
+                  { label: "Run SFEMI Benefit Selection", href: ROUTES.admin.batches, icon: "✨", bg: "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800/40" },
                   { label: "New Direct Sale", href: ROUTES.admin.billing, icon: "🧾", bg: "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/40" },
                   { label: "Create Purchase Order", href: ROUTES.admin.purchaseOrders, icon: "📦", bg: "bg-slate-50 dark:bg-slate-900/20 border-slate-200 dark:border-slate-800/40" },
                   { label: "Schedule Delivery", href: ROUTES.admin.deliveries, icon: "🚚", bg: "bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800/40" },
@@ -2039,7 +2039,7 @@ export default function AdminDashboardPage() {
                         ? `${legacy.batches.next_draw_batch.days_until_draw ?? 0} days to ${formatDate(
                             legacy.batches.next_draw_batch.draw_date
                           )}`
-                        : "No draw currently scheduled"}
+                        : "No selection currently scheduled"}
                     </div>
                   </div>
                 </div>
@@ -2059,7 +2059,7 @@ export default function AdminDashboardPage() {
                 >
                   <div className="grid gap-3 sm:grid-cols-2">
                     <StatCard
-                      label="Winner subscriptions"
+                      label="Beneficiary subscriptions"
                       value={String(
                         winnerSurface?.winner_subscriptions ??
                           summary.winner_subscriptions ??

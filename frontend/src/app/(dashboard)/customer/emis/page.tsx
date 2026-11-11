@@ -377,7 +377,7 @@ export default function CustomerEmisPage() {
 
         <ERPAuditNote title="EMI Status Guide">
           Pending: Payment due in future. Overdue: Payment past due date. Paid:
-          Payment received. Waived: EMI amount waived through lucky draw win.
+          Payment received. Waived: EMI amount waived through SFEMI promotional benefit.
         </ERPAuditNote>
       </div>
     </ERPPageShell>

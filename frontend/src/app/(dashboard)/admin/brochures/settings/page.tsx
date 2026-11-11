@@ -328,7 +328,7 @@ export default function BrochureProductSettingsPage() {
               ["public_visibility", "Public"],
               ["rent_visibility", "Rent"],
               ["lease_visibility", "Lease"],
-              ["lucky_visibility", "Lucky EMI"],
+              ["lucky_visibility", "SFEMI Advance EMI"],
               ["sale_visibility", "Sale"],
               ["featured", "Featured"],
             ] as Array<[keyof BulkForm, string]>).map(([key, label]) => (
@@ -352,7 +352,7 @@ export default function BrochureProductSettingsPage() {
             <>
               <div className="overflow-x-auto rounded-xl border border-border">
                 <table className="min-w-[1500px] divide-y divide-border text-sm">
-                  <thead className="bg-muted/60 text-left text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="px-3 py-3">Select</th><th className="px-3 py-3">Product</th><th className="px-3 py-3">Code</th><th className="px-3 py-3">Category</th><th className="px-3 py-3">Public</th><th className="px-3 py-3">Rent</th><th className="px-3 py-3">Lease</th><th className="px-3 py-3">Lucky EMI</th><th className="px-3 py-3">Sale</th><th className="px-3 py-3">Monthly rent</th><th className="px-3 py-3">Lease monthly</th><th className="px-3 py-3">Deposit</th><th className="px-3 py-3">Featured</th><th className="px-3 py-3">Sort</th><th className="px-3 py-3">Description</th><th className="px-3 py-3">Actions</th></tr></thead>
+                  <thead className="bg-muted/60 text-left text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="px-3 py-3">Select</th><th className="px-3 py-3">Product</th><th className="px-3 py-3">Code</th><th className="px-3 py-3">Category</th><th className="px-3 py-3">Public</th><th className="px-3 py-3">Rent</th><th className="px-3 py-3">Lease</th><th className="px-3 py-3">SFEMI Advance EMI</th><th className="px-3 py-3">Sale</th><th className="px-3 py-3">Monthly rent</th><th className="px-3 py-3">Lease monthly</th><th className="px-3 py-3">Deposit</th><th className="px-3 py-3">Featured</th><th className="px-3 py-3">Sort</th><th className="px-3 py-3">Description</th><th className="px-3 py-3">Actions</th></tr></thead>
                   <tbody className="divide-y divide-border bg-card">
                     {rows.map((row) => (
                       <tr key={row.product_id}>
@@ -382,7 +382,7 @@ export default function BrochureProductSettingsPage() {
                 ["visible_on_public_catalog", "Public catalog"],
                 ["visible_on_rent_catalog", "Rent catalog"],
                 ["visible_on_lease_catalog", "Lease catalog"],
-                ["visible_on_lucky_emi_catalog", "Lucky EMI catalog"],
+                ["visible_on_lucky_emi_catalog", "SFEMI Advance EMI catalog"],
                 ["visible_on_sale_catalog", "Sale catalog"],
                 ["brochure_featured", "Featured"],
               ] as Array<[keyof EditForm, string]>).map(([key, label]) => (

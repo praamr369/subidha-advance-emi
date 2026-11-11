@@ -96,7 +96,7 @@ export default function LuckyPlanWinnersPage() {
     >
       <ERPSectionShell
         title="Filters"
-        description="Narrow winners by batch ID"
+        description="Narrow recipients by batch ID"
       >
         <div className="flex flex-wrap gap-3 items-end">
           <div>
@@ -140,7 +140,7 @@ export default function LuckyPlanWinnersPage() {
                 <thead className="bg-muted/50">
                   <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground">
                     <th className="px-4 py-3">Batch</th>
-                    <th className="px-4 py-3 text-right">Draw Month</th>
+                    <th className="px-4 py-3 text-right">Selection Month</th>
                     <th className="px-4 py-3 text-right">SFEMI ID</th>
                     <th className="px-4 py-3">Customer</th>
                     <th className="px-4 py-3">Subscription</th>
@@ -148,7 +148,7 @@ export default function LuckyPlanWinnersPage() {
                     <th className="px-4 py-3 text-right">Waived EMIs</th>
                     <th className="px-4 py-3 text-right">Waived Amount</th>
                     <th className="px-4 py-3">Delivery</th>
-                    <th className="px-4 py-3">Draw Date</th>
+                    <th className="px-4 py-3">Selection Date</th>
                   </tr>
                 </thead>
                 <tbody>

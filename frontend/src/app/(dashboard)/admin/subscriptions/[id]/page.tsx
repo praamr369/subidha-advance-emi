@@ -1320,26 +1320,26 @@ export default function AdminSubscriptionDetailPage() {
                     meta={
                       <>
                         <DetailMetricTile
-                          label="Winner Month"
+                          label="Recipient Month"
                           value={formatWinnerMonthLabel(detailSemantics.winnerMonth)}
                           tone={detailSemantics.winnerTone}
                         />
                         <DetailMetricTile
-                          label="Lucky Number"
+                          label="SFEMI ID"
                           value={formatLuckyNumberLabel(detailSemantics.luckyNumber)}
                           hint={
                             detailSemantics.drawId != null
-                              ? `Draw #${detailSemantics.drawId}`
-                              : "No draw reference exposed"
+                              ? `Benefit Event #${detailSemantics.drawId}`
+                              : "No benefit event reference exposed"
                           }
                         />
                         <DetailMetricTile
-                          label="Draw Revealed"
+                          label="Selection Revealed"
                           value={formatDateTime(detailSemantics.drawRevealedAt)}
                           hint={
                             detailSemantics.drawMonth != null
-                              ? `Draw month ${detailSemantics.drawMonth}`
-                              : "Winner month stored on contract"
+                              ? `Cycle month ${detailSemantics.drawMonth}`
+                              : "Recipient month stored on contract"
                           }
                         />
                       </>
@@ -1499,7 +1499,7 @@ export default function AdminSubscriptionDetailPage() {
                     }
                   />
                   <DetailValue
-                    label="Lucky Number"
+                    label="SFEMI ID"
                     value={isEmiSubscription ? formatLuckyNumberLabel(subscription.lucky_number) : "Not applicable"}
                   />
                   <DetailValue label="Partner" value={isEmiSubscription ? subscription.partner_name || "—" : "Not applicable"} />
@@ -1565,22 +1565,22 @@ export default function AdminSubscriptionDetailPage() {
 
               {isEmiSubscription ? (
                 <DetailPanel
-                  title="Winner / lucky context"
-                  description="Winning draw linkage and waived EMI posture."
+                  title="SFEMI Benefit Context"
+                  description="Promotional benefit linkage and waived EMI posture."
                   className="rounded-[28px]"
                 >
                   <div className="grid gap-4 sm:grid-cols-2">
                     <DetailValue
-                      label="Winner Status"
+                      label="Benefit Status"
                       value={
                         <ERPStatusBadge
                           status={winnerStatus === "WON" ? "WON" : "NOT_WON"}
-                          label={winnerStatus === "WON" ? "Won" : "Not won"}
+                          label={winnerStatus === "WON" ? "Benefit awarded" : "Not awarded"}
                         />
                       }
                     />
                     <DetailValue
-                      label="Winner Month"
+                      label="Benefit Month"
                       value={
                         winnerSummary?.winner_month != null
                           ? `Month ${winnerSummary.winner_month}`
@@ -1590,16 +1590,16 @@ export default function AdminSubscriptionDetailPage() {
                       }
                     />
                     <DetailValue
-                      label="Lucky Number"
+                      label="SFEMI ID"
                       value={formatLuckyNumberLabel(
                         winnerSummary?.lucky_number ?? subscription.lucky_number
                       )}
                     />
                     <DetailValue
-                      label="Draw Reference"
+                      label="Benefit Event Reference"
                       value={
                         winnerSummary?.draw_id != null
-                          ? `Draw #${winnerSummary.draw_id} · Month ${winnerSummary.draw_month ?? "—"}`
+                          ? `Event #${winnerSummary.draw_id} · Month ${winnerSummary.draw_month ?? "—"}`
                           : "—"
                       }
                     />

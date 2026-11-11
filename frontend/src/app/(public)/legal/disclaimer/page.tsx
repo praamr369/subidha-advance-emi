@@ -25,7 +25,7 @@ const sections = [
   },
   {
     id: "no-guarantee",
-    title: "No guarantee of winning",
+    title: "No guarantee of promotional selection",
     paragraphs: [
       "SFEMI (Advance EMI) participation does not guarantee selection in the monthly promotional benefit event. Benefit selection is conducted under published rules. A SFEMI ID assignment does not create any entitlement to a prize or waiver.",
       "Benefit recipient waiver — if a customer's SFEMI ID is selected — applies only to remaining future EMI obligations from the approved selection month onward. Already-paid EMI is not automatically reversed or refunded.",
@@ -87,7 +87,7 @@ const sections = [
     id: "public-content-limits",
     title: "Limits of public content",
     paragraphs: [
-      "Public pages do not create contracts, post payments, alter ledgers, trigger payouts, or change winner records. Any action that appears to do so on the public site is for demonstration or explanation purposes only.",
+      "Public pages do not create contracts, post payments, alter ledgers, trigger payouts, or change beneficiary records. Any action that appears to do so on the public site is for demonstration or explanation purposes only.",
       "Real payment, receipt, contract, delivery, and accounting operations are controlled inside the authenticated core system.",
     ],
   },

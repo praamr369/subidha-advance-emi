@@ -127,8 +127,8 @@ export default function AdminLuckyDrawDetailPage() {
         at: draw.revealed_at,
         label: "Reveal Published",
         detail: draw.winner_lucky_number
-          ? `Winner Lucky #${String(draw.winner_lucky_number).padStart(2, "0")}`
-          : "Winner pending",
+          ? `Selected SFEMI ID #${String(draw.winner_lucky_number).padStart(2, "0")}`
+          : "Recipient pending",
       });
     }
 
@@ -144,14 +144,14 @@ export default function AdminLuckyDrawDetailPage() {
 
   return (
     <ERPPageShell
-      title={draw ? `Lucky Draw #${draw.id}` : "Lucky Draw Detail"}
-      subtitle="Committed hash, reveal state, winner result and traceability context."
+      title={draw ? `SFEMI Benefit #${draw.id}` : "SFEMI Benefit Detail"}
+      subtitle="Committed hash, reveal state, recipient result and traceability context."
     >
       <button type="button" onClick={() => router.push("/admin/lucky-draw")}>
-        Back to Draw List
+        Back to Benefits List
       </button>
 
-      {error ? <ErrorState title="Failed to load draw detail" description={error} /> : null}
+      {error ? <ErrorState title="Failed to load benefit detail" description={error} /> : null}
 
       {!error && !draw ? <LoadingBlock /> : null}
 
@@ -162,13 +162,13 @@ export default function AdminLuckyDrawDetailPage() {
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                    Draw certificate
+                    Benefit certificate
                   </div>
                   <h2 className="mt-2 text-2xl font-semibold text-foreground">
-                    {draw.batch_code || "Lucky Draw"}
+                    {draw.batch_code || "SFEMI Benefit"}
                   </h2>
                   <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                    Commitment hash is published first, reveal comes later, and winner benefit remains future EMI waiver only.
+                    Commitment hash is published first, reveal comes later, and promotional benefit remains future EMI waiver only.
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2 print:hidden">
@@ -218,12 +218,12 @@ export default function AdminLuckyDrawDetailPage() {
                   { label: "Verification status", value: verificationStatus },
                   { label: "Reveal time", value: formatDateTime(draw.revealed_at) },
                   {
-                    label: "Winner",
+                    label: "Recipient",
                     value: draw.winner_lucky_number
-                      ? `Lucky #${String(draw.winner_lucky_number).padStart(2, "0")}`
+                      ? `SFEMI ID #${String(draw.winner_lucky_number).padStart(2, "0")}`
                       : "Pending",
                   },
-                  { label: "Winner display", value: winnerDisplayName },
+                  { label: "Recipient display", value: winnerDisplayName },
                 ]}
                 note="Seed is visible only after reveal when public verification is published."
               />
@@ -243,7 +243,7 @@ export default function AdminLuckyDrawDetailPage() {
               {timeline.length === 0 ? (
                 <EmptyState
                   title="No lifecycle events yet"
-                  description="This draw has not produced a commitment or reveal event that can be shown in the certificate timeline."
+                  description="This benefit event has not produced a commitment or reveal event that can be shown in the certificate timeline."
                 />
               ) : (
                 <ul className="mt-4 space-y-3">
@@ -262,12 +262,12 @@ export default function AdminLuckyDrawDetailPage() {
           <aside className="space-y-4 print:hidden">
             <div className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-[0_20px_50px_-36px_rgba(15,23,42,0.5)]">
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Winner summary
+                Recipient summary
               </div>
               <p className="mt-2 text-lg font-semibold text-foreground">
                 {draw.winner_lucky_number
-                  ? `Lucky #${String(draw.winner_lucky_number).padStart(2, "0")}`
-                  : "Winner pending"}
+                  ? `SFEMI ID #${String(draw.winner_lucky_number).padStart(2, "0")}`
+                  : "Recipient pending"}
               </p>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">{winnerDisplayName}</p>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">

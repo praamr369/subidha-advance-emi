@@ -310,8 +310,8 @@ export default function PartnerSubscriptionDetailPage() {
     if (winnerSummary?.draw_revealed_at) {
       items.push({
         id: "winner",
-        title: "Winner history recorded",
-        description: `Winner status: ${detailSemantics.winnerHeadline}`,
+        title: "Beneficiary history recorded",
+        description: `Beneficiary status: ${detailSemantics.winnerHeadline}`,
         timestamp: formatDateTime(winnerSummary.draw_revealed_at),
         badge: <ERPStatusBadge status="WON" hideIcon />,
       });
@@ -484,8 +484,8 @@ export default function PartnerSubscriptionDetailPage() {
     >
       <div className="space-y-6">
         <WorkspaceSection
-          title="Contract, winner, and waiver posture"
-          description="Partner detail keeps contract lifecycle, winner history, and waiver settlement separate so follow-up stays operationally clear."
+          title="Contract, beneficiary, and waiver posture"
+          description="Partner detail keeps contract lifecycle, beneficiary history, and waiver settlement separate so follow-up stays operationally clear."
           action={
             <ActionButton
               type="button"
@@ -514,7 +514,7 @@ export default function PartnerSubscriptionDetailPage() {
               }
             />
             <DetailItem
-              label="Winner History"
+              label="Beneficiary History"
               value={
                 <div className="space-y-2">
                   <ERPStatusBadge
@@ -523,8 +523,8 @@ export default function PartnerSubscriptionDetailPage() {
                     }
                     label={
                       detailSemantics.winnerStatus === "WON"
-                        ? "Winner recorded"
-                        : "Not won"
+                        ? "Beneficiary recorded"
+                        : "Not awarded"
                     }
                     size="md"
                   />
@@ -606,8 +606,8 @@ export default function PartnerSubscriptionDetailPage() {
                 {summary.outstanding_amount > 0
                   ? `Outstanding exposure is ${formatRupee(summary.outstanding_amount)} across ${pendingEmiCount} visible Advance EMI row${
                       pendingEmiCount === 1 ? "" : "s"
-                    }. Winner history and waiver posture remain separate from collection workflow.`
-                  : "The visible contract exposure is settled in the current partner scope. Keep winner history and prior payment evidence separate from future collection activity."}
+                    }. Beneficiary history and waiver posture remain separate from collection workflow.`
+                  : "The visible contract exposure is settled in the current partner scope. Keep beneficiary history and prior payment evidence separate from future collection activity."}
               </WorkspaceNotice>
             </WorkspaceSection>
 
@@ -781,7 +781,7 @@ export default function PartnerSubscriptionDetailPage() {
 
             <WorkspaceSection
               title="Partner contract timeline"
-              description="Major contract, winner, and follow-up checkpoints currently visible from this partner-facing detail surface."
+              description="Major contract, beneficiary, and follow-up checkpoints currently visible from this partner-facing detail surface."
             >
               {timelineItems.length === 0 ? (
                 <ERPEmptyState

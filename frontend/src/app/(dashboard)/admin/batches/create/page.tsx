@@ -287,7 +287,7 @@ export default function AdminBatchCreatePage() {
         <section className="grid gap-6 xl:grid-cols-2">
           <SectionCard
             title="Batch fields"
-            description="Define identity, slot capacity, tenure, draw day, and start date before subscriptions and Lucky IDs attach."
+            description="Define identity, slot capacity, tenure, benefit selection day, and start date before subscriptions and SFEMI IDs attach."
           >
             <div className="grid gap-4">
               <div>

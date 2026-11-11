@@ -677,3 +677,60 @@ export async function getPublicBusinessComplianceSummary(): Promise<PublicBusine
     "Unable to load compliance summary right now."
   );
 }
+
+export interface ProductReactionSummary {
+  product_id: number;
+  product_name?: string;
+  likes_count: number;
+  dislikes_count: number;
+  total_reactions: number;
+  like_percentage: number;
+  user_reaction: "LIKE" | "DISLIKE" | null;
+  message?: string;
+}
+
+export async function getProductReactions(
+  productIdentifier: string | number,
+  sessionId?: string
+): Promise<ProductReactionSummary> {
+  const query = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : "";
+  return fetchPublic<ProductReactionSummary>(
+    `/public/products/${productIdentifier}/reactions/${query}`,
+    { cache: "no-store" },
+    "Unable to load product reactions."
+  );
+}
+
+export async function reactToProduct(
+  productIdentifier: string | number,
+  payload: { session_id: string; is_like: boolean; hp_field?: string }
+): Promise<ProductReactionSummary> {
+  return fetchPublic<ProductReactionSummary>(
+    `/public/products/${productIdentifier}/react/`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+    "Unable to record your feedback right now."
+  );
+}
+
+export async function trackPublicVisitorEvent(payload: {
+  session_id: string;
+  path: string;
+  event_type?: string;
+  product_id?: number | null;
+  referrer?: string;
+  hp_field?: string;
+}): Promise<{ status: string; session_id: string }> {
+  return fetchPublic<{ status: string; session_id: string }>(
+    "/public/analytics/track/",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+    "Unable to record visitor analytics."
+  );
+}

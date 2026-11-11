@@ -41,7 +41,7 @@ const journeys = [
     eyebrow: "Journey B — Rent",
     title: "Rent contract journey",
     description:
-      "Flexible product usage under a rent contract. Deposit and monthly demand are separate. No Lucky ID. Delivery, return, and service governed by terms.",
+      "Flexible product usage under a rent contract. Deposit and monthly demand are separate. No SFEMI ID. Delivery, return, and service governed by terms.",
     steps: HOW_IT_WORKS_JOURNEY_B,
   },
   {
@@ -50,7 +50,7 @@ const journeys = [
     eyebrow: "Journey C — Lease",
     title: "Lease contract journey",
     description:
-      "Longer-term product usage under an approved lease. No Lucky ID. Deposit and monthly lease charges are separate liabilities. Renewal and upgrade require admin approval.",
+      "Longer-term product usage under an approved lease. No SFEMI ID. Deposit and monthly lease charges are separate liabilities. Renewal and upgrade require admin approval.",
     steps: HOW_IT_WORKS_JOURNEY_C,
   },
   {
@@ -130,17 +130,17 @@ export default function HowItWorksPage() {
       ))}
 
       <PublicMarketingBanner
-        eyebrow="Draw transparency"
-        title="Commit-then-reveal draw process"
+        eyebrow="Selection transparency"
+        title="Commit-then-reveal selection process"
         description="The monthly SFEMI promotional benefit selection uses a commit-then-reveal mechanism. A commitment hash is published before the selection; the reveal is published afterward and can be verified. No public action can change a revealed result."
         items={[
           {
             title: "Commitment hash published first",
-            description: "Before each draw, a hash commitment is published so the result cannot be changed after commitment.",
+            description: "Before each selection, a hash commitment is published so the result cannot be changed after commitment.",
           },
           {
             title: "Reveal verified against commitment",
-            description: "The actual draw result is published later and can be checked against the earlier commitment for transparency.",
+            description: "The actual selection result is published later and can be checked against the earlier commitment for transparency.",
           },
           {
             title: "Benefit is remaining future EMI waiver only",

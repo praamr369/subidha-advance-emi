@@ -63,7 +63,7 @@ const CATEGORIES: { value: SupportTicketCategory; label: string }[] = [
   { value: "RENT_QUERY", label: "Rent query" },
   { value: "LEASE_QUERY", label: "Lease query" },
   { value: "DIRECT_SALE_QUERY", label: "Direct sale" },
-  { value: "LUCKY_DRAW_QUERY", label: "Lucky draw" },
+  { value: "LUCKY_DRAW_QUERY", label: "SFEMI Promotional Benefit" },
   { value: "DOCUMENT_CORRECTION", label: "Document correction" },
   { value: "CUSTOMER_PROFILE_UPDATE", label: "Profile update" },
   { value: "SERVICE_REQUEST", label: "Service request" },

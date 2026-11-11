@@ -43,8 +43,8 @@ export default function DrawAuthorisationsPage() {
 
   return (
     <ERPPageShell
-      title="Draw Authorisations"
-      subtitle="CTRL-LP-1 — Pre-draw officer sign-off required before seed commitment"
+      title="Benefit Selection Authorisations"
+      subtitle="CTRL-LP-1 — Pre-selection officer sign-off required before seed commitment"
       stats={kpis}
     >
       <WorkspaceSection title="Authorisation requests">
@@ -52,7 +52,7 @@ export default function DrawAuthorisationsPage() {
         {initialLoading ? (
           <p className="text-muted-foreground text-sm py-8 text-center">Loading…</p>
         ) : items.length === 0 ? (
-          <p className="text-muted-foreground text-sm py-8 text-center">No draw authorisation requests found.</p>
+          <p className="text-muted-foreground text-sm py-8 text-center">No benefit selection authorisation requests found.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">

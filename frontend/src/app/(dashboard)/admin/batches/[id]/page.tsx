@@ -697,7 +697,7 @@ export default function AdminBatchDetailPage() {
                                   : row.is_available || row.status === "AVAILABLE"
                                     ? "Unassigned"
                                     : row.status === "WON"
-                                      ? "Winner without customer link"
+                                      ? "Beneficiary without customer link"
                                       : "Assigned without customer link"}
                               </div>
                               <div className="mt-1 text-xs text-muted-foreground">
@@ -708,7 +708,7 @@ export default function AdminBatchDetailPage() {
                                     : row.status === "RELEASED"
                                       ? "Released from cancelled contract"
                                     : row.status === "WON"
-                                      ? "Missing winner subscription link"
+                                      ? "Missing beneficiary subscription link"
                                       : "Missing subscription link"}
                               </div>
                               {row.assignment_note ? (

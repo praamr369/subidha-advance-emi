@@ -29,6 +29,12 @@ class EmailSMTPSettings(BusinessSetupTimeStampedModel):
     from_email = models.EmailField(blank=True, default="")
     from_name = models.CharField(max_length=120, blank=True, default="")
     is_enabled = models.BooleanField(default=False)
+    google_client_id = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="Google Cloud Console OAuth 2.0 Web Client ID for free customer Google login and registration.",
+    )
     is_active = models.BooleanField(default=True, db_index=True)
 
     last_test_at = models.DateTimeField(null=True, blank=True)
@@ -54,8 +60,11 @@ class EmailSMTPSettings(BusinessSetupTimeStampedModel):
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
-        for field in ("smtp_host", "smtp_username", "from_email", "from_name", "last_test_message"):
-            setattr(self, field, (getattr(self, field, "") or "").strip())
+        for field in ("smtp_host", "smtp_username", "from_email", "from_name", "last_test_message", "google_client_id"):
+            val = (getattr(self, field, "") or "").strip()
+            if field == "google_client_id":
+                val = val.strip("\"'")
+            setattr(self, field, val)
         self.full_clean()
         super().save(*args, **kwargs)
 

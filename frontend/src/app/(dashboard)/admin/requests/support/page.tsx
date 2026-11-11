@@ -381,7 +381,7 @@ export default function AdminSupportRequestsPage() {
                   <option value="RECEIPT_ISSUE">Receipt issue</option>
                   <option value="EMI_ISSUE">EMI issue</option>
                   <option value="SUBSCRIPTION_QUERY">Subscription query</option>
-                  <option value="DRAW_QUERY">Lucky draw query</option>
+                  <option value="DRAW_QUERY">SFEMI Promotional Benefit query</option>
                   <option value="OTHER">Other</option>
                 </select>
               </div>

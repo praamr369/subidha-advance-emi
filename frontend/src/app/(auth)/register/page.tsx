@@ -22,6 +22,10 @@ import { useRouter } from "next/navigation";
 import { apiFetch, ApiError } from "@/lib/api";
 import ActionButton from "@/components/ui/ActionButton";
 import AuthBrand from "@/components/auth/AuthBrand";
+import { GoogleSignInButton, GooglePhoneModal } from "@/components/auth";
+import { googleAuthRequest, type GoogleAuthResponse } from "@/services/auth.service";
+import { useAuth } from "@/providers/AuthProvider";
+import { getDashboardRouteForRole } from "@/lib/auth/redirect";
 import { useI18n } from "@/components/i18n/I18nProvider";
 import { apiPaths } from "@/lib/api-paths";
 
@@ -169,10 +173,82 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  const { login } = useAuth();
   const [submitting, setSubmitting] = useState(false);
+  const [googleSubmitting, setGoogleSubmitting] = useState(false);
+  const [showPhoneModal, setShowPhoneModal] = useState(false);
+  const [pendingGoogleData, setPendingGoogleData] = useState<{
+    idToken: string;
+    email?: string;
+    name?: string;
+  } | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  function handleGoogleAuthSuccess(response: GoogleAuthResponse) {
+    const accessToken = response.access;
+    const refreshToken = response.refresh;
+    const resolvedRole = response.role ?? response.user?.role ?? "CUSTOMER";
+
+    if (!accessToken || !refreshToken) {
+      throw new Error("Invalid registration response.");
+    }
+
+    login({
+      id: response.user?.id ?? 0,
+      name: response.user?.name ?? response.user?.username ?? response.name ?? "Customer",
+      role: resolvedRole,
+      accessToken,
+      refreshToken,
+    });
+
+    const target = getDashboardRouteForRole(resolvedRole);
+    if (typeof window !== "undefined") {
+      window.location.assign(target);
+      return;
+    }
+    router.replace(target);
+  }
+
+  async function handleGoogleSuccess(idToken: string) {
+    try {
+      setGoogleSubmitting(true);
+      setError(null);
+      const response = await googleAuthRequest({ id_token: idToken });
+      if (response.requires_phone) {
+        setPendingGoogleData({
+          idToken,
+          email: response.email,
+          name: response.name,
+        });
+        setShowPhoneModal(true);
+        return;
+      }
+      handleGoogleAuthSuccess(response);
+    } catch (err) {
+      setError(toMessage(err));
+    } finally {
+      setGoogleSubmitting(false);
+    }
+  }
+
+  async function handlePhoneSubmit(submittedPhone: string) {
+    if (!pendingGoogleData?.idToken) return;
+    setGoogleSubmitting(true);
+    try {
+      const response = await googleAuthRequest({
+        id_token: pendingGoogleData.idToken,
+        phone: submittedPhone,
+      });
+      setShowPhoneModal(false);
+      handleGoogleAuthSuccess(response);
+    } catch (err) {
+      throw err;
+    } finally {
+      setGoogleSubmitting(false);
+    }
+  }
 
   const registerSchema = z.object({
     username: z.string().min(1, "Username is required."),
@@ -243,6 +319,13 @@ export default function RegisterPage() {
       setError(null);
       setSuccessMessage(null);
 
+      let visitorSessionId = "";
+      try {
+        visitorSessionId = localStorage.getItem("subidha_visitor_id") || "";
+      } catch {
+        // ignore
+      }
+
       await apiFetch<RegisterResponse>(apiPaths.auth.register, {
         method: "POST",
         body: {
@@ -253,6 +336,7 @@ export default function RegisterPage() {
           email: trimmedEmail,
           first_name: trimmedFirstName,
           last_name: trimmedLastName,
+          visitor_session_id: visitorSessionId,
         },
       });
 
@@ -380,6 +464,31 @@ export default function RegisterPage() {
             <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
               {t("auth.register.desktopFormDesc")}
             </p>
+          </div>
+
+          {/* Quick 1-Click Google Customer Registration */}
+          <div className="mb-6 rounded-3xl border border-border bg-card p-5 shadow-sm space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-semibold text-foreground">Fast Customer Registration with Google</div>
+                <p className="text-xs text-muted-foreground mt-0.5">Instant registration with your Gmail ID (100% Free)</p>
+              </div>
+            </div>
+            <GoogleSignInButton
+              onSuccess={handleGoogleSuccess}
+              onError={(msg) => setError(msg)}
+              disabled={submitting || googleSubmitting}
+              text="signup_with"
+            />
+          </div>
+
+          <div className="relative flex items-center justify-center mb-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-border" />
+            </div>
+            <div className="relative bg-background px-3 text-xs uppercase tracking-wider text-muted-foreground">
+              or register manually below
+            </div>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -768,6 +877,20 @@ export default function RegisterPage() {
               </aside>
             </div>
           </form>
+
+          <GooglePhoneModal
+            isOpen={showPhoneModal}
+            name={pendingGoogleData?.name}
+            email={pendingGoogleData?.email}
+            idToken={pendingGoogleData?.idToken || ""}
+            onSubmitPhone={handlePhoneSubmit}
+            onClose={() => {
+              setShowPhoneModal(false);
+              setPendingGoogleData(null);
+            }}
+            submitting={googleSubmitting}
+            error={error}
+          />
 
           <div className="mt-8 border-t border-border pt-5 text-center text-sm text-muted-foreground">
             {t("auth.register.alreadyHaveAccount")}{" "}

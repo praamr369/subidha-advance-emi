@@ -99,7 +99,7 @@ function ContractCard({ sub }: { sub: CustomerSubscription }) {
             ) : null}
             {isWinner ? (
               <span className="rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 text-[10px] font-bold flex items-center gap-1">
-                <Star className="size-2.5" /> Winner
+                <Star className="size-2.5" /> Beneficiary
               </span>
             ) : null}
           </div>
@@ -174,7 +174,7 @@ function ContractCard({ sub }: { sub: CustomerSubscription }) {
         ) : null}
         {pt === "EMI" && sub.lucky_number != null ? (
           <div>
-            <span className="text-muted-foreground">Lucky #</span>
+            <span className="text-muted-foreground">SFEMI ID</span>
             <div className="font-semibold mt-0.5">#{String(sub.lucky_number).padStart(2, "0")}</div>
           </div>
         ) : null}

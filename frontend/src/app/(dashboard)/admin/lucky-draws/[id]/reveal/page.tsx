@@ -339,10 +339,10 @@ function formatRevealActionError(error: unknown): string {
       return "You do not have permission to reveal this draw.";
     }
     if (error.status === 404) {
-      return "This lucky draw was not found.";
+      return "This promotional benefit selection was not found.";
     }
     if (error.status >= 500) {
-      return "Server error while revealing this lucky draw. Try again or contact support.";
+      return "Server error while revealing this promotional benefit. Try again or contact support.";
     }
     return error.readableMessage?.trim() || `Request failed (${error.status}).`;
   }
@@ -602,8 +602,8 @@ export default function AdminLuckyDrawRevealPage() {
 
         {!loading && !error && !draw ? (
           <EmptyState
-            title="Lucky Draw not available"
-            description="The requested draw could not be loaded."
+            title="SFEMI Benefit not available"
+            description="The requested benefit selection could not be loaded."
           />
         ) : null}
 
@@ -645,7 +645,7 @@ export default function AdminLuckyDrawRevealPage() {
               </div>
 
               <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-                This action is operationally sensitive. Reveal should not be repeated, and winner consequences must remain audit-safe.
+                This action is operationally sensitive. Reveal should not be repeated, and beneficiary consequences must remain audit-safe.
               </div>
             </SectionCard>
 
@@ -786,14 +786,14 @@ export default function AdminLuckyDrawRevealPage() {
             {revealResult ? (
               <SectionCard
                 title="Reveal result"
-                description="Backend returned the revealed winner information."
+                description="Backend returned the revealed beneficiary information."
               >
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                   <DetailValue label="Revealed" value={revealResult.is_revealed ? "Yes" : "No"} />
                   <DetailValue label="Revealed At" value={formatDateTime(revealResult.revealed_at)} />
-                  <DetailValue label="Winner Lucky Number" value={formatLuckyNumber(revealResult.winner_lucky_number)} />
-                  <DetailValue label="Winner Customer" value={revealResult.winner_customer_name || "Not visible"} />
-                  <DetailValue label="Winner Contract" value={revealResult.winner_subscription_number || "Not visible"} />
+                  <DetailValue label="Recipient SFEMI ID" value={formatLuckyNumber(revealResult.winner_lucky_number)} />
+                  <DetailValue label="Recipient Customer" value={revealResult.winner_customer_name || "Not visible"} />
+                  <DetailValue label="Recipient Contract" value={revealResult.winner_subscription_number || "Not visible"} />
                   <DetailValue label="Hash Preview" value={shortenHash(revealResult.committed_hash)} />
                   <DetailValue
                     label="Waiver Applied"
@@ -824,7 +824,7 @@ export default function AdminLuckyDrawRevealPage() {
                 </div>
 
                 <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-                  Reveal completed. Business rule reminder: winner benefit should apply to future EMI waiver only.
+                  Reveal completed. Business rule reminder: promotional benefit should apply to future EMI waiver only.
                 </div>
 
                 <div className="mt-4 flex flex-wrap gap-2">
@@ -840,7 +840,7 @@ export default function AdminLuckyDrawRevealPage() {
                       href={`/admin/subscriptions/${revealResult.winner_subscription_id}`}
                       className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
                     >
-                      Open Winner Contract
+                      Open Beneficiary Contract
                     </Link>
                   ) : null}
                 </div>

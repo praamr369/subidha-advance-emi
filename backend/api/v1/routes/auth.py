@@ -8,7 +8,7 @@ from api.v1.views.auth_password_reset import (
     request_password_reset,
     resend_password_reset_otp_view,
 )
-from api.v1.views.auth_views import logout_user, register_user
+from api.v1.views.auth_views import google_auth_config_view, google_auth_view, logout_user, register_user
 from api.v1.views.user import MeView
 
 
@@ -33,9 +33,44 @@ class CustomTokenView(TokenObtainPairView):
     throttle_classes = [AuthLoginThrottle]
 
     def post(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
         ip = _get_client_ip(request)
         ua = request.META.get("HTTP_USER_AGENT", "")
+
+        # Defense against brute-force & credential stuffing attacks
+        lockout_window = timezone.now() - timezone.timedelta(minutes=15)
+        
+        # Check IP-level repeated failures: locks out attacking client without denying service to real user
+        latest_success_ip = LoginAudit.objects.filter(
+            ip_address=ip,
+            timestamp__gte=lockout_window,
+            status="SUCCESS",
+        ).order_by("-timestamp").first()
+
+        ip_filter = {"ip_address": ip, "status": "FAILED"}
+        if latest_success_ip:
+            ip_filter["timestamp__gt"] = latest_success_ip.timestamp
+        else:
+            ip_filter["timestamp__gte"] = lockout_window
+
+        recent_ip_failures = LoginAudit.objects.filter(**ip_filter).count()
+
+        identifier = (request.data.get("identifier") or request.data.get("username") or "").strip()
+
+        if recent_ip_failures >= 5:
+            security_logger.warning(
+                "Security Alert: Blocked brute-force attempt from IP %s on identifier %s",
+                ip,
+                identifier,
+            )
+            return Response(
+                {
+                    "detail": "Too many failed login attempts from this connection. Please wait 15 minutes before trying again.",
+                    "locked_out": True,
+                },
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
+
+        serializer = self.get_serializer(data=request.data)
 
         try:
             serializer.is_valid(raise_exception=True)
@@ -91,6 +126,8 @@ class CustomTokenView(TokenObtainPairView):
 urlpatterns = [
     path("login/", CustomTokenView.as_view(), name="login"),
     path("register/", register_user, name="register"),
+    path("google/", google_auth_view, name="google-auth"),
+    path("google/config/", google_auth_config_view, name="google-auth-config"),
     path("refresh/", TokenRefreshView.as_view(), name="refresh"),
     path("logout/", logout_user, name="logout"),
     path("me/", MeView.as_view(), name="me"),

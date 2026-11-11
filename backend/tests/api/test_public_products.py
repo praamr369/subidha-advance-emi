@@ -81,3 +81,96 @@ class PublicProductsApiTests(APITestCase):
         sku_resp = self.client.get(f"/api/v1/public/products/{product.sku}/")
         self.assertEqual(sku_resp.status_code, status.HTTP_200_OK)
         self.assertEqual(sku_resp.data["id"], product.id)
+
+    def test_public_analytics_track_records_visitor_event(self):
+        product = self._create_uploaded_product(suffix="trk1")
+        response = self.client.post(
+            "/api/v1/public/analytics/track/",
+            {
+                "session_id": "test-session-uuid-1234",
+                "path": f"/products/{product.product_code}",
+                "event_type": "PRODUCT_VIEW",
+                "product_id": product.id,
+                "referrer": "https://google.com",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["status"], "tracked")
+
+        from crm.models import WebappVisitorEvent
+        event = WebappVisitorEvent.objects.filter(session_id="test-session-uuid-1234").first()
+        self.assertIsNotNone(event)
+        self.assertEqual(event.event_type, "PRODUCT_VIEW")
+        self.assertEqual(event.product_id, product.id)
+
+    def test_public_analytics_track_honeypot_ignored(self):
+        response = self.client.post(
+            "/api/v1/public/analytics/track/",
+            {
+                "session_id": "spambot-session",
+                "path": "/products/hack",
+                "event_type": "PAGE_VIEW",
+                "hp_field": "automated-bot-payload",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        from crm.models import WebappVisitorEvent
+        self.assertFalse(WebappVisitorEvent.objects.filter(session_id="spambot-session").exists())
+
+    def test_public_product_react_like_and_dislike(self):
+        product = self._create_uploaded_product(suffix="react1")
+
+        # Like the product
+        like_resp = self.client.post(
+            f"/api/v1/public/products/{product.id}/react/",
+            {
+                "session_id": "voter-session-001",
+                "is_like": True,
+            },
+            format="json",
+        )
+        self.assertEqual(like_resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(like_resp.data["likes_count"], 1)
+        self.assertEqual(like_resp.data["dislikes_count"], 0)
+        self.assertEqual(like_resp.data["user_reaction"], "LIKE")
+
+        # Second user dislikes the product
+        dislike_resp = self.client.post(
+            f"/api/v1/public/products/{product.id}/react/",
+            {
+                "session_id": "voter-session-002",
+                "is_like": False,
+            },
+            format="json",
+        )
+        self.assertEqual(dislike_resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(dislike_resp.data["likes_count"], 1)
+        self.assertEqual(dislike_resp.data["dislikes_count"], 1)
+        self.assertEqual(dislike_resp.data["total_reactions"], 2)
+        self.assertEqual(dislike_resp.data["like_percentage"], 50.0)
+
+        # First user changes their vote to dislike (toggle)
+        change_resp = self.client.post(
+            f"/api/v1/public/products/{product.id}/react/",
+            {
+                "session_id": "voter-session-001",
+                "is_like": False,
+            },
+            format="json",
+        )
+        self.assertEqual(change_resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(change_resp.data["likes_count"], 0)
+        self.assertEqual(change_resp.data["dislikes_count"], 2)
+        self.assertEqual(change_resp.data["user_reaction"], "DISLIKE")
+
+        # Query reactions summary
+        summary_resp = self.client.get(
+            f"/api/v1/public/products/{product.id}/reactions/?session_id=voter-session-001"
+        )
+        self.assertEqual(summary_resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(summary_resp.data["likes_count"], 0)
+        self.assertEqual(summary_resp.data["dislikes_count"], 2)
+        self.assertEqual(summary_resp.data["user_reaction"], "DISLIKE")

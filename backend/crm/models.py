@@ -2605,6 +2605,96 @@ class CRMPipeline(models.Model):
         self.save()
 
 
+class WebappVisitorEvent(CrmTimeStampedModel):
+    """
+    Tracks anonymous and registered public visits, route navigation,
+    product views, and conversion milestones (registration, enquiries).
+    """
+    class EventType(models.TextChoices):
+        PAGE_VIEW = "PAGE_VIEW", "Page View"
+        PRODUCT_VIEW = "PRODUCT_VIEW", "Product View"
+        REGISTER_PAGE_VIEW = "REGISTER_PAGE_VIEW", "Register Page View"
+        REGISTER_SUCCESS = "REGISTER_SUCCESS", "Registered Successfully"
+        LEAD_SUBMITTED = "LEAD_SUBMITTED", "Lead Submitted"
+
+    session_id = models.CharField(max_length=64, db_index=True)
+    path = models.CharField(max_length=255)
+    event_type = models.CharField(
+        max_length=40,
+        choices=EventType.choices,
+        default=EventType.PAGE_VIEW,
+        db_index=True,
+    )
+    referrer = models.CharField(max_length=255, blank=True, default="")
+    ip_address = models.CharField(max_length=45, blank=True, default="")
+    user_agent = models.TextField(blank=True, default="")
+    product = models.ForeignKey(
+        Product,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="visitor_events",
+    )
+    customer = models.ForeignKey(
+        Customer,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="visitor_events",
+    )
+    is_registered = models.BooleanField(default=False, db_index=True)
+
+    class Meta:
+        db_table = "crm_webapp_visitor_events"
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["session_id", "created_at"]),
+            models.Index(fields=["event_type", "created_at"]),
+            models.Index(fields=["product", "event_type"]),
+        ]
+
+    def __str__(self):
+        return f"{self.event_type} - {self.session_id[:8]} - {self.path}"
+
+
+class ProductReaction(CrmTimeStampedModel):
+    """
+    Public and customer reactions to products (likes / dislikes).
+    Provides feedback data on product popularity and interest for CRM.
+    """
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name="customer_reactions",
+    )
+    session_id = models.CharField(max_length=64, db_index=True)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="product_reactions",
+    )
+    is_like = models.BooleanField(
+        default=True,
+        help_text="True if liked, False if disliked",
+    )
+    ip_address = models.CharField(max_length=45, blank=True, default="")
+
+    class Meta:
+        db_table = "crm_product_reactions"
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["product", "session_id"],
+                name="unique_product_session_reaction",
+            ),
+        ]
+
+    def __str__(self):
+        sentiment = "LIKE" if self.is_like else "DISLIKE"
+        return f"{sentiment} on {self.product.name} by {self.session_id[:8]}"
+
 
 # --- Folded from subscriptions (Phase E of the split): CRM workbench items. ---
 from crm.models_workbench import *  # noqa: E402,F401,F403

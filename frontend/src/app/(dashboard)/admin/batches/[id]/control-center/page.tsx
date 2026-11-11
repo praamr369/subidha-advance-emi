@@ -207,7 +207,7 @@ export default function AdminBatchControlCenterPage() {
           : String(state?.commit_status || "absent"),
       },
       {
-        label: "Draw Status",
+        label: "Selection Status",
         value: String(state?.draw_status || "none"),
       },
     ],
@@ -248,8 +248,8 @@ export default function AdminBatchControlCenterPage() {
       setLastCommitSeed(seed);
       setActionSuccess(
         seed
-          ? "Draw commit published. Save the reveal seed securely before execution."
-          : "Draw commit already exists. State refreshed."
+          ? "Benefit selection commit published. Save the reveal seed securely before execution."
+          : "Benefit selection commit already exists. State refreshed."
       );
       await load("refresh");
     } catch (err) {
@@ -269,7 +269,7 @@ export default function AdminBatchControlCenterPage() {
         method: "POST",
         body: JSON.stringify({ revealed_seed: revealedSeed.trim() }),
       });
-      setActionSuccess("Draw execution completed or already finalized. State refreshed.");
+      setActionSuccess("Benefit selection execution completed or already finalized. State refreshed.");
       await load("refresh");
     } catch (err) {
       setActionError(toErrorMessage(err));
@@ -282,7 +282,7 @@ export default function AdminBatchControlCenterPage() {
     <ERPPageShell
       eyebrow="SFEMI"
       title={state?.batch_code || `Batch #${batchId ?? "—"} Control Center`}
-      subtitle="Lock, commit, and execute draw actions using real backend guardrails and reasons only."
+      subtitle="Lock, commit, and execute benefit selection actions using real backend guardrails and reasons only."
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
         { label: "Batches", href: "/admin/batches" },
@@ -374,7 +374,7 @@ export default function AdminBatchControlCenterPage() {
               <KpiCard label="Lock Status" value={<ERPStatusBadge status={state.lock_status || "UNKNOWN"} />} />
               <KpiCard label="Snapshot Status" value={<ERPStatusBadge status={state.snapshot_status || "ABSENT"} />} />
               <KpiCard label="Commit Status" value={<ERPStatusBadge status={state.commit_status || "ABSENT"} />} />
-              <KpiCard label="Draw Status" value={<ERPStatusBadge status={state.draw_status || "NONE"} />} />
+              <KpiCard label="Selection Status" value={<ERPStatusBadge status={state.draw_status || "NONE"} />} />
               <KpiCard
                 label="Finance Waiver Posting"
                 value={<ERPStatusBadge status={state.finance_waiver_posting_status || "UNKNOWN"} />}
@@ -422,7 +422,7 @@ export default function AdminBatchControlCenterPage() {
                 }
               />
               <WorkflowCard
-                title="Commit Draw"
+                title="Commit Benefit Selection"
                 description={reasonText(commitReasons)}
                 action={
                   <button
@@ -431,12 +431,12 @@ export default function AdminBatchControlCenterPage() {
                     onClick={() => void runCommit()}
                     className="inline-flex h-10 w-full items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {busyAction === "commit" ? "Committing..." : "Commit Draw"}
+                    {busyAction === "commit" ? "Committing..." : "Commit Benefit Selection"}
                   </button>
                 }
               />
               <WorkflowCard
-                title="Execute Draw"
+                title="Execute Benefit Selection"
                 description={reasonText(executeReasons)}
                 action={
                   <div className="space-y-3">
@@ -455,7 +455,7 @@ export default function AdminBatchControlCenterPage() {
                       onClick={() => void runExecute()}
                       className="inline-flex h-10 w-full items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      {busyAction === "execute" ? "Executing..." : "Execute Draw"}
+                      {busyAction === "execute" ? "Executing..." : "Execute Benefit Selection"}
                     </button>
                   </div>
                 }

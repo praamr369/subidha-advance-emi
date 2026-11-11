@@ -428,6 +428,7 @@ JWT_SIGNING_KEY = _get_jwt_signing_key(SECRET_KEY)
 FIELD_ENCRYPTION_KEYS = [
     k.strip() for k in (os.getenv("FIELD_ENCRYPTION_KEYS") or "").split(",") if k.strip()
 ]
+GOOGLE_CLIENT_ID = (os.getenv("GOOGLE_CLIENT_ID") or "").strip()
 ALLOWED_HOSTS = _get_allowed_hosts()
 CORS_ALLOWED_ORIGINS = _get_cors_allowed_origins()
 CSRF_TRUSTED_ORIGINS = _get_csrf_trusted_origins(CORS_ALLOWED_ORIGINS)
@@ -652,6 +653,8 @@ REST_FRAMEWORK = {
         # writes a row and lands it in a human worklist. Generous for a real
         # person filling in the form more than once; useless for flooding.
         "public_lead": os.getenv("DJANGO_THROTTLE_PUBLIC_LEAD", "20/hour"),
+        "public_analytics": os.getenv("DJANGO_THROTTLE_PUBLIC_ANALYTICS", "120/minute"),
+        "public_reaction": os.getenv("DJANGO_THROTTLE_PUBLIC_REACTION", "60/minute"),
         # Anonymous baseline.
         "anon": os.getenv("DJANGO_THROTTLE_ANON", "120/minute"),
         # Role-aware per-user baselines (generous — a cap on abuse, not normal
@@ -855,6 +858,9 @@ if CSRF_COOKIE_SAMESITE == "None" and not CSRF_COOKIE_SECURE:
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = os.getenv("SECURE_REFERRER_POLICY", "strict-origin-when-cross-origin")
 X_FRAME_OPTIONS = "DENY"
+SESSION_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = True
+SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin-allow-popups"
 
 LOG_LEVEL = _get_log_level()
 LOGGING = {

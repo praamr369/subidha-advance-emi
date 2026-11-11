@@ -788,7 +788,7 @@ export default function AdminPaymentDetailRoutePage() {
                 { label: "Receipt Status", value: statusLabel },
                 { label: "Batch", value: resolvedPayment.batch_code || "—" },
                 {
-                  label: "Lucky Number",
+                  label: "SFEMI ID",
                   value:
                     resolvedPayment.lucky_number !== null &&
                     resolvedPayment.lucky_number !== undefined
@@ -898,7 +898,7 @@ export default function AdminPaymentDetailRoutePage() {
 
               <DetailPanel
                 title="Contract Context"
-                description="Linked customer, subscription, batch, lucky, and EMI context for this payment."
+                description="Linked customer, subscription, batch, SFEMI ID, and EMI context for this payment."
               >
                 <div className="grid gap-4 sm:grid-cols-2">
                   <DetailValue
@@ -937,7 +937,7 @@ export default function AdminPaymentDetailRoutePage() {
                     value={resolvedPayment.batch_code || "—"}
                   />
                   <DetailValue
-                    label="Lucky Number"
+                    label="SFEMI ID"
                     value={
                       resolvedPayment.lucky_number !== null &&
                       resolvedPayment.lucky_number !== undefined

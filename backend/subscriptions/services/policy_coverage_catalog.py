@@ -55,7 +55,7 @@ This policy applies to Subidha Furniture operations, website workflows, staff ac
 Seeded policies remain DRAFT. Draft text must be reviewed by management/legal/admin control before it is relied upon operationally.
 
 ## 4. Operational rule
-No payment, receipt, subscription, accounting, reconciliation, inventory, delivery, rent/lease, deposit, commission, payout, amendment, Lucky ID, or batch record is changed by this policy template.
+No payment, receipt, subscription, accounting, reconciliation, inventory, delivery, rent/lease, deposit, commission, payout, amendment, SFEMI ID, or batch record is changed by this policy template.
 
 ## 5. Review
 The policy owner must review this template, adapt it to the approved business process, and publish or approve it only through the Policy Governance workflow.
@@ -65,7 +65,7 @@ The policy owner must review this template, adapt it to the approved business pr
 EXISTING_BASE_POLICY_SPECS: tuple[RequiredPolicySpec, ...] = (
     RequiredPolicySpec("terms", "Terms and Conditions", "Public Legal", "GENERAL", "GENERAL", PUBLIC, "General customer-facing website and business terms.", "Defines customer website, direct sale, EMI, rent/lease, payment, delivery, service, and account responsibilities.", content="""# Terms and Conditions
 
-These Terms and Conditions govern your use of [BUSINESS_NAME]'s website, showroom, and all business transactions including direct sale, Lucky Plan EMI subscription, rent/lease, and service arrangements.
+These Terms and Conditions govern your use of [BUSINESS_NAME]'s website, showroom, and all business transactions including direct sale, SFEMI Advance EMI subscription, rent/lease, and service arrangements.
 
 ## 1. Who we are
 
@@ -75,7 +75,7 @@ These Terms and Conditions govern your use of [BUSINESS_NAME]'s website, showroo
 
 We offer:
 - **Direct sale** of furniture products with immediate ownership transfer
-- **Lucky Plan EMI subscription** — a monthly instalment plan with an embedded Lucky Draw for EMI waiver
+- **SFEMI Advance EMI subscription** — a monthly instalment plan with an embedded monthly promotional benefit for EMI waiver
 - **Rent/lease** of furniture assets on monthly terms with security deposit
 - **Service and repair** for products sold or rented through us
 
@@ -149,7 +149,7 @@ We may collect:
 
 We process personal data for:
 - Completing purchases, contracts, and deliveries
-- Lucky Plan EMI subscription management and draw administration
+- SFEMI Advance EMI subscription management and promotional benefit administration
 - Rent/lease onboarding, asset tracking, and closure
 - Payment processing and receipt generation
 - KYC verification and fraud prevention
@@ -212,7 +212,7 @@ Address: [BUSINESS_NAME], [CITY], [STATE]
 We will respond to data requests within 30 days. Unresolved complaints may be escalated to the Data Protection Board of India as established under DPDP 2023."""),
     RequiredPolicySpec("refund-cancellation", "Refund and Cancellation Policy", "Customer Operations", "REFUND", "REFUND", PUBLIC, "Refund, return, cancellation, and reversal policy.", "Explains cancellation, refund, return, and reversal rules for direct sale, EMI, rent/lease, and service transactions.", content="""# Refund and Cancellation Policy
 
-This policy explains your rights and our procedures for returns, refunds, and cancellations for direct sale, Lucky Plan EMI subscriptions, rent/lease, and service transactions.
+This policy explains your rights and our procedures for returns, refunds, and cancellations for direct sale, SFEMI Advance EMI subscriptions, rent/lease, and service transactions.
 
 ## 1. Direct sale — return window
 
@@ -228,11 +228,11 @@ No refund is issued for:
 - Products with missing parts, altered serial numbers, or evidence of misuse
 - Change of mind after 7 days from delivery
 
-## 3. Lucky Plan EMI subscription — cancellation
+## 3. SFEMI Advance EMI subscription — cancellation
 
 - Customers may request cancellation in writing before delivery/possession.
 - After delivery/possession: cancellation is subject to review of payments made, asset condition, and contract terms.
-- Future EMI waiver from a lucky draw is forfeited on cancellation.
+- Future EMI waiver from a promotional benefit selection is forfeited on cancellation.
 - Advance payments or deposits may be refunded after deductions per the contract and Security Deposit Policy.
 
 ## 4. Rent/lease — closure and deposit refund
@@ -267,7 +267,7 @@ Include your subscription/order number, reason, and any supporting evidence.
 Nothing in this policy limits your statutory rights under the Consumer Protection Act 2019. If you believe your statutory rights have been violated, you may raise a complaint with the District Consumer Disputes Redressal Commission."""),
     RequiredPolicySpec("delivery-policy", "Delivery Policy", "Service / Delivery / Warranty", "DELIVERY", "DELIVERY", PUBLIC, "Delivery eligibility, scheduling, handover, and failure handling.", "Defines delivery scheduling, product handover, customer acknowledgement, and delivery exception handling.", content="""# Delivery Policy
 
-This policy governs the delivery of furniture products purchased through direct sale, Lucky Plan EMI subscriptions, or rent/lease arrangements.
+This policy governs the delivery of furniture products purchased through direct sale, SFEMI Advance EMI subscriptions, or rent/lease arrangements.
 
 ## 1. Delivery eligibility
 
@@ -498,11 +498,11 @@ Keep all receipts. Receipts are required for refund, dispute, warranty, and serv
 
 ## 4. EMI payment schedule
 
-For Lucky Plan EMI subscriptions:
+For SFEMI Advance EMI subscriptions:
 - EMI is due on the date specified in your subscription schedule
 - Reminders may be sent by SMS, WhatsApp, or phone before the due date
 - Failure to receive a reminder does not remove your payment obligation
-- Late payment may affect draw eligibility and trigger action under the EMI Subscription Default Policy
+- Late payment may affect promotional benefit eligibility and trigger action under the EMI Subscription Default Policy
 
 ## 5. Failed or unverified payments
 
@@ -541,7 +541,7 @@ This policy applies to retail and direct-sale purchases of furniture products fr
 
 ## 1. What is a direct sale
 
-A direct sale is a purchase where full payment (or approved advance plus balance on delivery) transfers ownership of the product to the customer immediately or on confirmed delivery. It is distinct from Lucky Plan EMI subscription or rent/lease arrangements.
+A direct sale is a purchase where full payment (or approved advance plus balance on delivery) transfers ownership of the product to the customer immediately or on confirmed delivery. It is distinct from SFEMI Advance EMI subscription or rent/lease arrangements.
 
 ## 2. Quotation and pricing
 
@@ -604,83 +604,83 @@ Customers are responsible for:
 ## 10. Limitation
 
 We are a small business. We do our best to resolve customer concerns promptly and fairly. For any concern, contact our support team before escalating externally."""),
-    RequiredPolicySpec("lucky-plan-policy", "Lucky Plan Policy", "Lucky Plan / EMI", "LUCKY_PLAN", "LUCKY_PLAN", PUBLIC, "Lucky Plan EMI customer terms.", "Defines Lucky Plan EMI enrollment, Lucky IDs, winner waiver, payment duties, and customer terms.", content="""# Lucky Plan Policy
+    RequiredPolicySpec("lucky-plan-policy", "SFEMI Advance EMI Policy", "SFEMI / EMI", "LUCKY_PLAN", "LUCKY_PLAN", PUBLIC, "SFEMI Advance EMI customer terms.", "Defines SFEMI Advance EMI enrollment, SFEMI IDs, recipient waiver, payment duties, and customer terms.", content="""# SFEMI Advance EMI Policy
 
-The Lucky Plan is [BUSINESS_NAME]'s EMI subscription scheme where customers pay monthly instalments and participate in a monthly lucky draw for an EMI waiver benefit.
+The SFEMI scheme is [BUSINESS_NAME]'s EMI subscription scheme where customers pay monthly instalments and participate in a monthly promotional benefit selection for an EMI waiver benefit.
 
-## 1. What is the Lucky Plan
+## 1. What is SFEMI Advance EMI
 
-The Lucky Plan allows you to:
+The SFEMI Advance EMI plan allows you to:
 - Take furniture on a monthly instalment (EMI) plan
-- Receive a unique Lucky ID for each EMI batch
-- Participate in a monthly draw where the winner's remaining future EMIs are waived
+- Receive a unique SFEMI ID for each EMI batch
+- Participate in a monthly promotional benefit selection where the recipient's remaining future EMIs are waived
 
-The Lucky Plan is a subscription product offered by [BUSINESS_NAME]. It is not a lottery, gambling scheme, or prize draw under the Prize Chits and Money Circulation Schemes (Banning) Act 1978. The Lucky Plan is structured as a lawful EMI subscription with an embedded waiver incentive, reviewed under applicable Indian commercial law.
+SFEMI is a subscription product offered by [BUSINESS_NAME]. It is not a lottery, gambling scheme, or prize draw under the Prize Chits and Money Circulation Schemes (Banning) Act 1978. SFEMI is structured as a lawful EMI subscription with an embedded waiver incentive, reviewed under applicable Indian commercial law.
 
 ## 2. Enrollment
 
-Enrollment in the Lucky Plan requires:
+Enrollment in SFEMI Advance EMI requires:
 - Completion of customer registration and KYC
-- Execution of a Lucky Plan subscription contract specifying the product, tenure, EMI amount, and batch
+- Execution of an SFEMI subscription contract specifying the product, tenure, EMI amount, and batch
 - Payment of the first EMI (and any advance/security, if applicable)
 - Delivery or possession of the subscribed product
 
 You are not enrolled until the contract is executed, first payment is confirmed, and the subscription is activated in our system.
 
-## 3. Lucky IDs
+## 3. SFEMI IDs
 
-- You receive one Lucky ID per batch on enrollment
-- Lucky IDs are unique, assigned by our system, and cannot be transferred
-- Your Lucky ID is displayed in your customer portal account
+- You receive one SFEMI ID per batch on enrollment
+- SFEMI IDs are unique, assigned by our system, and cannot be transferred
+- Your SFEMI ID is displayed in your customer portal account
 
 ## 4. Monthly EMI obligation
 
 - EMI is due each month on the date stated in your subscription schedule
-- Timely payment maintains your draw eligibility and subscription status
-- Late or missed EMI may result in reminders, draw eligibility review, or action under the EMI Subscription Default Policy
+- Timely payment maintains your promotional benefit eligibility and subscription status
+- Late or missed EMI may result in reminders, benefit eligibility review, or action under the EMI Subscription Default Policy
 
-## 5. The Lucky Draw
+## 5. The SFEMI Monthly Promotional Benefit
 
-- One Lucky ID per batch is drawn each month (one winner per batch)
-- The draw uses a cryptographic or audited random method as specified in the draw rulebook
-- Draw results are recorded and published through the policy governance system
-- The winner's remaining, unpaid future EMIs are waived — this is the EMI Waiver benefit
+- One SFEMI ID per batch is selected each month (one recipient per batch)
+- The selection uses a cryptographic or audited random method as specified in the rulebook
+- Benefit results are recorded and published through the policy governance system
+- The recipient's remaining, unpaid future EMIs are waived — this is the EMI Waiver benefit
 - **No cash prize is paid**. The waiver is a credit against future EMI obligations only
 
-## 6. Draw odds
+## 6. Selection odds
 
-Draw odds are determined by the number of eligible participants at the time of draw. Odds do not change as the draw date approaches. One winner is drawn per batch regardless of batch size.
+Selection odds are determined by the number of eligible participants at the time of selection. Odds do not change as the selection date approaches. One recipient is selected per batch regardless of batch size.
 
-## 7. Winner benefit and settlement
+## 7. Recipient benefit and settlement
 
-- The winning customer is notified through registered contact details
-- The future EMI waiver is applied within 7 working days of draw confirmation
-- The winner must sign/confirm waiver settlement documents as required
+- The recipient customer is notified through registered contact details
+- The future EMI waiver is applied within 7 working days of benefit confirmation
+- The recipient must sign/confirm waiver settlement documents as required
 - The waiver applies only to future unpaid EMIs in the current subscription batch
 
 ## 8. Eligibility conditions
 
-Your Lucky ID is eligible for a draw if:
+Your SFEMI ID is eligible for a benefit selection if:
 - Your subscription is active
-- All due EMIs up to the draw date are paid and confirmed
-- No cancellation, suspension, or default is in effect at draw time
+- All due EMIs up to the selection date are paid and confirmed
+- No cancellation, suspension, or default is in effect at selection time
 
-Late or disputed payments may render your Lucky ID ineligible for that month's draw.
+Late or disputed payments may render your SFEMI ID ineligible for that month's benefit selection.
 
 ## 9. Cancellation and early closure
 
 - Cancellation before possession: advances may be refunded per the Refund and Cancellation Policy
 - Cancellation after possession: subject to review of payments made, asset condition, and contract settlement
-- On cancellation, any future draw eligibility and waiver entitlement is forfeited
-- Winner status from a previous draw is not affected by later cancellation
+- On cancellation, any future benefit eligibility and waiver entitlement is forfeited
+- Recipient status from a previous selection is not affected by later cancellation
 
 ## 10. Transparency
 
-We publish draw results including Lucky ID, batch, date, and draw method record. Customer name and personal details are not published without consent. Audit records of draws, waivers, and settlements are maintained.
+We publish benefit results including SFEMI ID, batch, date, and verification record. Customer name and personal details are not published without consent. Audit records of selections, waivers, and settlements are maintained.
 
 ## 11. Disputes
 
-Draw disputes must be raised within 7 days of the draw result publication with your Lucky ID, subscription number, payment proof, and reason. We will review audit records and provide a written response."""),
+Disputes must be raised within 7 days of the benefit result publication with your SFEMI ID, subscription number, payment proof, and reason. We will review audit records and provide a written response."""),
     RequiredPolicySpec("rental-lease-policy", "Rental and Lease Policy", "Rent / Lease / Deposit", "RENT_LEASE", "RENT_LEASE", PUBLIC, "Rent/lease contract and asset use terms.", "Defines rent/lease onboarding, monthly demand, possession, use, return, and closure duties.", content="""# Rental and Lease Policy
 
 This policy governs the rent/lease of furniture products through [BUSINESS_NAME]. Under a rent/lease arrangement, you have use of the product for the agreed period; ownership remains with [BUSINESS_NAME].
@@ -1002,7 +1002,7 @@ This policy explains how Subidha Furniture handles customer enquiries, website c
 
 - Product enquiries (availability, specification, pricing)
 - Quotation requests
-- Lucky Plan EMI subscription enquiries
+- SFEMI Advance EMI subscription enquiries
 - Rent/lease enquiries
 - Delivery enquiries
 - Service and repair requests
@@ -1155,7 +1155,7 @@ Hosting, analytics, payment, email, WhatsApp, or security providers may process 
 Tracking practices may change as website features grow. Policy updates will be published through Policy Governance."""),
     RequiredPolicySpec("kyc-identity-verification", "KYC and Identity Verification Policy", "Customer Operations", "KYC", "COMPLIANCE", PUBLIC, "KYC, identity, address proof, and customer verification.", "Defines identity/address verification for EMI, rent/lease, delivery, refund, and account safety.", content="""# KYC and Identity Verification Policy
 
-KYC may be required for Lucky Plan EMI, rent/lease, high-value delivery, refund, dispute review, account recovery, partner onboarding, or fraud prevention.
+KYC may be required for SFEMI Advance EMI, rent/lease, high-value delivery, refund, dispute review, account recovery, partner onboarding, or fraud prevention.
 
 ## 1. Required information
 
@@ -1207,9 +1207,9 @@ Customers may request to stop promotional messages. Transactional and legally ne
 ## 6. Misuse reporting
 
 Report fake payment demands or suspicious messages immediately at **[BUSINESS_PHONE]**."""),
-    RequiredPolicySpec("emi-subscription-default-policy", "EMI Subscription Default Policy", "Lucky Plan / EMI", "EMI_DEFAULT", "LUCKY_PLAN", PUBLIC, "Overdue EMI, reminders, default handling, and cancellation consequences.", "Defines overdue EMI treatment, reminders, default posture, cancellation consequences, and support escalation.", content="""# EMI Subscription Default Policy
+    RequiredPolicySpec("emi-subscription-default-policy", "EMI Subscription Default Policy", "SFEMI / EMI", "EMI_DEFAULT", "LUCKY_PLAN", PUBLIC, "Overdue EMI, reminders, default handling, and cancellation consequences.", "Defines overdue EMI treatment, reminders, default posture, cancellation consequences, and support escalation.", content="""# EMI Subscription Default Policy
 
-This policy applies when Lucky Plan EMI or subscription payments are late, unpaid, disputed, reversed, or under review.
+This policy applies when SFEMI Advance EMI or subscription payments are late, unpaid, disputed, reversed, or under review.
 
 ## 1. Due date responsibility
 
@@ -1217,7 +1217,7 @@ Customers must pay EMI by the due date stated in schedule/contract. Reminder fai
 
 ## 2. Overdue handling
 
-Overdue EMI may trigger reminders, late review, delivery hold, service hold, draw eligibility review, cancellation review, or recovery action.
+Overdue EMI may trigger reminders, late review, delivery hold, service hold, benefit eligibility review, cancellation review, or recovery action.
 
 ## 3. Part payment
 
@@ -1234,33 +1234,33 @@ Repeated default, non-response, false proof, or contract breach may lead to canc
 ## 6. Audit
 
 EMI status, waiver status, payment status, cancellation, and settlement records remain auditable and cannot be silently changed."""),
-    RequiredPolicySpec("lucky-draw-rules-fairness", "Lucky Draw Rules and Fairness Policy", "Lucky Plan / EMI", "LUCKY_DRAW", "LUCKY_PLAN", PUBLIC, "Draw source, last-two-digit rule, winner waiver, and dispute handling.", "Explains draw source, last-two-digit winner rule, future EMI waiver, dispute handling, and no retroactive manipulation.", content="""# Lucky Draw Rules and Fairness Policy
+    RequiredPolicySpec("lucky-draw-rules-fairness", "SFEMI Promotional Benefit Selection & Fairness Policy", "SFEMI / EMI", "LUCKY_DRAW", "LUCKY_PLAN", PUBLIC, "Selection method, recipient waiver, and dispute handling.", "Explains selection method, recipient waiver rule, future EMI waiver, dispute handling, and no retroactive manipulation.", content="""# SFEMI Promotional Benefit Selection & Fairness Policy
 
-This policy explains the fairness principles for Lucky Plan draw records.
+This policy explains the fairness principles for SFEMI promotional benefit records.
 
-## 1. Draw source
+## 1. Selection method
 
-The draw source, date, time, last-two-digit rule, hash proof, or other approved method must be recorded before/during draw as per rulebook.
+The selection source, date, time, cryptographic seed, hash proof, or other approved method must be recorded before/during execution as per rulebook.
 
 ## 2. Eligibility
 
-Eligibility depends on batch, Lucky ID assignment, subscription status, payment status, and rulebook conditions.
+Eligibility depends on batch, SFEMI ID assignment, subscription status, payment status, and rulebook conditions.
 
-## 3. Winner benefit
+## 3. Recipient benefit
 
-The winner receives waiver of future unpaid EMIs only. The winner does not receive a cash prize unless a separate written policy/contract states so.
+The recipient receives waiver of future unpaid EMIs only. The recipient does not receive a cash prize unless a separate written policy/contract states so.
 
 ## 4. No manipulation
 
-After draw commitment/publication, source data, winner result, Lucky ID, and waiver settlement must not be changed for convenience.
+After selection commitment/publication, source data, recipient result, SFEMI ID, and waiver settlement must not be changed for convenience.
 
 ## 5. Dispute
 
-Draw disputes must be raised with batch ID, Lucky ID, subscription details, payment proof, and reason. Audit records will be reviewed.
+Disputes must be raised with batch ID, SFEMI ID, subscription details, payment proof, and reason. Audit records will be reviewed.
 
 ## 6. Transparency
 
-Published winner records should explain enough information for customer trust without exposing private customer data."""),
+Published recipient records should explain enough information for customer trust without exposing private customer data."""),
     RequiredPolicySpec("security-deposit-policy", "Security Deposit Policy", "Rent / Lease / Deposit", "SECURITY_DEPOSIT", "RENT_LEASE", PUBLIC, "Rent/lease deposit collection, liability, deduction, and refund.", "Defines security deposit collection, liability accounting, deduction evidence, return inspection, and refund rules.", content="""# Security Deposit Policy
 
 Security deposit is collected for rent/lease risk protection and is separate from monthly rent unless contract states otherwise.
@@ -1452,7 +1452,7 @@ Each journal must show source model, source ID, event, amount, operator/system, 
 
 ## 6. Future compatibility
 
-Rules apply to Lucky Plan, direct sale, rent, lease, manufacturing, vendor purchase, and future commerce expansion."""),
+Rules apply to SFEMI Advance EMI, direct sale, rent, lease, manufacturing, vendor purchase, and future commerce expansion."""),
     RequiredPolicySpec("reconciliation-policy", "Reconciliation Policy", "Finance / Accounting Controls", "RECONCILIATION", "COMPLIANCE", INTERNAL, "Unmatched receipts, settlement matching, and reconciliation evidence.", "Defines reconciliation evidence, unmatched item review, settlement matching, and closure rules.", requires_admin_acceptance=True, content="""# Reconciliation Policy
 
 Internal policy for matching payment records with cash, bank, UPI, settlement, receipt, invoice, and accounting records.
@@ -1675,7 +1675,7 @@ Internal policy for audit trail protection.
 
 ## 1. Protected records
 
-Payments, EMIs, waivers, lucky draws, subscriptions, receipts, invoices, journals, stock ledger, deposits, refunds, commissions, payouts, reconciliations, and user access logs are protected.
+Payments, EMIs, waivers, promotional benefits, subscriptions, receipts, invoices, journals, stock ledger, deposits, refunds, commissions, payouts, reconciliations, and user access logs are protected.
 
 ## 2. No silent deletion
 
@@ -1778,7 +1778,7 @@ def coverage_groups() -> list[str]:
     order = [
         "Public Legal",
         "Customer Operations",
-        "Lucky Plan / EMI",
+        "SFEMI / EMI",
         "Rent / Lease / Deposit",
         "Service / Delivery / Warranty",
         "Privacy / Data",

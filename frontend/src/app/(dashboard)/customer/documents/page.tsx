@@ -99,7 +99,7 @@ export default function CustomerDocumentsPage() {
       {!loading && !error && visible.length === 0 ? (
         <ERPEmptyState
           title="No documents yet"
-          description={tab === "DRAW_CERTIFICATE" ? "Certificates appear here when you win a Lucky Draw." : "Documents will appear here once your subscription is active."}
+          description={tab === "DRAW_CERTIFICATE" ? "Certificates appear here when you receive an SFEMI promotional benefit." : "Documents will appear here once your subscription is active."}
         />
       ) : null}
 

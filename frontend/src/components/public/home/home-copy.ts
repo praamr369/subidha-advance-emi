@@ -125,7 +125,7 @@ export type HomeCopy = {
 
 const en: HomeCopy = {
   hero: {
-    promises: ["A receipt for every payment", "Draw results you can verify", "Rules published before you join"],
+    promises: ["A receipt for every payment", "Benefit results you can verify", "Rules published before you join"],
     figures: { seats: "SFEMI seats open", members: "Active SFEMI members", winners: "SFEMI benefits published" },
     explore: "Explore products",
     compare: "Compare plans",
@@ -154,7 +154,7 @@ const en: HomeCopy = {
     items: {
       luckyPlan: {
         name: "SFEMI · Advance EMI",
-        pitch: "Own your furniture through fixed monthly instalments, with a monthly draw that can waive your remaining EMIs.",
+        pitch: "Own your furniture through fixed monthly instalments, with monthly promotional benefit opportunities that can waive your remaining EMIs.",
         points: [
           "Monthly EMI is the plan value divided by the tenure, fixed before you join",
           "Join an approved batch and receive an SFEMI ID (00–99) for the promotional benefit process",
@@ -241,12 +241,12 @@ const en: HomeCopy = {
     eyebrow: "Bulletin board",
     title: "Results, live figures and notices",
     description:
-      "Live figures come straight from our records and refresh every minute. A draw result appears only after the draw is revealed.",
+      "Live figures come straight from our records and refresh every minute. A benefit result appears only after the selection is revealed.",
     kinds: { live: "Live", rule: "Rule", policy: "Policy", visit: "Visit" },
     latestResult: "Latest SFEMI benefit record",
     luckyId: "SFEMI ID",
     batch: (name) => `Batch ${name}`,
-    drawMonth: (month) => `Draw month ${month}`,
+    drawMonth: (month) => `Selection month ${month}`,
     product: "Product",
     emisWaived: "EMIs waived",
     asPerRulebook: "As per rulebook",
@@ -260,11 +260,11 @@ const en: HomeCopy = {
       committed: "Committed",
     },
     commitHash: "Commit hash",
-    verifyDraw: "Verify this draw",
+    verifyDraw: "Verify this selection",
     winnerHistory: "SFEMI benefit history",
-    emptyTitle: "No draw result published yet",
+    emptyTitle: "No benefit result published yet",
     emptyBody: "SFEMI benefit records appear here only after they are verified. We never show placeholder records.",
-    howDrawsWork: "How draws work",
+    howDrawsWork: "How selections work",
     seats: {
       title: (open) => `${open} SFEMI seats open`,
       body: (taken, capacity, batches) => `${taken} of ${capacity} seats are taken across ${batches} published batches.`,
@@ -322,7 +322,7 @@ const en: HomeCopy = {
     statement:
       "Every family deserves a well-furnished home — paid for in comfortable steps, recorded honestly and delivered with care.",
     about:
-      "Subidha Furniture is an Asansol showroom building a more transparent way to furnish a home. Informal instalment notebooks can be lost, altered or disputed. We replace them with a system you can see and verify: clear prices, published rules, receipted payments and draws anyone can check.",
+      "Subidha Furniture is an Asansol showroom building a more transparent way to furnish a home. Informal instalment notebooks can be lost, altered or disputed. We replace them with a system you can see and verify: clear prices, published rules, receipted payments and benefit selections anyone can check.",
     strategyEyebrow: "Our strategy",
     strategyTitle: "Four ideas behind how we do business",
     pillars: [
@@ -332,7 +332,7 @@ const en: HomeCopy = {
       },
       {
         title: "Transparency by design",
-        body: "Plan rules, policies and draw results are published. Each draw is committed with a hash before it happens, so a result cannot be changed afterwards.",
+        body: "Plan rules, policies and selection results are published. Each selection cycle is committed with a hash before it happens, so a result cannot be changed afterwards.",
       },
       {
         title: "Showroom trust, digital records",
@@ -347,8 +347,8 @@ const en: HomeCopy = {
     commitments: [
       "Prices and monthly amounts shown before you enrol",
       "A receipt for every rupee collected",
-      "Draw proofs published for anyone to check",
-      "Winners shown with masked names to protect privacy",
+      "Benefit selection proofs published for anyone to check",
+      "Beneficiaries shown with masked names to protect privacy",
       "Documented delivery, handover and returns",
       "A grievance desk with tracked resolution",
     ],
@@ -376,8 +376,8 @@ const en: HomeCopy = {
 
 const hi: HomeCopy = {
   hero: {
-    promises: ["हर भुगतान की रसीद", "ड्रॉ के नतीजे जिन्हें आप जाँच सकें", "जुड़ने से पहले नियम प्रकाशित"],
-    figures: { seats: "लकी प्लान सीटें खाली", members: "सक्रिय प्लान सदस्य", winners: "प्रकाशित विजेता" },
+    promises: ["हर भुगतान की रसीद", "चयन परिणाम जिन्हें आप जाँच सकें", "जुड़ने से पहले नियम प्रकाशित"],
+    figures: { seats: "SFEMI सीटें खाली", members: "सक्रिय प्लान सदस्य", winners: "प्रकाशित लाभार्थी" },
     explore: "उत्पाद देखें",
     compare: "प्लान की तुलना करें",
     apply: "आवेदन / पूछताछ",
@@ -494,10 +494,10 @@ const hi: HomeCopy = {
     description:
       "लाइव आँकड़े सीधे हमारे रिकॉर्ड से आते हैं और हर मिनट अपडेट होते हैं। ड्रॉ का नतीजा ड्रॉ खुलने के बाद ही दिखता है।",
     kinds: { live: "लाइव", rule: "नियम", policy: "नीति", visit: "विज़िट" },
-    latestResult: "नवीनतम ड्रॉ परिणाम",
-    luckyId: "लकी ID",
+    latestResult: "नवीनतम प्रमोशनल लाभ परिणाम",
+    luckyId: "SFEMI ID",
     batch: (name) => `बैच ${name}`,
-    drawMonth: (month) => `ड्रॉ माह ${month}`,
+    drawMonth: (month) => `लाभ माह ${month}`,
     product: "उत्पाद",
     emisWaived: "माफ़ EMI",
     asPerRulebook: "नियम-पुस्तिका के अनुसार",
@@ -511,18 +511,18 @@ const hi: HomeCopy = {
       committed: "कमिट किया गया",
     },
     commitHash: "कमिट हैश",
-    verifyDraw: "यह ड्रॉ जाँचें",
-    winnerHistory: "विजेता इतिहास",
-    emptyTitle: "अभी कोई ड्रॉ परिणाम प्रकाशित नहीं",
-    emptyBody: "ड्रॉ खुलते ही पहला परिणाम यहाँ दिखेगा। हम कभी नकली विजेता नहीं दिखाते।",
-    howDrawsWork: "ड्रॉ कैसे होता है",
+    verifyDraw: "यह चयन जाँचें",
+    winnerHistory: "लाभार्थी इतिहास",
+    emptyTitle: "अभी कोई लाभ परिणाम प्रकाशित नहीं",
+    emptyBody: "चयन सत्यापित होने पर परिणाम यहाँ दिखेगा। हम कभी नकली रिकॉर्ड नहीं दिखाते।",
+    howDrawsWork: "चयन प्रक्रिया कैसे होती है",
     seats: {
-      title: (open) => `${open} लकी प्लान सीटें खाली`,
+      title: (open) => `${open} SFEMI सीटें खाली`,
       body: (taken, capacity, batches) => `${batches} प्रकाशित बैचों में ${capacity} में से ${taken} सीटें भर चुकी हैं।`,
       cta: "बैच में शामिल हों",
     },
     members: {
-      title: (active) => `${active} सक्रिय लकी प्लान सदस्य`,
+      title: (active) => `${active} सक्रिय SFEMI सदस्य`,
       body: (rent, lease) => `साथ ही आज ${rent} किराया और ${lease} लीज़ अनुबंध चल रहे हैं।`,
       cta: "लकी प्लान कैसे काम करता है",
     },
@@ -657,8 +657,8 @@ const hi: HomeCopy = {
 
 const bn: HomeCopy = {
   hero: {
-    promises: ["প্রতিটি পেমেন্টের রসিদ", "যাচাইযোগ্য ড্রয়ের ফলাফল", "যোগ দেওয়ার আগেই নিয়ম প্রকাশিত"],
-    figures: { seats: "লাকি প্ল্যানের খালি আসন", members: "সক্রিয় প্ল্যান সদস্য", winners: "প্রকাশিত বিজয়ী" },
+    promises: ["প্রতিটি পেমেন্টের রসিদ", "যাচাইযোগ্য সুবিধার ফলাফল", "যোগ দেওয়ার আগেই নিয়ম প্রকাশিত"],
+    figures: { seats: "SFEMI খালি আসন", members: "সক্রিয় প্ল্যান সদস্য", winners: "প্রকাশিত সুবিধাভোগী" },
     explore: "পণ্য দেখুন",
     compare: "প্ল্যান তুলনা করুন",
     apply: "আবেদন / জিজ্ঞাসা",
@@ -775,10 +775,10 @@ const bn: HomeCopy = {
     description:
       "লাইভ সংখ্যাগুলি সরাসরি আমাদের রেকর্ড থেকে আসে এবং প্রতি মিনিটে হালনাগাদ হয়। ড্রয়ের ফলাফল দেখা যায় শুধু ড্রয় প্রকাশের পরেই।",
     kinds: { live: "লাইভ", rule: "নিয়ম", policy: "নীতি", visit: "ভিজিট" },
-    latestResult: "সর্বশেষ ড্রয়ের ফলাফল",
-    luckyId: "লাকি ID",
+    latestResult: "সর্বশেষ প্রমোশনাল সুবিধার ফলাফল",
+    luckyId: "SFEMI ID",
     batch: (name) => `ব্যাচ ${name}`,
-    drawMonth: (month) => `ড্রয় মাস ${month}`,
+    drawMonth: (month) => `সুবিধা মাস ${month}`,
     product: "পণ্য",
     emisWaived: "মকুব হওয়া EMI",
     asPerRulebook: "নিয়মপুস্তিকা অনুযায়ী",
@@ -792,13 +792,13 @@ const bn: HomeCopy = {
       committed: "কমিট করা",
     },
     commitHash: "কমিট হ্যাশ",
-    verifyDraw: "এই ড্রয় যাচাই করুন",
-    winnerHistory: "বিজয়ীদের ইতিহাস",
-    emptyTitle: "এখনও কোনো ড্রয়ের ফলাফল প্রকাশিত হয়নি",
-    emptyBody: "ড্রয় প্রকাশ হলেই প্রথম ফলাফল এখানে দেখা যাবে। আমরা কখনও বানানো বিজয়ী দেখাই না।",
-    howDrawsWork: "ড্রয় কীভাবে হয়",
+    verifyDraw: "এই নির্বাচন যাচাই করুন",
+    winnerHistory: "সুবিধাভোগীদের ইতিহাস",
+    emptyTitle: "এখনও কোনো সুবিধার ফলাফল প্রকাশিত হয়নি",
+    emptyBody: "নির্বাচন যাচাই হলেই প্রথম ফলাফল এখানে দেখা যাবে। আমরা কখনও বানানো রেকর্ড দেখাই না।",
+    howDrawsWork: "নির্বাচন কীভাবে হয়",
     seats: {
-      title: (open) => `লাকি প্ল্যানে ${open}টি আসন খালি`,
+      title: (open) => `SFEMI-তে ${open}টি আসন খালি`,
       body: (taken, capacity, batches) => `${batches}টি প্রকাশিত ব্যাচে ${capacity}টির মধ্যে ${taken}টি আসন ভর্তি।`,
       cta: "ব্যাচে যোগ দিন",
     },

@@ -200,13 +200,27 @@ class CustomTokenSerializer(TokenObtainPairSerializer):
         )
         identifier = self._normalize_identifier(str(raw_identifier))
 
-        lockout_key = f"login_attempts:{identifier}" if identifier else None
+        request = self.context.get("request")
+        ip = ""
+        if request:
+            x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
+            if x_forwarded_for:
+                ip = x_forwarded_for.split(",")[0].strip()
+            else:
+                ip = request.META.get("REMOTE_ADDR", "")
+
+        # Key lockout by IP and identifier to prevent DoS attacks on genuine accounts
+        lockout_key = (
+            f"login_attempts:{ip}:{identifier}"
+            if (ip and identifier)
+            else (f"login_attempts:{identifier}" if identifier else None)
+        )
         if lockout_key:
             attempts = cache.get(lockout_key, 0)
             if attempts >= LOGIN_MAX_ATTEMPTS:
                 security_logger.warning(
                     "auth.login_locked_out",
-                    extra={"identifier": identifier, "attempts": attempts},
+                    extra={"identifier": identifier, "ip": ip, "attempts": attempts},
                 )
                 raise AuthenticationFailed(
                     "Too many failed login attempts. Please try again in 15 minutes."

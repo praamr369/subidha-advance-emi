@@ -31,7 +31,7 @@ export default function WaiverSettlementsPage() {
   return (
     <ERPPageShell
       title="EMI Waiver Settlements"
-      subtitle="CTRL-LP-3 — Waiver settlement records for lucky-plan draw winners"
+      subtitle="CTRL-LP-3 — Waiver settlement records for SFEMI benefit beneficiaries"
       stats={kpis}
     >
       {totalWaived > 0 && (

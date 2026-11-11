@@ -147,7 +147,7 @@ export default function AdminAccountingFinanceAccountsPage() {
   }
 
   async function applyDefaults() {
-    const ok = window.confirm("Apply system-recommended accounting defaults for missing COA / finance setup? This does not post payments, receipts, journals, settlements, reconciliation, EMI, lucky draw, commission, payout, delivery, or stock records.");
+    const ok = window.confirm("Apply system-recommended accounting defaults for missing COA / finance setup? This does not post payments, receipts, journals, settlements, reconciliation, EMI, promotional benefit, commission, payout, delivery, or stock records.");
     if (!ok) return;
     setSaving(true);
     try {

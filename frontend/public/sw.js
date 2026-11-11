@@ -1,29 +1,34 @@
-// SUBIDHA CORE — Lightweight Service Worker
-// Enhances Asansol store offline counter resilience without interfering with financial mutations.
-const CACHE_NAME = "subidha-core-v2";
+// SUBIDHA CORE — Enterprise Offline Service Worker (v3.1)
+// Full offline counter resilience for Asansol showroom with zero interference to financial invariants.
+
+const STATIC_CACHE_NAME = "subidha-core-static-v3";
+const PAGES_CACHE_NAME = "subidha-core-pages-v3";
+const API_CACHE_NAME = "subidha-core-api-v3";
+
 const STATIC_ASSETS = [
   "/brand/logo.png",
-  "/manifest.webmanifest",
   "/favicon.ico",
+  "/manifest.webmanifest",
 ];
 
 // Install: Cache critical static assets
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
+    caches.open(STATIC_CACHE_NAME).then((cache) => {
       return cache.addAll(STATIC_ASSETS).catch(() => {});
     })
   );
   self.skipWaiting();
 });
 
-// Activate: Prune outdated caches
+// Activate: Clean up older cache versions
 self.addEventListener("activate", (event) => {
+  const currentCaches = [STATIC_CACHE_NAME, PAGES_CACHE_NAME, API_CACHE_NAME];
   event.waitUntil(
     caches.keys().then((keys) => {
       return Promise.all(
         keys.map((key) => {
-          if (key !== CACHE_NAME) {
+          if (!currentCaches.includes(key)) {
             return caches.delete(key);
           }
         })
@@ -33,50 +38,48 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
-// Fetch: Network-first for all API / dynamic data to ensure 100% financial accuracy.
-// Stale-while-revalidate for static assets (images, brand, fonts).
+// Fetch: Strategy depending on request type
 self.addEventListener("fetch", (event) => {
-  if (event.request.method !== "GET") {
+  const request = event.request;
+
+  // Never intercept non-GET requests (handled by client outbox)
+  if (request.method !== "GET") {
     return;
   }
 
-  const url = new URL(event.request.url);
+  const url = new URL(request.url);
 
-  // CRITICAL CSP & PWA GUARD:
-  // Only intercept same-origin requests. Never intercept cross-origin / third-party requests
-  // (e.g., Unsplash, external CDNs, Google Analytics, YouTube embeds, payment gateways).
-  // The browser will handle external requests natively without triggering CSP connect-src violations.
+  // CRITICAL CSP GUARD: Only intercept same-origin requests
   if (url.origin !== self.location.origin) {
     return;
   }
 
-  // Never cache mutation requests (POST, PUT, PATCH, DELETE) or auth endpoints
-  if (
-    url.pathname.startsWith("/api/v1/auth/") ||
-    url.pathname.includes("/token")
-  ) {
+  // Never cache authentication tokens
+  if (url.pathname.includes("/auth/refresh/") || url.pathname.includes("/auth/token/")) {
     return;
   }
 
-  // Static assets: Cache-first with network fallback
+  // 1. Static Next.js Bundles & Assets: Cache-first with network fallback
   if (
+    url.pathname.startsWith("/_next/static/") ||
     url.pathname.startsWith("/brand/") ||
     url.pathname.startsWith("/images/") ||
-    url.pathname.startsWith("/_next/static/") ||
     url.pathname.endsWith(".png") ||
     url.pathname.endsWith(".jpg") ||
     url.pathname.endsWith(".jpeg") ||
     url.pathname.endsWith(".webp") ||
     url.pathname.endsWith(".svg") ||
-    url.pathname.endsWith(".ico")
+    url.pathname.endsWith(".ico") ||
+    url.pathname.endsWith(".woff2") ||
+    url.pathname.endsWith(".woff")
   ) {
     event.respondWith(
-      caches.match(event.request).then((cached) => {
+      caches.match(request).then((cached) => {
         if (cached) return cached;
-        return fetch(event.request).then((response) => {
+        return fetch(request).then((response) => {
           if (response && response.status === 200) {
             const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+            caches.open(STATIC_CACHE_NAME).then((cache) => cache.put(request, clone));
           }
           return response;
         });
@@ -85,16 +88,99 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // HTML and API: Network-first, fallback to offline notice if network fails
-  event.respondWith(
-    fetch(event.request).catch(async () => {
-      const cached = await caches.match(event.request);
-      if (cached) return cached;
-      return new Response(
-        JSON.stringify({ error: "Offline: Network connectivity lost. Retrying when connection returns." }),
-        { status: 503, headers: { "Content-Type": "application/json" } }
-      );
-    })
-  );
-});
+  // 2. Full Page Navigation (HTML): Network-first with cache fallback
+  if (request.mode === "navigate") {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response && response.status === 200) {
+            const clone = response.clone();
+            caches.open(PAGES_CACHE_NAME).then((cache) => cache.put(request, clone));
+          }
+          return response;
+        })
+        .catch(async () => {
+          const cached = await caches.match(request);
+          if (cached) return cached;
 
+          const adminShell = await caches.match("/admin");
+          if (adminShell) return adminShell;
+
+          return new Response(
+            `<!DOCTYPE html>
+            <html lang="en">
+            <head>
+              <meta charset="utf-8"/>
+              <title>SUBIDHA CORE — Offline Mode</title>
+              <meta name="viewport" content="width=device-width, initial-scale=1"/>
+              <style>
+                body { font-family: system-ui, -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #0f172a; color: #f8fafc; }
+                .card { max-width: 480px; padding: 2.5rem; text-align: center; background: #1e293b; border-radius: 1rem; border: 1px solid #334155; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
+                h1 { font-size: 1.5rem; margin-bottom: 0.75rem; color: #f59e0b; }
+                p { font-size: 0.95rem; line-height: 1.5; color: #94a3b8; margin-bottom: 1.5rem; }
+                button { background: #d97706; color: white; border: none; padding: 0.75rem 1.5rem; font-weight: 600; border-radius: 0.5rem; cursor: pointer; }
+                button:hover { background: #b45309; }
+              </style>
+            </head>
+            <body>
+              <div class="card">
+                <h1>Store Offline Mode Active</h1>
+                <p>SUBIDHA CORE is operating in offline resilience mode. Your cached data, counter POS, and pending outbox remain fully accessible.</p>
+                <button onclick="window.location.reload()">Retry Connection</button>
+              </div>
+            </body>
+            </html>`,
+            { status: 200, headers: { "Content-Type": "text/html" } }
+          );
+        })
+    );
+    return;
+  }
+
+  // 3. Next.js App Router Client-Side Route Transitions (RSC / Admin routes)
+  if (
+    request.headers.get("RSC") === "1" ||
+    url.searchParams.has("_rsc") ||
+    url.pathname.startsWith("/admin/")
+  ) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response && response.status === 200) {
+            const clone = response.clone();
+            caches.open(PAGES_CACHE_NAME).then((cache) => cache.put(request, clone));
+          }
+          return response;
+        })
+        .catch(async () => {
+          const cached = await caches.match(request);
+          if (cached) return cached;
+          return caches.match("/admin");
+        })
+    );
+    return;
+  }
+
+  // 4. API GET Requests: Network-first with cache fallback
+  if (url.pathname.startsWith("/api/v1/")) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response && response.status === 200) {
+            const clone = response.clone();
+            caches.open(API_CACHE_NAME).then((cache) => cache.put(request, clone));
+          }
+          return response;
+        })
+        .catch(async () => {
+          const cached = await caches.match(request);
+          if (cached) return cached;
+          return new Response(
+            JSON.stringify({ error: "Offline: Network unavailable. Using cached local state." }),
+            { status: 503, headers: { "Content-Type": "application/json" } }
+          );
+        })
+    );
+    return;
+  }
+});

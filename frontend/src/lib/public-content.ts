@@ -665,7 +665,7 @@ export const RULEBOOK_SECTIONS = [
       "Partners act as customer liaisons and lead facilitators; registration creates no legal agency or employment.",
       "Commission calculations are automated internal workflows; partners cannot self-approve or self-post commission payouts.",
       "Commission Clawback Invariant: Cancelled subscriptions or reversed payments trigger an automatic clawback debited from accrued commissions.",
-      "Partners have no authority to promise waivers, lucky draw wins, discounts, or delivery dates outside signed contracts.",
+      "Partners have no authority to promise waivers, promotional benefit selections, discounts, or delivery dates outside signed contracts.",
     ],
   },
   {
@@ -749,7 +749,7 @@ export const PARTNERS_PAGE_CONTENT = {
     {
       title: "Zero Promise Authority",
       description:
-        "Partners have no legal authority to promise waivers, lucky draw wins, discounts, or delivery timelines outside official system-generated contracts.",
+        "Partners have no legal authority to promise waivers, promotional benefit selections, discounts, or delivery timelines outside official system-generated contracts.",
     },
   ],
   disclaimer:

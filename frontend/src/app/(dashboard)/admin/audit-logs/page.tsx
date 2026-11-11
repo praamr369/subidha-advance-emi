@@ -485,7 +485,7 @@ export default function AdminAuditLogsPage() {
         {!loading && !error ? (
           <SectionCard
             title="Audit Event Rows"
-            description="Review immutable event history for payment, subscription, draw, reconciliation, auth, and operator actions."
+            description="Review immutable event history for payment, subscription, promotional benefit selection, reconciliation, auth, and operator actions."
           >
             {rows.length === 0 ? (
               <EmptyState

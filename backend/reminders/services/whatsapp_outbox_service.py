@@ -74,8 +74,8 @@ TEMPLATES: dict[str, str] = {
         "Your security deposit settlement will follow after inspection. — {company}"
     ),
     WhatsAppEventType.DRAW_WINNER: (
-        "Congratulations {name}! Your plan {ref} has won the lucky draw for month {month}. "
-        "Your remaining instalments are waived as per scheme rules. Our team will contact you. — {company}"
+        "Congratulations {name}! Your SFEMI subscription {ref} has been selected for the monthly promotional benefit for month {month}. "
+        "Your remaining future instalments are waived as per SFEMI scheme rules. Our team will contact you. — {company}"
     ),
     WhatsAppEventType.KYC_VERIFIED: (
         "Dear {name}, your KYC documents are verified. Your account is ready. — {company}"

@@ -80,7 +80,7 @@ export default function WaiverHistoryPage() {
               <table className="w-full">
                 <thead className="bg-gray-50 border-b">
                   <tr>
-                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Draw Date</th>
+                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Selection Date</th>
                     <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">EMI Amount</th>
                     <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Waiver Amount</th>
                     <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Savings %</th>
@@ -134,7 +134,7 @@ export default function WaiverHistoryPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <h3 className="text-xl font-semibold text-gray-900 mb-2">No Waivers Yet</h3>
-            <p className="text-gray-600 mb-6">You haven't won any EMI waivers yet. Keep trying!</p>
+            <p className="text-gray-600 mb-6">No promotional benefit EMI waivers have been awarded to your account yet.</p>
             <Link
               href="/customer/lucky-plan/eligibility"
               className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg transition"
@@ -185,7 +185,7 @@ export default function WaiverHistoryPage() {
             </li>
             <li className="flex gap-3">
               <span className="text-blue-600 font-bold">4.</span>
-              <span>The waiver is settled within 7 days of the draw</span>
+              <span>The waiver is settled within 7 days of benefit selection</span>
             </li>
           </ul>
         </div>
@@ -202,7 +202,7 @@ export default function WaiverHistoryPage() {
             href="/customer/lucky-plan/results"
             className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition text-center"
           >
-            View Draw Results
+            View Benefit Results
           </Link>
         </div>
       </div>

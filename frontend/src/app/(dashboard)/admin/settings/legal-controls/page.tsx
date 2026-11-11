@@ -101,7 +101,7 @@ const FUNDING_SOURCE_OPTIONS = [
 
 const APPROVED_WORDING = [
   "Monthly Waiver Benefit",
-  "Eligible Plan ID / Lucky ID",
+  "Eligible Plan ID / SFEMI ID",
   "Waiver Recipient",
   "Waiver Selection Event",
   "Fairness Commitment Hash",
@@ -929,7 +929,7 @@ export default function AdminLegalControlsPage() {
                   <h3 className="text-sm font-semibold text-foreground">Waiver launch gate</h3>
 
                   <FieldRow label="Waiver launch status"
-                    hint="Must be 'Approved for Public Launch' before the Lucky Draw can go live. Do not set without actual advocate/CA sign-off.">
+                    hint="Must be 'Approved for Public Launch' before the SFEMI Benefit Selection can go live. Do not set without actual advocate/CA sign-off.">
                     <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                       {RISK_OPTIONS.map((opt) => (
                         <label key={opt.value}

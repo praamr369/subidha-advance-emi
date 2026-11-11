@@ -10,8 +10,8 @@ export default function SampleWaiverReceiptPage() {
     <ERPPageShell
       className="receipt-print-page"
       eyebrow="Billing"
-      title="Sample Waiver / Lucky Draw Benefit Receipt"
-      subtitle="Future-EMI-only waiver confirmation document for winner communication."
+      title="Sample Waiver / SFEMI Promotional Benefit Receipt"
+      subtitle="Future-EMI-only waiver confirmation document for recipient communication."
       breadcrumbs={[
         { label: "Admin", href: "/admin" },
         { label: "Receipt Samples", href: "/admin/receipts/sample" },
@@ -35,10 +35,10 @@ export default function SampleWaiverReceiptPage() {
           { label: "Batch / SFEMI ID", value: "APR-26-A / #08" },
         ]}
         waiverFields={[
-          { label: "Winner Month", value: "Month 9" },
+          { label: "Recipient Month", value: "Month 9" },
           { label: "Waiver Scope", value: "Future EMI Waiver Only", emphasize: true },
           { label: "Applicable Installments", value: "Month 10 to Month 24" },
-          { label: "Issue Authority", value: "Admin Lucky Draw Desk" },
+          { label: "Issue Authority", value: "Admin SFEMI Benefit Desk" },
         ]}
         waiverSummaryFields={[
           { label: "Waived Installments", value: "15" },

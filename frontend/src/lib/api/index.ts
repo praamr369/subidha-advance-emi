@@ -7,6 +7,12 @@ import {
   setRefreshToken,
 } from "@/lib/auth/tokens";
 import { refreshTokenRequest } from "@/services/auth.service";
+import {
+  adjustLocalStockCache,
+  enqueueOutboxItem,
+  getCachedData,
+  setCachedData,
+} from "@/lib/offline/offline-db";
 
 export class ApiError extends Error {
   status: number;
@@ -459,7 +465,15 @@ async function performAccessTokenRefresh(): Promise<string | null> {
     }
 
     return nextAccessToken;
-  } catch {
+  } catch (err: unknown) {
+    // CRITICAL OFFLINE GUARD: If offline or network connection is down,
+    // NEVER clear the user's session! Retain the existing token so admin offline work continues uninterrupted.
+    if (typeof window !== "undefined" && !navigator.onLine) {
+      return getAccessToken();
+    }
+    if (err instanceof TypeError && err.message.toLowerCase().includes("fetch")) {
+      return getAccessToken();
+    }
     clearSession();
     return null;
   }
@@ -523,6 +537,279 @@ export async function apiFetch<T = unknown>(
   return request;
 }
 
+async function handleOfflineMutation<T>(
+  path: string,
+  method: string,
+  body: unknown,
+  headers: Record<string, string>
+): Promise<T | null> {
+  const normPath = path.toLowerCase();
+
+  // 1. Direct Sale / POS Checkout
+  if (normPath.includes("direct-sale") && (method === "POST" || method === "PATCH")) {
+    let parsedPayload: any = {};
+    try {
+      parsedPayload = typeof body === "string" ? JSON.parse(body) : (body as any) || {};
+    } catch {
+      parsedPayload = (body as any) || {};
+    }
+
+    const memoNo = `OFF-POS-${Date.now().toString(36).toUpperCase()}`;
+    const idempotencyKey =
+      headers["Idempotency-Key"] ||
+      headers["idempotency-key"] ||
+      headers["X-Idempotency-Key"] ||
+      headers["x-idempotency-key"] ||
+      `offline_sale_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+
+    // Optimistic local stock reduction for each sold product
+    if (Array.isArray(parsedPayload?.lines)) {
+      for (const line of parsedPayload.lines) {
+        const prodId = Number(line?.product || line?.product_id);
+        const qty = Number(line?.quantity || 1);
+        if (prodId && qty > 0) {
+          adjustLocalStockCache(prodId, -qty).catch(() => {});
+        }
+      }
+    }
+
+    const totalAmt =
+      parsedPayload?.total_amount ||
+      parsedPayload?.gross_amount ||
+      parsedPayload?.taxable_amount ||
+      "0";
+
+    await enqueueOutboxItem({
+      kind: "DIRECT_SALE",
+      path,
+      method: method as any,
+      payload: parsedPayload,
+      headers,
+      idempotency_key: idempotencyKey,
+      client_memo_no: memoNo,
+      summary: `Offline Direct Sale (${memoNo}) - ₹${totalAmt}`,
+      total_amount: totalAmt,
+    });
+
+    return {
+      sale: {
+        id: -1,
+        sale_no: memoNo,
+        billing_invoice_no: `PROVISIONAL (${memoNo})`,
+        customer_name: parsedPayload?.customer_name || "Direct Customer",
+        total_amount: String(totalAmt),
+        requirement_count: 0,
+        is_offline_provisional: true,
+        delivery_display: "Counter Handover (Offline Saved)",
+      },
+      stock_status: "OFFLINE_RECORDED",
+      delivery_request: null,
+      stock_need: null,
+      warnings: [
+        "Offline Sale Recorded. Official GST Tax Invoice will be finalized automatically when network reconnects.",
+      ],
+    } as unknown as T;
+  }
+
+  // 2. Stock Adjustment / Count
+  if (normPath.includes("stock-adjustment") && method === "POST") {
+    let parsedPayload: any = {};
+    try {
+      parsedPayload = typeof body === "string" ? JSON.parse(body) : (body as any) || {};
+    } catch {
+      parsedPayload = (body as any) || {};
+    }
+
+    const memoNo = `OFF-STK-${Date.now().toString(36).toUpperCase()}`;
+    const idempotencyKey =
+      headers["Idempotency-Key"] || `offline_stk_${Date.now()}`;
+
+    await enqueueOutboxItem({
+      kind: "STOCK_ADJUSTMENT",
+      path,
+      method: "POST",
+      payload: parsedPayload,
+      headers,
+      idempotency_key: idempotencyKey,
+      client_memo_no: memoNo,
+      summary: `Offline Stock Adjustment (${memoNo})`,
+    });
+
+    return {
+      id: -1,
+      adjustment_number: memoNo,
+      status: "DRAFT_OFFLINE",
+      is_offline_provisional: true,
+      notes: "Saved offline. Sync pending.",
+    } as unknown as T;
+  }
+
+  // 3. Purchase Entry / Bill
+  if (normPath.includes("purchase") && (method === "POST" || method === "PATCH")) {
+    let parsedPayload: any = {};
+    try {
+      parsedPayload = typeof body === "string" ? JSON.parse(body) : (body as any) || {};
+    } catch {
+      parsedPayload = (body as any) || {};
+    }
+
+    const memoNo = `OFF-PUR-${Date.now().toString(36).toUpperCase()}`;
+    const idempotencyKey =
+      headers["Idempotency-Key"] || `offline_pur_${Date.now()}`;
+
+    await enqueueOutboxItem({
+      kind: "PURCHASE_ENTRY",
+      path,
+      method: method as any,
+      payload: parsedPayload,
+      headers,
+      idempotency_key: idempotencyKey,
+      client_memo_no: memoNo,
+      summary: `Offline Purchase Bill (${memoNo})`,
+      total_amount: parsedPayload?.total_amount || 0,
+    });
+
+    return {
+      id: -1,
+      bill_number: memoNo,
+      status: "OFFLINE_RECORDED",
+      is_offline_provisional: true,
+      notes: "Saved offline. Sync pending.",
+    } as unknown as T;
+  }
+
+  // 4. Payment Collection
+  if ((normPath.includes("collection") || normPath.includes("payment")) && method === "POST") {
+    let parsedPayload: any = {};
+    try {
+      parsedPayload = typeof body === "string" ? JSON.parse(body) : (body as any) || {};
+    } catch {
+      parsedPayload = (body as any) || {};
+    }
+
+    const memoNo = `OFF-PAY-${Date.now().toString(36).toUpperCase()}`;
+    const idempotencyKey =
+      headers["Idempotency-Key"] || `offline_pay_${Date.now()}`;
+
+    await enqueueOutboxItem({
+      kind: "PAYMENT_COLLECTION",
+      path,
+      method: "POST",
+      payload: parsedPayload,
+      headers,
+      idempotency_key: idempotencyKey,
+      client_memo_no: memoNo,
+      summary: `Offline Payment Collection (${memoNo}) - ₹${parsedPayload?.amount || "0"}`,
+      total_amount: parsedPayload?.amount || 0,
+    });
+
+    return {
+      id: -1,
+      receipt_no: memoNo,
+      status: "OFFLINE_RECORDED",
+      is_offline_provisional: true,
+    } as unknown as T;
+  }
+
+  // 5. Customer / Party Creation
+  if ((normPath.includes("customer") || normPath.includes("parties")) && method === "POST") {
+    let parsedPayload: any = {};
+    try {
+      parsedPayload = typeof body === "string" ? JSON.parse(body) : (body as any) || {};
+    } catch {
+      parsedPayload = (body as any) || {};
+    }
+
+    const memoNo = `OFF-CUST-${Date.now().toString(36).toUpperCase()}`;
+    const idempotencyKey =
+      headers["Idempotency-Key"] || `offline_cust_${Date.now()}`;
+
+    await enqueueOutboxItem({
+      kind: "CUSTOMER_CREATION",
+      path,
+      method: "POST",
+      payload: parsedPayload,
+      headers,
+      idempotency_key: idempotencyKey,
+      client_memo_no: memoNo,
+      summary: `Offline Customer Created: ${parsedPayload?.name || "Direct Customer"} (${parsedPayload?.phone || ""})`,
+    });
+
+    return {
+      id: -Date.now(),
+      name: parsedPayload?.name || "Direct Customer",
+      phone: parsedPayload?.phone || "",
+      is_offline_provisional: true,
+      status: "OFFLINE_RECORDED",
+    } as unknown as T;
+  }
+
+  // 6. Delivery Updates & Dispatch
+  if (normPath.includes("deliver") && (method === "POST" || method === "PATCH")) {
+    let parsedPayload: any = {};
+    try {
+      parsedPayload = typeof body === "string" ? JSON.parse(body) : (body as any) || {};
+    } catch {
+      parsedPayload = (body as any) || {};
+    }
+
+    const memoNo = `OFF-DELIV-${Date.now().toString(36).toUpperCase()}`;
+    const idempotencyKey =
+      headers["Idempotency-Key"] || `offline_deliv_${Date.now()}`;
+
+    await enqueueOutboxItem({
+      kind: "DELIVERY_UPDATE",
+      path,
+      method: method as any,
+      payload: parsedPayload,
+      headers,
+      idempotency_key: idempotencyKey,
+      client_memo_no: memoNo,
+      summary: `Offline Delivery Update (${memoNo})`,
+    });
+
+    return {
+      id: -1,
+      status: "OFFLINE_RECORDED",
+      is_offline_provisional: true,
+    } as unknown as T;
+  }
+
+  // 7. Generic Safe Admin Mutation
+  if (method === "POST" || method === "PATCH" || method === "PUT") {
+    let parsedPayload: any = {};
+    try {
+      parsedPayload = typeof body === "string" ? JSON.parse(body) : (body as any) || {};
+    } catch {
+      parsedPayload = (body as any) || {};
+    }
+
+    const memoNo = `OFF-MUT-${Date.now().toString(36).toUpperCase()}`;
+    const idempotencyKey =
+      headers["Idempotency-Key"] || `offline_mut_${Date.now()}`;
+
+    await enqueueOutboxItem({
+      kind: "GENERIC_MUTATION",
+      path,
+      method: method as any,
+      payload: parsedPayload,
+      headers,
+      idempotency_key: idempotencyKey,
+      client_memo_no: memoNo,
+      summary: `Offline Transaction [${method} ${path}] (${memoNo})`,
+    });
+
+    return {
+      id: -1,
+      status: "OFFLINE_RECORDED",
+      is_offline_provisional: true,
+      message: "Queued offline. Will sync with SUBIDHA CORE upon reconnection.",
+    } as unknown as T;
+  }
+
+  return null;
+}
+
 async function apiFetchInternal<T>(
   path: string,
   options: ApiFetchOptions,
@@ -582,6 +869,21 @@ async function apiFetchInternal<T>(
     getRequestTimeoutMs(method, configuredTimeoutMs)
   );
 
+  // Fast offline bypass if browser is explicitly offline
+  if (typeof window !== "undefined" && !navigator.onLine) {
+    if (method === "GET") {
+      const cached = await getCachedData<T>(path);
+      if (cached !== null && cached !== undefined) {
+        return cached;
+      }
+    } else {
+      const offlineResult = await handleOfflineMutation<T>(path, method, originalBody, headers);
+      if (offlineResult !== null) {
+        return offlineResult;
+      }
+    }
+  }
+
   let response: Response;
   let parsed: ParsedResponseBody;
   try {
@@ -593,11 +895,31 @@ async function apiFetchInternal<T>(
       signal: managedSignal.signal,
     });
     parsed = await parseResponseBody(response);
+  } catch (networkErr: unknown) {
+    if (typeof window !== "undefined") {
+      if (method === "GET") {
+        const cached = await getCachedData<T>(path);
+        if (cached !== null && cached !== undefined) {
+          return cached;
+        }
+      } else {
+        const offlineResult = await handleOfflineMutation<T>(path, method, originalBody, headers);
+        if (offlineResult !== null) {
+          return offlineResult;
+        }
+      }
+    }
+    throw networkErr;
   } finally {
     managedSignal.cleanup();
   }
 
   const body = parsed.body;
+
+  if (response.ok && method === "GET" && typeof window !== "undefined") {
+    // Cache successful GET API response asynchronously in IndexedDB
+    setCachedData(path, body).catch(() => {});
+  }
 
   if (!response.ok) {
     if (shouldAttemptRefresh(path, response.status, alreadyRetried)) {

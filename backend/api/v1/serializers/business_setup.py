@@ -309,6 +309,7 @@ class EmailSMTPSettingsSerializer(BusinessSetupModelSerializer):
             "from_email",
             "from_name",
             "is_enabled",
+            "google_client_id",
             "last_test_at",
             "last_test_success",
             "last_test_message",

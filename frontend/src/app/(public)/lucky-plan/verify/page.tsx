@@ -85,7 +85,7 @@ export default function PublicLuckyDrawVerifyPage() {
         >
           <div className="flex-1 space-y-1">
             <label htmlFor="draw-id" className="text-sm font-medium text-foreground">
-              Draw ID
+              Benefit Event ID
             </label>
             <input
               id="draw-id"
@@ -136,7 +136,7 @@ export default function PublicLuckyDrawVerifyPage() {
                   {matches
                     ? "Verified — commitment hash matches the revealed seed"
                     : verification.verification_message ||
-                      "This draw has not been revealed or could not be verified yet."}
+                      "This benefit selection has not been revealed or could not be verified yet."}
                 </p>
                 {verification.public_explanation && (
                   <p className="text-sm text-muted-foreground">
@@ -148,10 +148,10 @@ export default function PublicLuckyDrawVerifyPage() {
 
             <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
               <h2 className="mb-2 text-base font-semibold text-foreground">
-                Draw details
+                Selection details
               </h2>
               <Row label="Batch" value={verification.batch_code} />
-              <Row label="Draw month" value={verification.draw_month} />
+              <Row label="Selection month" value={verification.draw_month} />
               <Row
                 label="Eligible entries (snapshot)"
                 value={verification.eligible_snapshot_count}
@@ -194,10 +194,10 @@ export default function PublicLuckyDrawVerifyPage() {
             {summary && (
               <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
                 <h2 className="mb-2 text-base font-semibold text-foreground">
-                  Winner (privacy-safe)
+                  Recipient (privacy-safe)
                 </h2>
-                <Row label="Winner" value={summary.winner_name_masked} />
-                <Row label="Winning lucky number" value={summary.winner_lucky_number} />
+                <Row label="Recipient" value={summary.winner_name_masked} />
+                <Row label="Selected SFEMI ID" value={summary.winner_lucky_number != null ? `#${String(summary.winner_lucky_number).padStart(2, "0")}` : "—"} />
                 <Row label="EMIs waived" value={summary.waived_emi_count} />
               </section>
             )}

@@ -15,13 +15,13 @@ import {
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { useI18n } from "@/components/i18n/I18nProvider";
-import { AuthLayoutShell } from "@/components/auth";
+import { AuthLayoutShell, GoogleSignInButton, GooglePhoneModal } from "@/components/auth";
 import ActionButton from "@/components/ui/ActionButton";
 import { APP_NAME } from "@/lib/constants";
 import { ROUTES } from "@/lib/routes";
 import { getDashboardRouteForRole } from "@/lib/auth/redirect";
 import { useAuth } from "@/providers/AuthProvider";
-import { loginRequest } from "@/services/auth.service";
+import { loginRequest, googleAuthRequest, type LoginResponse, type GoogleAuthResponse } from "@/services/auth.service";
 
 function toMessage(error: unknown): string {
   if (!(error instanceof Error)) {
@@ -69,6 +69,13 @@ function LoginContent() {
   const [error, setError] = useState<string | null>(null);
   const [mfaRequired, setMfaRequired] = useState(false);
   const [mfaCode, setMfaCode] = useState("");
+  const [googleSubmitting, setGoogleSubmitting] = useState(false);
+  const [showPhoneModal, setShowPhoneModal] = useState(false);
+  const [pendingGoogleData, setPendingGoogleData] = useState<{
+    idToken: string;
+    email?: string;
+    name?: string;
+  } | null>(null);
 
   const nextUrl = useMemo(() => {
     const next = searchParams.get("next");
@@ -91,6 +98,106 @@ function LoginContent() {
     router.replace(target);
   }, [isAuthenticated, role, router]);
 
+  function handleAuthSuccess(
+    response: LoginResponse | GoogleAuthResponse,
+    fallbackName?: string
+  ) {
+    const accessToken = response.access;
+    const refreshToken = response.refresh;
+    const resolvedRole =
+      response.role ??
+      response.user?.role ??
+      (response as LoginResponse).user_role ??
+      null;
+
+    if (!accessToken || !refreshToken || !resolvedRole) {
+      throw new Error("Invalid authentication response.");
+    }
+
+    login({
+      id: response.user?.id ?? 0,
+      name:
+        response.user?.name ??
+        response.user?.username ??
+        fallbackName ??
+        "User",
+      role: resolvedRole,
+      accessToken,
+      refreshToken,
+    });
+
+    const normalizedRole = (resolvedRole || "").trim().toUpperCase();
+    if (normalizedRole === "ADMIN" && typeof window !== "undefined") {
+      try {
+        window.localStorage.setItem(
+          "subidha_offline_admin_profile",
+          JSON.stringify({
+            id: response.user?.id ?? 0,
+            name: response.user?.name ?? fallbackName ?? "Admin",
+            role: resolvedRole,
+            accessToken,
+            refreshToken,
+            identifier: (fallbackName || "").trim().toLowerCase(),
+            savedAt: new Date().toISOString(),
+          })
+        );
+      } catch {
+        // Ignore storage quota
+      }
+    }
+
+    const target =
+      normalizedRole === "ADMIN"
+        ? getDashboardRouteForRole(resolvedRole)
+        : nextUrl || getDashboardRouteForRole(resolvedRole);
+
+    if (typeof window !== "undefined") {
+      window.location.assign(target);
+      return;
+    }
+
+    router.replace(target);
+  }
+
+  async function handleGoogleSuccess(idToken: string) {
+    try {
+      setGoogleSubmitting(true);
+      setError(null);
+      const response = await googleAuthRequest({ id_token: idToken });
+      if (response.requires_phone) {
+        setPendingGoogleData({
+          idToken,
+          email: response.email,
+          name: response.name,
+        });
+        setShowPhoneModal(true);
+        return;
+      }
+      handleAuthSuccess(response, response.name || response.email);
+    } catch (err) {
+      setError(toMessage(err));
+    } finally {
+      setGoogleSubmitting(false);
+    }
+  }
+
+  async function handlePhoneSubmit(phone: string) {
+    if (!pendingGoogleData?.idToken) return;
+    setGoogleSubmitting(true);
+    try {
+      const response = await googleAuthRequest({
+        id_token: pendingGoogleData.idToken,
+        phone,
+      });
+      setShowPhoneModal(false);
+      handleAuthSuccess(response, response.name || response.email);
+    } catch (err) {
+      throw err;
+    } finally {
+      setGoogleSubmitting(false);
+    }
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -104,42 +211,31 @@ function LoginContent() {
         mfa_code: mfaRequired ? mfaCode : undefined,
       });
 
-      const accessToken = response.access;
-      const refreshToken = response.refresh;
-      const resolvedRole =
-        response.role ??
-        response.user?.role ??
-        response.user_role ??
-        null;
-
-      if (!accessToken || !refreshToken || !resolvedRole) {
-        throw new Error("Invalid login response.");
-      }
-
-      login({
-        id: response.user?.id ?? 0,
-        name:
-          response.user?.name ??
-          response.user?.username ??
-          identifier.trim(),
-        role: resolvedRole,
-        accessToken,
-        refreshToken,
-      });
-
-      const normalizedRole = (resolvedRole || "").trim().toUpperCase();
-      const target =
-        normalizedRole === "ADMIN"
-          ? getDashboardRouteForRole(resolvedRole)
-          : nextUrl || getDashboardRouteForRole(resolvedRole);
-
-      if (typeof window !== "undefined") {
-        window.location.assign(target);
+      handleAuthSuccess(response, identifier.trim());
+    } catch (err) {
+      if (typeof window !== "undefined" && (!navigator.onLine || String(err).toLowerCase().includes("fetch"))) {
+        const rawOffline = window.localStorage.getItem("subidha_offline_admin_profile");
+        if (rawOffline) {
+          try {
+            const profile = JSON.parse(rawOffline);
+            login({
+              id: profile.id,
+              name: profile.name,
+              role: profile.role,
+              accessToken: profile.accessToken,
+              refreshToken: profile.refreshToken,
+            });
+            router.replace("/admin");
+            return;
+          } catch {
+            // Ignore parse error
+          }
+        }
+        setError("Network offline. Connect to internet on this device once to initialize offline counter access.");
+        setSubmitting(false);
         return;
       }
 
-      router.replace(target);
-    } catch (err) {
       const msg = toMessage(err);
       if (msg === "MFA code is required.") {
         setMfaRequired(true);
@@ -271,12 +367,29 @@ function LoginContent() {
 
         <ActionButton
           type="submit"
-          disabled={submitting}
+          disabled={submitting || googleSubmitting}
           className="public-action-primary h-12 w-full justify-center disabled:opacity-50"
         >
           {submitting ? t("auth.login.authenticating") : t("auth.login.signIn")}
           {!submitting && <ArrowRight className="h-4 w-4 ml-2" />}
         </ActionButton>
+
+        {/* 100% Free Google Sign-In for Customers */}
+        <div className="relative flex items-center justify-center my-3">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-border" />
+          </div>
+          <div className="relative bg-card px-3 text-xs uppercase tracking-wider text-muted-foreground">
+            or customer sign in with
+          </div>
+        </div>
+
+        <GoogleSignInButton
+          onSuccess={handleGoogleSuccess}
+          onError={(msg) => setError(msg)}
+          disabled={submitting || googleSubmitting}
+          text="signin_with"
+        />
 
         <div className="rounded-2xl border border-border bg-card space-y-3 p-4">
           <div className="flex items-start gap-3">
@@ -306,6 +419,20 @@ function LoginContent() {
           </Link>
         </div>
       </form>
+
+      <GooglePhoneModal
+        isOpen={showPhoneModal}
+        name={pendingGoogleData?.name}
+        email={pendingGoogleData?.email}
+        idToken={pendingGoogleData?.idToken || ""}
+        onSubmitPhone={handlePhoneSubmit}
+        onClose={() => {
+          setShowPhoneModal(false);
+          setPendingGoogleData(null);
+        }}
+        submitting={googleSubmitting}
+        error={error}
+      />
     </AuthLayoutShell>
   );
 }

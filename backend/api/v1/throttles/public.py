@@ -20,3 +20,15 @@ class PublicLeadThrottle(AnonRateThrottle):
     """
 
     scope = "public_lead"
+
+
+class PublicAnalyticsThrottle(AnonRateThrottle):
+    """Rate-limit public analytics tracking events to prevent log flooding."""
+
+    scope = "public_analytics"
+
+
+class PublicReactionThrottle(AnonRateThrottle):
+    """Rate-limit public product likes/dislikes to prevent ballot-stuffing."""
+
+    scope = "public_reaction"

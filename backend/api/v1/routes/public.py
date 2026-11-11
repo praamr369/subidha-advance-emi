@@ -7,6 +7,8 @@ from rest_framework import generics, serializers, status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.authentication import SessionAuthentication
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from core.services.operational_visibility import subscription_dashboard_visible_q
 from api.v1.serializers.media import serialize_media_url
@@ -30,10 +32,17 @@ from subscriptions.models import (
     Subscription,
 )
 from subscriptions.services.audit_service import log_audit
-from api.v1.throttles.public import PublicLeadThrottle
+from api.v1.throttles.public import PublicAnalyticsThrottle, PublicLeadThrottle, PublicReactionThrottle
 from api.v1.views.public_draw_verification import public_verify_seed_view
 from crm.services.public_lead_service import create_public_lead
 from lucky_plan.services.winner_state_service import winner_history_q
+
+
+def _get_client_ip(request):
+    x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
+    if x_forwarded_for:
+        return x_forwarded_for.split(",")[0].strip()
+    return request.META.get("REMOTE_ADDR", "")
 
 
 class PublicLeadSerializer(serializers.Serializer):
@@ -47,6 +56,8 @@ class PublicLeadSerializer(serializers.Serializer):
     notes = serializers.CharField(required=False, allow_blank=True)
     intent = serializers.ChoiceField(choices=PublicLeadIntent.choices, required=False, default="GENERAL")
     create_procurement_enquiry = serializers.BooleanField(required=False, default=False)
+    session_id = serializers.CharField(max_length=64, required=False, allow_blank=True, default="")
+    hp_field = serializers.CharField(required=False, allow_blank=True, default="")
 
 
 def _mask_public_name(raw):
@@ -111,12 +122,12 @@ def _public_verification_status(draw: LuckyDraw) -> str:
 def _public_explanation_text() -> str:
     return (
         "The commitment hash is like a sealed envelope: it is published first, "
-        "then the seed is revealed later so the draw can be verified against the original commitment."
+        "then the seed is revealed later so the promotional benefit selection can be verified against the original commitment."
     )
 
 
 def _winner_benefit_note() -> str:
-    return "Winner receives future EMI waiver only. Already collected EMI remains recorded and valid."
+    return "Promotional benefit recipient receives future EMI waiver only. Already collected EMI remains recorded and valid."
 
 
 def _serialize_public_winner(draw: LuckyDraw, request):
@@ -581,7 +592,16 @@ class PublicLeadView(APIView):
         serializer = PublicLeadSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
+        # Anti-bot honeypot protection: silently drop automated spam
+        if serializer.validated_data.get("hp_field"):
+            return Response(
+                {"message": "Enquiry received successfully.", "lead_id": None},
+                status=status.HTTP_201_CREATED,
+            )
+
         validated = serializer.validated_data.copy()
+        validated.pop("hp_field", None)
+        session_id = validated.pop("session_id", "").strip()[:64]
         create_pe = validated.pop("create_procurement_enquiry", False)
         intent_val = validated.pop("intent", "GENERAL")
         product = None
@@ -602,6 +622,19 @@ class PublicLeadView(APIView):
                 create_procurement_enquiry=create_pe,
                 **validated,
             )
+            if session_id:
+                try:
+                    from crm.models import WebappVisitorEvent
+                    WebappVisitorEvent.objects.create(
+                        session_id=session_id,
+                        path=request.path,
+                        event_type=WebappVisitorEvent.EventType.LEAD_SUBMITTED,
+                        product=product,
+                        ip_address=_get_client_ip(request),
+                        user_agent=request.META.get("HTTP_USER_AGENT", "")[:500],
+                    )
+                except Exception:
+                    pass
         except ValueError as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
 
@@ -706,6 +739,210 @@ class PublicWinnersView(PublicWinnerHistoryView):
     """
 
 
+class PublicVisitorTrackSerializer(serializers.Serializer):
+    session_id = serializers.CharField(max_length=64)
+    path = serializers.CharField(max_length=255)
+    event_type = serializers.ChoiceField(
+        choices=[
+            ("PAGE_VIEW", "Page View"),
+            ("PRODUCT_VIEW", "Product View"),
+            ("REGISTER_PAGE_VIEW", "Register Page View"),
+            ("REGISTER_SUCCESS", "Registered Successfully"),
+            ("LEAD_SUBMITTED", "Lead Submitted"),
+        ],
+        default="PAGE_VIEW",
+    )
+    product_id = serializers.IntegerField(required=False, allow_null=True)
+    referrer = serializers.CharField(max_length=255, required=False, allow_blank=True, default="")
+    hp_field = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class PublicVisitorTrackView(APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+    throttle_classes = [PublicAnalyticsThrottle]
+
+    def post(self, request):
+        serializer = PublicVisitorTrackSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        if data.get("hp_field"):
+            return Response({"status": "ok"}, status=status.HTTP_200_OK)
+
+        from crm.models import WebappVisitorEvent
+        from customers.models import Customer
+
+        session_id = data["session_id"].strip()
+        path = data["path"].strip()[:255]
+        event_type = data.get("event_type", "PAGE_VIEW")
+        referrer = (data.get("referrer") or "").strip()[:255]
+        product_id = data.get("product_id")
+
+        product = None
+        if product_id:
+            product = Product.objects.filter(id=product_id).first()
+
+        customer = None
+        is_registered = False
+        if request.user and request.user.is_authenticated:
+            is_registered = True
+            customer = Customer.objects.filter(user=request.user).first() or Customer.objects.filter(phone=getattr(request.user, "phone", None)).first()
+        else:
+            existing_reg = WebappVisitorEvent.objects.filter(session_id=session_id, is_registered=True).first()
+            if existing_reg:
+                is_registered = True
+                customer = existing_reg.customer
+
+        ip = _get_client_ip(request)
+        ua = request.META.get("HTTP_USER_AGENT", "")[:500]
+
+        WebappVisitorEvent.objects.create(
+            session_id=session_id,
+            path=path,
+            event_type=event_type,
+            referrer=referrer,
+            ip_address=ip,
+            user_agent=ua,
+            product=product,
+            customer=customer,
+            is_registered=is_registered,
+        )
+
+        return Response({"status": "tracked", "session_id": session_id}, status=status.HTTP_200_OK)
+
+
+class PublicProductReactSerializer(serializers.Serializer):
+    session_id = serializers.CharField(max_length=64)
+    is_like = serializers.BooleanField(default=True)
+    hp_field = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class PublicProductReactView(APIView):
+    authentication_classes = [JWTAuthentication, SessionAuthentication]
+    permission_classes = [AllowAny]
+    throttle_classes = [PublicReactionThrottle]
+
+    def post(self, request, product_identifier):
+        serializer = PublicProductReactSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        if data.get("hp_field"):
+            return Response({"status": "ok"}, status=status.HTTP_200_OK)
+
+        product = None
+        ident_str = str(product_identifier).strip()
+        if ident_str.isdigit():
+            product = Product.objects.filter(id=int(ident_str)).first()
+        if not product:
+            product = Product.objects.filter(slug=ident_str).first() or Product.objects.filter(product_code=ident_str).first()
+
+        if not product:
+            return Response({"detail": "Product not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        from crm.models import ProductReaction
+        session_id = data["session_id"].strip()[:64]
+        is_like = data["is_like"]
+        ip = _get_client_ip(request)
+        user = request.user if (request.user and request.user.is_authenticated) else None
+
+        if user:
+            # If user is authenticated, ensure 1 vote per user even if session_id changes
+            existing_user_reaction = ProductReaction.objects.filter(product=product, user=user).first()
+            if existing_user_reaction:
+                existing_user_reaction.is_like = is_like
+                existing_user_reaction.session_id = session_id
+                existing_user_reaction.ip_address = ip
+                existing_user_reaction.save(update_fields=["is_like", "session_id", "ip_address", "updated_at"])
+                reaction = existing_user_reaction
+            else:
+                reaction, _ = ProductReaction.objects.update_or_create(
+                    product=product,
+                    session_id=session_id,
+                    defaults={
+                        "is_like": is_like,
+                        "user": user,
+                        "ip_address": ip,
+                    },
+                )
+        else:
+            reaction, _ = ProductReaction.objects.update_or_create(
+                product=product,
+                session_id=session_id,
+                defaults={
+                    "is_like": is_like,
+                    "user": None,
+                    "ip_address": ip,
+                },
+            )
+
+        likes = ProductReaction.objects.filter(product=product, is_like=True).count()
+        dislikes = ProductReaction.objects.filter(product=product, is_like=False).count()
+        total = likes + dislikes
+        like_pct = round((likes / total * 100), 1) if total > 0 else 0
+
+        return Response(
+            {
+                "product_id": product.id,
+                "likes_count": likes,
+                "dislikes_count": dislikes,
+                "total_reactions": total,
+                "like_percentage": like_pct,
+                "user_reaction": "LIKE" if reaction.is_like else "DISLIKE",
+                "message": "Feedback recorded. Thank you!",
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class PublicProductReactionsView(APIView):
+    authentication_classes = [JWTAuthentication, SessionAuthentication]
+    permission_classes = [AllowAny]
+
+    def get(self, request, product_identifier):
+        product = None
+        ident_str = str(product_identifier).strip()
+        if ident_str.isdigit():
+            product = Product.objects.filter(id=int(ident_str)).first()
+        if not product:
+            product = Product.objects.filter(slug=ident_str).first() or Product.objects.filter(product_code=ident_str).first()
+
+        if not product:
+            return Response({"detail": "Product not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        from crm.models import ProductReaction
+        likes = ProductReaction.objects.filter(product=product, is_like=True).count()
+        dislikes = ProductReaction.objects.filter(product=product, is_like=False).count()
+        total = likes + dislikes
+        like_pct = round((likes / total * 100), 1) if total > 0 else 0
+
+        user_reaction = None
+        if request.user and request.user.is_authenticated:
+            reaction = ProductReaction.objects.filter(product=product, user=request.user).first()
+            if reaction:
+                user_reaction = "LIKE" if reaction.is_like else "DISLIKE"
+        else:
+            session_id = request.query_params.get("session_id")
+            if session_id:
+                reaction = ProductReaction.objects.filter(product=product, session_id=session_id.strip()).first()
+                if reaction:
+                    user_reaction = "LIKE" if reaction.is_like else "DISLIKE"
+
+        return Response(
+            {
+                "product_id": product.id,
+                "product_name": product.name,
+                "likes_count": likes,
+                "dislikes_count": dislikes,
+                "total_reactions": total,
+                "like_percentage": like_pct,
+                "user_reaction": user_reaction,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
 from api.v1.views.whatsapp_catalog import WhatsAppCatalogFeedView  # noqa: E402
 from api.v1.views.admin_pod import public_pod_handover_view  # noqa: E402
 from api.v1.views.public_contract_sign import public_contract_sign_view  # noqa: E402
@@ -738,6 +975,9 @@ urlpatterns = [
     path("categories/", PublicProductCategoriesView.as_view(), name="public-categories"),
     path("products/<str:slug>/", PublicProductDetailView.as_view(), name="public-product-detail"),
     path("products/by-id/<int:id>/", PublicProductDetailView.as_view(), name="public-product-detail-by-id"),
+    path("products/<str:product_identifier>/react/", PublicProductReactView.as_view(), name="public-product-react"),
+    path("products/<str:product_identifier>/reactions/", PublicProductReactionsView.as_view(), name="public-product-reactions"),
+    path("analytics/track/", PublicVisitorTrackView.as_view(), name="public-analytics-track"),
     path("leads/", PublicLeadView.as_view(), name="public-leads"),
     # Public commit-reveal check. Unauthenticated on purpose: a verification
     # only staff can run proves nothing to the person who needs convincing.

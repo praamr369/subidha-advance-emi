@@ -1002,7 +1002,7 @@ export default function AdminSubscriptionsPage() {
 
         <FormSection
           title="Filter register"
-          description="Search by subscription, customer, phone, product, batch, lucky number, partner, or plan type."
+          description="Search by subscription, customer, phone, product, batch, SFEMI ID, partner, or plan type."
         >
           <form onSubmit={handleApplyFilters} className="grid gap-4 lg:grid-cols-7">
             <div className="lg:col-span-3">
@@ -1069,7 +1069,7 @@ export default function AdminSubscriptionsPage() {
                 type="text"
                 value={planTypeInput}
                 onChange={(event) => setPlanTypeInput(event.target.value)}
-                placeholder="EMI, lucky, etc."
+                placeholder="EMI, SFEMI, etc."
                 className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
               />
             </div>
@@ -1430,7 +1430,7 @@ export default function AdminSubscriptionsPage() {
                                     </span>
                                   )}
                                   <span>{row.batch_code ? `Batch ${row.batch_code}` : "No Batch"}</span>
-                                  {typeof row.lucky_number === "number" ? <span>· Lucky #{row.lucky_number}</span> : null}
+                                  {typeof row.lucky_number === "number" ? <span>· SFEMI ID #{row.lucky_number}</span> : null}
                                 </div>
                               </>
                             )}

@@ -41,7 +41,7 @@ function toErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim()) {
     return error.message;
   }
-  return "Failed to load lucky draws.";
+  return "Failed to load promotional benefits.";
 }
 
 function drawStatus(record: CustomerLuckyDraw): string {

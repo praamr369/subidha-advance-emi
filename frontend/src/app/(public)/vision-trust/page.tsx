@@ -14,7 +14,7 @@ export default function VisionTrustPage() {
   return (
     <PublicPageShell
       title="Vision & Trust"
-      subtitle="Trust comes from live product visibility, real enquiry capture, and winner publication sourced from revealed draw records."
+      subtitle="Trust comes from live product visibility, real enquiry capture, and beneficiary publication sourced from revealed selection records."
       breadcrumbs={[
         { label: "Home", href: ROUTES.public.home },
         { label: "Vision & Trust" },
@@ -40,7 +40,7 @@ export default function VisionTrustPage() {
             {
               title: "Transparency without leaking private data",
               description:
-                "Winner visibility is sourced from revealed draw records with privacy-safe display labels, not internal ledgers.",
+                "Beneficiary visibility is sourced from revealed selection records with privacy-safe display labels, not internal ledgers.",
             },
             {
               title: "Conversion paths that map to workflows",

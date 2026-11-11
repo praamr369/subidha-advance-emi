@@ -344,8 +344,8 @@ export default function CustomerDashboardPage() {
     const winnerCount = Number(summary.winner_subscriptions ?? 0);
     if (winnerCount > 0) {
       items.push({
-        label: "Lucky draw",
-        value: `${winnerCount} winner contract${winnerCount === 1 ? "" : "s"}`,
+        label: "SFEMI Benefits",
+        value: `${winnerCount} benefit contract${winnerCount === 1 ? "" : "s"}`,
         helper: "Open a subscription for benefit detail",
         href: ROUTES.customer.subscriptions,
       });
@@ -385,7 +385,7 @@ export default function CustomerDashboardPage() {
     },
     {
       title: "My Subscriptions",
-      description: "Open contract detail, winner posture, and product status by subscription.",
+      description: "Open contract detail, beneficiary posture, and product status by subscription.",
       href: ROUTES.customer.subscriptions,
     },
     {
@@ -490,7 +490,7 @@ export default function CustomerDashboardPage() {
               {
                 id: "subs",
                 title: "My subscriptions",
-                subtitle: "Contract and winner posture overview.",
+                subtitle: "Contract and beneficiary posture overview.",
                 group: "core",
                 fixed: true,
                 content: (
@@ -558,7 +558,7 @@ export default function CustomerDashboardPage() {
                   {legacy.customer.name || "Customer"}
                 </h2>
                 <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600 sm:text-base">
-                  Paid, remaining, overdue, and lucky-draw benefit figures are
+                  Paid, remaining, overdue, and SFEMI promotional benefit figures are
                   calculated from your live contracts and payments so what you
                   see here matches your subscription and receipt records.
                 </p>
@@ -584,7 +584,7 @@ export default function CustomerDashboardPage() {
                   </dd>
                 </div>
                 <div className="rounded-2xl border border-white/80 bg-white/85 p-4 shadow-sm">
-                  <dt className="text-xs font-medium text-slate-500">Winner history</dt>
+                  <dt className="text-xs font-medium text-slate-500">Beneficiary history</dt>
                   <dd className="mt-1 text-sm font-semibold text-slate-950">
                     {summary.winner_subscriptions ?? 0} subscription
                     {(summary.winner_subscriptions ?? 0) === 1 ? "" : "s"}
@@ -772,7 +772,7 @@ export default function CustomerDashboardPage() {
                     {summary.subscription_count ?? legacy.subscriptions.length}
                   </div>
                   <div className="mt-1 text-xs text-slate-500">
-                    {summary.winner_subscriptions ?? 0} with winner history
+                    {summary.winner_subscriptions ?? 0} with beneficiary history
                   </div>
                 </div>
               </div>
@@ -831,8 +831,8 @@ export default function CustomerDashboardPage() {
                         {item.subscription_number || `SUB-${String(item.subscription_id ?? item.id)}`}
                       </div>
                       <div className="mt-1 text-xs text-muted-foreground">
-                        {item.product_name || "Linked product"} · Batch {item.batch_code || "—"} · Lucky{" "}
-                        {item.lucky_number ?? "—"}
+                        {item.product_name || "Linked product"} · Batch {item.batch_code || "—"} · SFEMI ID{" "}
+                        {item.lucky_number != null ? `#${String(item.lucky_number).padStart(2, "0")}` : "—"}
                       </div>
                       <div className="mt-2 text-sm text-muted-foreground">
                         Due {formatDate(item.due_date)} · Pending {money(item.pending_amount)}
@@ -920,7 +920,7 @@ export default function CustomerDashboardPage() {
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
                 Priority contracts are surfaced here with their linked product,
-                current remaining amount, and winner posture.
+                current remaining amount, and beneficiary posture.
               </p>
             </div>
 

@@ -387,7 +387,7 @@ export default function AdminLuckyIdEditPage() {
   const rqQuery = useQuery({
     queryKey: ['adminLuckyIdEdit', luckyIdId],
     queryFn: async () => {
-      if (!luckyIdId) throw new Error("Lucky ID is missing.");
+      if (!luckyIdId) throw new Error("SFEMI ID is missing.");
       const luckyIdPayload = await apiFetch<Record<string, unknown>>(
         `/admin/lucky-ids/${luckyIdId}/`
       );
@@ -501,7 +501,7 @@ export default function AdminLuckyIdEditPage() {
       const normalized = normalizeLuckyIdDetail(updatedPayload);
       setLuckyId(normalized);
       setTargetStatus("");
-      setSuccessMessage(`Lucky ID status updated to ${normalized.status}.`);
+      setSuccessMessage(`SFEMI ID status updated to ${normalized.status}.`);
       await loadPage();
     } catch (err) {
       setFieldErrors(parseFieldErrors(err));
@@ -543,7 +543,7 @@ export default function AdminLuckyIdEditPage() {
       ]}
       stats={[
         {
-          label: "Lucky Number",
+          label: "SFEMI ID",
           value: luckyId ? formatLuckyNumber(luckyId.lucky_number) : "—",
         },
         {
@@ -562,7 +562,7 @@ export default function AdminLuckyIdEditPage() {
         },
       ]}
       statusBadge={{
-        label: luckyId?.status || "Lucky ID Edit",
+        label: luckyId?.status || "SFEMI ID Edit",
         tone:
           luckyId?.status === "ASSIGNED"
             ? "success"
@@ -585,11 +585,11 @@ export default function AdminLuckyIdEditPage() {
           </button>
         </section>
 
-        {loading ? <ERPLoadingState label="Loading Lucky ID edit workspace..." /> : null}
+        {loading ? <ERPLoadingState label="Loading SFEMI ID edit workspace..." /> : null}
 
         {!loading && error && !luckyId ? (
           <ERPErrorState
-            title="Unable to load Lucky ID edit page"
+            title="Unable to load SFEMI ID edit page"
             description={error || actionError || undefined}
             onRetry={() => void loadPage()}
           />
@@ -597,8 +597,8 @@ export default function AdminLuckyIdEditPage() {
 
         {!loading && !error && !luckyId ? (
           <ERPEmptyState
-            title="Lucky ID not available"
-            description="The requested Lucky ID could not be loaded."
+            title="SFEMI ID not available"
+            description="The requested SFEMI ID could not be loaded."
           />
         ) : null}
 
@@ -606,7 +606,7 @@ export default function AdminLuckyIdEditPage() {
           <>
             <DetailPanel
               title="Correction rule"
-              description="Lucky ID linkage is derived from the subscription workflow, not edited directly here. This page should be used only for controlled administrative status correction."
+              description="SFEMI ID linkage is derived from the subscription workflow, not edited directly here. This page should be used only for controlled administrative status correction."
             >
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <DetailValue label="Current Status" value={<ERPStatusBadge status={luckyId.status} />} />
@@ -628,10 +628,10 @@ export default function AdminLuckyIdEditPage() {
             {isAssignedState && hasLinkage ? (
               <DetailPanel
                 title="Status editing locked"
-                description="This Lucky ID is already linked to a visible contract context."
+                description="This SFEMI ID is already linked to a visible contract context."
               >
                 <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                  Do not correct this Lucky ID directly. Fix assignment issues through the linked subscription workflow to preserve financial and audit integrity.
+                  Do not correct this SFEMI ID directly. Fix assignment issues through the linked subscription workflow to preserve financial and audit integrity.
                 </div>
               </DetailPanel>
             ) : null}
@@ -639,7 +639,7 @@ export default function AdminLuckyIdEditPage() {
             {isAssignedState && !hasLinkage ? (
               <DetailPanel
                 title="Integrity alert"
-                description="This Lucky ID is assigned-like but visible linkage is missing."
+                description="This SFEMI ID is assigned-like but visible linkage is missing."
               >
                 <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
                   This row may need administrative correction. If no subscription truly exists, moving it back to AVAILABLE or blocking it may be appropriate after verification.
@@ -649,13 +649,13 @@ export default function AdminLuckyIdEditPage() {
 
             <section className="grid gap-6 xl:grid-cols-2">
               <DetailPanel
-                title="Lucky ID overview"
-                description="Primary record snapshot for this Lucky ID."
+                title="SFEMI ID overview"
+                description="Primary record snapshot for this SFEMI ID."
               >
                 <div className="grid gap-4 sm:grid-cols-2">
                   <DetailValue label="Row ID" value={`#${luckyId.id}`} />
                   <DetailValue
-                    label="Lucky Number"
+                    label="SFEMI ID"
                     value={formatLuckyNumber(luckyId.lucky_number)}
                   />
                   <DetailValue label="Batch Code" value={luckyId.batch_code} />
@@ -754,7 +754,7 @@ export default function AdminLuckyIdEditPage() {
                 ) : (
                   <ERPEmptyState
                     title="No direct status correction available"
-                    description="This Lucky ID should be reviewed through its linked subscription or winner workflow rather than corrected directly here."
+                    description="This SFEMI ID should be reviewed through its linked subscription or promotional benefit workflow rather than corrected directly here."
                   />
                 )}
               </FormSection>
@@ -763,7 +763,7 @@ export default function AdminLuckyIdEditPage() {
             <section className="grid gap-6 xl:grid-cols-2">
               <DetailPanel
                 title="Batch context"
-                description="Batch ownership for this Lucky ID."
+                description="Batch ownership for this SFEMI ID."
               >
                 {batchPreview ? (
                   <div className="grid gap-4 sm:grid-cols-2">
@@ -824,7 +824,7 @@ export default function AdminLuckyIdEditPage() {
                       value={subscriptionPreview.batch_code || "—"}
                     />
                     <DetailValue
-                      label="Lucky Number"
+                      label="SFEMI ID"
                       value={formatLuckyNumber(subscriptionPreview.lucky_number)}
                     />
                     <DetailValue
@@ -847,7 +847,7 @@ export default function AdminLuckyIdEditPage() {
                 ) : (
                   <ERPEmptyState
                     title="No linked contract preview"
-                    description="This Lucky ID does not currently resolve to a visible subscription preview."
+                    description="This SFEMI ID does not currently resolve to a visible subscription preview."
                   />
                 )}
               </DetailPanel>
@@ -855,7 +855,7 @@ export default function AdminLuckyIdEditPage() {
 
             {error ? (
               <ERPErrorState
-                title="Unable to update Lucky ID"
+                title="Unable to update SFEMI ID"
                 description={error || actionError || undefined}
               />
             ) : null}
@@ -863,7 +863,7 @@ export default function AdminLuckyIdEditPage() {
             {successMessage ? (
               <DetailPanel
                 title="Update successful"
-                description="Lucky ID status correction was saved successfully."
+                description="SFEMI ID status correction was saved successfully."
               >
                 <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
                   {successMessage}

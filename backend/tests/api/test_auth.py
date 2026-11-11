@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from rest_framework import status
@@ -580,3 +582,206 @@ class AuthApiTests(APITestCase):
         sessions_after = self.client.get("/api/v1/auth/sessions/")
         remaining_ids = [s["id"] for s in sessions_after.data]
         self.assertNotIn(session_a_id, remaining_ids)
+
+    # -------------------------------------------------
+    # GOOGLE OAUTH & CUSTOMER PHONE ONBOARDING
+    # -------------------------------------------------
+
+    def test_google_auth_missing_token(self):
+        response = self.client.post("/api/v1/auth/google/", {}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Google ID token (id_token) is required.", response.data.get("detail", ""))
+
+    @patch("api.v1.views.auth_views._verify_google_id_token")
+    def test_google_auth_new_customer_requires_phone(self, mock_verify):
+        mock_verify.return_value = {
+            "email": "newcustomer@gmail.com",
+            "name": "Rohan Sharma",
+            "given_name": "Rohan",
+            "family_name": "Sharma",
+            "email_verified": True,
+            "iss": "accounts.google.com",
+            "sub": "google-sub-12345",
+        }
+
+        response = self.client.post(
+            "/api/v1/auth/google/",
+            {"id_token": "valid-test-token"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data.get("requires_phone"))
+        self.assertEqual(response.data.get("email"), "newcustomer@gmail.com")
+        self.assertEqual(response.data.get("name"), "Rohan Sharma")
+
+    @patch("api.v1.views.auth_views._verify_google_id_token")
+    def test_google_auth_new_customer_with_phone_registration(self, mock_verify):
+        mock_verify.return_value = {
+            "email": "newcustomer2@gmail.com",
+            "name": "Amit Kumar",
+            "given_name": "Amit",
+            "family_name": "Kumar",
+            "email_verified": True,
+            "iss": "accounts.google.com",
+            "sub": "google-sub-67890",
+        }
+
+        response = self.client.post(
+            "/api/v1/auth/google/",
+            {"id_token": "valid-test-token", "phone": "9876543210"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertFalse(response.data.get("requires_phone"))
+        self.assertTrue(response.data.get("is_new_customer"))
+        self.assertIn("access", response.data)
+        self.assertIn("refresh", response.data)
+        self.assertEqual(response.data.get("user", {}).get("phone"), "9876543210")
+        self.assertEqual(response.data.get("user", {}).get("role"), UserRole.CUSTOMER)
+
+        # Confirm Customer profile was created
+        cust = Customer.objects.filter(phone="9876543210").first()
+        self.assertIsNotNone(cust)
+        self.assertEqual(cust.name, "Amit Kumar")
+        self.assertEqual(cust.user.email, "newcustomer2@gmail.com")
+
+    @patch("api.v1.views.auth_views._verify_google_id_token")
+    def test_google_auth_existing_customer_direct_login(self, mock_verify):
+        mock_verify.return_value = {
+            "email": "existingcust@gmail.com",
+            "name": "Existing Customer",
+            "given_name": "Existing",
+            "family_name": "Customer",
+            "email_verified": True,
+            "iss": "accounts.google.com",
+        }
+
+        user = User.objects.create_user(
+            username="existing_cust_01",
+            email="existingcust@gmail.com",
+            phone="9876543211",
+            role=UserRole.CUSTOMER,
+        )
+        Customer.objects.create(user=user, name="Existing Customer", phone="9876543211")
+
+        response = self.client.post(
+            "/api/v1/auth/google/",
+            {"id_token": "valid-test-token"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data.get("requires_phone"))
+        self.assertIn("access", response.data)
+        self.assertEqual(response.data.get("user", {}).get("email"), "existingcust@gmail.com")
+
+    @patch("api.v1.views.auth_views._verify_google_id_token")
+    def test_google_auth_blocks_internal_admin_role(self, mock_verify):
+        mock_verify.return_value = {
+            "email": "auth_admin@example.com",
+            "name": "Auth Admin",
+            "email_verified": True,
+            "iss": "accounts.google.com",
+        }
+
+        response = self.client.post(
+            "/api/v1/auth/google/",
+            {"id_token": "valid-test-token"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertIn("internal staff", response.data.get("detail", ""))
+
+    def test_google_auth_config_endpoint_returns_db_client_id(self):
+        from business_setup.models.email_smtp import EmailSMTPSettings
+        EmailSMTPSettings.objects.all().delete()
+        EmailSMTPSettings.objects.create(
+            google_client_id="custom-db-client-id-123.apps.googleusercontent.com",
+            is_active=True,
+        )
+
+        response = self.client.get("/api/v1/auth/google/config/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.data.get("google_client_id"),
+            "custom-db-client-id-123.apps.googleusercontent.com",
+        )
+        self.assertTrue(response.data.get("is_configured"))
+
+    @patch("api.v1.views.auth_views._verify_google_id_token")
+    def test_google_auth_normalizes_indian_phone_formats(self, mock_verify):
+        mock_verify.return_value = {
+            "email": "phoneformat@gmail.com",
+            "name": "Phone Test",
+            "email_verified": True,
+            "iss": "accounts.google.com",
+        }
+
+        # Test with +91 country code and spaces
+        response = self.client.post(
+            "/api/v1/auth/google/",
+            {"id_token": "valid-test-token", "phone": "+91 91234-56789"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data.get("user", {}).get("phone"), "9123456789")
+
+    @patch("api.v1.views.auth_views._verify_google_id_token")
+    def test_google_auth_prevents_takeover_of_different_customer_email(self, mock_verify):
+        # Alice already registered her phone
+        alice = User.objects.create_user(
+            username="alice_cust",
+            email="alice@gmail.com",
+            phone="9876543299",
+            role=UserRole.CUSTOMER,
+        )
+        Customer.objects.create(user=alice, name="Alice", phone="9876543299")
+
+        # Bob logs in with Google as bob@gmail.com and tries to claim Alice's phone
+        mock_verify.return_value = {
+            "email": "bob@gmail.com",
+            "name": "Bob",
+            "email_verified": True,
+            "iss": "accounts.google.com",
+        }
+
+        response = self.client.post(
+            "/api/v1/auth/google/",
+            {"id_token": "valid-test-token", "phone": "9876543299"},
+            format="json",
+        )
+        # Must be rejected, not hijacked!
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("already linked to another customer", response.data.get("detail", ""))
+
+        # Verify Alice's account was NOT modified
+        alice.refresh_from_db()
+        self.assertEqual(alice.email, "alice@gmail.com")
+
+    @patch("requests.get")
+    def test_google_token_verification_validates_db_audience(self, mock_get):
+        from business_setup.models.email_smtp import EmailSMTPSettings
+        EmailSMTPSettings.objects.all().delete()
+        EmailSMTPSettings.objects.create(
+            google_client_id="expected-client-id.apps.googleusercontent.com",
+            is_active=True,
+        )
+
+        class MockResponse:
+            status_code = 200
+            def json(self):
+                return {
+                    "email": "audtest@gmail.com",
+                    "email_verified": True,
+                    "iss": "accounts.google.com",
+                    "aud": "wrong-client-id.apps.googleusercontent.com",
+                }
+
+        mock_get.return_value = MockResponse()
+
+        response = self.client.post(
+            "/api/v1/auth/google/",
+            {"id_token": "token-with-wrong-aud"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("client ID mismatch", response.data.get("detail", ""))

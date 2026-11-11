@@ -88,27 +88,27 @@ export function buildWinnerPosture(
 
   if (winnerSubscriptions > 0 || waivedAmount > 0 || waivedEmis > 0) {
     return {
-      title: "Winner benefit is already reflected in scoped totals",
+      title: "Beneficiary promotional benefit is already reflected in scoped totals",
       description:
         winnerSurface?.note ??
         `${winnerSubscriptions} subscription${
           winnerSubscriptions === 1 ? "" : "s"
-        } carry winner history, and ${money(
+        } carry beneficiary history, and ${money(
           waivedAmount
         )} is already recorded as waived EMI value.`,
       badgeClass:
         "border border-[color-mix(in_oklab,oklch(0.5_0.1_290)_32%,var(--border)_68%)] bg-[color-mix(in_oklab,oklch(0.45_0.06_290)_14%,var(--card)_86%)] text-foreground shadow-[var(--badge-inset-highlight)]",
-      badgeLabel: "Winner benefit",
+      badgeLabel: "Promotional benefit",
     };
   }
 
   return {
-    title: "No winner waiver is currently recorded",
+    title: "No promotional waiver is currently recorded",
     description:
       winnerSurface?.note ??
-      "If a draw benefit is applied later, it should stay separate from payment settlement and contract status.",
+      "If a promotional benefit is applied later, it should stay separate from payment settlement and contract status.",
     badgeClass: "border border-border bg-muted text-muted-foreground shadow-[var(--badge-inset-highlight)]",
-    badgeLabel: "No winner benefit",
+    badgeLabel: "No promotional benefit",
   };
 }
 

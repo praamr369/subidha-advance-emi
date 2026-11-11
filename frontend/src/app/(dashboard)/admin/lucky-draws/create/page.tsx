@@ -122,10 +122,10 @@ function formatDrawMonth(value: number | null | undefined): string {
 }
 
 function parseErrorMessage(error: unknown): string {
-  if (!(error instanceof Error)) return "Failed to create draw commitment.";
+  if (!(error instanceof Error)) return "Failed to create benefit selection commitment.";
 
   const raw = error.message.trim();
-  if (!raw) return "Failed to create draw commitment.";
+  if (!raw) return "Failed to create benefit selection commitment.";
 
   try {
     const parsed = JSON.parse(raw) as Record<string, unknown>;
@@ -517,11 +517,11 @@ export default function AdminLuckyDrawCreatePage() {
           </button>
         </section>
 
-        {loading ? <LoadingBlock label="Loading draw creation workspace..." /> : null}
+        {loading ? <LoadingBlock label="Loading selection creation workspace..." /> : null}
 
         {!loading && error && batchOptions.length === 0 ? (
           <ErrorState
-            title="Unable to load draw creation page"
+            title="Unable to load benefit selection creation page"
             description={error}
             onRetry={() => void loadBatches("initial")}
           />
@@ -530,7 +530,7 @@ export default function AdminLuckyDrawCreatePage() {
         {!loading && !error && batchOptions.length === 0 ? (
           <EmptyState
             title="No batches available"
-            description="No batches were returned for draw commitment selection."
+            description="No batches were returned for benefit selection commitment."
           />
         ) : null}
 
@@ -556,7 +556,7 @@ export default function AdminLuckyDrawCreatePage() {
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                   <DetailValue label="Draw ID" value={`#${persistedCommit.id}`} />
                   <DetailValue label="Batch ID" value={`#${persistedCommit.batch}`} />
-                  <DetailValue label="Draw Month" value={formatDrawMonth(persistedCommit.draw_month)} />
+                  <DetailValue label="Selection Month" value={formatDrawMonth(persistedCommit.draw_month)} />
                   <DetailValue label="Saved At" value={formatDateTime(persistedCommit.saved_at)} />
                 </div>
 
@@ -598,7 +598,7 @@ export default function AdminLuckyDrawCreatePage() {
                     href={`/admin/lucky-draws/${persistedCommit.id}`}
                     className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
                   >
-                    Open Draw Detail
+                    Open Benefit Detail
                   </Link>
                 </div>
               </SectionCard>
@@ -606,7 +606,7 @@ export default function AdminLuckyDrawCreatePage() {
 
             <SectionCard
               title="Select batch"
-              description="Choose the batch for which the Lucky Draw commitment should be created."
+              description="Choose the batch for which the promotional benefit commitment should be created."
             >
               <div className="grid gap-4 md:grid-cols-[1fr_auto]">
                 <div>
@@ -675,14 +675,14 @@ export default function AdminLuckyDrawCreatePage() {
                       </span>
                     }
                   />
-                  <DetailValue label="Next Draw Basis" value={formatDate(selectedBatchSummary.start_date)} />
-                  <DetailValue label="Draw Day" value={selectedBatchSummary.draw_day != null ? String(selectedBatchSummary.draw_day) : "—"} />
+                  <DetailValue label="Next Selection Basis" value={formatDate(selectedBatchSummary.start_date)} />
+                  <DetailValue label="Selection Day" value={selectedBatchSummary.draw_day != null ? String(selectedBatchSummary.draw_day) : "—"} />
                   <DetailValue label="Total Slots" value={String(selectedBatchSummary.total_slots)} />
                   <DetailValue label="SFEMI IDs Created" value={String(luckyIdsCreated)} />
                   <DetailValue label="Assigned SFEMI IDs" value={String(selectedBatchSummary.assigned_lucky_ids)} />
                   <DetailValue label="Waived SFEMI IDs" value={String(selectedBatchSummary.won_lucky_ids)} />
                   <DetailValue label="Subscriptions" value={String(selectedBatchSummary.subscription_count)} />
-                  <DetailValue label="Existing Draws" value={String(selectedBatchSummary.draw_count)} />
+                  <DetailValue label="Existing Selections" value={String(selectedBatchSummary.draw_count)} />
                   <DetailValue label="Monthly Booked Value" value={formatRupee(selectedBatchSummary.monthly_booked_value)} />
                   <DetailValue label="Start Date" value={formatDate(selectedBatchSummary.start_date)} />
                 </div>
@@ -701,7 +701,7 @@ export default function AdminLuckyDrawCreatePage() {
 
             {error ? (
               <ErrorState
-                title="Unable to create draw commitment"
+                title="Unable to create benefit selection commitment"
                 description={error}
               />
             ) : null}
@@ -714,7 +714,7 @@ export default function AdminLuckyDrawCreatePage() {
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                   <DetailValue label="Draw ID" value={`#${displayedCommit.id}`} />
                   <DetailValue label="Batch ID" value={`#${displayedCommit.batch}`} />
-                  <DetailValue label="Draw Month" value={formatDrawMonth(displayedCommit.draw_month)} />
+                  <DetailValue label="Selection Month" value={formatDrawMonth(displayedCommit.draw_month)} />
                   <DetailValue label="Revealed" value={displayedCommit.is_revealed ? "Yes" : "No"} />
                 </div>
 
@@ -760,7 +760,7 @@ export default function AdminLuckyDrawCreatePage() {
                     href={`/admin/lucky-draws/${displayedCommit.id}`}
                     className="inline-flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition hover:bg-muted"
                   >
-                    Open Draw Detail
+                    Open Benefit Detail
                   </Link>
 
                   <Link

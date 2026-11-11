@@ -144,7 +144,7 @@ def check_delivery_eligibility(subscription: Subscription) -> DeliveryEligibilit
     if is_winner:
         return DeliveryEligibility(
             eligible=True,
-            reason="Draw winner — delivery eligible immediately.",
+            reason="Promotional benefit beneficiary — delivery eligible immediately.",
             paid_emi_count=paid_emi_count,
             total_emi_count=total_emi_count,
             paid_ratio=paid_ratio,
@@ -174,7 +174,7 @@ def check_delivery_eligibility(subscription: Subscription) -> DeliveryEligibilit
     pct = int(paid_ratio * 100) if total_emi_count > 0 else 0
     return DeliveryEligibility(
         eligible=False,
-        reason=f"Only {pct}% EMIs paid ({paid_emi_count}/{total_emi_count}). Need 70%+ or draw win.",
+        reason=f"Only {pct}% EMIs paid ({paid_emi_count}/{total_emi_count}). Need 70%+ or promotional benefit waiver.",
         paid_emi_count=paid_emi_count,
         total_emi_count=total_emi_count,
         paid_ratio=paid_ratio,

@@ -142,11 +142,11 @@ const SEARCH_MODE_CONFIG: Record<
       "Subscription search finds collectible EMI rows, then loads that customer queue for final selection.",
   },
   lucky: {
-    label: "Lucky ID",
-    inputLabel: "Lucky ID / lucky number",
-    placeholder: "Enter Lucky ID row id or lucky number",
+    label: "SFEMI ID",
+    inputLabel: "SFEMI ID / number",
+    placeholder: "Enter SFEMI ID or number",
     help:
-      "Lucky search is useful when the customer only knows the lucky number used in the batch.",
+      "SFEMI search is useful when the customer only knows the SFEMI ID used in the batch.",
   },
   emi: {
     label: "EMI",
@@ -817,7 +817,7 @@ export default function CashierCollectPage() {
         <div id="cashier-step-search">
         <FormSection
           title="Step 1 · Search collectible EMI rows"
-          description="Phone loads the full customer queue directly. Subscription, lucky, and EMI search modes first locate the collectible row, then open that customer queue for final confirmation."
+          description="Phone loads the full customer queue directly. Subscription, SFEMI ID, and EMI search modes first locate the collectible row, then open that customer queue for final confirmation."
         >
           <form
             onSubmit={handleLookup}
@@ -955,7 +955,7 @@ export default function CashierCollectPage() {
                         <div className="text-xs text-slate-600">
                           {result.batch_code || "No batch"}
                           {typeof result.lucky_number === "number"
-                            ? ` · Lucky #${result.lucky_number}`
+                            ? ` · SFEMI ID #${result.lucky_number}`
                             : ""}
                         </div>
                       </div>
@@ -1126,7 +1126,7 @@ export default function CashierCollectPage() {
                             <div className="text-xs text-slate-600">
                               Batch {emi.batch_code || "—"}
                               {typeof emi.lucky_number === "number"
-                                ? ` · Lucky #${emi.lucky_number}`
+                                ? ` · SFEMI ID #${emi.lucky_number}`
                                 : ""}
                             </div>
                           </div>

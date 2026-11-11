@@ -162,8 +162,8 @@ export default function EligibilityCheckPage() {
                 </svg>
               </div>
               <div>
-                <p className="font-semibold text-gray-900">Current Draw</p>
-                <p className="text-sm text-gray-600">Draw must be currently active</p>
+                <p className="font-semibold text-gray-900">Current Benefit Cycle</p>
+                <p className="text-sm text-gray-600">Promotional benefit cycle must be currently active</p>
               </div>
             </div>
           </div>
@@ -175,7 +175,7 @@ export default function EligibilityCheckPage() {
             href="/customer/lucky-plan/results"
             className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-3 rounded-lg transition text-center"
           >
-            View Draw Results
+            View Benefit Results
           </Link>
           <Link
             href="/customer/lucky-plan/history"

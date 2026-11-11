@@ -128,23 +128,23 @@ export function buildSubscriptionDetailSemantics(
 
   const contractDescription =
     contractStatus === "COMPLETED" && hasWinnerHistory
-      ? "This winner subscription is fully settled. Winner history remains part of the contract record."
+      ? "This promotional benefit subscription is fully settled. Benefit history remains part of the contract record."
       : contractStatus === "COMPLETED"
       ? "All EMI rows are settled through paid or waived entries."
       : contractStatus === "WON"
-      ? "Winner benefit is recorded, but at least one EMI row still requires settlement."
+      ? "Promotional benefit is recorded, but at least one EMI row still requires settlement."
       : contractStatus === "DEFAULTED"
       ? "Defaulted status is preserved as the contract lifecycle state."
       : "Contract lifecycle remains active until all EMI rows are settled.";
 
   const winnerHeadline = hasWinnerHistory
-    ? "Winner benefit recorded"
-    : "No winner benefit recorded";
+    ? "Promotional benefit recorded"
+    : "No promotional benefit recorded";
   const winnerDescription = hasWinnerHistory
     ? isSettled
-      ? `${formatWinnerMonthLabel(winnerMonth)} won the draw. The contract later reached a fully settled state without losing winner history.`
-      : `${formatWinnerMonthLabel(winnerMonth)} won the draw. Contract status stays WON until remaining EMI exposure is settled.`
-    : "Winner history is shown only when backend draw and waiver evidence is present.";
+      ? `${formatWinnerMonthLabel(winnerMonth)} was selected for promotional benefit. The contract later reached a fully settled state without losing benefit history.`
+      : `${formatWinnerMonthLabel(winnerMonth)} was selected for promotional benefit. Contract status stays WON until remaining EMI exposure is settled.`
+    : "Promotional benefit history is shown only when backend selection and waiver evidence is present.";
 
   const waiverHeadline = hasWaiver
     ? isSettled

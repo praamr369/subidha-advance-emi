@@ -26,8 +26,8 @@ type PageProps = {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { id } = await params;
   return buildPublicMetadata({
-    title: `Fair Draw #${id}`,
-    description: "Public commitment certificate, verification result, and masked winner detail.",
+    title: `SFEMI Benefit #${id}`,
+    description: "Public commitment certificate, verification result, and masked recipient detail.",
     path: `/lucky-plan/fair-draw/${id}`,
   });
 }
@@ -100,27 +100,27 @@ export default async function FairDrawDetailPage({ params }: PageProps) {
     summary = summaryPayload.draw || certificatePayload.certificate || winnerPayload.winner;
     verification = verificationPayload.verification;
   } catch (err) {
-    error = err instanceof Error ? err.message : "Unable to load Lucky Draw detail right now.";
+    error = err instanceof Error ? err.message : "Unable to load benefit detail right now.";
   }
 
   const certificate = summary;
 
   return (
     <PublicPageShell
-      title={certificate ? `Fair Draw #${id}` : "Fair Draw Detail"}
-      subtitle="Certificate, verification, and masked winner record."
+      title={certificate ? `SFEMI Benefit #${id}` : "SFEMI Benefit Detail"}
+      subtitle="Certificate, verification, and masked recipient record."
       heroSlot={
         <DrawTransparencyHero
           mode="certificate"
-          title={certificate ? `Fair Draw #${id}` : "Fair Draw Detail"}
-          subtitle="Read the public certificate, verification status, masked winner detail, and future-EMI-only boundary for this draw record."
+          title={certificate ? `SFEMI Benefit #${id}` : "SFEMI Benefit Detail"}
+          subtitle="Read the public certificate, verification status, masked recipient detail, and future-EMI-only boundary for this benefit record."
         />
       }
       breadcrumbs={[
         { label: dictionary.common.home, href: ROUTES.public.home },
         { label: dictionary.common.luckyPlan, href: ROUTES.public.luckyPlan },
-        { label: "Fair Draw", href: ROUTES.public.fairDraw },
-        { label: `Draw ${id}` },
+        { label: "Fair Benefit Selection", href: ROUTES.public.fairDraw },
+        { label: `Selection ${id}` },
       ]}
       actions={[
         { label: "SFEMI FAQ", href: ROUTES.public.faq, variant: "secondary" },
@@ -130,11 +130,11 @@ export default async function FairDrawDetailPage({ params }: PageProps) {
       <PublicMarketingBanner
         eyebrow="Public verification"
         title="Trust without exposing private customer data"
-        description="This page shows the published commitment, later verification record, and a masked winner summary only. It is read-only and cannot mutate any operational record."
+        description="This page shows the published commitment, later verification record, and a masked beneficiary summary only. It is read-only and cannot mutate any operational record."
         items={[
           { title: "No raw PII", description: "Public data never includes phone numbers, Aadhaar, KYC IDs, or internal customer identifiers." },
-          { title: "Seed later", description: "The reveal seed appears only after the draw is revealed and the verification record is published." },
-          { title: "Future EMI waiver only", description: "The winning benefit applies to future EMI obligations only." },
+          { title: "Seed later", description: "The reveal seed appears only after the selection is revealed and the verification record is published." },
+          { title: "Future EMI waiver only", description: "The promotional benefit applies to future EMI obligations only." },
         ]}
       />
 
@@ -150,7 +150,7 @@ export default async function FairDrawDetailPage({ params }: PageProps) {
             <Panel eyebrow="Certificate" title="Published commitment certificate">
               <div className="grid gap-4 md:grid-cols-2">
                 <Metric label="Batch" value={certificate.batch_code} />
-                <Metric label="Draw month" value={`Month ${certificate.draw_month}`} />
+                <Metric label="Selection month" value={`Month ${certificate.draw_month}`} />
                 <Metric label="Published at" value={formatDateTime(certificate.commitment_published_at || certificate.draw_date)} />
                 <Metric label="Public hash" value={certificate.public_commit_hash || "—"} />
                 <Metric label="Eligibility snapshots" value={String(certificate.eligible_snapshot_count ?? 0)} />
@@ -194,17 +194,17 @@ export default async function FairDrawDetailPage({ params }: PageProps) {
               </p>
             </Panel>
 
-            <Panel eyebrow="Winner" title="Masked public winner detail">
+            <Panel eyebrow="Beneficiary" title="Masked public recipient detail">
               <div className="grid gap-4">
-                <Metric label="Winner display" value={certificate.winner_name_masked || "Pending"} />
-                <Metric label="Lucky number" value={certificate.winner_lucky_number != null ? `Lucky #${String(certificate.winner_lucky_number).padStart(2, "0")}` : "Pending"} />
+                <Metric label="Recipient display" value={certificate.winner_name_masked || "Pending"} />
+                <Metric label="SFEMI ID" value={certificate.winner_lucky_number != null ? `SFEMI ID #${String(certificate.winner_lucky_number).padStart(2, "0")}` : "Pending"} />
                 <Metric label="Product" value={certificate.product_name || "—"} />
                 <Metric label="Waived EMI" value={certificate.waived_emi_count != null ? `${certificate.waived_emi_count} EMI rows` : "—"} />
                 <Metric label="Waived amount" value={certificate.waived_amount || "—"} />
                 <Metric label="Waiver scope" value={certificate.waiver_scope || "FUTURE_EMI_ONLY"} />
               </div>
               <p className="mt-4 text-sm leading-6 text-muted-foreground">
-                {certificate.winner_benefit_note || "Winner receives future EMI waiver only."}
+                {certificate.winner_benefit_note || "Promotional benefit recipient receives future EMI waiver only."}
               </p>
             </Panel>
           </div>

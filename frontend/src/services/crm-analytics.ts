@@ -3,6 +3,12 @@ import { apiFetch } from "@/lib/api";
 export interface FunnelAnalytics {
   period_days: number;
   funnel: {
+    public_visits?: number;
+    unique_visitors?: number;
+    registered_visitors?: number;
+    unregistered_visitors?: number;
+    visitor_to_registered_pct?: number;
+    visitor_to_lead_pct?: number;
     leads_created: number;
     leads_contacted: number;
     leads_contacted_pct: number;
@@ -27,6 +33,14 @@ export interface FunnelAnalytics {
 export interface ProductPerformance {
   product_id: number;
   product_name: string;
+  product_code?: string;
+  category?: string;
+  views_count?: number;
+  likes_count?: number;
+  dislikes_count?: number;
+  total_reactions?: number;
+  like_ratio?: number;
+  sentiment?: "NO_VOTES" | "HIGHLY_LIKED" | "POPULAR" | "MIXED" | "LOW_APPROVAL";
   requests_count: number;
   approved_count: number;
   conversion_rate: number;

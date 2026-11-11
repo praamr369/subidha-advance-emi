@@ -536,7 +536,7 @@ export default function CustomerSubscriptionDetailPage() {
                 <InfoRow label="Batch" value={text(subscription.batch_code)} />
               ) : null}
               {subscription.plan_type === "EMI" && subscription.lucky_number != null ? (
-                <InfoRow label="Lucky number" value={formatLuckyNumberLabel(subscription.lucky_number)} />
+                <InfoRow label="SFEMI ID" value={formatLuckyNumberLabel(subscription.lucky_number)} />
               ) : null}
               <InfoRow label="Next due" value={formatDate(subscription.next_due_date)} />
               <InfoRow label="Created" value={formatDate(subscription.created_at)} />
@@ -683,18 +683,18 @@ export default function CustomerSubscriptionDetailPage() {
             </CPageCard>
           </CPageSection>
 
-          {/* Winner info */}
+          {/* Beneficiary info */}
           {detailSemantics.hasWinnerHistory || subscription.winner_status ? (
-            <CPageSection title="Winner Status">
+            <CPageSection title="Beneficiary Status">
               <CPageCard>
                 <div className="mb-3">
-                  <ERPStatusBadge status={detailSemantics.winnerStatus === "WON" ? "WON" : "NOT_WON"} label={detailSemantics.winnerStatus === "WON" ? "Winner!" : "Not won yet"} />
+                  <ERPStatusBadge status={detailSemantics.winnerStatus === "WON" ? "WON" : "NOT_WON"} label={detailSemantics.winnerStatus === "WON" ? "Beneficiary Awarded" : "Not awarded"} />
                 </div>
                 {detailSemantics.winnerMonth ? (
-                  <InfoRow label="Winner month" value={formatWinnerMonthLabel(detailSemantics.winnerMonth)} />
+                  <InfoRow label="Beneficiary month" value={formatWinnerMonthLabel(detailSemantics.winnerMonth)} />
                 ) : null}
                 {detailSemantics.drawRevealedAt ? (
-                  <InfoRow label="Draw revealed" value={formatDateTime(detailSemantics.drawRevealedAt)} />
+                  <InfoRow label="Selection revealed" value={formatDateTime(detailSemantics.drawRevealedAt)} />
                 ) : null}
                 {detailSemantics.hasWaiver ? (
                   <>

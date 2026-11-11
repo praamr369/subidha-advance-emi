@@ -75,13 +75,13 @@ export default function RulebookPage() {
       </div>
 
       <PublicMarketingBanner
-        eyebrow="Draw transparency"
-        title="How the monthly draw is kept fair"
-        description="The commit-then-reveal process means no one can change the draw outcome after commitment. A hash is published first; the reveal comes later and is verifiable against the hash."
+        eyebrow="Selection transparency"
+        title="How monthly promotional benefit selection is kept transparent"
+        description="The commit-then-reveal process means no one can change the selection outcome after commitment. A hash is published first; the reveal comes later and is verifiable against the hash."
         items={[
-          { title: "Commitment hash", description: "Published before each draw so the result cannot be retroactively changed." },
-          { title: "Reveal publication", description: "The actual draw result is published and can be verified against the earlier commitment." },
-          { title: "Masked winner identity", description: "Winner names are masked on public pages to protect privacy while keeping the process auditable." },
+          { title: "Commitment hash", description: "Published before each selection so the result cannot be retroactively changed." },
+          { title: "Reveal publication", description: "The actual selection result is published and can be verified against the earlier commitment." },
+          { title: "Masked beneficiary identity", description: "Beneficiary names are masked on public pages to protect privacy while keeping the process auditable." },
         ]}
       />
 

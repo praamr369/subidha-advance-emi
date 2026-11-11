@@ -115,6 +115,10 @@ const EodReconciliationDrawer = dynamic(
   () => import("@/components/admin/finance/EodReconciliationDrawer"),
   { ssr: false }
 );
+const AdminOfflineControlCenter = dynamic(
+  () => import("@/components/admin/offline/AdminOfflineControlCenter"),
+  { ssr: false }
+);
 import { openAdminHelp } from "@/components/admin/help/AdminHelpDrawer";
 
 const DashboardShellContext = createContext(false);
@@ -1505,6 +1509,7 @@ function Topbar({
               <span className="hidden md:inline">Help</span>
             </button>
 
+            <AdminOfflineControlCenter />
             <ThemeToggle variant="dashboard" />
             <NotificationBellDropdown role={role} />
             <UserDropdown displayName={displayName} role={role} onLogout={onLogout} isLoggingOut={isLoggingOut} />

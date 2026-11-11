@@ -487,7 +487,7 @@ export default function AdminSubscriptionContractPrintPage() {
           <div className="text-xs font-black uppercase tracking-[0.12em] text-[#6f4e27]">Business Obligations</div>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-5 text-[#6f5c46]">
             <li>Maintain posted EMI, payment, waiver, delivery, and audit records in SUBIDHA CORE.</li>
-            <li>Apply lucky winner EMI waiver only through backend lucky draw and waiver workflows.</li>
+            <li>Apply promotional benefit recipient EMI waiver only through backend benefit selection and waiver workflows.</li>
             <li>Keep cancellation, return, service, reconciliation, and accounting actions separate from this read-only document.</li>
           </ul>
         </section>

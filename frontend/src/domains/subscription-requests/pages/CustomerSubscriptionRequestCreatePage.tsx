@@ -388,10 +388,10 @@ function LuckyNumberPicker({
   disabled: boolean;
 }) {
   if (disabled) {
-    return <p className="text-sm text-muted-foreground">Select a batch first to see available lucky numbers.</p>;
+    return <p className="text-sm text-muted-foreground">Select a batch first to see available SFEMI IDs.</p>;
   }
   if (numbers.length === 0) {
-    return <p className="text-sm text-amber-600 dark:text-amber-400">No lucky numbers available in this batch.</p>;
+    return <p className="text-sm text-amber-600 dark:text-amber-400">No SFEMI IDs available in this batch.</p>;
   }
   return (
     <div className="flex flex-wrap gap-2">
@@ -526,7 +526,7 @@ export default function CustomerSubscriptionRequestCreatePage({
     if (s === 0 && !productId) return "Please select a product.";
     if (s === 1) {
       if (!batchId) return "Please select a batch.";
-      if (!luckyNumber) return "Please pick a lucky number.";
+      if (!luckyNumber) return "Please pick a SFEMI ID.";
     }
     return null;
   }
@@ -730,7 +730,7 @@ export default function CustomerSubscriptionRequestCreatePage({
 
           <div className="space-y-3 rounded-2xl border border-border bg-card p-4 shadow-sm">
             <div>
-              <h2 className="font-bold text-foreground">Choose Your Lucky Number</h2>
+              <h2 className="font-bold text-foreground">Choose Your SFEMI ID</h2>
               <p className="text-xs text-muted-foreground">Available SFEMI IDs in the selected batch</p>
             </div>
             <LuckyNumberPicker
@@ -770,7 +770,7 @@ export default function CustomerSubscriptionRequestCreatePage({
                   ? `${selectedBatch.batch_code} · ${selectedBatch.duration_months} months`
                   : "—",
               },
-              { label: "Lucky Number", value: luckyNumber ? `#${luckyNumber.padStart(2, "0")}` : "—" },
+              { label: "SFEMI ID", value: luckyNumber ? `#${luckyNumber.padStart(2, "0")}` : "—" },
               { label: "Monthly EMI", value: derivedMonthly ? money(derivedMonthly) : "—" },
             ].map(({ label, value }) => (
               <div key={label} className="flex items-start justify-between gap-3 py-2 border-b border-border last:border-0">

@@ -14,7 +14,7 @@ import { ROUTES } from "@/lib/routes";
 export const metadata: Metadata = buildPublicMetadata({
   title: "Lease Contract",
   description:
-    "Understand Subidha Furniture lease contract: tenure, payment, upgrade rules, handover, and return. Lease does not include Lucky ID or draw participation.",
+    "Understand Subidha Furniture lease contract: tenure, payment, upgrade rules, handover, and return. Lease does not include SFEMI ID or promotional benefit participation.",
   path: "/contracts/lease",
 });
 
@@ -39,7 +39,7 @@ export default function ContractsLeasePage() {
       <PublicBanner
         eyebrow="Read before applying"
         title="Lease renewal and upgrade are approval-based"
-        description="Please review these points carefully before enrollment. Lease does not create Lucky ID participation, winner eligibility, or EMI waiver benefits."
+        description="Please review these points carefully before enrollment. Lease does not create SFEMI ID allocation, promotional benefit eligibility, or EMI waiver benefits."
       />
 
       <RentLeaseWorkflowPreview mode="lease" />

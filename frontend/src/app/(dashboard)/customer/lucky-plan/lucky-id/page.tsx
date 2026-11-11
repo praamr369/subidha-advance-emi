@@ -189,7 +189,7 @@ export default function LuckyIDTrackerPage() {
             href="/customer/lucky-plan/results"
             className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 rounded-lg transition text-center"
           >
-            View Draw Results
+            View Benefit Results
           </Link>
           <Link
             href="/customer/lucky-plan/history"

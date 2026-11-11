@@ -22,6 +22,7 @@ function emptySettings(): EmailSMTPSettings {
     from_name: "",
     is_enabled: false,
     has_app_password: false,
+    google_client_id: "",
   };
 }
 
@@ -76,6 +77,7 @@ export default function EmailSmtpSettingsPage() {
         from_email: settings.from_email,
         from_name: settings.from_name,
         is_enabled: settings.is_enabled,
+        google_client_id: settings.google_client_id?.trim() || "",
       };
       if (appPassword.trim()) payload.app_password = appPassword.trim();
       const saved = await saveEmailSmtpSettings(payload);
@@ -207,6 +209,43 @@ export default function EmailSmtpSettingsPage() {
               </div>
             </section>
 
+            {/* Google OAuth 2.0 Web Client ID */}
+            <section className="rounded-xl border border-border bg-card p-5 shadow-sm space-y-3">
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600 text-white font-bold text-xs shadow-sm">
+                  G
+                </span>
+                <div className="text-base font-semibold text-foreground">
+                  Google OAuth 2.0 Client ID (Customer Sign-In & Sign-Up)
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Paste your Web Client ID from Google Cloud Console below. Once saved, customers can immediately sign in and register with Google on the webapp with 1 click &mdash; <strong>no environment variable editing or server restart required</strong>.
+              </p>
+              <div>
+                <label className="text-sm text-muted-foreground block">
+                  Google OAuth Client ID
+                  <input
+                    type="text"
+                    className="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground font-mono placeholder:text-muted-foreground focus-visible:border-[var(--ring)]"
+                    value={settings.google_client_id || ""}
+                    onChange={(e) => updateField("google_client_id", e.target.value)}
+                    placeholder="e.g. 1234567890-abcdefg.apps.googleusercontent.com"
+                  />
+                </label>
+                <div className="mt-2 flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">
+                    {settings.google_client_id ? "Active and saved in database for customer Google Sign-In." : "Not configured yet. Paste Client ID to activate."}
+                  </span>
+                  {settings.google_client_id ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700 border border-emerald-200">
+                      ✓ Active in Database
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            </section>
+
             <section className="rounded-xl border border-border bg-card p-5 shadow-sm">
               <div className="text-base font-semibold text-foreground">Enable for live sending</div>
               <p className="mt-1 text-sm text-muted-foreground">
@@ -280,6 +319,64 @@ export default function EmailSmtpSettingsPage() {
           </aside>
         </div>
       ) : null}
+
+      {/* Unified Google Setup Guide Card */}
+      <section className="rounded-2xl border border-blue-200/80 bg-blue-50/40 p-6 shadow-sm">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white font-bold text-sm">
+            G
+          </div>
+          <div>
+            <h3 className="text-base font-bold text-foreground">
+              Unified Google Account Setup (OAuth 2.0 + Gmail SMTP / OTP)
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              Connect both customer Google login/registration and OTP email dispatch using the <strong>same business Gmail account</strong> without any paid API.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-2 mt-4 text-xs leading-relaxed text-foreground">
+          <div className="rounded-xl border border-border bg-card p-4 space-y-2">
+            <div className="font-semibold text-sm text-blue-700">Part A: Gmail SMTP App Password (Outbound OTP)</div>
+            <ol className="list-decimal pl-4 space-y-1.5 text-muted-foreground">
+              <li>Log in to your business Google Account and go to <code className="rounded bg-muted px-1.5 py-0.5 text-foreground">myaccount.google.com/security</code>.</li>
+              <li>Ensure <strong>2-Step Verification</strong> is enabled.</li>
+              <li>Go to <strong>App passwords</strong> (<code className="rounded bg-muted px-1.5 py-0.5 text-foreground">myaccount.google.com/apppasswords</code>).</li>
+              <li>Create a new app name &quot;Subidha Core&quot; and copy the 16-character code.</li>
+              <li>Paste it into the <strong>App password</strong> field above and click <strong>Save email settings</strong>.</li>
+              <li>Run a test email using the test box on the right. Once successful, check <strong>Use this account for live outbound email</strong>.</li>
+            </ol>
+          </div>
+
+          <div className="rounded-xl border border-border bg-card p-4 space-y-2">
+            <div className="font-semibold text-sm text-blue-700">Part B: Google Cloud Console (Free Customer OAuth)</div>
+            <ol className="list-decimal pl-4 space-y-1.5 text-muted-foreground">
+              <li>Open <code className="rounded bg-muted px-1.5 py-0.5 text-foreground">console.cloud.google.com</code> using the <strong>same Gmail account</strong>.</li>
+              <li>Create a new project named <strong>Subidha Core</strong> (100% Free, zero credit card required).</li>
+              <li>Navigate to <strong>APIs &amp; Services &rarr; OAuth consent screen</strong>:
+                <ul className="list-disc pl-4 mt-0.5 space-y-0.5">
+                  <li>User Type: <em>External</em></li>
+                  <li>App Name: <em>Subidha Furniture</em></li>
+                  <li>User support &amp; developer email: <em>yourbusiness@gmail.com</em></li>
+                </ul>
+              </li>
+              <li>Go to <strong>Credentials &rarr; Create Credentials &rarr; OAuth client ID</strong>:
+                <ul className="list-disc pl-4 mt-0.5 space-y-0.5">
+                  <li>Application type: <em>Web application</em></li>
+                  <li>Authorized JavaScript origins: <code className="text-foreground">https://subidhafurnitureasansol.com</code> and <code className="text-foreground">http://localhost:3000</code></li>
+                </ul>
+              </li>
+              <li>Copy the generated <strong>Client ID</strong> and add it to your server configuration:
+                <div className="mt-1 rounded bg-muted/70 p-2 font-mono text-[11px] text-foreground">
+                  NEXT_PUBLIC_GOOGLE_CLIENT_ID=&quot;your-client-id.apps.googleusercontent.com&quot;<br />
+                  GOOGLE_CLIENT_ID=&quot;your-client-id.apps.googleusercontent.com&quot;
+                </div>
+              </li>
+            </ol>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

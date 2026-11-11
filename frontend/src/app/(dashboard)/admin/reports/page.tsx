@@ -318,7 +318,7 @@ export default function AdminReportsPage() {
     },
     {
       title: "Batch Performance",
-      description: "Subscription and winner progression by batch with draw context.",
+      description: "Subscription and beneficiary progression by batch with selection context.",
       href: ROUTES.admin.reportsBatchPerformance,
       badge: "BATCH",
     },

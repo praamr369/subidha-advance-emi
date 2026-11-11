@@ -187,7 +187,7 @@ export default function CustomerSubscriptionRequestsPage() {
       ) : null}
 
       <div className="mt-4 rounded-2xl border border-dashed border-border bg-muted/30 px-4 py-3 text-xs text-muted-foreground">
-        A submitted request is not a live contract. Admin approval creates the real subscription, EMI schedule, and lucky draw assignment.
+        A submitted request is not a live contract. Admin approval creates the real subscription, EMI schedule, and SFEMI benefit selection assignment.
       </div>
     </CustomerPageShell>
   );

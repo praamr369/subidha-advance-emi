@@ -797,8 +797,8 @@ export default function AdminOperationsDashboard() {
         };
       case "winners":
         return {
-          title: "Lucky draw & waiver surface",
-          description: "Winner subscriptions and future EMI waiver surface summary.",
+          title: "SFEMI promotional benefit & waiver surface",
+          description: "Beneficiary subscriptions and future EMI waiver surface summary.",
           icon: <BadgeCheck className="h-5 w-5" />,
           openHref: ROUTES.admin.luckyDraws,
         };
@@ -899,7 +899,7 @@ export default function AdminOperationsDashboard() {
     }
     if (id === "winners") {
       const count = winnerSurface?.winner_subscriptions ?? 0;
-      if (count > 0) return { attention: "normal", label: `${count} winners` };
+      if (count > 0) return { attention: "normal", label: `${count} beneficiaries` };
       return { attention: "quiet", label: "Quiet" };
     }
     return { attention: "normal" };
@@ -1418,7 +1418,7 @@ export default function AdminOperationsDashboard() {
               </div>
             </div>
             <div className="rounded-xl border border-border bg-[var(--surface-card-elevated)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.74)]">
-              <div className="enterprise-eyebrow">Lucky draw</div>
+              <div className="enterprise-eyebrow">Promotional Benefit</div>
               <div className="mt-2 text-sm font-semibold text-foreground">
                 {legacy?.batches?.next_draw_batch?.batch_code ?? "—"}
               </div>
@@ -1427,7 +1427,7 @@ export default function AdminOperationsDashboard() {
                   ? `${legacy.batches.next_draw_batch.days_until_draw ?? 0} days to ${formatDate(
                       legacy.batches.next_draw_batch.draw_date
                     )}`
-                  : "No draw scheduled"}
+                  : "No selection scheduled"}
               </div>
             </div>
           </div>
@@ -2049,7 +2049,7 @@ export default function AdminOperationsDashboard() {
                       <div className="space-y-4">
                         <div className="grid gap-3 sm:grid-cols-2">
                           <StatCard
-                            label="Winner subscriptions"
+                            label="Beneficiary subscriptions"
                             value={String(winnerSurface?.winner_subscriptions ?? 0)}
                             subtext={`${winnerSurface?.waived_emis ?? 0} waived EMI rows`}
                             tone="info"
@@ -2085,8 +2085,8 @@ export default function AdminOperationsDashboard() {
                           </div>
                         ) : (
                           <EmptyState
-                            title="No winner rows"
-                            description="No winner subscriptions are visible in the current window."
+                            title="No beneficiary rows"
+                            description="No beneficiary subscriptions are visible in the current window."
                           />
                         )}
                       </div>

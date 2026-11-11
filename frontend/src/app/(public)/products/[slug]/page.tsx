@@ -6,6 +6,7 @@ import { Suspense } from "react";
 
 import ProductDetailWorkflowBoundary from "@/components/public/ProductDetailWorkflowBoundary";
 import ProductReviews from "@/components/public/ProductReviews";
+import ProductReactionWidget from "@/components/public/ProductReactionWidget";
 import ProductEnquiryHandoffPanel from "@/components/public/ProductEnquiryHandoffPanel";
 import { buildProductEnquiryHref } from "@/components/public/product-enquiry-utils";
 import PublicPageShell from "@/components/public/PublicPageShell";
@@ -177,8 +178,16 @@ export default async function ProductDetailPage({ params, searchParams }: Produc
 
       <ProductDetailWorkflowBoundary />
 
+      {/* Customer Reaction & Feedback Section */}
+      <div className="mt-8">
+        <ProductReactionWidget
+          productId={product.id}
+          productName={product.name}
+        />
+      </div>
+
       {/* Reviews section */}
-      <div className="mt-10">
+      <div className="mt-8">
         <ProductReviews
           productId={product.id}
           productName={product.name}

@@ -601,7 +601,7 @@ export default function CashierDashboardPage() {
                   </div>
                   <div className="rounded-[1.3rem] border border-slate-200 bg-white p-4">
                     <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                      Winner / waiver
+                      Beneficiary / waiver
                     </div>
                     <div className="mt-2 text-sm font-semibold text-slate-950">
                       {winnerSurface?.winner_subscriptions ?? 0} subscriptions
@@ -627,7 +627,7 @@ export default function CashierDashboardPage() {
                 >
                   <div className="grid gap-3 sm:grid-cols-2">
                     <StatCard
-                      label="Winner subscriptions"
+                      label="Beneficiary subscriptions"
                       value={String(
                         winnerSurface?.winner_subscriptions ??
                           summary.winner_subscriptions ??

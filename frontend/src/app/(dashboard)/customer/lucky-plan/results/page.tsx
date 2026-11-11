@@ -48,8 +48,8 @@ export default function DrawResultsPage() {
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Draw Results</h1>
-          <p className="text-gray-600">Past and upcoming draw results</p>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">Promotional Benefit Results</h1>
+          <p className="text-gray-600">Past and upcoming promotional benefit results</p>
         </div>
 
         {error && (
@@ -64,11 +64,11 @@ export default function DrawResultsPage() {
             <div key={result.id} className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition">
               <div className="grid md:grid-cols-3 gap-4 mb-4">
                 <div>
-                  <p className="text-sm text-gray-500 mb-1">Draw Batch</p>
+                  <p className="text-sm text-gray-500 mb-1">Batch</p>
                   <p className="text-lg font-semibold text-gray-900">{result.batch_name}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500 mb-1">Draw Date</p>
+                  <p className="text-sm text-gray-500 mb-1">Benefit Date</p>
                   <p className="text-lg font-semibold text-gray-900">
                     {new Date(result.draw_date).toLocaleDateString('en-IN', {
                       year: 'numeric',
@@ -93,27 +93,27 @@ export default function DrawResultsPage() {
                       </svg>
                     </div>
                     <div>
-                      <h3 className="font-bold text-green-900">Congratulations! You Won!</h3>
-                      <p className="text-sm text-green-700">EMI Waiver: ₹{result.customer_waiver_amount?.toLocaleString('en-IN') || '0'}</p>
+                      <h3 className="font-bold text-green-900">Congratulations! Selected for Benefit!</h3>
+                      <p className="text-sm text-green-700">Remaining Future EMIs Waived: ₹{result.customer_waiver_amount?.toLocaleString('en-IN') || '0'}</p>
                     </div>
                   </div>
                 </div>
               ) : (
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
-                  <p className="text-gray-600">Better luck next time!</p>
+                  <p className="text-gray-600">Not selected for this cycle.</p>
                 </div>
               )}
 
-              {/* Winners Info */}
+              {/* Recipients Info */}
               {result.winner_details && result.winner_details.length > 0 && (
                 <div className="mt-4 pt-4 border-t">
-                  <p className="font-semibold text-gray-900 mb-3">Winners ({result.winners_count})</p>
+                  <p className="font-semibold text-gray-900 mb-3">Benefit Recipients ({result.winners_count})</p>
                   <div className="grid md:grid-cols-2 gap-3">
                     {result.winner_details.slice(0, 2).map((winner, idx) => (
                       <div key={idx} className="bg-blue-50 rounded p-3">
                         <p className="text-sm font-semibold text-blue-900">{winner.customer_name}</p>
                         <p className="text-xs text-blue-700">{winner.location}</p>
-                        <p className="text-sm font-bold text-blue-900 mt-1">₹{winner.prize_amount.toLocaleString('en-IN')}</p>
+                        <p className="text-sm font-bold text-blue-900 mt-1">₹{winner.prize_amount.toLocaleString('en-IN')} waived</p>
                       </div>
                     ))}
                   </div>
