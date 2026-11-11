@@ -1,9 +1,14 @@
+import logging
+
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.shortcuts import get_object_or_404
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+logger = logging.getLogger(__name__)
 
 from accounting.models import (
     ChartOfAccount,
@@ -462,8 +467,14 @@ class ExpenseVoucherViewSet(AdminAccountingModelViewSet):
                 expense_voucher_id=int(pk),
                 approved_by=request.user,
             )
-        except ValueError as exc:
-            raise ValidationError({"detail": str(exc)}) from exc
+        except (ValueError, DjangoValidationError) as exc:
+            msg = getattr(exc, "message", None) or str(exc)
+            if hasattr(exc, "message_dict"):
+                msg = "; ".join(f"{k}: {', '.join(v)}" for k, v in exc.message_dict.items())
+            raise ValidationError({"detail": msg}) from exc
+        except Exception as exc:
+            logger.exception("Failed to approve expense voucher %s", pk)
+            raise ValidationError({"detail": f"Approval failed: {str(exc)}"}) from exc
 
         payload = ExpenseVoucherSerializer(voucher, context=self.get_serializer_context())
         return Response({"updated": updated, "expense": payload.data}, status=status.HTTP_200_OK)
@@ -477,8 +488,14 @@ class ExpenseVoucherViewSet(AdminAccountingModelViewSet):
                 expense_voucher_id=int(pk),
                 posted_by=request.user,
             )
-        except ValueError as exc:
-            raise ValidationError({"detail": str(exc)}) from exc
+        except (ValueError, DjangoValidationError) as exc:
+            msg = getattr(exc, "message", None) or str(exc)
+            if hasattr(exc, "message_dict"):
+                msg = "; ".join(f"{k}: {', '.join(v)}" for k, v in exc.message_dict.items())
+            raise ValidationError({"detail": msg}) from exc
+        except Exception as exc:
+            logger.exception("Failed to post expense voucher %s", pk)
+            raise ValidationError({"detail": f"Posting failed: {str(exc)}"}) from exc
 
         payload = ExpenseVoucherSerializer(voucher, context=self.get_serializer_context())
         return Response({"updated": updated, "expense": payload.data}, status=status.HTTP_200_OK)

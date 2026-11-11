@@ -132,3 +132,45 @@ class AccountingExpensePostingTests(TestCase):
         saved = serializer.save()
         self.assertEqual(saved.gross_amount, Decimal("10000.00"))
         self.assertEqual(saved.net_amount, Decimal("10000.00"))
+
+    def test_post_expense_voucher_heals_zero_gross_amount_and_posts_successfully(self):
+        # Emulate an existing/legacy voucher created with 0 gross amount
+        legacy_voucher = ExpenseVoucher.objects.create(
+            expense_date=timezone.localdate(),
+            expense_account=self.expense_chart,
+            gross_amount=Decimal("0.00"),
+            tax_amount=Decimal("0.00"),
+            net_amount=Decimal("10000.00"),
+            payment_mode="CASH",
+            finance_account=self.finance_account,
+            notes="Legacy expense with zero gross",
+        )
+        approved_voucher, approved = approve_expense_voucher(
+            expense_voucher_id=legacy_voucher.id,
+            approved_by=self.admin,
+        )
+        self.assertTrue(approved)
+        approved_voucher.refresh_from_db()
+        self.assertEqual(approved_voucher.gross_amount, Decimal("10000.00"))
+
+        posted_voucher, posted = post_expense_voucher(
+            expense_voucher_id=legacy_voucher.id,
+            posted_by=self.admin,
+        )
+        self.assertTrue(posted)
+        posted_voucher.refresh_from_db()
+        self.assertEqual(posted_voucher.status, ExpenseVoucherStatus.POSTED)
+        self.assertEqual(posted_voucher.gross_amount, Decimal("10000.00"))
+        self.assertIsNotNone(posted_voucher.posted_journal_entry_id)
+
+    def test_expense_voucher_viewset_post_action_handles_errors_gracefully(self):
+        from rest_framework.test import APIClient
+
+        client = APIClient()
+        client.force_authenticate(user=self.admin)
+
+        # Calling post on an unapproved voucher should return a 400 JSON error with detail, not a 500 crash
+        response = client.post(f"/api/v1/accounting/expenses/{self.expense.id}/post/")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("detail", response.data)
+        self.assertIn("must be approved", response.data["detail"])

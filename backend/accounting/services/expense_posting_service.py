@@ -1,13 +1,32 @@
 from __future__ import annotations
 
+from decimal import Decimal
 from django.db import transaction
 
-from accounting.models import ExpenseVoucher, ExpenseVoucherStatus, JournalEntryType
+from accounting.models import (
+    ChartOfAccount,
+    ExpenseVoucher,
+    ExpenseVoucherStatus,
+    FinanceAccountCoaMapping,
+    JournalEntryType,
+    MONEY_ZERO,
+)
 from accounting.services.journal_posting_service import (
     _log_accounting_event,
     create_journal_entry,
     post_journal_entry,
 )
+
+
+def _sync_voucher_amounts(voucher: ExpenseVoucher) -> None:
+    tax = voucher.tax_amount or MONEY_ZERO
+    gross = voucher.gross_amount or MONEY_ZERO
+    net = voucher.net_amount or MONEY_ZERO
+
+    if gross <= MONEY_ZERO and net > MONEY_ZERO:
+        voucher.gross_amount = (net - tax) if (net > tax and (net - tax) > MONEY_ZERO) else net
+    elif net <= MONEY_ZERO and gross > MONEY_ZERO:
+        voucher.net_amount = gross + tax
 
 
 @transaction.atomic
@@ -21,8 +40,9 @@ def approve_expense_voucher(*, expense_voucher_id: int, approved_by):
     if voucher.status == ExpenseVoucherStatus.CANCELLED:
         raise ValueError("Cancelled expense vouchers cannot be approved.")
 
+    _sync_voucher_amounts(voucher)
     voucher.status = ExpenseVoucherStatus.APPROVED
-    voucher.save(update_fields=["status", "updated_at"])
+    voucher.save(update_fields=["status", "gross_amount", "net_amount", "updated_at"])
     _log_accounting_event(
         event="ACCOUNTING_EXPENSE_APPROVED",
         instance=voucher,
@@ -50,6 +70,19 @@ def post_expense_voucher(*, expense_voucher_id: int, posted_by):
     if voucher.finance_account_id is None:
         raise ValueError("Expense voucher requires a finance account before posting.")
 
+    _sync_voucher_amounts(voucher)
+
+    finance_chart = getattr(voucher.finance_account, "chart_account", None)
+    if finance_chart is None:
+        mapping = FinanceAccountCoaMapping.objects.filter(
+            finance_account=voucher.finance_account,
+            is_active=True,
+        ).first()
+        if mapping and mapping.chart_account:
+            finance_chart = mapping.chart_account
+    if finance_chart is None:
+        raise ValueError(f"Finance account '{voucher.finance_account.name}' has no linked Chart of Account.")
+
     journal_entry = create_journal_entry(
         entry_date=voucher.expense_date,
         entry_type=JournalEntryType.EXPENSE,
@@ -64,7 +97,7 @@ def post_expense_voucher(*, expense_voucher_id: int, posted_by):
                 "credit_amount": 0,
             },
             {
-                "chart_account": voucher.finance_account.chart_account,
+                "chart_account": finance_chart,
                 "description": voucher.voucher_no,
                 "debit_amount": 0,
                 "credit_amount": voucher.net_amount,
@@ -78,7 +111,7 @@ def post_expense_voucher(*, expense_voucher_id: int, posted_by):
 
     voucher.posted_journal_entry = posted_journal
     voucher.status = ExpenseVoucherStatus.POSTED
-    voucher.save(update_fields=["posted_journal_entry", "status", "updated_at"])
+    voucher.save(update_fields=["posted_journal_entry", "status", "gross_amount", "net_amount", "updated_at"])
 
     _log_accounting_event(
         event="ACCOUNTING_EXPENSE_POSTED",

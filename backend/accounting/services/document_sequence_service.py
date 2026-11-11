@@ -6,7 +6,7 @@ from datetime import date
 from typing import Any
 
 from django.db import transaction
-from django.db.models import Count, QuerySet
+from django.db.models import Count, Q, QuerySet
 from django.utils import timezone
 
 from accounting.models import AccountingPeriod, AccountingPeriodStatus, DocumentSequence, FinancialYear
@@ -227,8 +227,19 @@ def get_or_create_sequence_for_document_type(document_type: str, document_date: 
         raise DocumentNumberingSetupError(f"Unsupported document type {document_type}.")
     financial_year = resolve_financial_year_for_document_date(document_date)
     legacy_fy = _legacy_code_for_financial_year(financial_year)
-    sequence = _sequence_queryset_for_type(document_type=document_type, financial_year=financial_year).order_by("-id").first()
+    sequence = (
+        DocumentSequence.objects.filter(
+            Q(document_type=document_type) | Q(series_code=profile.series_code),
+            financial_year=legacy_fy,
+            is_active=True,
+        )
+        .order_by("-id")
+        .first()
+    )
     if sequence is not None:
+        if not sequence.document_type:
+            sequence.document_type = document_type
+            sequence.save(update_fields=["document_type"])
         return sequence
     return DocumentSequence.objects.create(
         series_code=profile.series_code,
@@ -252,7 +263,18 @@ def validate_document_numbering_ready(document_type: str, document_date: date, b
         raise DocumentNumberingSetupError("No accounting period is configured for the document date.")
     if period.status in {AccountingPeriodStatus.LOCKED, AccountingPeriodStatus.CLOSED} or period.is_locked:
         raise DocumentNumberingSetupError("The accounting period for the document date is locked or closed.")
-    sequence = _sequence_queryset_for_type(document_type=document_type, financial_year=financial_year).order_by("-id").first()
+    profile = DOCUMENT_PROFILES_BY_TYPE.get(document_type)
+    series_code = profile.series_code if profile else document_type
+    legacy_fy = _legacy_code_for_financial_year(financial_year)
+    sequence = (
+        DocumentSequence.objects.filter(
+            Q(document_type=document_type) | Q(series_code=series_code),
+            financial_year=legacy_fy,
+            is_active=True,
+        )
+        .order_by("-id")
+        .first()
+    )
     if sequence is None:
         try:
             return get_or_create_sequence_for_document_type(document_type, document_date, branch=branch)
@@ -261,6 +283,9 @@ def validate_document_numbering_ready(document_type: str, document_date: date, b
         raise DocumentNumberingSetupError(
             f"No {document_type} numbering profile is configured for financial year {financial_year.code}."
         )
+    if not sequence.document_type:
+        sequence.document_type = document_type
+        sequence.save(update_fields=["document_type"])
     return sequence
 
 
@@ -295,6 +320,11 @@ def allocate_document_number(document_type: str, document_date: date, branch=Non
     sequence = validate_document_numbering_ready(document_type, document_date, branch=branch)
     locked_sequence = DocumentSequence.objects.select_for_update().get(pk=sequence.pk)
     number = preview_document_number(sequence=locked_sequence, branch=branch)
+    attempts = 0
+    while _number_collides(document_type=document_type, number=number) and attempts < 1000:
+        locked_sequence.next_number += 1
+        number = preview_document_number(sequence=locked_sequence, branch=branch)
+        attempts += 1
     if _number_collides(document_type=document_type, number=number):
         raise DocumentNumberingSetupError(f"Document number {number} already exists. Increase next number before issuing documents.")
     locked_sequence.next_number += 1
