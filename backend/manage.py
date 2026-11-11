@@ -2,6 +2,9 @@
 """Django's command-line utility for administrative tasks."""
 import os
 import sys
+import warnings
+
+warnings.filterwarnings("ignore", message=".*urllib3.*doesn't match a supported version.*")
 
 
 def main():

@@ -176,6 +176,6 @@ else
 fi
 
 cd "$APP_DIR"
-git tag -f "prod-$STAMP" && git push -f origin "prod-$STAMP" 2>/dev/null || true
+git tag -f "prod-$STAMP" && ALLOW_GIT_PUSH=true git push -f origin "prod-$STAMP" 2>/dev/null || true
 echo "==> Deploy complete: $NEW_COMMIT (tagged prod-$STAMP)"
 echo "    Rollback point kept at: $LATEST_BACKUP"
