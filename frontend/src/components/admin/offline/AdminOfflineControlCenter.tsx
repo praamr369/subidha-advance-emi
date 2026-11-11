@@ -114,7 +114,7 @@ export default function AdminOfflineControlCenter() {
     try {
       const res = await preCacheStoreMasterData();
       if (res.success) {
-        setPreCacheMessage(`✓ Pre-cached ${res.cachedCount} master catalogues (Stock, Products, CRM) for offline use.`);
+        setPreCacheMessage(`✓ Pre-cached ${res.cachedCount} master catalogues & offline routes (Billing, Production, Inventory, CRM) for offline use.`);
       } else {
         setPreCacheMessage(res.error || "Pre-caching failed. Verify network.");
       }

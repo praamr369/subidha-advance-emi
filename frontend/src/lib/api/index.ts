@@ -466,13 +466,26 @@ async function performAccessTokenRefresh(): Promise<string | null> {
 
     return nextAccessToken;
   } catch (err: unknown) {
-    // CRITICAL OFFLINE GUARD: If offline or network connection is down,
+    // CRITICAL OFFLINE GUARD: If offline, network connection is down,
+    // or server returned 5xx / gateway / network error,
     // NEVER clear the user's session! Retain the existing token so admin offline work continues uninterrupted.
-    if (typeof window !== "undefined" && !navigator.onLine) {
-      return getAccessToken();
-    }
-    if (err instanceof TypeError && err.message.toLowerCase().includes("fetch")) {
-      return getAccessToken();
+    if (typeof window !== "undefined") {
+      if (!navigator.onLine) {
+        return getAccessToken();
+      }
+      const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
+      if (
+        msg.includes("fetch") ||
+        msg.includes("network") ||
+        msg.includes("offline") ||
+        msg.includes("timeout") ||
+        msg.includes("abort") ||
+        msg.includes("503") ||
+        msg.includes("502") ||
+        msg.includes("504")
+      ) {
+        return getAccessToken();
+      }
     }
     clearSession();
     return null;
@@ -775,7 +788,48 @@ async function handleOfflineMutation<T>(
     } as unknown as T;
   }
 
-  // 7. Generic Safe Admin Mutation
+  // 7. Manufacturing & Production Jobs
+  if ((normPath.includes("manufacturing") || normPath.includes("production")) && (method === "POST" || method === "PATCH" || method === "PUT")) {
+    let parsedPayload: any = {};
+    try {
+      parsedPayload = typeof body === "string" ? JSON.parse(body) : (body as any) || {};
+    } catch {
+      parsedPayload = (body as any) || {};
+    }
+
+    const memoNo = `OFF-JOB-${Date.now().toString(36).toUpperCase()}`;
+    const idempotencyKey =
+      headers["Idempotency-Key"] || `offline_mfg_${Date.now()}`;
+
+    await enqueueOutboxItem({
+      kind: "PRODUCTION_ACTION",
+      path,
+      method: method as any,
+      payload: parsedPayload,
+      headers,
+      idempotency_key: idempotencyKey,
+      client_memo_no: memoNo,
+      summary: `Offline Production Action (${memoNo}) - ${path}`,
+    });
+
+    return {
+      id: -Date.now(),
+      job_no: memoNo,
+      status: "DRAFT",
+      is_offline_provisional: true,
+      updated: true,
+      job: {
+        id: -Date.now(),
+        job_no: memoNo,
+        status: "DRAFT",
+        is_offline_provisional: true,
+        ...parsedPayload,
+      },
+      message: "Production job recorded locally. Will sync upon reconnection.",
+    } as unknown as T;
+  }
+
+  // 8. Generic Safe Admin Mutation
   if (method === "POST" || method === "PATCH" || method === "PUT") {
     let parsedPayload: any = {};
     try {
@@ -808,6 +862,83 @@ async function handleOfflineMutation<T>(
   }
 
   return null;
+}
+
+function getGracefulOfflineFallback<T>(path: string): T {
+  const normPath = path.toLowerCase();
+
+  // 1. Auth current user / profile
+  if (normPath.includes("/auth/me")) {
+    const session = getStoredSession();
+    if (session) {
+      return {
+        id: session.id,
+        name: session.name,
+        username: session.name,
+        role: session.role,
+        is_active: true,
+        offline: true,
+      } as unknown as T;
+    }
+  }
+
+  // 2. Realtime stream SSE ticket
+  if (normPath.includes("/realtime/ticket")) {
+    return {
+      ticket: "",
+      expires_in: 0,
+      stream_path: "",
+      stream_lifetime_seconds: 0,
+    } as unknown as T;
+  }
+
+  // 3. Stock on hand
+  if (normPath.includes("stock-on-hand")) {
+    return {
+      total_items: 0,
+      items: [],
+      low_stock: [],
+      critical: [],
+      results: [],
+      count: 0,
+    } as unknown as T;
+  }
+
+  // 4. Manufacturing overview
+  if (normPath.includes("manufacturing/overview")) {
+    return {
+      active_jobs_count: 0,
+      completed_today_count: 0,
+      total_boms_count: 0,
+      recent_jobs: [],
+    } as unknown as T;
+  }
+
+  // 5. Paginated endpoints (page_size, page=, results)
+  if (
+    normPath.includes("page_size") ||
+    normPath.includes("page=") ||
+    normPath.includes("/jobs") ||
+    normPath.includes("/boms") ||
+    normPath.includes("/direct-sales") ||
+    normPath.includes("/invoices") ||
+    normPath.includes("/customers")
+  ) {
+    return {
+      count: 0,
+      next: null,
+      previous: null,
+      results: [],
+    } as unknown as T;
+  }
+
+  // 6. Generic list fallback
+  if (normPath.endsWith("s/") || normPath.endsWith("s")) {
+    return [] as unknown as T;
+  }
+
+  // 7. Generic empty object fallback
+  return {} as unknown as T;
 }
 
 async function apiFetchInternal<T>(
@@ -876,6 +1007,7 @@ async function apiFetchInternal<T>(
       if (cached !== null && cached !== undefined) {
         return cached;
       }
+      return getGracefulOfflineFallback<T>(path);
     } else {
       const offlineResult = await handleOfflineMutation<T>(path, method, originalBody, headers);
       if (offlineResult !== null) {
@@ -902,6 +1034,7 @@ async function apiFetchInternal<T>(
         if (cached !== null && cached !== undefined) {
           return cached;
         }
+        return getGracefulOfflineFallback<T>(path);
       } else {
         const offlineResult = await handleOfflineMutation<T>(path, method, originalBody, headers);
         if (offlineResult !== null) {

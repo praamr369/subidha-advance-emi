@@ -13,6 +13,7 @@ export type OutboxTransactionKind =
   | "PAYMENT_COLLECTION"
   | "CUSTOMER_CREATION"
   | "DELIVERY_UPDATE"
+  | "PRODUCTION_ACTION"
   | "GENERIC_MUTATION";
 
 export type OutboxStatus = "PENDING" | "SYNCING" | "SYNCED" | "FAILED";
@@ -342,21 +343,41 @@ export async function getCachedData<T>(rawKey: string): Promise<T | null> {
           return;
         }
 
-        // Fuzzy path fallback: if key has query params (e.g. ?page=2), check base path
-        const basePath = key.split("?")[0];
-        if (basePath && basePath !== key) {
-          const fallbackReq = store.get(basePath);
-          fallbackReq.onsuccess = () => {
-            const fallbackRes = fallbackReq.result as MasterCacheEntry<T> | undefined;
-            if (fallbackRes && (!fallbackRes.expires_at || fallbackRes.expires_at >= Date.now())) {
-              resolve(fallbackRes.data);
+        // Fuzzy path & query parameter agnostic fallback:
+        // If key has query params (e.g. ?page_size=50), match cached records under the same base path
+        const basePath = key.split("?")[0].replace(/\/+$/, "");
+        const allReq = store.getAll();
+        allReq.onsuccess = () => {
+          const allEntries = (allReq.result as MasterCacheEntry<T>[]) || [];
+          const now = Date.now();
+
+          // 1. Direct base path match or any query variant under the same base path
+          const match = allEntries.find((e) => {
+            const entryBase = e.key.split("?")[0].replace(/\/+$/, "");
+            return (entryBase === basePath || e.key.startsWith(basePath)) && (!e.expires_at || e.expires_at >= now);
+          });
+          if (match) {
+            resolve(match.data);
+            return;
+          }
+
+          // 2. Sibling module match (e.g. /customers vs /crm/customers)
+          const lastSegment = basePath.split("/").filter(Boolean).pop();
+          if (lastSegment && lastSegment.length > 3) {
+            const segMatch = allEntries.find((e) => {
+              const entryBase = e.key.split("?")[0].replace(/\/+$/, "");
+              return entryBase.endsWith(`/${lastSegment}`) && (!e.expires_at || e.expires_at >= now);
+            });
+            if (segMatch) {
+              resolve(segMatch.data);
               return;
             }
-            resolve(null);
-          };
-          fallbackReq.onerror = () => resolve(null);
-          return;
-        }
+          }
+
+          resolve(null);
+        };
+        allReq.onerror = () => resolve(null);
+        return;
 
         resolve(null);
       };

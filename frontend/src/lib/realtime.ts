@@ -61,6 +61,7 @@ function teardown() {
 async function connect(): Promise<void> {
   if (connecting || subscribers.size === 0 || typeof window === "undefined") return;
   if (typeof window.EventSource === "undefined") return; // very old browsers: REST polling still works
+  if (typeof navigator !== "undefined" && !navigator.onLine) return; // Never connect SSE while offline
   connecting = true;
   try {
     const ticketRes = await apiFetch<TicketResponse>("/realtime/ticket/", {
@@ -68,6 +69,7 @@ async function connect(): Promise<void> {
       body: JSON.stringify({}),
     });
     if (subscribers.size === 0) return;
+    if (!ticketRes || !ticketRes.ticket || ticketRes.ticket === "undefined") return;
 
     const base = API_BASE_URL.replace(/\/+$/, "");
     source?.close();
@@ -97,15 +99,33 @@ async function connect(): Promise<void> {
     source.onerror = () => {
       source?.close();
       source = null;
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        // Paused while offline; window "online" handler will resume
+        return;
+      }
       scheduleReconnect(retryDelayMs);
       retryDelayMs = Math.min(retryDelayMs * 2, 30_000);
     };
   } catch {
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      return;
+    }
     scheduleReconnect(retryDelayMs);
     retryDelayMs = Math.min(retryDelayMs * 2, 30_000);
   } finally {
     connecting = false;
   }
+}
+
+// Global network listener to pause and resume SSE seamlessly
+if (typeof window !== "undefined") {
+  window.addEventListener("offline", () => {
+    teardown();
+  });
+  window.addEventListener("online", () => {
+    retryDelayMs = 2_000;
+    scheduleReconnect(1_000);
+  });
 }
 
 export function subscribeRealtime(handlers: RealtimeHandlers): () => void {

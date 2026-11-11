@@ -106,14 +106,16 @@ function getKindPriority(kind: OutboxTransactionKind): number {
       return 2;
     case "STOCK_ADJUSTMENT":
       return 3;
-    case "DIRECT_SALE":
+    case "PRODUCTION_ACTION":
       return 4;
-    case "PAYMENT_COLLECTION":
+    case "DIRECT_SALE":
       return 5;
-    case "DELIVERY_UPDATE":
+    case "PAYMENT_COLLECTION":
       return 6;
-    default:
+    case "DELIVERY_UPDATE":
       return 7;
+    default:
+      return 8;
   }
 }
 
@@ -402,9 +404,27 @@ async function refreshCoreMasterData(): Promise<void> {
   }
 }
 
+export const CORE_OFFLINE_ROUTES = [
+  "/admin",
+  "/admin/billing/direct-sale",
+  "/admin/billing/direct-sales",
+  "/admin/billing/invoices",
+  "/admin/billing/receipts",
+  "/admin/manufacturing",
+  "/admin/manufacturing/jobs",
+  "/admin/manufacturing/boms",
+  "/admin/inventory/stock-on-hand",
+  "/admin/customers",
+  "/admin/deliveries",
+  "/admin/sales",
+  "/admin/collections",
+  "/admin/offline",
+];
+
 /**
  * Pre-cache all essential store data across all 17 admin modules
- * into IndexedDB so staff and admin users can operate offline immediately.
+ * and Next.js page shells/scripts into IndexedDB & CacheStorage so staff
+ * and admin users can operate offline immediately.
  */
 export async function preCacheStoreMasterData(): Promise<{
   success: boolean;
@@ -416,17 +436,80 @@ export async function preCacheStoreMasterData(): Promise<{
     return { success: false, cachedCount: 0, error: "Must be signed in to pre-cache store data." };
   }
 
+  // 1. Pre-cache Next.js page shells, RSC payloads, and JS/CSS static bundles
+  if (typeof window !== "undefined" && "caches" in window) {
+    try {
+      const pagesCache = await caches.open("subidha-core-pages-v4");
+      const staticCache = await caches.open("subidha-core-static-v4");
+
+      for (const route of CORE_OFFLINE_ROUTES) {
+        try {
+          const res = await fetch(route, { cache: "reload" });
+          if (res.ok) {
+            await pagesCache.put(route, res.clone());
+            const text = await res.text();
+
+            // Extract and cache all scripts
+            const scriptMatches = text.matchAll(/src="(\/_next\/static\/[^"]+)"/g);
+            for (const m of scriptMatches) {
+              try {
+                const sRes = await fetch(m[1]);
+                if (sRes.ok) await staticCache.put(m[1], sRes);
+              } catch {}
+            }
+
+            // Extract and cache stylesheets
+            const styleMatches = text.matchAll(/href="(\/_next\/static\/[^"]+\.css)"/g);
+            for (const m of styleMatches) {
+              try {
+                const cRes = await fetch(m[1]);
+                if (cRes.ok) await staticCache.put(m[1], cRes);
+              } catch {}
+            }
+          }
+
+          // Cache RSC route payload
+          try {
+            const rscRes = await fetch(route, {
+              headers: { RSC: "1" },
+              cache: "reload",
+            });
+            if (rscRes.ok) {
+              await pagesCache.put(`${route}?_rsc=1`, rscRes.clone());
+              await pagesCache.put(route, rscRes);
+            }
+          } catch {}
+        } catch {
+          // ignore individual route cache failure
+        }
+      }
+
+      // Tell the active service worker to also pre-cache routes
+      if (navigator.serviceWorker?.controller) {
+        navigator.serviceWorker.controller.postMessage({
+          type: "PRE_CACHE_ROUTES",
+          routes: CORE_OFFLINE_ROUTES,
+        });
+      }
+    } catch {
+      // ignore
+    }
+  }
+
   const allModuleEndpoints = [
     // 1. Command Center & Operations
     "/admin/operations/today-work/",
     "/admin/operations/summary/",
 
     // 2. Profiles, CRM & Customers
-    "/crm/customers/?page_size=150",
+    "/customers/?page_size=150",
+    "/customers/?page_size=50",
+    "/customers/",
     "/crm/parties/?page_size=150",
 
-    // 3. Sales & Contracts
+    // 3. Sales & Direct Sales (Billing)
     "/admin/sales/direct-sales/?page_size=50",
+    "/billing/direct-sales/?page_size=50",
     "/billing/products/?page_size=200",
     "/catalog/products/?page_size=200",
 
@@ -434,7 +517,7 @@ export async function preCacheStoreMasterData(): Promise<{
     "/subscriptions/?page_size=50",
     "/subscriptions/plans/",
 
-    // 5. Collections & Cashier
+    // 5. Collections & Invoices
     "/billing/invoices/?page_size=50",
     "/finance/cash-accounts/",
 
@@ -448,18 +531,24 @@ export async function preCacheStoreMasterData(): Promise<{
     "/inventory/locations/",
     "/inventory/categories/",
 
-    // 8. Purchases & Vendors
+    // 8. Manufacturing & Production Jobs
+    "/manufacturing/overview/",
+    "/manufacturing/boms/?page_size=50",
+    "/manufacturing/jobs/?page_size=50",
+    "/manufacturing/jobs/",
+
+    // 9. Purchases & Vendors
     "/inventory/vendors/?page_size=100",
     "/inventory/purchase-orders/?page_size=50",
     "/admin/vendors/?page_size=100",
 
-    // 9. Delivery & Logistics
+    // 10. Delivery & Logistics
     "/deliveries/?page_size=50",
 
-    // 10. HR & Staff
+    // 11. HR & Staff
     "/hr/employees/?page_size=100",
 
-    // 11. Governance & Configuration
+    // 12. Governance & Configuration
     "/core/document-numbering/",
     "/compliance/tax-profiles/",
   ];
@@ -519,6 +608,13 @@ export function initOfflineSyncEngine(): () => void {
       }
     }
   }, 45000);
+
+  // Automatic background warmup when online (runs after 3s to not compete with initial page render)
+  if (navigator.onLine && getAccessToken()) {
+    setTimeout(() => {
+      preCacheStoreMasterData().catch(() => {});
+    }, 3000);
+  }
 
   return () => {
     window.removeEventListener("online", handleOnline);
