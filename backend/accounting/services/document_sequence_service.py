@@ -128,12 +128,21 @@ def resolve_financial_year_for_document_date(document_date: date) -> FinancialYe
 
 
 def current_period_for_date(document_date: date) -> AccountingPeriod | None:
-    from accounting.services.period_service import list_periods_cached
+    from accounting.services.period_service import list_periods_cached, generate_current_period, get_active_financial_year
 
-    return next(
+    period = next(
         (row for row in list_periods_cached() if row.start_date <= document_date <= row.end_date),
         None,
     )
+    if period is None:
+        active = get_active_financial_year()
+        if active and active.start_date <= document_date <= active.end_date:
+            try:
+                res = generate_current_period(reference_date=document_date)
+                return res.get("period")
+            except Exception:
+                pass
+    return period
 
 
 def render_document_number(
@@ -245,6 +254,10 @@ def validate_document_numbering_ready(document_type: str, document_date: date, b
         raise DocumentNumberingSetupError("The accounting period for the document date is locked or closed.")
     sequence = _sequence_queryset_for_type(document_type=document_type, financial_year=financial_year).order_by("-id").first()
     if sequence is None:
+        try:
+            return get_or_create_sequence_for_document_type(document_type, document_date, branch=branch)
+        except Exception:
+            pass
         raise DocumentNumberingSetupError(
             f"No {document_type} numbering profile is configured for financial year {financial_year.code}."
         )

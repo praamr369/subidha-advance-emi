@@ -3,7 +3,7 @@
 import { useCallback, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { ArrowRight, FileText, CheckCircle2, Clock } from "lucide-react";
+import { ArrowRight, FileText, CheckCircle2, Clock, AlertCircle, X, Loader2 } from "lucide-react";
 
 import EmptyState from "@/components/feedback/EmptyState";
 import ErrorState from "@/components/feedback/ErrorState";
@@ -40,7 +40,12 @@ function formatDate(value?: string | null): string {
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim()) return error.message;
-  return "Failed to load expense workbench.";
+  if (typeof error === "object" && error !== null) {
+    const obj = error as Record<string, unknown>;
+    if (typeof obj.message === "string" && obj.message.trim()) return obj.message;
+    if (typeof obj.detail === "string" && obj.detail.trim()) return obj.detail;
+  }
+  return "Failed to complete expense operation.";
 }
 
 function fieldClassName() {
@@ -79,6 +84,7 @@ export default function AccountingExpensesPage() {
   const refreshing = query.isFetching && !query.isLoading;
   const error = query.error ? toErrorMessage(query.error) : null;
   const [actionError, setActionError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const loadPage = useCallback(async () => {
     await query.refetch();
@@ -88,9 +94,9 @@ export default function AccountingExpensesPage() {
     expense_date: new Date().toISOString().slice(0, 10),
     branch: "",
     expense_account: "",
-    gross_amount: "0.00",
+    gross_amount: "",
     tax_amount: "0.00",
-    net_amount: "0.00",
+    net_amount: "",
     payment_mode: "CASH",
     finance_account: "",
     bill_no: "",
@@ -98,22 +104,86 @@ export default function AccountingExpensesPage() {
     notes: "",
   });
 
+  const handleGrossChange = (val: string) => {
+    const grossNum = parseFloat(val);
+    const taxNum = parseFloat(expenseForm.tax_amount) || 0;
+    setExpenseForm((current) => ({
+      ...current,
+      gross_amount: val,
+      net_amount: Number.isFinite(grossNum) ? (grossNum + taxNum).toFixed(2) : current.net_amount,
+    }));
+  };
+
+  const handleTaxChange = (val: string) => {
+    const taxNum = parseFloat(val) || 0;
+    const grossNum = parseFloat(expenseForm.gross_amount);
+    const netNum = parseFloat(expenseForm.net_amount);
+    setExpenseForm((current) => {
+      if (Number.isFinite(grossNum) && grossNum > 0) {
+        return {
+          ...current,
+          tax_amount: val,
+          net_amount: (grossNum + taxNum).toFixed(2),
+        };
+      }
+      if (Number.isFinite(netNum) && netNum > 0) {
+        return {
+          ...current,
+          tax_amount: val,
+          gross_amount: Math.max(0, netNum - taxNum).toFixed(2),
+        };
+      }
+      return {
+        ...current,
+        tax_amount: val,
+      };
+    });
+  };
+
+  const handleNetChange = (val: string) => {
+    const netNum = parseFloat(val);
+    const taxNum = parseFloat(expenseForm.tax_amount) || 0;
+    setExpenseForm((current) => ({
+      ...current,
+      net_amount: val,
+      gross_amount: Number.isFinite(netNum) ? Math.max(0, netNum - taxNum).toFixed(2) : current.gross_amount,
+    }));
+  };
+
   async function handleCreateExpense(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const netAmount = parseFloat(expenseForm.net_amount);
-    if (!Number.isFinite(netAmount) || netAmount <= 0) {
-      setActionError("Net amount must be greater than zero.");
+    setActionError(null);
+
+    if (!expenseForm.expense_account) {
+      setActionError("Please select a Chart of Account category for this expense.");
       return;
     }
+
+    let grossVal = parseFloat(expenseForm.gross_amount) || 0;
+    const taxVal = parseFloat(expenseForm.tax_amount) || 0;
+    let netVal = parseFloat(expenseForm.net_amount) || 0;
+
+    if (grossVal <= 0 && netVal > 0) {
+      grossVal = taxVal > 0 && netVal > taxVal ? Number((netVal - taxVal).toFixed(2)) : netVal;
+    } else if (netVal <= 0 && grossVal > 0) {
+      netVal = Number((grossVal + taxVal).toFixed(2));
+    }
+
+    if (netVal <= 0 || grossVal <= 0) {
+      setActionError("Please enter a valid expense amount greater than zero.");
+      return;
+    }
+
+    setIsSubmitting(true);
     try {
       await createExpenseVoucher({
         expense_date: expenseForm.expense_date,
         branch: expenseForm.branch ? Number(expenseForm.branch) : null,
         vendor: null, // Vendors are explicitly managed via /admin/vendors
         expense_account: Number(expenseForm.expense_account),
-        gross_amount: expenseForm.gross_amount,
-        tax_amount: expenseForm.tax_amount,
-        net_amount: expenseForm.net_amount,
+        gross_amount: grossVal.toFixed(2),
+        tax_amount: taxVal > 0 ? taxVal.toFixed(2) : "0.00",
+        net_amount: netVal.toFixed(2),
         payment_mode: expenseForm.payment_mode as ExpenseVoucher["payment_mode"],
         finance_account: expenseForm.finance_account
           ? Number(expenseForm.finance_account)
@@ -126,9 +196,9 @@ export default function AccountingExpensesPage() {
         expense_date: new Date().toISOString().slice(0, 10),
         branch: "",
         expense_account: "",
-        gross_amount: "0.00",
+        gross_amount: "",
         tax_amount: "0.00",
-        net_amount: "0.00",
+        net_amount: "",
         payment_mode: "CASH",
         finance_account: "",
         bill_no: "",
@@ -141,28 +211,41 @@ export default function AccountingExpensesPage() {
     } catch (err) {
       setNotice(null);
       setActionError(toErrorMessage(err));
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
+  const [approvingId, setApprovingId] = useState<number | null>(null);
+  const [postingId, setPostingId] = useState<number | null>(null);
+
   async function handleApproveExpense(id: number) {
+    setApprovingId(id);
+    setActionError(null);
     try {
       await approveExpenseVoucher(id);
-      setNotice("Expense voucher approved.");
+      setNotice("Expense voucher approved. You can now post it to journals.");
       await loadPage();
     } catch (err) {
       setNotice(null);
       setActionError(toErrorMessage(err));
+    } finally {
+      setApprovingId(null);
     }
   }
 
   async function handlePostExpense(id: number) {
+    setPostingId(id);
+    setActionError(null);
     try {
       await postExpenseVoucher(id);
-      setNotice("Expense voucher posted.");
+      setNotice("Expense voucher successfully posted to General Journal!");
       await loadPage();
     } catch (err) {
       setNotice(null);
       setActionError(toErrorMessage(err));
+    } finally {
+      setPostingId(null);
     }
   }
 
@@ -190,7 +273,10 @@ export default function AccountingExpensesPage() {
         <div className="flex flex-wrap items-center justify-between gap-4">
           <WorkbenchFilterChips
             active={activeTab}
-            onSelect={setActiveTab}
+            onSelect={(tab) => {
+              setActiveTab(tab);
+              setActionError(null);
+            }}
             chips={[
               { key: "overview", label: "Overview" },
               { key: "register", label: "Expense Register", count: draftCount + approvedCount },
@@ -212,6 +298,26 @@ export default function AccountingExpensesPage() {
           <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4" />
             {notice}
+          </div>
+        ) : null}
+
+        {actionError ? (
+          <div className="rounded-xl border border-rose-300 bg-rose-50 dark:border-rose-900/50 dark:bg-rose-950/30 p-4 text-sm text-rose-800 dark:text-rose-200 flex items-start justify-between gap-3 shadow-sm animate-in fade-in duration-200">
+            <div className="flex items-start gap-2.5">
+              <AlertCircle className="h-5 w-5 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold text-rose-900 dark:text-rose-100">Unable to complete action</p>
+                <p className="mt-0.5 text-xs text-rose-700 dark:text-rose-300">{actionError}</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActionError(null)}
+              className="text-rose-500 hover:text-rose-800 dark:hover:text-rose-200 p-1"
+              aria-label="Dismiss error"
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
         ) : null}
 
@@ -316,6 +422,24 @@ export default function AccountingExpensesPage() {
             title="Register Manual Expense"
             description="Create a manual general expense (e.g., electricity, rent). Expenses stay in draft until approved and posted."
           >
+            {actionError ? (
+              <div className="mb-4 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive flex items-start justify-between gap-2">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-semibold">Cannot submit expense: </span>
+                    <span>{actionError}</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActionError(null)}
+                  className="text-destructive hover:opacity-75"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ) : null}
             <form className="grid gap-4 md:grid-cols-2" onSubmit={handleCreateExpense}>
               <label className="text-sm font-medium text-foreground">
                 Expense Date
@@ -419,13 +543,9 @@ export default function AccountingExpensesPage() {
                   type="number"
                   min="0"
                   step="0.01"
+                  placeholder="0.00"
                   value={expenseForm.gross_amount}
-                  onChange={(event) =>
-                    setExpenseForm((current) => ({
-                      ...current,
-                      gross_amount: event.target.value,
-                    }))
-                  }
+                  onChange={(event) => handleGrossChange(event.target.value)}
                   required
                 />
               </label>
@@ -437,13 +557,9 @@ export default function AccountingExpensesPage() {
                   type="number"
                   min="0"
                   step="0.01"
+                  placeholder="0.00"
                   value={expenseForm.tax_amount}
-                  onChange={(event) =>
-                    setExpenseForm((current) => ({
-                      ...current,
-                      tax_amount: event.target.value,
-                    }))
-                  }
+                  onChange={(event) => handleTaxChange(event.target.value)}
                 />
               </label>
 
@@ -454,13 +570,9 @@ export default function AccountingExpensesPage() {
                   type="number"
                   min="0"
                   step="0.01"
+                  placeholder="0.00"
                   value={expenseForm.net_amount}
-                  onChange={(event) =>
-                    setExpenseForm((current) => ({
-                      ...current,
-                      net_amount: event.target.value,
-                    }))
-                  }
+                  onChange={(event) => handleNetChange(event.target.value)}
                   required
                 />
               </label>
@@ -533,9 +645,17 @@ export default function AccountingExpensesPage() {
               <div className="md:col-span-2 flex justify-end mt-2">
                 <button
                   type="submit"
-                  className="rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground transition-all hover:bg-primary/90 shadow-sm"
+                  disabled={isSubmitting}
+                  className="rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-primary-foreground transition-all hover:bg-primary/90 shadow-sm disabled:opacity-60 flex items-center gap-2"
                 >
-                  Submit Expense Voucher
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Submitting Expense...
+                    </>
+                  ) : (
+                    "Submit Expense Voucher"
+                  )}
                 </button>
               </div>
             </form>
@@ -585,22 +705,48 @@ export default function AccountingExpensesPage() {
                       
                       <div className="flex flex-wrap items-center gap-2 border-t border-border/40 bg-muted/20 px-4 py-3">
                         {expense.status === "DRAFT" ? (
-                          <button type="button" onClick={() => void handleApproveExpense(expense.id)}
-                            className="inline-flex h-8 items-center rounded-lg bg-sky-100 text-sky-800 hover:bg-sky-200 dark:bg-sky-900/50 dark:text-sky-300 px-4 text-xs font-semibold transition-colors">
-                            Approve
+                          <button
+                            type="button"
+                            disabled={approvingId === expense.id}
+                            onClick={() => void handleApproveExpense(expense.id)}
+                            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-sky-100 text-sky-800 hover:bg-sky-200 dark:bg-sky-900/50 dark:text-sky-300 px-4 text-xs font-semibold transition-colors disabled:opacity-60"
+                          >
+                            {approvingId === expense.id ? (
+                              <>
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                Approving...
+                              </>
+                            ) : (
+                              "Approve"
+                            )}
                           </button>
                         ) : null}
                         {expense.status === "APPROVED" ? (
-                          <button type="button" onClick={() => void handlePostExpense(expense.id)}
-                            className="inline-flex h-8 items-center rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 px-4 text-xs font-semibold transition-colors">
-                            Post to Journals
+                          <button
+                            type="button"
+                            disabled={postingId === expense.id}
+                            onClick={() => void handlePostExpense(expense.id)}
+                            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 px-4 text-xs font-semibold transition-colors disabled:opacity-60 shadow-sm"
+                          >
+                            {postingId === expense.id ? (
+                              <>
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                Posting to Journals...
+                              </>
+                            ) : (
+                              "Post to Journals"
+                            )}
                           </button>
                         ) : null}
                         {expense.posted_journal_entry_no ? (
-                          <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
+                          <Link
+                            href={ROUTES.admin.accountingJournals}
+                            className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5 hover:underline"
+                          >
                             <CheckCircle2 className="h-3.5 w-3.5" />
                             Journal Ref: {expense.posted_journal_entry_no}
-                          </span>
+                            <ArrowRight className="h-3 w-3" />
+                          </Link>
                         ) : null}
                       </div>
                     </div>

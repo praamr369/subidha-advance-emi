@@ -2219,6 +2219,13 @@ class ExpenseVoucher(AccountingTimeStampedModel):
             errors["expense_account"] = "Expense vouchers must use an EXPENSE chart account."
         if self.finance_account_id and not self.finance_account.is_active:
             errors["finance_account"] = "Finance account must be active."
+
+        tax = self.tax_amount or MONEY_ZERO
+        if (self.gross_amount or MONEY_ZERO) <= MONEY_ZERO and (self.net_amount or MONEY_ZERO) > MONEY_ZERO:
+            self.gross_amount = (self.net_amount - tax) if (self.net_amount > tax and (self.net_amount - tax) > MONEY_ZERO) else self.net_amount
+        elif (self.net_amount or MONEY_ZERO) <= MONEY_ZERO and (self.gross_amount or MONEY_ZERO) > MONEY_ZERO:
+            self.net_amount = self.gross_amount + tax
+
         if (self.gross_amount or MONEY_ZERO) <= MONEY_ZERO:
             errors["gross_amount"] = "Gross amount must be greater than zero."
         if (self.net_amount or MONEY_ZERO) <= MONEY_ZERO:

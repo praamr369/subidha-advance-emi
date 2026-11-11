@@ -234,6 +234,12 @@ def resolve_accounting_period(posting_date: date) -> AccountingPeriod:
         None,
     )
     if period is None:
+        try:
+            res = generate_current_period(reference_date=posting_date)
+            invalidate_period_memo()
+            return res["period"]
+        except Exception:
+            pass
         raise ValueError(f"No accounting period is configured for posting date {posting_date.isoformat()}.")
     return period
 

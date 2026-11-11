@@ -96,3 +96,39 @@ class AccountingExpensePostingTests(TestCase):
         self.assertTrue(
             any(event.get("event") == "ACCOUNTING_EXPENSE_POSTED" for event in audit_events)
         )
+
+    def test_expense_voucher_clean_auto_derives_gross_from_net(self):
+        voucher = ExpenseVoucher(
+            expense_date=timezone.localdate(),
+            expense_account=self.expense_chart,
+            gross_amount=Decimal("0.00"),
+            tax_amount=Decimal("0.00"),
+            net_amount=Decimal("10000.00"),
+            payment_mode="CASH",
+            finance_account=self.finance_account,
+            notes="Withdrawal test",
+        )
+        voucher.clean()
+        self.assertEqual(voucher.gross_amount, Decimal("10000.00"))
+        self.assertEqual(voucher.net_amount, Decimal("10000.00"))
+
+    def test_expense_voucher_serializer_auto_syncs_amounts(self):
+        from api.v1.serializers.accounting import ExpenseVoucherSerializer
+
+        data = {
+            "expense_date": str(timezone.localdate()),
+            "expense_account": self.expense_chart.id,
+            "gross_amount": "0.00",
+            "tax_amount": "0.00",
+            "net_amount": "10000.00",
+            "payment_mode": "CASH",
+            "finance_account": self.finance_account.id,
+            "notes": "Testing serializer derivation",
+        }
+        serializer = ExpenseVoucherSerializer(data=data)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        self.assertEqual(serializer.validated_data["gross_amount"], Decimal("10000.00"))
+        self.assertEqual(serializer.validated_data["net_amount"], Decimal("10000.00"))
+        saved = serializer.save()
+        self.assertEqual(saved.gross_amount, Decimal("10000.00"))
+        self.assertEqual(saved.net_amount, Decimal("10000.00"))

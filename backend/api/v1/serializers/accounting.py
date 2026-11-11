@@ -697,6 +697,17 @@ class ExpenseVoucherSerializer(serializers.ModelSerializer):
         instance = getattr(self, "instance", None)
         if instance and instance.status == ExpenseVoucherStatus.POSTED:
             raise serializers.ValidationError("Posted expense vouchers cannot be edited.")
+
+        gross = attrs.get("gross_amount")
+        tax = attrs.get("tax_amount") or Decimal("0.00")
+        net = attrs.get("net_amount")
+
+        # Auto-sync gross and net if one is missing or zero
+        if (gross is None or gross <= 0) and net is not None and net > 0:
+            attrs["gross_amount"] = (net - tax) if (net > tax and (net - tax) > 0) else net
+        elif (net is None or net <= 0) and gross is not None and gross > 0:
+            attrs["net_amount"] = gross + tax
+
         return attrs
 
 
