@@ -328,12 +328,51 @@ def google_auth_config_view(request):
     )
 
 
+def _fetch_google_token_info(id_token: str) -> dict:
+    """
+    Fetches Google tokeninfo payload from Google's public endpoint.
+    Uses standard urllib.request with requests fallback so zero external packages are strictly required.
+    """
+    url = f"https://oauth2.googleapis.com/tokeninfo?id_token={id_token}"
+    try:
+        import requests
+        response = requests.get(url, timeout=7)
+        if response.status_code != 200:
+            security_logger.warning("google_auth.invalid_token: status=%s body=%s", response.status_code, response.text[:200])
+            raise DjangoValidationError("Invalid or expired Google authentication token.")
+        return response.json()
+    except (ImportError, ModuleNotFoundError):
+        import json
+        import urllib.request
+        import urllib.error
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Subidha-Auth/1.0"})
+            with urllib.request.urlopen(req, timeout=7) as resp:
+                body = resp.read().decode("utf-8")
+        except urllib.error.HTTPError as exc:
+            body = exc.read().decode("utf-8")
+            security_logger.warning("google_auth.invalid_token: status=%s body=%s", exc.code, body[:200])
+            raise DjangoValidationError("Invalid or expired Google authentication token.")
+        except Exception as exc:
+            security_logger.error("google_auth.network_error: %s", exc)
+            raise DjangoValidationError("Failed to connect to Google authentication service. Please check your internet connection.")
+
+        try:
+            return json.loads(body)
+        except Exception:
+            raise DjangoValidationError("Invalid response from Google authentication service.")
+    except DjangoValidationError:
+        raise
+    except Exception as exc:
+        security_logger.error("google_auth.network_error: %s", exc)
+        raise DjangoValidationError("Failed to connect to Google authentication service. Please check your internet connection.")
+
+
 def _verify_google_id_token(id_token: str) -> dict:
     """
     Verifies a Google ID token using Google's public tokeninfo endpoint.
     100% free, zero external paid APIs.
     """
-    import requests
     from django.conf import settings
 
     # In local testing or simulated unit tests, if a mock hook is active:
@@ -341,18 +380,7 @@ def _verify_google_id_token(id_token: str) -> dict:
     if callable(mock_verifier):
         return mock_verifier(id_token)
 
-    url = f"https://oauth2.googleapis.com/tokeninfo?id_token={id_token}"
-    try:
-        response = requests.get(url, timeout=7)
-    except Exception as exc:
-        security_logger.error("google_auth.network_error: %s", exc)
-        raise DjangoValidationError("Failed to connect to Google authentication service. Please check your internet connection.")
-
-    if response.status_code != 200:
-        security_logger.warning("google_auth.invalid_token: status=%s body=%s", response.status_code, response.text[:200])
-        raise DjangoValidationError("Invalid or expired Google authentication token.")
-
-    payload = response.json()
+    payload = _fetch_google_token_info(id_token)
 
     # Validate issuer
     iss = payload.get("iss")

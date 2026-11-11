@@ -757,8 +757,8 @@ class AuthApiTests(APITestCase):
         alice.refresh_from_db()
         self.assertEqual(alice.email, "alice@gmail.com")
 
-    @patch("requests.get")
-    def test_google_token_verification_validates_db_audience(self, mock_get):
+    @patch("api.v1.views.auth_views._fetch_google_token_info")
+    def test_google_token_verification_validates_db_audience(self, mock_fetch):
         from business_setup.models.email_smtp import EmailSMTPSettings
         EmailSMTPSettings.objects.all().delete()
         EmailSMTPSettings.objects.create(
@@ -766,17 +766,12 @@ class AuthApiTests(APITestCase):
             is_active=True,
         )
 
-        class MockResponse:
-            status_code = 200
-            def json(self):
-                return {
-                    "email": "audtest@gmail.com",
-                    "email_verified": True,
-                    "iss": "accounts.google.com",
-                    "aud": "wrong-client-id.apps.googleusercontent.com",
-                }
-
-        mock_get.return_value = MockResponse()
+        mock_fetch.return_value = {
+            "email": "audtest@gmail.com",
+            "email_verified": True,
+            "iss": "accounts.google.com",
+            "aud": "wrong-client-id.apps.googleusercontent.com",
+        }
 
         response = self.client.post(
             "/api/v1/auth/google/",
