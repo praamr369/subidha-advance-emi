@@ -836,7 +836,10 @@ class PublicProductReactView(APIView):
         if ident_str.isdigit():
             product = Product.objects.filter(id=int(ident_str)).first()
         if not product:
-            product = Product.objects.filter(slug=ident_str).first() or Product.objects.filter(product_code=ident_str).first()
+            product = (
+                Product.objects.filter(product_code__iexact=ident_str).first()
+                or Product.objects.filter(sku__iexact=ident_str).first()
+            )
 
         if not product:
             return Response({"detail": "Product not found."}, status=status.HTTP_404_NOT_FOUND)
@@ -906,7 +909,10 @@ class PublicProductReactionsView(APIView):
         if ident_str.isdigit():
             product = Product.objects.filter(id=int(ident_str)).first()
         if not product:
-            product = Product.objects.filter(slug=ident_str).first() or Product.objects.filter(product_code=ident_str).first()
+            product = (
+                Product.objects.filter(product_code__iexact=ident_str).first()
+                or Product.objects.filter(sku__iexact=ident_str).first()
+            )
 
         if not product:
             return Response({"detail": "Product not found."}, status=status.HTTP_404_NOT_FOUND)
