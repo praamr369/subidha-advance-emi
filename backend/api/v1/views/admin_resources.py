@@ -749,7 +749,11 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
                     .annotate(
                         total=Sum(
                             "billing_invoices__balance_total",
-                            filter=invoice_active_q("billing_invoices__"),
+                            filter=invoice_active_q("billing_invoices__")
+                            & Q(
+                                billing_invoices__direct_sale__isnull=True,
+                                billing_invoices__subscription__isnull=True,
+                            ),
                         )
                     )
                     .values("total")[:1]
@@ -1707,7 +1711,11 @@ class CustomerAdminViewSet(AdminOnlyModelViewSet):
             or Decimal("0.00")
         )
         invoices_due = (
-            BillingInvoice.objects.filter(invoice_active_q(""))
+            BillingInvoice.objects.filter(
+                invoice_active_q(""),
+                direct_sale__isnull=True,
+                subscription__isnull=True,
+            )
             .aggregate(total=Sum("balance_total"))["total"]
             or Decimal("0.00")
         )

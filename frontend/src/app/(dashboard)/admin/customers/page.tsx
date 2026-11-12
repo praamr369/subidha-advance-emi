@@ -654,7 +654,8 @@ export default function AdminCustomersPage() {
           const rentLeaseDue = Number(row.rent_lease_due || 0);
           const directDue = Number(row.active_direct_sale_outstanding || 0);
           const invDue = Number(row.active_invoice_outstanding || 0);
-          const totalDue = subDue + rentLeaseDue + directDue + invDue;
+          const directInvoiceDue = directDue + invDue;
+          const totalDue = subDue + rentLeaseDue + directInvoiceDue;
           const overdue = Number(row.emi_overdue || 0) + Number(row.rent_lease_overdue || 0);
           const depositHeld = Number(row.deposit_held || 0);
           const directValue = Number(row.direct_sale_value || 0);
@@ -725,12 +726,11 @@ export default function AdminCustomersPage() {
                   ))}
                 </div>
               ) : null}
-              <div className="text-[11px] text-muted-foreground bg-muted/60 rounded px-1.5 py-1 inline-block border border-border/60">
-                <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-left">
+              <div className="text-[11px] text-muted-foreground bg-muted/60 rounded px-2 py-1 inline-block border border-border/60">
+                <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-0.5 text-left">
                   <span>EMI: <strong className="text-foreground">{formatRupee(subDue)}</strong></span>
                   <span>Rent/Lease: <strong className="text-foreground">{formatRupee(rentLeaseDue)}</strong></span>
-                  <span>Direct: <strong className="text-foreground">{formatRupee(directDue)}</strong></span>
-                  <span>Invoice: <strong className="text-foreground">{formatRupee(invDue)}</strong></span>
+                  <span>Direct / Invoice: <strong className="text-foreground">{formatRupee(directInvoiceDue)}</strong></span>
                 </div>
               </div>
               {overdue > 0 ? (
@@ -767,11 +767,13 @@ export default function AdminCustomersPage() {
         key: "actions",
         title: "Actions",
         render: (row) => {
+          const directInvoiceDue =
+            Number(row.active_direct_sale_outstanding || 0) +
+            Number(row.active_invoice_outstanding || 0);
           const totalDue =
             Number(row.active_subscription_due || 0) +
             Number(row.rent_lease_due || 0) +
-            Number(row.active_direct_sale_outstanding || 0) +
-            Number(row.active_invoice_outstanding || 0);
+            directInvoiceDue;
           return (
             <div className="flex items-center gap-1.5">
               <Link
