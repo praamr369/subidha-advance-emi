@@ -168,7 +168,14 @@ export async function getMoneyInHand() {
   return apiFetch<MoneyInHandResponse>("/admin/finance/money-in-hand/");
 }
 
-export async function listFinanceTransfers(params: { page?: number; page_size?: number; status?: string; finance_account_id?: number | string } = {}) {
+export async function listFinanceTransfers(params: {
+  page?: number;
+  page_size?: number;
+  status?: string;
+  finance_account_id?: number | string;
+  date_from?: string;
+  date_to?: string;
+} = {}) {
   const query = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== null && String(value).trim()) {
@@ -189,9 +196,12 @@ export async function previewFinanceTransfer(payload: CreateFinanceTransferPaylo
   return unwrapEnvelope(response);
 }
 
-export async function createFinanceTransfer(payload: CreateFinanceTransferPayload) {
-  const preview = await previewFinanceTransfer(payload);
-  if (!preview.can_post || !preview.idempotency_key) {
+export async function createFinanceTransfer(
+  payload: CreateFinanceTransferPayload,
+  idempotencyKey?: string
+) {
+  const key = idempotencyKey || (await previewFinanceTransfer(payload)).idempotency_key;
+  if (!key) {
     throw new Error("Finance transfer preview did not return a postable idempotency key.");
   }
   const response = await apiFetch<FinanceOperationEnvelope<CreateFinanceTransferResult>>(
@@ -200,7 +210,7 @@ export async function createFinanceTransfer(payload: CreateFinanceTransferPayloa
       method: "POST",
       body: JSON.stringify({
         ...payload,
-        idempotency_key: preview.idempotency_key,
+        idempotency_key: key,
         confirm: true,
       }),
     }

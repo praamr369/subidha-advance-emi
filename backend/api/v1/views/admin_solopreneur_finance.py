@@ -87,13 +87,26 @@ class AdminSolopreneurLedgerHealthView(APIView):
         
         is_balanced = tb.get("is_balanced", False)
         
+        raw_checks = tb.get("checks", [])
+        checks = []
+        for c in raw_checks:
+            item = dict(c)
+            is_ok = item.get("status") not in {"CRITICAL", "WARNING"}
+            if item.get("key") == "balance.debit_equals_credit":
+                is_ok = is_balanced
+            item["passed"] = is_ok
+            checks.append(item)
+
+        all_checks_passed = all(c.get("passed", True) for c in checks)
+        overall_status = "OK" if is_balanced and all_checks_passed else "WARNING"
+
         response_data = {
-            "status": "OK" if is_balanced else "WARNING",
+            "status": overall_status,
             "is_balanced": is_balanced,
             "total_debit": tb.get("total_debit", "0.00"),
             "total_credit": tb.get("total_credit", "0.00"),
             "difference": tb.get("difference", "0.00"),
-            "checks": tb.get("checks", []),
+            "checks": checks,
         }
         
         cache.set(cache_key, response_data, 30) # 30s cache

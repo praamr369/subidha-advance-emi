@@ -109,6 +109,7 @@ export const ROUTES = {
     hrStaffProfile: "/admin/hr/staff",
     hrAttendance: "/admin/hr/attendance",
     hrPayroll: "/admin/hr/payroll",
+    hrSalary: "/admin/hr/salary",
     hrSalaryPayments: "/admin/hr/salary-payments",
     hrStaffAdvances: "/admin/hr/staff-advances",
     hrLeave: "/admin/hr/leave",
@@ -174,6 +175,8 @@ export const ROUTES = {
     financeRefunds: "/admin/finance/refunds",
     financeReversalControl: "/admin/finance/reversal-control",
     financeOwnerFunds: "/admin/finance/owner-funds",
+    financeTransfers: "/admin/finance-transfers",
+    financeTransfersNew: "/admin/finance/transfers/new",
     financeReversalReconciliation: "/admin/finance/reversal-reconciliation",
     settlements: "/admin/settlements",
     settlementsDayCloses: "/admin/settlements/day-closes",
@@ -398,6 +401,7 @@ export const ROUTES = {
     accountingExportReports: "/admin/accounting/exports/reports",
     accountingFinancialIntelligence: "/admin/accounting/financial-intelligence",
     accountingTrialBalanceCheck: "/admin/accounting/trial-balance-check",
+    accountingLedgerHealth: "/admin/accounting/ledger-health",
     accountingLiabilityReconciliation: "/admin/accounting/liability-reconciliation",
     // Session 4: HR Consolidation - Routes moved to HR module
     accountingStaff: "/admin/hr/staff", // Redirects to HR (backward compat)

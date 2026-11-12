@@ -2577,13 +2577,23 @@ export async function createFixedAsset(payload: Partial<FixedAsset>): Promise<Fi
 }
 
 // Solopreneur Endpoints
+export type LedgerHealthCheck = {
+  key: string;
+  label?: string;
+  status?: "OK" | "INFO" | "WARNING" | "CRITICAL";
+  passed?: boolean;
+  count?: number;
+  message?: string;
+  metadata?: Record<string, unknown>;
+};
+
 export type LedgerHealthResponse = {
   status: "OK" | "WARNING";
   is_balanced: boolean;
   total_debit: string;
   total_credit: string;
   difference: string;
-  checks: { key: string; passed: boolean; count?: number }[];
+  checks: LedgerHealthCheck[];
 };
 
 export async function fetchSolopreneurLedgerHealth(refresh: boolean = false): Promise<LedgerHealthResponse> {

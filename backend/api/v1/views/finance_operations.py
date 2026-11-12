@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import logging
+from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.utils import timezone
 from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+logger = logging.getLogger(__name__)
 
 from accounting.services.finance_transfer_service import (
     FinanceTransferService,
@@ -50,8 +54,11 @@ class AdminAdvanceAllocationView(APIView):
                 reference_no=validated.get("reference_no"),
                 allocation_date=validated.get("allocation_date") or timezone.localdate(),
             )
-        except ValueError as exc:
+        except (ValueError, ValidationError) as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as exc:
+            logger.exception("Unexpected error in AdminAdvanceAllocationView: %s", exc)
+            return Response({"detail": str(exc) or "Advance allocation failed."}, status=status.HTTP_400_BAD_REQUEST)
 
         payment = result["payment"]
         advance = result["advance"]
@@ -161,8 +168,11 @@ class AdminFinanceTransferView(APIView):
                 notes=validated.get("notes"),
                 idempotency_key=validated.get("idempotency_key"),
             )
-        except ValueError as exc:
+        except (ValueError, ValidationError) as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as exc:
+            logger.exception("Unexpected error in AdminFinanceTransferView: %s", exc)
+            return Response({"detail": str(exc) or "Internal finance transfer failed."}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(
             {

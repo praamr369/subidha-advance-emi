@@ -199,7 +199,12 @@ export default function FinanceControlPage() {
     },
   ];
 
-  const failedChecks = (health?.checks ?? []).filter((check) => !check.passed);
+  const failedChecks = (health?.checks ?? []).filter((check) => {
+    if (check.passed !== undefined) {
+      return !check.passed;
+    }
+    return (check.status === "CRITICAL" || check.status === "WARNING") && (check.count ?? 0) > 0;
+  });
   const intelligenceActionItems = intelligence?.action_items ?? [];
 
   const [activeTab, setActiveTab] = useState<"control" | "receivables" | "payables" | "treasury">("control");
@@ -490,7 +495,7 @@ export default function FinanceControlPage() {
                           <ul className="space-y-2 text-sm">
                             {failedChecks.map((check) => (
                               <li key={check.key} className="flex justify-between rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-900">
-                                <span className="font-medium">{check.key}</span>
+                                <span className="font-medium">{check.label || check.key}</span>
                                 {typeof check.count === "number" && <span className="font-bold tabular-nums">{check.count}</span>}
                               </li>
                             ))}
@@ -505,7 +510,7 @@ export default function FinanceControlPage() {
                           <EmptyState title="All Clear" description="No ledger exceptions detected." />
                         )}
                         <div className="mt-4">
-                          <Link href="/admin/accounting/ledger-health" className="text-sm font-medium text-primary hover:underline">
+                          <Link href={ROUTES.admin.accountingLedgerHealth} className="text-sm font-medium text-primary hover:underline">
                             View Ledger Review Routes →
                           </Link>
                         </div>
@@ -561,7 +566,7 @@ export default function FinanceControlPage() {
                   <Receipt className="h-5 w-5 text-slate-600" />
                   Purchase Bills
                 </Link>
-                <Link href="/admin/hr/salary" className={financeLaneLinkClass}>
+                <Link href={ROUTES.admin.hrPayroll} className={financeLaneLinkClass}>
                   <UsersRound className="h-5 w-5 text-blue-600" />
                   Staff Salary
                 </Link>
@@ -577,7 +582,7 @@ export default function FinanceControlPage() {
             <div className="space-y-6">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 rounded-xl border border-rose-200 bg-rose-50/50 p-4 text-sm text-rose-800">
                 <span><strong>Treasury & Reversals</strong>: Strict treasury control over bank deposits and reversed receipts.</span>
-                <Link href="/admin/finance/transfers/new" className="inline-flex items-center gap-2 bg-rose-600 text-white px-3 py-2 rounded-lg text-xs font-semibold shadow hover:bg-rose-700 transition">
+                <Link href={ROUTES.admin.financeTransfersNew} className="inline-flex items-center gap-2 bg-rose-600 text-white px-3 py-2 rounded-lg text-xs font-semibold shadow hover:bg-rose-700 transition">
                   <ArrowRightLeft className="w-4 h-4" /> New Admin Finance Transfer
                 </Link>
               </div>
@@ -602,7 +607,7 @@ export default function FinanceControlPage() {
                   <Banknote className="h-5 w-5 text-indigo-600" />
                   Payout Batches
                 </Link>
-                <Link href="/admin/finance-transfers" className={financeLaneLinkClass}>
+                <Link href={ROUTES.admin.financeTransfers} className={financeLaneLinkClass}>
                   <ArrowRightLeft className="h-5 w-5 text-orange-600" />
                   Internal Ledger Transfers
                 </Link>
