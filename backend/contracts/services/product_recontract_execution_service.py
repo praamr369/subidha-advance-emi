@@ -157,7 +157,7 @@ def _posted_journal_amount(bridge: AccountingBridgePosting) -> Decimal:
 
 def _accounting_bridge_for_event(event: ContractRecontractEvent) -> AccountingBridgePosting | None:
     return (
-        AccountingBridgePosting.objects.select_for_update()
+        AccountingBridgePosting.objects.select_for_update(of=("self",))
         .select_related("journal_entry")
         .prefetch_related("journal_entry__lines")
         .filter(
@@ -171,7 +171,7 @@ def _accounting_bridge_for_event(event: ContractRecontractEvent) -> AccountingBr
 
 def _reconciliation_item_for_event(event: ContractRecontractEvent) -> ReconciliationItem | None:
     return (
-        ReconciliationItem.objects.select_for_update()
+        ReconciliationItem.objects.select_for_update(of=("self",))
         .select_related("run")
         .filter(
             module=RECONCILIATION_MODULE,
@@ -244,7 +244,7 @@ def _assert_subscription_executable(subscription: Subscription) -> None:
 
 def _schedule_preview_lines(event: ContractRecontractEvent) -> list[ContractRecontractScheduleLine]:
     return list(
-        ContractRecontractScheduleLine.objects.select_for_update()
+        ContractRecontractScheduleLine.objects.select_for_update(of=("self",))
         .select_related("original_emi")
         .filter(event=event, proposed_status=ContractRecontractScheduleLine.ProposedStatus.PREVIEW_ONLY)
         .order_by("line_no", "id")
@@ -287,7 +287,7 @@ def execute_product_recontract_event(*, amendment: ContractAmendment, executed_b
         raise ValidationError({"detail": f"Cannot execute recontract for amendment status '{locked_amendment.status}'. Must be APPROVED."})
 
     event = (
-        ContractRecontractEvent.objects.select_for_update()
+        ContractRecontractEvent.objects.select_for_update(of=("self",))
         .select_related("amendment", "subscription", "old_product", "new_product")
         .prefetch_related("schedule_preview_lines")
         .filter(amendment=locked_amendment)
@@ -336,7 +336,7 @@ def execute_product_recontract_event(*, amendment: ContractAmendment, executed_b
     )
     reconciliation_evidence_ids = _reconciliation_evidence_ids(reconciliation_item)
 
-    subscription = Subscription.objects.select_for_update().select_related("product", "batch", "lucky_id").get(pk=event.subscription_id)
+    subscription = Subscription.objects.select_for_update(of=("self",)).select_related("product", "batch", "lucky_id").get(pk=event.subscription_id)
     _assert_subscription_executable(subscription)
     _verify_operational_cancellation(subscription)
 

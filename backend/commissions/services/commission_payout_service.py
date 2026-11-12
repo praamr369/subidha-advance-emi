@@ -172,7 +172,7 @@ def create_commission_payout_batch(
     notes = (notes or "").strip()
 
     commissions = list(
-        Commission.objects.select_for_update()
+        Commission.objects.select_for_update(of=("self",))
         .select_related("partner")
         .prefetch_related("payout_line")
         .filter(id__in=commission_ids)
@@ -293,7 +293,7 @@ def finalize_commission_payout_batch(
         raise ValueError("processed_by is required.")
 
     payout_batch = (
-        CommissionPayoutBatch.objects.select_for_update()
+        CommissionPayoutBatch.objects.select_for_update(of=("self",))
         .prefetch_related("lines__commission")
         .get(id=batch_id)
     )
@@ -406,7 +406,7 @@ def cancel_commission_payout_batch(*, batch_id: int, processed_by, reason: str |
         raise ValueError("processed_by is required.")
 
     payout_batch = (
-        CommissionPayoutBatch.objects.select_for_update()
+        CommissionPayoutBatch.objects.select_for_update(of=("self",))
         .prefetch_related("lines")
         .get(id=batch_id)
     )
@@ -474,7 +474,7 @@ def mark_commission_payout_batch_paid(
         raise ValueError("processed_by is required.")
 
     payout_batch = (
-        CommissionPayoutBatch.objects.select_for_update().get(id=batch_id)
+        CommissionPayoutBatch.objects.select_for_update(of=("self",)).get(id=batch_id)
     )
 
     if payout_batch.status == CommissionPayoutBatch.Status.PAID:

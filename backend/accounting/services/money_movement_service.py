@@ -43,7 +43,7 @@ def validate_money_movement_for_posting(movement: MoneyMovement) -> None:
 @transaction.atomic
 def post_money_movement(*, money_movement_id: int, posted_by):
     movement = (
-        MoneyMovement.objects.select_for_update()
+        MoneyMovement.objects.select_for_update(of=("self",))
         .select_related(
             "from_finance_account",
             "from_finance_account__chart_account",

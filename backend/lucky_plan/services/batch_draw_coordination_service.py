@@ -539,7 +539,7 @@ def execute_batch_draw(*, batch: Batch, revealed_seed: str, performed_by=None) -
     Reveal month-1 draw for coordination batches (snapshot-based eligibility inside reveal).
     Idempotent when the draw is already revealed.
     """
-    batch = Batch.objects.select_for_update().get(pk=batch.pk)
+    batch = Batch.objects.select_for_update(of=("self",)).get(pk=batch.pk)
     draw = (
         LuckyDraw.objects.select_for_update(of=("self",))
         .select_related("batch")

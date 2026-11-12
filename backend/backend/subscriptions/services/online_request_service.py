@@ -215,7 +215,7 @@ def approve_online_request(
 ) -> (OnlineRequest, object):
     """Approve online request and optionally create subscription/sale"""
 
-    request = online_request_base_queryset().select_for_update().get(pk=request_id)
+    request = online_request_base_queryset().select_for_update(of=("self",)).get(pk=request_id)
 
     if request.status != 'QUOTE_ACCEPTED':
         raise ValidationError({'detail': 'Only QUOTE_ACCEPTED requests can be approved.'})

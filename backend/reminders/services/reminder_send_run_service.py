@@ -18,7 +18,7 @@ def run_payment_reminders(*, due_date_on_or_before: date | None = None, send_now
     sent_count = 0
     skipped_count = 0
     if send_now:
-        queryset = PaymentReminder.objects.select_for_update().filter(
+        queryset = PaymentReminder.objects.select_for_update(of=("self",)).filter(
             status__in=[ReminderStatus.PENDING, ReminderStatus.SCHEDULED]
         )
         for reminder in queryset:

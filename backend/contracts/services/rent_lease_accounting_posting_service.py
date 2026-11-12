@@ -378,7 +378,7 @@ def _execute(payload: dict[str, Any], actor=None) -> dict[str, Any]:
 def _demand(demand_id: int, lock: bool = False) -> RentLeaseBillingDemand:
     qs = RentLeaseBillingDemand.objects.select_related("subscription", "subscription__customer", "subscription__product")
     if lock:
-        qs = qs.select_for_update()
+        qs = qs.select_for_update(of=("self",))
     demand = qs.filter(pk=demand_id).first()
     if not demand:
         raise RentLeasePostingError({"detail": "Rent/lease demand not found."})

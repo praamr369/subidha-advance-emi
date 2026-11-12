@@ -427,7 +427,7 @@ class PimProductViewSet(viewsets.ModelViewSet):
 
         with transaction.atomic():
             products = list(
-                PimProduct.objects.select_for_update().filter(id__in=product_ids)
+                PimProduct.objects.select_for_update(of=("self",)).filter(id__in=product_ids)
             )
             found_ids = {product.id for product in products}
             missing_ids = sorted(set(product_ids) - found_ids)

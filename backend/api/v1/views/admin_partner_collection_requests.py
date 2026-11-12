@@ -24,7 +24,7 @@ def _request_base_queryset():
     Safe read queryset for list/detail style serialization.
 
     Keep select_related here for response efficiency, but do NOT combine this
-    queryset with select_for_update() because approved_payment / approved_emi are
+    queryset with select_for_update(of=("self",)) because approved_payment / approved_emi are
     nullable and PostgreSQL rejects FOR UPDATE on the nullable side of outer joins.
     """
     return PartnerCollectionRequest.objects.select_related(

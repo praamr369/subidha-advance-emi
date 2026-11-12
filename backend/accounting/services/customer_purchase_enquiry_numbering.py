@@ -20,7 +20,7 @@ def allocate_customer_purchase_enquiry_number(*, reference_date=None) -> str:
         prefix="OPE",
         padding=6,
     )
-    locked_sequence = DocumentSequence.objects.select_for_update().get(pk=seq.pk)
+    locked_sequence = DocumentSequence.objects.select_for_update(of=("self",)).get(pk=seq.pk)
     number = locked_sequence.next_number
     locked_sequence.next_number = number + 1
     locked_sequence.last_issued_at = timezone.now()
@@ -44,7 +44,7 @@ def allocate_purchase_order_no_for_enquiry_draft(*, reference_date=None) -> str:
         prefix="PO-OPE",
         padding=6,
     )
-    locked_sequence = DocumentSequence.objects.select_for_update().get(pk=seq.pk)
+    locked_sequence = DocumentSequence.objects.select_for_update(of=("self",)).get(pk=seq.pk)
     number = locked_sequence.next_number
     locked_sequence.next_number = number + 1
     locked_sequence.last_issued_at = timezone.now()

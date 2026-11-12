@@ -96,7 +96,7 @@ def enable_rent_lease_posting_bridge(actor, reason: str, confirmation: str) -> d
     if not readiness.get("mapping_ready"):
         raise ValidationError({"readiness": "Rent/lease COA and finance account mapping must be valid before bridge setup."})
 
-    config = RentLeasePostingBridgeConfig.objects.select_for_update().filter(pk=1).first()
+    config = RentLeasePostingBridgeConfig.objects.select_for_update(of=("self",)).filter(pk=1).first()
     if config is None:
         config = RentLeasePostingBridgeConfig(pk=1)
     now = timezone.now()
@@ -134,7 +134,7 @@ def disable_rent_lease_posting_bridge(actor, reason: str, confirmation: str) -> 
         confirmation=confirmation,
         expected_confirmation=DISABLE_RENT_LEASE_POSTING_CONFIRMATION,
     )
-    config = RentLeasePostingBridgeConfig.objects.select_for_update().filter(pk=1).first()
+    config = RentLeasePostingBridgeConfig.objects.select_for_update(of=("self",)).filter(pk=1).first()
     if config is None:
         config = RentLeasePostingBridgeConfig(pk=1)
     now = timezone.now()

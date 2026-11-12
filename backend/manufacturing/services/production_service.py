@@ -525,7 +525,7 @@ def upsert_manufacturing_bom_draft(*, payload: dict, bom_id: int | None = None, 
         )
         return bom
 
-    bom = ManufacturingBom.objects.select_for_update().get(pk=bom_id)
+    bom = ManufacturingBom.objects.select_for_update(of=("self",)).get(pk=bom_id)
     if bom.status == ManufacturingBomStatus.ACTIVE:
         raise ValueError("Active BOMs cannot be edited. Deactivate or create a new revision instead.")
     for field_name, value in payload.items():
@@ -552,7 +552,7 @@ def upsert_manufacturing_bom_draft(*, payload: dict, bom_id: int | None = None, 
 
 @transaction.atomic
 def activate_manufacturing_bom(*, bom_id: int, performed_by=None):
-    bom = ManufacturingBom.objects.select_for_update().prefetch_related("lines").get(pk=bom_id)
+    bom = ManufacturingBom.objects.select_for_update(of=("self",)).prefetch_related("lines").get(pk=bom_id)
     if bom.status == ManufacturingBomStatus.ACTIVE:
         return bom, False
     if not bom.lines.exists():
@@ -580,7 +580,7 @@ def activate_manufacturing_bom(*, bom_id: int, performed_by=None):
 
 @transaction.atomic
 def deactivate_manufacturing_bom(*, bom_id: int, performed_by=None):
-    bom = ManufacturingBom.objects.select_for_update().get(pk=bom_id)
+    bom = ManufacturingBom.objects.select_for_update(of=("self",)).get(pk=bom_id)
     if bom.status == ManufacturingBomStatus.INACTIVE:
         return bom, False
     bom.status = ManufacturingBomStatus.INACTIVE
@@ -646,7 +646,7 @@ def upsert_production_job_draft(*, payload: dict, job_id: int | None = None, per
         return job
 
     job = (
-        ProductionJob.objects.select_for_update()
+        ProductionJob.objects.select_for_update(of=("self",))
         .select_related("bom", "finished_good_inventory_item", "stock_location")
         .prefetch_related("material_issue_lines", "receipt_lines", "scrap_lines", "labor_lines")
         .get(pk=job_id)
@@ -695,7 +695,7 @@ def upsert_production_job_draft(*, payload: dict, job_id: int | None = None, per
 @transaction.atomic
 def release_production_job(*, job_id: int, performed_by=None):
     job = (
-        ProductionJob.objects.select_for_update()
+        ProductionJob.objects.select_for_update(of=("self",))
         .select_related("bom", "finished_good_inventory_item")
         .prefetch_related("material_issue_lines", "bom__lines", "bom__lines__inventory_item", "bom__lines__inventory_item__product")
         .get(pk=job_id)
@@ -729,7 +729,7 @@ def release_production_job(*, job_id: int, performed_by=None):
 @transaction.atomic
 def post_production_materials(*, job_id: int, movement_date=None, lines: list[dict] | None = None, performed_by=None):
     job = (
-        ProductionJob.objects.select_for_update()
+        ProductionJob.objects.select_for_update(of=("self",))
         .select_related("bom", "finished_good_inventory_item", "stock_location")
         .prefetch_related("material_issue_lines", "material_issue_lines__inventory_item", "material_issue_lines__inventory_item__product")
         .get(pk=job_id)
@@ -857,7 +857,7 @@ def post_production_materials(*, job_id: int, movement_date=None, lines: list[di
 @transaction.atomic
 def post_production_output(*, job_id: int, output_date=None, receipt_lines: list[dict] | None = None, scrap_lines: list[dict] | None = None, performed_by=None):
     job = (
-        ProductionJob.objects.select_for_update()
+        ProductionJob.objects.select_for_update(of=("self",))
         .select_related("finished_good_inventory_item", "stock_location")
         .prefetch_related("material_issue_lines", "receipt_lines", "scrap_lines")
         .get(pk=job_id)
@@ -998,7 +998,7 @@ def post_production_output(*, job_id: int, output_date=None, receipt_lines: list
 @transaction.atomic
 def complete_production_job(*, job_id: int, performed_by=None):
     job = (
-        ProductionJob.objects.select_for_update()
+        ProductionJob.objects.select_for_update(of=("self",))
         .prefetch_related("material_issue_lines", "receipt_lines", "scrap_lines", "labor_lines")
         .get(pk=job_id)
     )
@@ -1051,7 +1051,7 @@ def complete_production_job(*, job_id: int, performed_by=None):
 @transaction.atomic
 def cancel_production_job(*, job_id: int, performed_by=None, reason: str):
     job = (
-        ProductionJob.objects.select_for_update()
+        ProductionJob.objects.select_for_update(of=("self",))
         .prefetch_related("material_issue_lines", "receipt_lines", "scrap_lines")
         .get(pk=job_id)
     )
@@ -1180,7 +1180,7 @@ def _build_bridge_lines_for_labor(line) -> list[dict] | None:
 @transaction.atomic
 def post_production_labor(*, job_id: int, labor_lines: list[dict] | None = None, performed_by=None):
     job = (
-        ProductionJob.objects.select_for_update()
+        ProductionJob.objects.select_for_update(of=("self",))
         .prefetch_related("labor_lines")
         .get(pk=job_id)
     )

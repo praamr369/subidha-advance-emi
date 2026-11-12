@@ -1032,7 +1032,7 @@ def get_bridge_candidate(candidate_id: str, *, for_update: bool = False) -> dict
         if source_kind == "salarysheet":
             qs = SalarySheet.objects.select_related("employee", "employee__payroll_expense_account", "payroll_period")
             if for_update:
-                qs = qs.select_for_update()
+                qs = qs.select_for_update(of=("self",))
             candidate = salary_sheet_candidate(qs.get(pk=source_pk))
             if candidate["event_key"] != event_key:
                 raise ValueError("SalarySheet candidate event no longer matches current source state.")
@@ -1040,7 +1040,7 @@ def get_bridge_candidate(candidate_id: str, *, for_update: bool = False) -> dict
         if source_kind == "salarypayment":
             qs = SalaryPayment.objects.select_related("salary_sheet", "salary_sheet__employee", "finance_account", "finance_account__chart_account", "branch", "posted_journal_entry")
             if for_update:
-                qs = qs.select_for_update()
+                qs = qs.select_for_update(of=("self",))
             candidate = salary_payment_candidate(qs.get(pk=source_pk))
             if candidate["event_key"] != event_key:
                 raise ValueError("SalaryPayment candidate event no longer matches current source state.")
@@ -1048,7 +1048,7 @@ def get_bridge_candidate(candidate_id: str, *, for_update: bool = False) -> dict
         if source_kind == "stockledger":
             qs = StockLedger.objects.select_related("inventory_item", "inventory_item__product", "stock_location", "stock_location__branch")
             if for_update:
-                qs = qs.select_for_update()
+                qs = qs.select_for_update(of=("self",))
             candidate = stock_ledger_candidate(qs.get(pk=source_pk))
             if candidate["event_key"] != event_key:
                 raise ValueError("StockLedger candidate event no longer matches current source state.")
@@ -1056,7 +1056,7 @@ def get_bridge_candidate(candidate_id: str, *, for_update: bool = False) -> dict
         if source_kind == "vendorpayment":
             qs = VendorPayment.objects.select_related("vendor", "vendor_bill", "finance_account", "finance_account__chart_account", "finance_account__branch")
             if for_update:
-                qs = qs.select_for_update()
+                qs = qs.select_for_update(of=("self",))
             candidate = vendor_payment_candidate(qs.get(pk=source_pk))
             if candidate["event_key"] != event_key:
                 raise ValueError("VendorPayment candidate event no longer matches current source state.")
@@ -1064,7 +1064,7 @@ def get_bridge_candidate(candidate_id: str, *, for_update: bool = False) -> dict
         return base.get_bridge_candidate(candidate_id, for_update=for_update)
     qs = PurchaseBill.objects.select_related("vendor", "branch", "stock_location", "finance_account", "finance_account__chart_account")
     if for_update:
-        qs = qs.select_for_update()
+        qs = qs.select_for_update(of=("self",))
     candidate = purchase_bill_candidate(qs.get(pk=source_pk))
     if candidate["event_key"] != event_key:
         raise ValueError("PurchaseBill candidate event no longer matches current source state.")
@@ -1278,7 +1278,7 @@ def post_bridge_candidate(*, candidate_id: str, idempotency_key: str, confirmed:
             if candidate["event_key"] not in SALARY_ACCRUAL_EVENT_KEYS:
                 raise ValueError("Unsupported bridge candidate source.")
             purpose = SALARY_ACCRUAL_PURPOSE_BY_EVENT[candidate["event_key"]]
-            existing = AccountingBridgePosting.objects.select_for_update().filter(source_model=SALARY_SHEET_SOURCE_MODEL, source_id=candidate["source_id"], purpose=purpose).select_related("journal_entry").first()
+            existing = AccountingBridgePosting.objects.select_for_update(of=("self",)).filter(source_model=SALARY_SHEET_SOURCE_MODEL, source_id=candidate["source_id"], purpose=purpose).select_related("journal_entry").first()
             if existing is not None:
                 existing_key = ((existing.trace_metadata or {}).get("idempotency_key") or "").strip()
                 if existing_key and existing_key == key:
@@ -1289,7 +1289,7 @@ def post_bridge_candidate(*, candidate_id: str, idempotency_key: str, confirmed:
             preview = preview_bridge_candidate(candidate_id)
             if not preview["can_post"]:
                 raise ValueError("; ".join(preview["blockers"]) or "Candidate is not postable.")
-            row = SalarySheet.objects.select_for_update().select_related("employee", "employee__payroll_expense_account", "payroll_period").get(pk=candidate["source_id"])
+            row = SalarySheet.objects.select_for_update(of=("self",)).select_related("employee", "employee__payroll_expense_account", "payroll_period").get(pk=candidate["source_id"])
             if row.status != SalarySheetStatus.APPROVED:
                 raise ValueError("SalarySheet must remain approved/finalized at posting time.")
             salary_before = _salary_sheet_snapshot(row)
@@ -1357,7 +1357,7 @@ def post_bridge_candidate(*, candidate_id: str, idempotency_key: str, confirmed:
             if candidate["event_key"] not in SALARY_PAYMENT_EVENT_KEYS:
                 raise ValueError("Unsupported bridge candidate source.")
             purpose = SALARY_PAYMENT_PURPOSE_BY_EVENT[candidate["event_key"]]
-            existing = AccountingBridgePosting.objects.select_for_update().filter(source_model=SALARY_PAYMENT_SOURCE_MODEL, source_id=candidate["source_id"], purpose=purpose).select_related("journal_entry").first()
+            existing = AccountingBridgePosting.objects.select_for_update(of=("self",)).filter(source_model=SALARY_PAYMENT_SOURCE_MODEL, source_id=candidate["source_id"], purpose=purpose).select_related("journal_entry").first()
             if existing is not None:
                 existing_key = ((existing.trace_metadata or {}).get("idempotency_key") or "").strip()
                 if existing_key and existing_key == key:
@@ -1368,7 +1368,7 @@ def post_bridge_candidate(*, candidate_id: str, idempotency_key: str, confirmed:
             preview = preview_bridge_candidate(candidate_id)
             if not preview["can_post"]:
                 raise ValueError("; ".join(preview["blockers"]) or "Candidate is not postable.")
-            row = SalaryPayment.objects.select_for_update().select_related("salary_sheet", "salary_sheet__employee", "finance_account", "finance_account__chart_account", "branch").get(pk=candidate["source_id"])
+            row = SalaryPayment.objects.select_for_update(of=("self",)).select_related("salary_sheet", "salary_sheet__employee", "finance_account", "finance_account__chart_account", "branch").get(pk=candidate["source_id"])
             if row.posted_journal_entry_id:
                 raise ValueError("SalaryPayment already has a posted journal reference; F13 will not duplicate salary payment accounting.")
             payment_before = _salary_payment_snapshot(row)
@@ -1434,7 +1434,7 @@ def post_bridge_candidate(*, candidate_id: str, idempotency_key: str, confirmed:
             if candidate["event_key"] not in STOCK_LEDGER_EVENT_KEYS:
                 raise ValueError("Unsupported bridge candidate source.")
             purpose = STOCK_LEDGER_PURPOSE_BY_EVENT[candidate["event_key"]]
-            existing = AccountingBridgePosting.objects.select_for_update().filter(source_model=STOCK_LEDGER_SOURCE_MODEL, source_id=candidate["source_id"], purpose=purpose).select_related("journal_entry").first()
+            existing = AccountingBridgePosting.objects.select_for_update(of=("self",)).filter(source_model=STOCK_LEDGER_SOURCE_MODEL, source_id=candidate["source_id"], purpose=purpose).select_related("journal_entry").first()
             if existing is not None:
                 existing_key = ((existing.trace_metadata or {}).get("idempotency_key") or "").strip()
                 if existing_key and existing_key == key:
@@ -1445,7 +1445,7 @@ def post_bridge_candidate(*, candidate_id: str, idempotency_key: str, confirmed:
             preview = preview_bridge_candidate(candidate_id)
             if not preview["can_post"]:
                 raise ValueError("; ".join(preview["blockers"]) or "Candidate is not postable.")
-            row = StockLedger.objects.select_for_update().select_related("inventory_item", "inventory_item__product", "stock_location", "stock_location__branch").get(pk=candidate["source_id"])
+            row = StockLedger.objects.select_for_update(of=("self",)).select_related("inventory_item", "inventory_item__product", "stock_location", "stock_location__branch").get(pk=candidate["source_id"])
             source_before = _stock_ledger_snapshot(row)
             item_before = _inventory_item_snapshot(row.inventory_item)
             lines, _warnings, finance_account = _lines_for_candidate(candidate)
@@ -1473,7 +1473,7 @@ def post_bridge_candidate(*, candidate_id: str, idempotency_key: str, confirmed:
             if candidate["event_key"] not in VENDOR_PAYMENT_EVENT_KEYS:
                 raise ValueError("Unsupported bridge candidate source.")
             purpose = VENDOR_PAYMENT_PURPOSE_BY_EVENT[candidate["event_key"]]
-            existing = AccountingBridgePosting.objects.select_for_update().filter(source_model=VENDOR_PAYMENT_SOURCE_MODEL, source_id=candidate["source_id"], purpose=purpose).select_related("journal_entry").first()
+            existing = AccountingBridgePosting.objects.select_for_update(of=("self",)).filter(source_model=VENDOR_PAYMENT_SOURCE_MODEL, source_id=candidate["source_id"], purpose=purpose).select_related("journal_entry").first()
             if existing is not None:
                 existing_key = ((existing.trace_metadata or {}).get("idempotency_key") or "").strip()
                 if existing_key and existing_key == key:
@@ -1508,7 +1508,7 @@ def post_bridge_candidate(*, candidate_id: str, idempotency_key: str, confirmed:
     if candidate["event_key"] not in PURCHASE_BILL_EVENT_KEYS:
         raise ValueError("Unsupported bridge candidate source.")
     purpose = PURCHASE_BILL_PURPOSE_BY_EVENT[candidate["event_key"]]
-    existing = AccountingBridgePosting.objects.select_for_update().filter(source_model=PURCHASE_BILL_SOURCE_MODEL, source_id=candidate["source_id"], purpose=purpose).select_related("journal_entry").first()
+    existing = AccountingBridgePosting.objects.select_for_update(of=("self",)).filter(source_model=PURCHASE_BILL_SOURCE_MODEL, source_id=candidate["source_id"], purpose=purpose).select_related("journal_entry").first()
     if existing is not None:
         existing_key = ((existing.trace_metadata or {}).get("idempotency_key") or "").strip()
         if existing_key and existing_key == key:

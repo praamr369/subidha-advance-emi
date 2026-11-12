@@ -71,7 +71,7 @@ def _post_opening_journal(*, entry_date: date, source_model: str, source_id: str
 
 @transaction.atomic
 def set_finance_account_opening_balance(*, finance_account: FinanceAccount, amount, entry_date: date, actor) -> dict:
-    finance_account = FinanceAccount.objects.select_for_update().select_related("chart_account").get(pk=finance_account.pk)
+    finance_account = FinanceAccount.objects.select_for_update(of=("self",)).select_related("chart_account").get(pk=finance_account.pk)
 
     # One-time lock: once an opening balance journal has been posted, it cannot be re-posted.
     # Re-posting would create duplicate debit entries and break double-entry reconciliation.

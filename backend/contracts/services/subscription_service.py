@@ -45,7 +45,7 @@ def create_emi_subscription(
         raise ValidationError("Batch is not open for subscription.")
 
     lucky = (
-        LuckyId.objects.select_for_update()
+        LuckyId.objects.select_for_update(of=("self",))
         .select_related("batch")
         .get(batch=batch, lucky_number=lucky_number)
     )

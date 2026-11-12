@@ -212,7 +212,7 @@ def record_confirmation(
 
     rate = _coerce_rate(gst_rate)
     with transaction.atomic():
-        mapping, created = FieldSuggestionMapping.objects.select_for_update().get_or_create(
+        mapping, created = FieldSuggestionMapping.objects.select_for_update(of=("self",)).get_or_create(
             field_key=field_key,
             input_normalized=normalized,
             defaults={
@@ -249,7 +249,7 @@ def _record_pincode_confirmation(
     state_code = parts[3].strip() if len(parts) > 3 else ""
 
     with transaction.atomic():
-        row, created = PincodeLocation.objects.select_for_update().get_or_create(
+        row, created = PincodeLocation.objects.select_for_update(of=("self",)).get_or_create(
             pincode=pincode,
             city=city,
             district=district,

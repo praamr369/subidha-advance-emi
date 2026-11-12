@@ -223,7 +223,7 @@ def upsert_purchase_bill_draft(
         )
         return purchase_bill
 
-    purchase_bill = PurchaseBill.objects.select_for_update().get(pk=purchase_bill_id)
+    purchase_bill = PurchaseBill.objects.select_for_update(of=("self",)).get(pk=purchase_bill_id)
     if purchase_bill.status != PurchaseBillStatus.DRAFT:
         raise ValueError("Only draft purchase bills can be edited.")
 
@@ -642,7 +642,7 @@ def post_debit_note_stock_movements(*, note, posted_by=None) -> dict:
 
 @transaction.atomic
 def approve_stock_adjustment(*, stock_adjustment_id: int, approved_by):
-    adjustment = StockAdjustment.objects.select_for_update().get(pk=stock_adjustment_id)
+    adjustment = StockAdjustment.objects.select_for_update(of=("self",)).get(pk=stock_adjustment_id)
     if adjustment.status == StockAdjustmentStatus.APPROVED:
         return adjustment, False
     if adjustment.status in {StockAdjustmentStatus.POSTED, StockAdjustmentStatus.CANCELLED}:
@@ -791,7 +791,7 @@ def set_stock_adjustment_line_unit_costs(*, stock_adjustment_id: int, unit_costs
     can never be retro-edited.
     """
     adjustment = (
-        StockAdjustment.objects.select_for_update()
+        StockAdjustment.objects.select_for_update(of=("self",))
         .prefetch_related("lines")
         .get(pk=stock_adjustment_id)
     )
@@ -838,7 +838,7 @@ def set_stock_adjustment_line_unit_costs(*, stock_adjustment_id: int, unit_costs
 @transaction.atomic
 def post_stock_adjustment(*, stock_adjustment_id: int, posted_by):
     adjustment = (
-        StockAdjustment.objects.select_for_update()
+        StockAdjustment.objects.select_for_update(of=("self",))
         .prefetch_related("lines", "lines__inventory_item")
         .get(pk=stock_adjustment_id)
     )

@@ -53,11 +53,11 @@ def apply_credit_note_to_invoice(
     if amount <= MONEY_ZERO:
         raise ValueError("Application amount must be positive.")
 
-    note = BillingCreditNote.objects.select_for_update().get(pk=credit_note_id)
+    note = BillingCreditNote.objects.select_for_update(of=("self",)).get(pk=credit_note_id)
     if note.status != "POSTED":
         raise ValueError("Only posted credit notes can be applied.")
 
-    invoice = BillingInvoice.objects.select_for_update().get(pk=invoice_id)
+    invoice = BillingInvoice.objects.select_for_update(of=("self",)).get(pk=invoice_id)
     if invoice.status not in ("APPROVED", "POSTED"):
         raise ValueError("Credit can only be applied to approved or posted invoices.")
 

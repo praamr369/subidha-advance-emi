@@ -71,7 +71,7 @@ def settle_legacy_receivable(
     old-customer collections the same ledger footprint as new-customer ones.
     """
     try:
-        receivable = CustomerOpeningOutstanding.objects.select_for_update().get(id=receivable_id)
+        receivable = CustomerOpeningOutstanding.objects.select_for_update(of=("self",)).get(id=receivable_id)
     except CustomerOpeningOutstanding.DoesNotExist:
         raise ValidationError(f"Legacy receivable {receivable_id} not found.")
 

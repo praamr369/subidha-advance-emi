@@ -65,7 +65,7 @@ def _create_vendor_ledger_entry(*, vendor_id: int, entry_type: str, source_type:
 @transaction.atomic
 def approve_purchase_request(*, purchase_request_id: int, performed_by=None):
     """Approve a DRAFT purchase request. Idempotent if already APPROVED."""
-    pr = PurchaseRequest.objects.select_for_update().get(pk=purchase_request_id)
+    pr = PurchaseRequest.objects.select_for_update(of=("self",)).get(pk=purchase_request_id)
     if pr.status == PurchaseRequestStatus.APPROVED:
         return pr, False
     if pr.status != PurchaseRequestStatus.DRAFT:
@@ -148,7 +148,7 @@ def convert_purchase_request_to_po(*, purchase_request_id: int, performed_by=Non
 
 @transaction.atomic
 def cancel_purchase_order(*, purchase_order_id: int, performed_by=None):
-    purchase_order = PurchaseOrder.objects.select_for_update().get(pk=purchase_order_id)
+    purchase_order = PurchaseOrder.objects.select_for_update(of=("self",)).get(pk=purchase_order_id)
     if purchase_order.status == PurchaseOrderStatus.CANCELLED:
         return purchase_order, False
     if purchase_order.status != PurchaseOrderStatus.DRAFT:

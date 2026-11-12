@@ -49,13 +49,13 @@ class PaymentAllocationService:
         effective_date = allocation_date or timezone.localdate()
         normalized_reference = (reference_no or "").strip() or None
 
-        advance = CustomerAdvance.objects.select_for_update().select_related("customer", "finance_account", "cash_counter", "branch").get(pk=customer_advance_id)
-        emi = Emi.objects.select_for_update().select_related("subscription", "subscription__customer").get(pk=emi_id)
+        advance = CustomerAdvance.objects.select_for_update(of=("self",)).select_related("customer", "finance_account", "cash_counter", "branch").get(pk=customer_advance_id)
+        emi = Emi.objects.select_for_update(of=("self",)).select_related("subscription", "subscription__customer").get(pk=emi_id)
         if emi.subscription.customer_id != advance.customer_id:
             raise ValueError("Advance can be allocated only to the same customer.")
 
         if normalized_reference:
-            existing_payment = Payment.objects.select_for_update().filter(reference_no=normalized_reference).first()
+            existing_payment = Payment.objects.select_for_update(of=("self",)).filter(reference_no=normalized_reference).first()
             if existing_payment is not None:
                 if _allocation_matches(existing_payment, customer_advance_id=advance.id, emi_id=emi.id, amount=allocation_amount, allocation_date=effective_date):
                     allocation = getattr(existing_payment, "customer_advance_allocation", None)

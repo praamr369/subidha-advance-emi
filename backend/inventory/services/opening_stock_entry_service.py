@@ -151,7 +151,7 @@ def create_opening_stock_entry(
 
 
 def update_opening_stock_entry_draft(*, entry_id: int, performed_by=None, **fields) -> OpeningStockEntry:
-    entry = OpeningStockEntry.objects.select_related("inventory_item").select_for_update().get(pk=entry_id)
+    entry = OpeningStockEntry.objects.select_related("inventory_item").select_for_update(of=("self",)).get(pk=entry_id)
     if entry.status != OpeningStockEntryStatus.DRAFT:
         raise ValueError(POSTED_IMMUTABLE_MSG)
 
@@ -192,7 +192,7 @@ def update_opening_stock_entry_draft(*, entry_id: int, performed_by=None, **fiel
 @transaction.atomic
 def post_opening_stock_entry(*, entry_id: int, posted_by=None) -> tuple[OpeningStockEntry, bool]:
     entry = (
-        OpeningStockEntry.objects.select_for_update()
+        OpeningStockEntry.objects.select_for_update(of=("self",))
         .select_related("inventory_item", "stock_location")
         .get(pk=entry_id)
     )
@@ -286,7 +286,7 @@ def post_opening_stock_entry(*, entry_id: int, posted_by=None) -> tuple[OpeningS
 
 @transaction.atomic
 def cancel_opening_stock_entry(*, entry_id: int, performed_by=None) -> OpeningStockEntry:
-    entry = OpeningStockEntry.objects.select_for_update().get(pk=entry_id)
+    entry = OpeningStockEntry.objects.select_for_update(of=("self",)).get(pk=entry_id)
     if entry.status != OpeningStockEntryStatus.DRAFT:
         raise ValueError("Only draft opening stock rows can be cancelled.")
     entry.status = OpeningStockEntryStatus.CANCELLED

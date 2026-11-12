@@ -109,7 +109,7 @@ class CustomerRequestGenerateQuoteView(APIView):
             return err_resp
 
         try:
-            req_obj = online_request_base_queryset().select_for_update().get(
+            req_obj = online_request_base_queryset().select_for_update(of=("self",)).get(
                 pk=pk, customer=customer
             )
             quote_data = generate_quote(

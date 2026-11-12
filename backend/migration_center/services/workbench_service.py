@@ -129,7 +129,7 @@ def add_row(*, batch: MigrationBatch, data: dict[str, Any], actor=None) -> Migra
 def update_row(*, batch: MigrationBatch, row_number: int, data: dict[str, Any], actor=None) -> MigrationStagingRow:
     _assert_editable(batch)
     dataset = get_dataset(batch.dataset_key)
-    row = batch.rows.select_for_update().get(row_number=row_number)
+    row = batch.rows.select_for_update(of=("self",)).get(row_number=row_number)
     if row.status == StagingRowStatus.IMPORTED:
         raise ValueError("Imported rows cannot be edited. Roll back the batch first.")
     cleaned = _clean_row_data(dataset, data)
@@ -153,7 +153,7 @@ def update_row(*, batch: MigrationBatch, row_number: int, data: dict[str, Any], 
 @transaction.atomic
 def delete_row(*, batch: MigrationBatch, row_number: int, actor=None) -> None:
     _assert_editable(batch)
-    row = batch.rows.select_for_update().get(row_number=row_number)
+    row = batch.rows.select_for_update(of=("self",)).get(row_number=row_number)
     if row.status == StagingRowStatus.IMPORTED:
         raise ValueError("Imported rows cannot be deleted. Roll back the batch first.")
     row.delete()

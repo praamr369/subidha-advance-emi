@@ -160,7 +160,7 @@ def get_late_payment_charge_label() -> str:
 @transaction.atomic
 def update_active_business_rule_policy(*, payload: dict[str, Any], performed_by=None) -> BusinessRulePolicy:
     now = timezone.now()
-    old_policy = BusinessRulePolicy.objects.select_for_update().filter(is_active=True).order_by("-effective_from", "-id").first()
+    old_policy = BusinessRulePolicy.objects.select_for_update(of=("self",)).filter(is_active=True).order_by("-effective_from", "-id").first()
     
     if old_policy:
         old_policy.is_active = False

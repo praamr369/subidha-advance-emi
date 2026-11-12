@@ -26,7 +26,7 @@ def complete_repossession_return(repossession, *, performed_by=None) -> dict:
     subscription = repossession.subscription
     # Capture the asset first: closing the delivery unlinks it from the contract.
     asset = (
-        RentalAsset.objects.select_for_update()
+        RentalAsset.objects.select_for_update(of=("self",))
         .filter(current_subscription=subscription)
         .exclude(status=RentalAssetStatus.RETIRED)
         .order_by("id")

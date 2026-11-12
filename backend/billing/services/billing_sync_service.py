@@ -97,7 +97,7 @@ def _get_or_create_sync_event(
 ) -> tuple[BillingSyncEvent, bool]:
     if idempotency_key:
         existing = (
-            BillingSyncEvent.objects.select_for_update()
+            BillingSyncEvent.objects.select_for_update(of=("self",))
             .filter(idempotency_key=idempotency_key)
             .first()
         )
@@ -135,7 +135,7 @@ def sync_subscription_billing_profile(
     idempotency_key: str | None = None,
 ) -> tuple[BillingProfile, BillingSyncEvent, bool]:
     subscription = (
-        Subscription.objects.select_for_update()
+        Subscription.objects.select_for_update(of=("self",))
         .select_related("customer", "product")
         .prefetch_related("emis", "emis__payments", "emis__ledger_entries", "deliveries")
         .get(pk=subscription_id)

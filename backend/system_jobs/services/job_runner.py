@@ -22,7 +22,7 @@ def run_idempotent_job(
 
     Retries: if the last run FAILED, the same key may run again (retry_count increments).
     """
-    initial = SystemJobLog.objects.select_for_update().filter(idempotency_key=idempotency_key).first()
+    initial = SystemJobLog.objects.select_for_update(of=("self",)).filter(idempotency_key=idempotency_key).first()
     if initial and initial.status == SystemJobStatus.SUCCESS:
         return initial, {"skipped": True, "reason": "already_succeeded"}
 
@@ -51,7 +51,7 @@ def run_idempotent_job(
                     celery_task_id=celery_task_id or "",
                 )
         except IntegrityError:
-            log = SystemJobLog.objects.select_for_update().filter(idempotency_key=idempotency_key).first()
+            log = SystemJobLog.objects.select_for_update(of=("self",)).filter(idempotency_key=idempotency_key).first()
             if log is None:
                 raise
             if log.status == SystemJobStatus.SUCCESS:

@@ -40,7 +40,7 @@ def create_payment_reminder(*, performed_by=None, **validated_data):
 
 @transaction.atomic
 def schedule_payment_reminder(*, reminder_id: int, scheduled_for, performed_by=None):
-    reminder = PaymentReminder.objects.select_for_update().get(pk=reminder_id)
+    reminder = PaymentReminder.objects.select_for_update(of=("self",)).get(pk=reminder_id)
     if reminder.status in {ReminderStatus.SENT, ReminderStatus.CANCELLED}:
         raise ValueError("Sent or cancelled reminders cannot be rescheduled.")
     reminder.status = ReminderStatus.SCHEDULED
@@ -85,7 +85,7 @@ def send_payment_reminder(
     notes: str = "",
     manual_send: bool = True,
 ):
-    reminder = PaymentReminder.objects.select_for_update().get(pk=reminder_id)
+    reminder = PaymentReminder.objects.select_for_update(of=("self",)).get(pk=reminder_id)
     if reminder.status == ReminderStatus.SENT:
         return reminder, False
     if reminder.status == ReminderStatus.CANCELLED:
@@ -165,7 +165,7 @@ def send_payment_reminder(
 
 @transaction.atomic
 def cancel_payment_reminder(*, reminder_id: int, performed_by=None, notes: str = ""):
-    reminder = PaymentReminder.objects.select_for_update().get(pk=reminder_id)
+    reminder = PaymentReminder.objects.select_for_update(of=("self",)).get(pk=reminder_id)
     if reminder.status == ReminderStatus.CANCELLED:
         return reminder, False
     if reminder.status == ReminderStatus.SENT:
@@ -236,7 +236,7 @@ MAX_RETRY_ATTEMPTS = 3
 @transaction.atomic
 def retry_failed_reminder(*, reminder_id: int, performed_by=None):
     """Retry a FAILED reminder. Email only — non-email channels require manual resend. Returns (reminder, retried_bool)."""
-    reminder = PaymentReminder.objects.select_for_update().get(pk=reminder_id)
+    reminder = PaymentReminder.objects.select_for_update(of=("self",)).get(pk=reminder_id)
     if reminder.status != ReminderStatus.FAILED:
         raise ValueError("Only FAILED reminders can be retried.")
     if reminder.channel != ReminderChannel.EMAIL:

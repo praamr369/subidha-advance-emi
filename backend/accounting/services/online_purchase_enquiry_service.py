@@ -138,7 +138,7 @@ def select_vendor_quote_for_enquiry(
     if enquiry.status == CustomerPurchaseEnquiryStatus.CANCELLED:
         raise ValueError("Cancelled enquiries cannot select vendors.")
 
-    quote = VendorQuote.objects.select_related("quote_request", "vendor").select_for_update().get(pk=vendor_quote_id)
+    quote = VendorQuote.objects.select_related("quote_request", "vendor").select_for_update(of=("self",)).get(pk=vendor_quote_id)
     _ensure_quote_belongs_to_enquiry(enquiry, quote)
     _assert_vendor_eligibility(
         quote.vendor,

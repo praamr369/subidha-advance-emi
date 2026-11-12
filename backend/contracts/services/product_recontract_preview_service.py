@@ -71,7 +71,7 @@ def _event_is_executed(event: ContractRecontractEvent | None) -> bool:
 def _latest_event(amendment: ContractAmendment, *, lock: bool = False) -> ContractRecontractEvent | None:
     queryset = ContractRecontractEvent.objects.select_related("old_product", "new_product", "subscription").filter(amendment=amendment)
     if lock:
-        queryset = queryset.select_for_update()
+        queryset = queryset.select_for_update(of=("self",))
     return queryset.order_by("-created_at", "-id").first()
 
 
@@ -181,7 +181,7 @@ def latest_product_recontract_preview_summary(amendment: ContractAmendment) -> d
 
 def _event_for_schedule_preview(amendment: ContractAmendment) -> ContractRecontractEvent:
     event = (
-        ContractRecontractEvent.objects.select_for_update()
+        ContractRecontractEvent.objects.select_for_update(of=("self",))
         .select_related("subscription", "old_product", "new_product")
         .prefetch_related("schedule_preview_lines")
         .filter(amendment=amendment)
@@ -217,10 +217,10 @@ def _deterministic_installments(total: Decimal, count: int) -> list[Decimal]:
 def create_product_recontract_schedule_preview(*, amendment: ContractAmendment, requested_by=None) -> ContractRecontractEvent:
     """Create and persist preview-only future EMI schedule lines for an approved recontract event."""
     with transaction.atomic():
-        locked_amendment = ContractAmendment.objects.select_for_update().get(pk=amendment.pk)
+        locked_amendment = ContractAmendment.objects.select_for_update(of=("self",)).get(pk=amendment.pk)
         event = _event_for_schedule_preview(locked_amendment)
         pending_emis = list(
-            Emi.objects.select_for_update()
+            Emi.objects.select_for_update(of=("self",))
             .filter(subscription_id=event.subscription_id, status=EmiStatus.PENDING)
             .order_by("month_no", "due_date", "id")
         )
@@ -234,7 +234,7 @@ def create_product_recontract_schedule_preview(*, amendment: ContractAmendment, 
                 {"detail": "Schedule preview is blocked: pending EMI mapping changed after preview snapshot; regenerate product preview first."}
             )
 
-        ContractRecontractScheduleLine.objects.select_for_update().filter(
+        ContractRecontractScheduleLine.objects.select_for_update(of=("self",)).filter(
             event=event, proposed_status=ContractRecontractScheduleLine.ProposedStatus.PREVIEW_ONLY
         ).update(
             proposed_status=ContractRecontractScheduleLine.ProposedStatus.SUPERSEDED,
@@ -434,7 +434,7 @@ def create_product_recontract_preview_snapshot(
 ) -> ContractRecontractEvent:
     """Persist one backend-calculated product recontract preview as audit evidence only."""
     with transaction.atomic():
-        locked_amendment = ContractAmendment.objects.select_for_update().get(pk=amendment.pk)
+        locked_amendment = ContractAmendment.objects.select_for_update(of=("self",)).get(pk=amendment.pk)
         _assert_not_executed_for_amendment(locked_amendment)
         preview = preview_product_recontract(
             amendment=locked_amendment,
@@ -448,7 +448,7 @@ def create_product_recontract_preview_snapshot(
         if not source:
             raise ValidationError({"detail": "Source subscription is required for product recontract preview persistence."})
 
-        ContractRecontractEvent.objects.select_for_update().filter(
+        ContractRecontractEvent.objects.select_for_update(of=("self",)).filter(
             amendment=locked_amendment,
             status=ContractRecontractEvent.Status.PREVIEWED,
         ).update(status=ContractRecontractEvent.Status.SUPERSEDED, updated_at=timezone.now())
@@ -529,7 +529,7 @@ def record_product_recontract_customer_consent(
         raise ValidationError({"detail": "You can consent only to your own amendment."})
 
     with transaction.atomic():
-        locked_amendment = ContractAmendment.objects.select_for_update().get(pk=amendment.pk)
+        locked_amendment = ContractAmendment.objects.select_for_update(of=("self",)).get(pk=amendment.pk)
         if locked_amendment.customer_id != customer.id:
             raise ValidationError({"detail": "You can consent only to your own amendment."})
 
@@ -612,7 +612,7 @@ def record_product_recontract_admin_approval(
         raise ValidationError({"decision": "Decision must be APPROVED or REJECTED."})
 
     with transaction.atomic():
-        locked_amendment = ContractAmendment.objects.select_for_update().get(pk=amendment.pk)
+        locked_amendment = ContractAmendment.objects.select_for_update(of=("self",)).get(pk=amendment.pk)
         event = _latest_event(locked_amendment, lock=True)
         if not event:
             raise ValidationError({"detail": "No saved product recontract preview exists for this amendment."})
@@ -693,9 +693,9 @@ def create_product_recontract_financial_impact_preview(
     requested_by=None,
 ) -> ContractRecontractFinancialImpactPreview:
     with transaction.atomic():
-        locked_amendment = ContractAmendment.objects.select_for_update().get(pk=amendment.pk)
+        locked_amendment = ContractAmendment.objects.select_for_update(of=("self",)).get(pk=amendment.pk)
         event = (
-            ContractRecontractEvent.objects.select_for_update()
+            ContractRecontractEvent.objects.select_for_update(of=("self",))
             .prefetch_related("schedule_preview_lines")
             .filter(amendment=locked_amendment)
             .order_by("-created_at", "-id")
@@ -720,11 +720,11 @@ def create_product_recontract_financial_impact_preview(
             raise ValidationError({"detail": "Financial impact preview requires generated schedule preview lines."})
 
         now = timezone.now()
-        ContractRecontractFinancialImpactPreview.objects.select_for_update().filter(
+        ContractRecontractFinancialImpactPreview.objects.select_for_update(of=("self",)).filter(
             event=event,
             accounting_preview_status=ContractRecontractFinancialImpactPreview.PreviewStatus.PREVIEWED,
         ).update(accounting_preview_status=ContractRecontractFinancialImpactPreview.PreviewStatus.SUPERSEDED, updated_at=now)
-        ContractRecontractFinancialImpactPreview.objects.select_for_update().filter(
+        ContractRecontractFinancialImpactPreview.objects.select_for_update(of=("self",)).filter(
             event=event,
             reconciliation_preview_status=ContractRecontractFinancialImpactPreview.PreviewStatus.PREVIEWED,
         ).update(reconciliation_preview_status=ContractRecontractFinancialImpactPreview.PreviewStatus.SUPERSEDED, updated_at=now)

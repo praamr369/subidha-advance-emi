@@ -194,13 +194,13 @@ def get_subscription_winner_evidence(subscription: Subscription) -> dict:
 
 
 def _lock_subscription_only(subscription_id: int) -> Subscription:
-    return Subscription.objects.select_for_update().get(pk=subscription_id)
+    return Subscription.objects.select_for_update(of=("self",)).get(pk=subscription_id)
 
 
 def _lock_lucky_id_if_present(subscription: Subscription):
     if not subscription.lucky_id_id:
         return None
-    lucky_id = LuckyId.objects.select_for_update().get(pk=subscription.lucky_id_id)
+    lucky_id = LuckyId.objects.select_for_update(of=("self",)).get(pk=subscription.lucky_id_id)
     subscription.lucky_id = lucky_id
     return lucky_id
 
@@ -246,7 +246,7 @@ def apply_winner_state(
         raise ValidationError("Invalid winner month.")
 
     emis = list(
-        subscription.emis.select_for_update().order_by("month_no", "id")
+        subscription.emis.select_for_update(of=("self",)).order_by("month_no", "id")
     )
 
     unpaid_before_winner = any(

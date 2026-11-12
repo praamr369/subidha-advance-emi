@@ -109,7 +109,7 @@ def _post_base_candidate(*, candidate_id: str, idempotency_key: str, confirmed: 
 
     purpose = base._purpose_for_event(candidate["source_model"], candidate["event_key"])
     existing = (
-        AccountingBridgePosting.objects.select_for_update()
+        AccountingBridgePosting.objects.select_for_update(of=("self",))
         .filter(source_model=candidate["source_model"], source_id=candidate["source_id"], purpose=purpose)
         .select_related("journal_entry")
         .first()

@@ -173,7 +173,7 @@ def refund_assess_damage_view(request, request_id: int):
     leave its own trail, not a side effect of posting the form twice.
     """
     req = get_object_or_404(
-        ConsumerReturnRequest.objects.select_for_update().select_related(
+        ConsumerReturnRequest.objects.select_for_update(of=("self",)).select_related(
             "subscription", "subscription__customer"
         ),
         pk=request_id,
@@ -279,7 +279,7 @@ def refund_advance_view(request, request_id: int):
     absence of one.
     """
     req = get_object_or_404(
-        ConsumerReturnRequest.objects.select_for_update().select_related("subscription"),
+        ConsumerReturnRequest.objects.select_for_update(of=("self",)).select_related("subscription"),
         pk=request_id,
     )
 

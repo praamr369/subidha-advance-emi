@@ -394,7 +394,7 @@ def approve_subscription_request(
         )
 
     product = request_obj.product
-    batch = Batch.objects.select_for_update().get(pk=request_obj.batch_id)
+    batch = Batch.objects.select_for_update(of=("self",)).get(pk=request_obj.batch_id)
 
     if not product.is_active or not product.is_emi_enabled:
         raise ValidationError({"detail": "Requested product is no longer available for EMI subscription approval."})
@@ -407,7 +407,7 @@ def approve_subscription_request(
         else request_obj.preferred_lucky_number
     )
 
-    lucky = LuckyId.objects.select_for_update().filter(
+    lucky = LuckyId.objects.select_for_update(of=("self",)).filter(
         batch=batch,
         lucky_number=lucky_number,
     ).first()

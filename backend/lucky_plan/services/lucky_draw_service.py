@@ -66,7 +66,7 @@ def _eligible_winner_subscriptions(batch: Batch):
         return ordered_subs
 
     return list(
-        Subscription.objects.select_for_update()
+        Subscription.objects.select_for_update(of=("self",))
         .filter(
             batch=batch,
             plan_type=PlanType.EMI,
@@ -91,7 +91,7 @@ def generate_commitment(seed: str) -> str:
 
 @transaction.atomic
 def create_lucky_draw_commit(batch: Batch):
-    batch = Batch.objects.select_for_update().get(pk=batch.pk)
+    batch = Batch.objects.select_for_update(of=("self",)).get(pk=batch.pk)
 
     if batch.status == BatchStatus.DRAFT:
         raise ValidationError("Batch must not be DRAFT before draw commitment is created.")

@@ -1382,7 +1382,7 @@ def _compact_journal_lines(lines: list[dict]) -> list[dict]:
 
 @transaction.atomic
 def approve_billing_credit_note(*, credit_note_id: int, approved_by):
-    note = BillingCreditNote.objects.select_for_update().get(pk=credit_note_id)
+    note = BillingCreditNote.objects.select_for_update(of=("self",)).get(pk=credit_note_id)
     return _approve_note(
         note,
         approved_by=approved_by,
@@ -1393,7 +1393,7 @@ def approve_billing_credit_note(*, credit_note_id: int, approved_by):
 
 @transaction.atomic
 def approve_billing_debit_note(*, debit_note_id: int, approved_by):
-    note = BillingDebitNote.objects.select_for_update().get(pk=debit_note_id)
+    note = BillingDebitNote.objects.select_for_update(of=("self",)).get(pk=debit_note_id)
     return _approve_note(
         note,
         approved_by=approved_by,
@@ -1404,7 +1404,7 @@ def approve_billing_debit_note(*, debit_note_id: int, approved_by):
 
 @transaction.atomic
 def post_billing_credit_note(*, credit_note_id: int, posted_by):
-    note = BillingCreditNote.objects.select_for_update().prefetch_related("lines").get(pk=credit_note_id)
+    note = BillingCreditNote.objects.select_for_update(of=("self",)).prefetch_related("lines").get(pk=credit_note_id)
     if note.status == BillingDocumentStatus.POSTED and note.posted_journal_entry_id:
         return note, False
     if note.status != BillingDocumentStatus.APPROVED:
@@ -1475,7 +1475,7 @@ def post_billing_credit_note(*, credit_note_id: int, posted_by):
 
 @transaction.atomic
 def post_billing_debit_note(*, debit_note_id: int, posted_by):
-    note = BillingDebitNote.objects.select_for_update().prefetch_related("lines").get(pk=debit_note_id)
+    note = BillingDebitNote.objects.select_for_update(of=("self",)).prefetch_related("lines").get(pk=debit_note_id)
     if note.status == BillingDocumentStatus.POSTED and note.posted_journal_entry_id:
         return note, False
     if note.status != BillingDocumentStatus.APPROVED:

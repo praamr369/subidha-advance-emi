@@ -49,14 +49,14 @@ def get_erasure_preview(*, customer_id: int) -> dict:
 def execute_erasure(*, erasure_guard_id: int, actor) -> dict:
     from customers.models import Customer, CustomerKycDocument
 
-    guard = DataErasureGuard.objects.select_for_update().get(pk=erasure_guard_id)
+    guard = DataErasureGuard.objects.select_for_update(of=("self",)).get(pk=erasure_guard_id)
 
     if guard.status == ErasureRequestStatus.COMPLETED:
         raise ValueError("Erasure already completed.")
     if guard.status == ErasureRequestStatus.REJECTED:
         raise ValueError("Erasure request was rejected.")
 
-    customer = Customer.objects.select_for_update().get(pk=guard.customer_id)
+    customer = Customer.objects.select_for_update(of=("self",)).get(pk=guard.customer_id)
     original_name = customer.name
 
     # 1. Anonymize PII fields
@@ -145,7 +145,7 @@ def execute_erasure(*, erasure_guard_id: int, actor) -> dict:
 
 @transaction.atomic
 def reject_erasure(*, erasure_guard_id: int, reason: str, actor) -> dict:
-    guard = DataErasureGuard.objects.select_for_update().get(pk=erasure_guard_id)
+    guard = DataErasureGuard.objects.select_for_update(of=("self",)).get(pk=erasure_guard_id)
 
     if guard.status in (ErasureRequestStatus.COMPLETED, ErasureRequestStatus.REJECTED):
         raise ValueError(f"Erasure request is already {guard.status}.")

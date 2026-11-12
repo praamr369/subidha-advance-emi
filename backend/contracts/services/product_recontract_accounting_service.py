@@ -55,7 +55,7 @@ def _account_snapshot(account: ChartOfAccount) -> dict:
 
 def _profile_account(*, key: str, expected_type: str) -> ChartOfAccount:
     profile = (
-        AccountingPostingProfile.objects.select_for_update()
+        AccountingPostingProfile.objects.select_for_update(of=("self",))
         .select_related("chart_account")
         .filter(key=key, is_active=True)
         .first()
@@ -103,7 +103,7 @@ def _assert_schedule_preview_exists(event: ContractRecontractEvent) -> None:
 
 def _existing_bridge(event: ContractRecontractEvent) -> AccountingBridgePosting | None:
     return (
-        AccountingBridgePosting.objects.select_for_update()
+        AccountingBridgePosting.objects.select_for_update(of=("self",))
         .select_related("journal_entry")
         .filter(
             source_model="ContractRecontractEvent",
@@ -292,7 +292,7 @@ def execute_product_recontract_accounting(
 
     actor = requested_by or performed_by
     locked_event = (
-        ContractRecontractEvent.objects.select_for_update()
+        ContractRecontractEvent.objects.select_for_update(of=("self",))
         .select_related("amendment", "subscription", "old_product", "new_product")
         .prefetch_related("schedule_preview_lines")
         .get(pk=event.pk)

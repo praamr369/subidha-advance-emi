@@ -62,7 +62,7 @@ def post_vendor_settlement(*, vendor_settlement_id: int, posted_by):
         raise ValueError("An advance payment cannot be tied to a purchase bill; apply it to bills afterwards.")
 
     if settlement.purchase_bill_id:
-        purchase_bill = PurchaseBill.objects.select_for_update().get(pk=settlement.purchase_bill_id)
+        purchase_bill = PurchaseBill.objects.select_for_update(of=("self",)).get(pk=settlement.purchase_bill_id)
         if purchase_bill.vendor_id != settlement.vendor_id:
             raise ValueError("Selected purchase bill does not belong to the settlement vendor.")
         if purchase_bill.status != PurchaseBillStatus.POSTED:
@@ -131,7 +131,7 @@ def post_vendor_settlement(*, vendor_settlement_id: int, posted_by):
 
 @transaction.atomic
 def cancel_vendor_settlement(*, vendor_settlement_id: int, performed_by, reason: str = ""):
-    settlement = VendorSettlement.objects.select_for_update().get(pk=vendor_settlement_id)
+    settlement = VendorSettlement.objects.select_for_update(of=("self",)).get(pk=vendor_settlement_id)
     if settlement.status == VendorSettlementStatus.CANCELLED:
         return settlement, False
     if settlement.status == VendorSettlementStatus.POSTED:

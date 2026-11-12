@@ -101,7 +101,7 @@ class CustomerAdvanceService:
         if normalized_idempotency:
             duplicate_filter |= Q(allocation_metadata__source_idempotency_key=normalized_idempotency)
         if duplicate_filter:
-            existing = CustomerAdvance.objects.select_for_update().filter(duplicate_filter).order_by("id").first()
+            existing = CustomerAdvance.objects.select_for_update(of=("self",)).filter(duplicate_filter).order_by("id").first()
             if existing is not None:
                 if _advance_matches(existing, customer_id=customer.id, amount=normalized_amount, finance_account_id=finance_account.id, method=normalized_method, payment_date=payment_date, branch_id=resolved_branch_id):
                     return existing

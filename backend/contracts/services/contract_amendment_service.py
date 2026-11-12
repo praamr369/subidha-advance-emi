@@ -529,7 +529,7 @@ def _implement_customer_field_amendment(*, locked_amendment: ContractAmendment, 
         raise ValidationError({"detail": metadata["implementation_block_reason"]})
     if config["source"] != "customer" or not locked_amendment.customer_id:
         raise ValidationError({"detail": "Phase 3 implementation requires a linked customer source record."})
-    customer = Customer.objects.select_for_update().get(pk=locked_amendment.customer_id)
+    customer = Customer.objects.select_for_update(of=("self",)).get(pk=locked_amendment.customer_id)
     values = _implementation_values_for(locked_amendment, set(config["allowed_fields"]))
     field_changes = {}
     update_fields = []
@@ -562,8 +562,8 @@ def _implement_product_change(*, locked_amendment: ContractAmendment, implemente
     source = locked_amendment.source_contract()
     if not source:
         raise ValidationError({"detail": "Source subscription is required for product reference correction."})
-    source = Subscription.objects.select_for_update().select_related("product", "batch", "lucky_id", "customer", "partner").get(pk=source.pk)
-    target_product = Product.objects.select_for_update().get(pk=target_product_id)
+    source = Subscription.objects.select_for_update(of=("self",)).select_related("product", "batch", "lucky_id", "customer", "partner").get(pk=source.pk)
+    target_product = Product.objects.select_for_update(of=("self",)).get(pk=target_product_id)
     locked_amendment.subscription = source if locked_amendment.contract_type == "EMI_SUBSCRIPTION" else None
     locked_amendment.rent_lease_contract = source if locked_amendment.contract_type == "RENT_LEASE" else None
     metadata = phase3_implementation_metadata(locked_amendment)
@@ -607,7 +607,7 @@ def _implement_product_change(*, locked_amendment: ContractAmendment, implemente
 
 @transaction.atomic
 def implement_approved_amendment(*, amendment: ContractAmendment, implemented_by) -> ContractAmendment:
-    locked_amendment = ContractAmendment.objects.select_for_update().get(pk=amendment.pk)
+    locked_amendment = ContractAmendment.objects.select_for_update(of=("self",)).get(pk=amendment.pk)
     if locked_amendment.status == "IMPLEMENTED":
         raise ValidationError({"detail": "This amendment is already implemented."})
     if locked_amendment.status != "APPROVED":

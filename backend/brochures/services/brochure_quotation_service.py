@@ -205,7 +205,7 @@ def validate_and_calculate_line(line: BrochureQuotationLine) -> BrochureQuotatio
 
 @transaction.atomic
 def recalculate_quotation(quotation: BrochureQuotation) -> BrochureQuotation:
-    locked = BrochureQuotation.objects.select_for_update().get(pk=quotation.pk)
+    locked = BrochureQuotation.objects.select_for_update(of=("self",)).get(pk=quotation.pk)
     delivery_charge = _decimal(locked.delivery_charge)
     quote_discount = _decimal(locked.discount_amount)
     if delivery_charge < ZERO:
@@ -219,7 +219,7 @@ def recalculate_quotation(quotation: BrochureQuotation) -> BrochureQuotation:
     recurring_total = ZERO
     direct_sale_total = ZERO
     projected_total = ZERO
-    for line in locked.lines.select_for_update().all():
+    for line in locked.lines.select_for_update(of=("self",)).all():
         validate_and_calculate_line(line)
         line.save(
             update_fields=[
@@ -346,7 +346,7 @@ def create_quotation(*, payload: dict, created_by) -> BrochureQuotation:
 
 @transaction.atomic
 def create_quotation_from_enquiry(*, enquiry: BrochureEnquiry, created_by):
-    locked = BrochureEnquiry.objects.select_for_update().select_related("brochure").get(
+    locked = BrochureEnquiry.objects.select_for_update(of=("self",)).select_related("brochure").get(
         pk=enquiry.pk
     )
     plan = (
@@ -408,7 +408,7 @@ def create_quotation_from_enquiry(*, enquiry: BrochureEnquiry, created_by):
 
 @transaction.atomic
 def update_quotation(*, quotation, payload, changed_by):
-    locked = BrochureQuotation.objects.select_for_update().get(pk=quotation.pk)
+    locked = BrochureQuotation.objects.select_for_update(of=("self",)).get(pk=quotation.pk)
     if locked.status != BrochureQuotation.Status.DRAFT:
         raise ValidationError({"status": "Only draft quotations can be edited."})
     lines = payload.pop("lines", None)
@@ -429,7 +429,7 @@ def update_quotation(*, quotation, payload, changed_by):
 
 @transaction.atomic
 def transition_quotation_status(*, quotation, to_status, changed_by=None, note=""):
-    locked = BrochureQuotation.objects.select_for_update().get(pk=quotation.pk)
+    locked = BrochureQuotation.objects.select_for_update(of=("self",)).get(pk=quotation.pk)
     if to_status not in ALLOWED_STATUS_TRANSITIONS.get(locked.status, set()):
         raise ValidationError(
             {"status": f"Invalid quotation transition from {locked.status} to {to_status}."}

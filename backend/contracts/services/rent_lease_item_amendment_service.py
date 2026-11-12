@@ -467,7 +467,7 @@ def apply_rent_lease_item_amendment(
     Atomically updates ContractItems, Subscription financial totals, Rent/Lease profile
     deposit, and pending uncollected billing demands. Preserves append-only auditability.
     """
-    locked_amendment = ContractAmendment.objects.select_for_update().get(pk=amendment.pk)
+    locked_amendment = ContractAmendment.objects.select_for_update(of=("self",)).get(pk=amendment.pk)
     if locked_amendment.status == "IMPLEMENTED":
         raise ValidationError({"detail": "This amendment is already implemented."})
     if locked_amendment.status != "APPROVED":
@@ -479,7 +479,7 @@ def apply_rent_lease_item_amendment(
     if not source:
         raise ValidationError({"detail": "Source contract is missing on amendment."})
 
-    subscription = Subscription.objects.select_for_update().get(pk=source.pk)
+    subscription = Subscription.objects.select_for_update(of=("self",)).get(pk=source.pk)
     if subscription.plan_type not in (PlanType.RENT, PlanType.LEASE):
         raise ValidationError({"detail": f"Invalid plan type '{subscription.plan_type}' for rent/lease amendment."})
 

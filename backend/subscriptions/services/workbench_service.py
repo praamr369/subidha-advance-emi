@@ -62,7 +62,7 @@ def assign_workbench_item(
     performed_by,
 ) -> WorkbenchItem:
     """Assign a workbench item to a user."""
-    item = WorkbenchItem.objects.select_for_update().get(pk=item_id)
+    item = WorkbenchItem.objects.select_for_update(of=("self",)).get(pk=item_id)
     item.assigned_to = assigned_to
     item.assigned_at = timezone.now()
     item.status = WorkbenchItemStatus.ASSIGNED
@@ -86,7 +86,7 @@ def complete_workbench_item(
     result_data: dict = None,
 ) -> WorkbenchItem:
     """Mark a workbench item as completed."""
-    item = WorkbenchItem.objects.select_for_update().get(pk=item_id)
+    item = WorkbenchItem.objects.select_for_update(of=("self",)).get(pk=item_id)
     if item.status == WorkbenchItemStatus.COMPLETED:
         raise ValidationError({"detail": "Item is already completed."})
 
@@ -112,7 +112,7 @@ def cancel_workbench_item(
     notes: str = "",
 ) -> WorkbenchItem:
     """Cancel a workbench item."""
-    item = WorkbenchItem.objects.select_for_update().get(pk=item_id)
+    item = WorkbenchItem.objects.select_for_update(of=("self",)).get(pk=item_id)
     if item.status in [WorkbenchItemStatus.COMPLETED, WorkbenchItemStatus.CANCELLED]:
         raise ValidationError({"detail": f"Cannot cancel {item.get_status_display()} item."})
 
@@ -390,7 +390,7 @@ class WorkbenchService:
     def update_customer_profile(self, customer_id: int, updates: dict):
         """Atomically update customer profile"""
         with transaction.atomic():
-            customer = Customer.objects.select_for_update().get(id=customer_id)
+            customer = Customer.objects.select_for_update(of=("self",)).get(id=customer_id)
             changed = []
 
             for field, value in updates.items():

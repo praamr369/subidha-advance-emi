@@ -25,7 +25,7 @@ def _require_reason(reason: str):
 @transaction.atomic
 def mark_reconciled(*, reconciliation_id: int, performed_by, reason: str) -> dict:
     _require_reason(reason)
-    row = PaymentReconciliation.objects.select_for_update().select_related("payment").get(pk=reconciliation_id)
+    row = PaymentReconciliation.objects.select_for_update(of=("self",)).select_related("payment").get(pk=reconciliation_id)
     old_status = row.status
     if row.status == ReconciliationStatus.MATCHED:
         return {"id": row.id, "status": row.status, "idempotent": True}
@@ -55,7 +55,7 @@ def mark_reconciled(*, reconciliation_id: int, performed_by, reason: str) -> dic
 @transaction.atomic
 def mark_unreconciled(*, reconciliation_id: int, performed_by, reason: str) -> dict:
     _require_reason(reason)
-    row = PaymentReconciliation.objects.select_for_update().select_related("payment").get(pk=reconciliation_id)
+    row = PaymentReconciliation.objects.select_for_update(of=("self",)).select_related("payment").get(pk=reconciliation_id)
     old_status = row.status
     if row.status == ReconciliationStatus.PENDING:
         return {"id": row.id, "status": row.status, "idempotent": True}
@@ -86,7 +86,7 @@ def attach_reference(*, reconciliation_id: int, performed_by, reference: str, re
     _require_reason(reason)
     if not reference or not reference.strip():
         raise serializers.ValidationError({"reference": "Reference is required."})
-    row = PaymentReconciliation.objects.select_for_update().select_related("payment").get(pk=reconciliation_id)
+    row = PaymentReconciliation.objects.select_for_update(of=("self",)).select_related("payment").get(pk=reconciliation_id)
     message = f"REFERENCE: {reference.strip()} | {reason.strip()}"
     row.notes = _append_note(row.notes, message)
     row.reconciled_by = performed_by

@@ -324,7 +324,7 @@ def collect_security_deposit_with_metadata(
     resolved_payment_method = _normal_method(payment_method)
     resolved_payment_date = _payment_date(payment_date)
     amount_q = _money(amount)
-    demand = RentLeaseBillingDemand.objects.select_for_update().get(
+    demand = RentLeaseBillingDemand.objects.select_for_update(of=("self",)).get(
         subscription=subscription,
         demand_type=RentLeaseDemandType.SECURITY_DEPOSIT,
     )
@@ -483,7 +483,7 @@ def collect_rent_lease_monthly_demand(
 
     demand_types = _monthly_demand_types(subscription)
     qs = (
-        RentLeaseBillingDemand.objects.select_for_update()
+        RentLeaseBillingDemand.objects.select_for_update(of=("self",))
         .filter(subscription=subscription, demand_type__in=demand_types)
         .exclude(status__in=[RentLeaseDemandStatus.CANCELLED, RentLeaseDemandStatus.WAIVED])
         .order_by("due_date", "id")

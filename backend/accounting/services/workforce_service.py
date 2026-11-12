@@ -305,7 +305,7 @@ def _sync_leave_request_attendance(*, leave_request: LeaveRequest, recorded_by=N
 
 @transaction.atomic
 def approve_leave_request(*, leave_request_id: int, approved_by):
-    leave_request = LeaveRequest.objects.select_for_update().select_related("employee", "leave_type").get(pk=leave_request_id)
+    leave_request = LeaveRequest.objects.select_for_update(of=("self",)).select_related("employee", "leave_type").get(pk=leave_request_id)
     if leave_request.status == LeaveRequestStatus.APPROVED:
         return leave_request, False
     if leave_request.status != LeaveRequestStatus.DRAFT:
@@ -428,7 +428,7 @@ def reject_leave_request(*, leave_request_id: int, rejection_reason: str, reject
 
 @transaction.atomic
 def cancel_leave_request(*, leave_request_id: int, cancel_reason: str, cancelled_by):
-    leave_request = LeaveRequest.objects.select_for_update().get(pk=leave_request_id)
+    leave_request = LeaveRequest.objects.select_for_update(of=("self",)).get(pk=leave_request_id)
     if leave_request.status == LeaveRequestStatus.CANCELLED:
         return leave_request, False
     if leave_request.status != LeaveRequestStatus.DRAFT:
@@ -712,7 +712,7 @@ def upsert_salary_sheet_draft(*, payload: dict, salary_sheet_id: int | None = No
         payload.setdefault("net_amount", Decimal("0.00"))
         salary_sheet = SalarySheet.objects.create(**payload)
     else:
-        salary_sheet = SalarySheet.objects.select_for_update().select_related("payroll_period").get(pk=salary_sheet_id)
+        salary_sheet = SalarySheet.objects.select_for_update(of=("self",)).select_related("payroll_period").get(pk=salary_sheet_id)
         if salary_sheet.status != SalarySheetStatus.DRAFT:
             raise ValueError("Only draft salary sheets can be edited.")
         payroll_period = payload.get("payroll_period") or salary_sheet.payroll_period
@@ -794,7 +794,7 @@ def upsert_salary_sheet_draft(*, payload: dict, salary_sheet_id: int | None = No
 
 @transaction.atomic
 def close_payroll_period(*, payroll_period_id: int, close_reason: str = "", closed_by=None):
-    payroll_period = PayrollPeriod.objects.select_for_update().prefetch_related("salary_sheets").get(pk=payroll_period_id)
+    payroll_period = PayrollPeriod.objects.select_for_update(of=("self",)).prefetch_related("salary_sheets").get(pk=payroll_period_id)
     if payroll_period.status == PayrollPeriodStatus.CLOSED:
         return payroll_period, False
     blocking_statuses = {
@@ -838,7 +838,7 @@ def upsert_employee_expense_claim_draft(*, payload: dict, expense_claim_id: int 
         )
         return claim
 
-    claim = EmployeeExpenseClaim.objects.select_for_update().get(pk=expense_claim_id)
+    claim = EmployeeExpenseClaim.objects.select_for_update(of=("self",)).get(pk=expense_claim_id)
     if claim.status != ExpenseClaimStatus.DRAFT:
         raise ValueError("Only draft expense claims can be edited.")
     expense_date = payload.get("expense_date") or payload.get("claim_date") or claim.expense_date
@@ -857,7 +857,7 @@ def upsert_employee_expense_claim_draft(*, payload: dict, expense_claim_id: int 
 
 @transaction.atomic
 def approve_employee_expense_claim(*, expense_claim_id: int, approved_amount=None, approved_by=None):
-    claim = EmployeeExpenseClaim.objects.select_for_update().get(pk=expense_claim_id)
+    claim = EmployeeExpenseClaim.objects.select_for_update(of=("self",)).get(pk=expense_claim_id)
     if claim.status == ExpenseClaimStatus.APPROVED:
         return claim, False
     if claim.status != ExpenseClaimStatus.DRAFT:
@@ -883,7 +883,7 @@ def approve_employee_expense_claim(*, expense_claim_id: int, approved_amount=Non
 
 @transaction.atomic
 def reject_employee_expense_claim(*, expense_claim_id: int, rejection_reason: str, rejected_by=None):
-    claim = EmployeeExpenseClaim.objects.select_for_update().get(pk=expense_claim_id)
+    claim = EmployeeExpenseClaim.objects.select_for_update(of=("self",)).get(pk=expense_claim_id)
     if claim.status == ExpenseClaimStatus.REJECTED:
         return claim, False
     if claim.status != ExpenseClaimStatus.DRAFT:
@@ -907,7 +907,7 @@ def reject_employee_expense_claim(*, expense_claim_id: int, rejection_reason: st
 
 @transaction.atomic
 def post_employee_expense_claim(*, expense_claim_id: int, posted_by=None):
-    claim = EmployeeExpenseClaim.objects.select_for_update().select_related("employee", "expense_account").get(pk=expense_claim_id)
+    claim = EmployeeExpenseClaim.objects.select_for_update(of=("self",)).select_related("employee", "expense_account").get(pk=expense_claim_id)
     if claim.status in {ExpenseClaimStatus.POSTED, ExpenseClaimStatus.PAID_PARTIAL, ExpenseClaimStatus.PAID} and claim.posted_journal_entry_id:
         return claim, False
     if claim.status != ExpenseClaimStatus.APPROVED:
@@ -967,14 +967,14 @@ def post_employee_expense_claim_payment(
     reference_no: str = "",
     posted_by=None,
 ):
-    claim = EmployeeExpenseClaim.objects.select_for_update().select_related("employee").prefetch_related("payments").get(pk=expense_claim_id)
+    claim = EmployeeExpenseClaim.objects.select_for_update(of=("self",)).select_related("employee").prefetch_related("payments").get(pk=expense_claim_id)
     if claim.posted_journal_entry_id is None or claim.status not in {
         ExpenseClaimStatus.POSTED,
         ExpenseClaimStatus.PAID_PARTIAL,
         ExpenseClaimStatus.PAID,
     }:
         raise ValueError("Expense claim must be posted before reimbursement payment.")
-    finance_account = FinanceAccount.objects.select_for_update().select_related("chart_account").get(pk=finance_account_id)
+    finance_account = FinanceAccount.objects.select_for_update(of=("self",)).select_related("chart_account").get(pk=finance_account_id)
     payment_amount = _money(amount)
     if payment_amount <= MONEY_ZERO:
         raise ValueError("Claim payment amount must be greater than zero.")

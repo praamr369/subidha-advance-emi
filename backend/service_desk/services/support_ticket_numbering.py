@@ -18,7 +18,7 @@ def issue_next_support_ticket_no() -> str:
     prefix = f"TKT-{fy}"
 
     seq = (
-        DocumentSequence.objects.select_for_update()
+        DocumentSequence.objects.select_for_update(of=("self",))
         .filter(series_code=series_code)
         .first()
     )
@@ -35,7 +35,7 @@ def issue_next_support_ticket_no() -> str:
         except IntegrityError:
             pass
         seq = (
-            DocumentSequence.objects.select_for_update()
+            DocumentSequence.objects.select_for_update(of=("self",))
             .filter(series_code=series_code)
             .first()
         )

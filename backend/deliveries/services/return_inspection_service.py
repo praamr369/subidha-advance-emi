@@ -186,10 +186,10 @@ def complete_inspected_return(
     if inspection.status != InspectionStatus.APPROVED:
         raise ValidationError("Only an approved inspection can complete the return.")
 
-    subscription = Subscription.objects.select_for_update().get(pk=inspection.subscription_id)
+    subscription = Subscription.objects.select_for_update(of=("self",)).get(pk=inspection.subscription_id)
     # Capture the asset first: closing the delivery unlinks it from the contract.
     asset = (
-        RentalAsset.objects.select_for_update()
+        RentalAsset.objects.select_for_update(of=("self",))
         .filter(current_subscription=subscription)
         .exclude(status=RentalAssetStatus.RETIRED)
         .order_by("id")
@@ -226,7 +226,7 @@ def cancel_unbilled_rent_demands(subscription: Subscription) -> list[int]:
     )
     return_date = timezone.localdate(returned_at) if returned_at else timezone.localdate()
     demands = list(
-        RentLeaseBillingDemand.objects.select_for_update().filter(
+        RentLeaseBillingDemand.objects.select_for_update(of=("self",)).filter(
             subscription=subscription,
             demand_type__in=[RentLeaseDemandType.RENT_MONTHLY, RentLeaseDemandType.LEASE_MONTHLY],
             status__in=[RentLeaseDemandStatus.PENDING, RentLeaseDemandStatus.OVERDUE, RentLeaseDemandStatus.DRY_RUN],
@@ -274,7 +274,7 @@ def _asset_returned_from(subscription: Subscription):
     if returned is None:
         return None
     return (
-        RentalAsset.objects.select_for_update()
+        RentalAsset.objects.select_for_update(of=("self",))
         .filter(pk=returned, status=RentalAssetStatus.RETURNED, current_subscription__isnull=True)
         .first()
     )
@@ -537,7 +537,7 @@ def release_returned_asset(asset: RentalAsset, *, performed_by=None) -> RentalAs
     from inventory.models import StockLedger, StockMovementType
     from inventory.services.stock_service import create_stock_ledger_entry
 
-    asset = RentalAsset.objects.select_for_update().get(pk=asset.pk)
+    asset = RentalAsset.objects.select_for_update(of=("self",)).get(pk=asset.pk)
     if asset.status not in (RentalAssetStatus.RETURNED, RentalAssetStatus.UNDER_REPAIR):
         raise ValidationError(
             f"Only a returned or under-repair asset can be released; "

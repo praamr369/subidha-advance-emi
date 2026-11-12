@@ -226,7 +226,7 @@ def approve_product_request_for_admin(
     - For RENT: monthly_rent_amount (decimal)
     - For LEASE: monthly_lease_amount (decimal)
     """
-    req = ProductRequest.objects.select_for_update().get(id=request_id)
+    req = ProductRequest.objects.select_for_update(of=("self",)).get(id=request_id)
     if req.status != ProductRequestStatus.SUBMITTED:
         raise ValidationError({"detail": "Only submitted requests can be approved."})
 
@@ -336,7 +336,7 @@ def reject_product_request_for_admin(
     admin: User,
     review_note: str,
 ) -> ProductRequest:
-    req = ProductRequest.objects.select_for_update().get(id=request_id)
+    req = ProductRequest.objects.select_for_update(of=("self",)).get(id=request_id)
     if req.status != ProductRequestStatus.SUBMITTED:
         raise ValidationError({"detail": "Only submitted requests can be rejected."})
 
@@ -358,7 +358,7 @@ def reject_product_request_for_admin(
 
 @transaction.atomic
 def cancel_product_request(*, request_id: int, user: User) -> ProductRequest:
-    req = ProductRequest.objects.select_for_update().get(id=request_id)
+    req = ProductRequest.objects.select_for_update(of=("self",)).get(id=request_id)
     if req.status not in [ProductRequestStatus.SUBMITTED, ProductRequestStatus.APPROVED]:
         raise ValidationError({"detail": "Only submitted or approved requests can be cancelled."})
     
@@ -373,7 +373,7 @@ def cancel_product_request(*, request_id: int, user: User) -> ProductRequest:
 @transaction.atomic
 def cancel_product_request_for_admin(*, request_id: int, admin: User, review_note: str = "") -> ProductRequest:
     """Admin can cancel any SUBMITTED request."""
-    req = ProductRequest.objects.select_for_update().get(id=request_id)
+    req = ProductRequest.objects.select_for_update(of=("self",)).get(id=request_id)
     if req.status not in [ProductRequestStatus.SUBMITTED, ProductRequestStatus.APPROVED]:
         raise ValidationError({"detail": "Only submitted or approved requests can be cancelled."})
 
@@ -402,7 +402,7 @@ def edit_product_request_for_admin(
     **fields,
 ) -> ProductRequest:
     """Admin can edit fields on a SUBMITTED request before decision."""
-    req = ProductRequest.objects.select_for_update().get(id=request_id)
+    req = ProductRequest.objects.select_for_update(of=("self",)).get(id=request_id)
     if req.status != ProductRequestStatus.SUBMITTED:
         raise ValidationError({"detail": "Only submitted requests can be edited."})
 

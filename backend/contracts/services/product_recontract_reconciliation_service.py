@@ -53,7 +53,7 @@ def _event_is_executed(event: ContractRecontractEvent) -> bool:
 
 def _latest_financial_preview(event: ContractRecontractEvent) -> ContractRecontractFinancialImpactPreview | None:
     return (
-        ContractRecontractFinancialImpactPreview.objects.select_for_update()
+        ContractRecontractFinancialImpactPreview.objects.select_for_update(of=("self",))
         .filter(
             event=event,
             accounting_preview_status=ContractRecontractFinancialImpactPreview.PreviewStatus.PREVIEWED,
@@ -84,7 +84,7 @@ def _expected_amount(*, event: ContractRecontractEvent, financial_preview: Contr
 
 def _accounting_bridge_for_event(event: ContractRecontractEvent) -> AccountingBridgePosting | None:
     return (
-        AccountingBridgePosting.objects.select_for_update()
+        AccountingBridgePosting.objects.select_for_update(of=("self",))
         .select_related("journal_entry")
         .prefetch_related("journal_entry__lines")
         .filter(
@@ -117,7 +117,7 @@ def _posted_journal_amount(bridge: AccountingBridgePosting) -> Decimal:
 
 def _existing_reconciliation_item(event: ContractRecontractEvent) -> ReconciliationItem | None:
     return (
-        ReconciliationItem.objects.select_for_update()
+        ReconciliationItem.objects.select_for_update(of=("self",))
         .filter(
             module=RECONCILIATION_MODULE,
             source_type=RECONCILIATION_SOURCE_TYPE,
@@ -182,7 +182,7 @@ def execute_product_recontract_reconciliation(
         raise ValidationError({"detail": "Reconciliation bridge requires an authenticated admin actor."})
 
     locked_event = (
-        ContractRecontractEvent.objects.select_for_update()
+        ContractRecontractEvent.objects.select_for_update(of=("self",))
         .select_related("amendment", "subscription", "old_product", "new_product")
         .prefetch_related("schedule_preview_lines")
         .get(pk=event.pk)
@@ -200,7 +200,7 @@ def execute_product_recontract_reconciliation(
     _assert_schedule_preview_exists(locked_event)
 
     if financial_preview is not None:
-        financial_preview = ContractRecontractFinancialImpactPreview.objects.select_for_update().get(pk=financial_preview.pk)
+        financial_preview = ContractRecontractFinancialImpactPreview.objects.select_for_update(of=("self",)).get(pk=financial_preview.pk)
         if financial_preview.event_id != locked_event.id:
             raise ValidationError({"detail": "Financial impact preview does not belong to this recontract event."})
         if (

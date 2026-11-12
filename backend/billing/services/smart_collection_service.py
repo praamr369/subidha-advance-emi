@@ -210,12 +210,12 @@ def execute_smart_collection(
         # Actually, let's lock them in advance if we can, or just let the services do it.
         # But we need an accurate plan before calling services.
         # Lock EMIs and Sales
-        list(Emi.objects.select_for_update().filter(
+        list(Emi.objects.select_for_update(of=("self",)).filter(
             subscription__customer_id=customer_id,
             status__in=[EmiStatus.PENDING, EmiStatus.OVERDUE],
         ))
-        list(DirectSale.objects.select_for_update().filter(customer_id=customer_id, status="INVOICED", balance_total__gt=0))
-        CustomerAdvance.objects.select_for_update().filter(customer_id=customer_id)
+        list(DirectSale.objects.select_for_update(of=("self",)).filter(customer_id=customer_id, status="INVOICED", balance_total__gt=0))
+        CustomerAdvance.objects.select_for_update(of=("self",)).filter(customer_id=customer_id)
         
         # Now re-run plan safely
         plan = plan_smart_collection(

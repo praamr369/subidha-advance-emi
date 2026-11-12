@@ -60,7 +60,7 @@ def _salary_payment_total(*, salary_sheet_id: int) -> Decimal:
 
 @transaction.atomic
 def approve_salary_sheet(*, salary_sheet_id: int, approved_by):
-    salary_sheet = SalarySheet.objects.select_for_update().get(pk=salary_sheet_id)
+    salary_sheet = SalarySheet.objects.select_for_update(of=("self",)).get(pk=salary_sheet_id)
 
     if salary_sheet.status == SalarySheetStatus.APPROVED:
         return salary_sheet, False
@@ -319,12 +319,12 @@ def post_salary_payment(
     posted_by=None,
 ):
     salary_sheet = (
-        SalarySheet.objects.select_for_update()
+        SalarySheet.objects.select_for_update(of=("self",))
         .select_related("employee")
         .prefetch_related("salary_payments")
         .get(pk=salary_sheet_id)
     )
-    finance_account = FinanceAccount.objects.select_for_update().select_related(
+    finance_account = FinanceAccount.objects.select_for_update(of=("self",)).select_related(
         "chart_account"
     ).get(pk=finance_account_id)
     accounts = ensure_phase3_system_accounts()
@@ -428,7 +428,7 @@ def reverse_salary_payment(*, salary_payment_id: int, reason: str, performed_by)
     if not reason:
         raise ValueError("Reversal reason is required.")
 
-    payment = SalaryPayment.objects.select_for_update().select_related("salary_sheet").get(pk=salary_payment_id)
+    payment = SalaryPayment.objects.select_for_update(of=("self",)).select_related("salary_sheet").get(pk=salary_payment_id)
     salary_sheet = SalarySheet.objects.select_for_update(of=("self",)).get(pk=payment.salary_sheet_id)
     status_before = salary_sheet.status
 

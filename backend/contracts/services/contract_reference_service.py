@@ -140,7 +140,7 @@ def _sequence_scope(*, contract_type: str, year: int, batch: str = "", lucky: st
 def _issue_sequence_number(scope_key: str) -> int:
     with transaction.atomic():
         sequence, _ = (
-            ContractReferenceSequence.objects.select_for_update().get_or_create(
+            ContractReferenceSequence.objects.select_for_update(of=("self",)).get_or_create(
                 scope_key=scope_key,
                 defaults={"next_number": 1},
             )
@@ -1012,7 +1012,7 @@ def collect_unified_receivable(
     if idem:
         with transaction.atomic():
             row = (
-                UnifiedCollectionIdempotency.objects.select_for_update()
+                UnifiedCollectionIdempotency.objects.select_for_update(of=("self",))
                 .filter(user_id=collected_by.id, key=idem)
                 .first()
             )

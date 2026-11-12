@@ -1197,47 +1197,47 @@ def get_bridge_candidate(candidate_id: str, *, for_update: bool = False) -> dict
     if source_kind == "commissionpayoutbatch":
         qs = CommissionPayoutBatch.objects.select_related("finance_account", "finance_account__chart_account", "processed_by").prefetch_related("lines__partner")
         if for_update:
-            qs = qs.select_for_update()
+            qs = qs.select_for_update(of=("self",))
         candidate = commission_payout_candidate(qs.get(pk=source_pk))
     elif source_kind == "commission":
         qs = Commission.objects.select_related("partner", "subscription", "subscription__customer", "payment", "payment__customer", "emi")
         if for_update:
-            qs = qs.select_for_update()
+            qs = qs.select_for_update(of=("self",))
         candidate = commission_candidate(qs.get(pk=source_pk))
     elif source_kind == "payment" and event_key == PAYMENT_COLLECTION_EVENT_KEY:
         qs = Payment.objects.select_related("finance_account", "finance_account__chart_account", "customer", "subscription")
         if for_update:
-            qs = qs.select_for_update()
+            qs = qs.select_for_update(of=("self",))
         return payment_candidate(qs.get(pk=source_pk))
     elif source_kind == "receiptdocument":
         qs = ReceiptDocument.objects.select_related("finance_account", "finance_account__chart_account", "billing_invoice", "direct_sale", "customer", "subscription", "payment")
         if for_update:
-            qs = qs.select_for_update()
+            qs = qs.select_for_update(of=("self",))
         candidate = receipt_candidate(qs.get(pk=source_pk))
     elif source_kind == "billinginvoice":
         qs = BillingInvoice.objects.select_related("finance_account", "finance_account__chart_account", "direct_sale", "customer", "subscription")
         if for_update:
-            qs = qs.select_for_update()
+            qs = qs.select_for_update(of=("self",))
         candidate = billing_invoice_candidate(qs.get(pk=source_pk))
     elif source_kind == "rentleasebillingdemand":
         qs = RentLeaseBillingDemand.objects.select_related("subscription", "subscription__customer")
         if for_update:
-            qs = qs.select_for_update()
+            qs = qs.select_for_update(of=("self",))
         candidate = rent_lease_revenue_candidate(qs.get(pk=source_pk))
     elif source_kind == "billingcreditnote":
         qs = BillingCreditNote.objects.select_related("original_invoice", "original_invoice__customer")
         if for_update:
-            qs = qs.select_for_update()
+            qs = qs.select_for_update(of=("self",))
         candidate = billing_credit_note_candidate(qs.get(pk=source_pk))
     elif source_kind == "billingdebitnote":
         qs = BillingDebitNote.objects.select_related("original_invoice", "original_invoice__customer")
         if for_update:
-            qs = qs.select_for_update()
+            qs = qs.select_for_update(of=("self",))
         candidate = billing_debit_note_candidate(qs.get(pk=source_pk))
     elif source_kind == "directsalereturn":
         qs = DirectSaleReturn.objects.select_related("direct_sale", "original_invoice", "credit_note", "customer")
         if for_update:
-            qs = qs.select_for_update()
+            qs = qs.select_for_update(of=("self",))
         candidate = direct_sale_return_candidate(qs.get(pk=source_pk))
     else:
         raise ValueError("Unsupported bridge candidate source.")
@@ -1313,7 +1313,7 @@ def post_bridge_candidate(*, candidate_id: str, idempotency_key: str, confirmed:
     if candidate["event_key"] not in supported.get(candidate["source_model"], set()):
         raise ValueError("Unsupported bridge candidate source.")
     purpose = _purpose_for_event(candidate["source_model"], candidate["event_key"])
-    existing = AccountingBridgePosting.objects.select_for_update().filter(source_model=candidate["source_model"], source_id=candidate["source_id"], purpose=purpose).select_related("journal_entry").first()
+    existing = AccountingBridgePosting.objects.select_for_update(of=("self",)).filter(source_model=candidate["source_model"], source_id=candidate["source_id"], purpose=purpose).select_related("journal_entry").first()
     if existing is not None:
         existing_key = ((existing.trace_metadata or {}).get("idempotency_key") or "").strip()
         if existing_key and existing_key == candidate_key:
@@ -1337,7 +1337,7 @@ def post_bridge_candidate(*, candidate_id: str, idempotency_key: str, confirmed:
         commission_ids = [commission_id for _line_id, commission_id, _partner_id, _amount in payout_lines_before or []]
         payout_commissions_before = {
             row.id: _commission_snapshot(row)
-            for row in Commission.objects.select_for_update().filter(id__in=commission_ids).order_by("id")
+            for row in Commission.objects.select_for_update(of=("self",)).filter(id__in=commission_ids).order_by("id")
         }
     payout_line_count_before = 0
     if candidate["source_model"] == COMMISSION_SOURCE_MODEL:
@@ -1376,7 +1376,7 @@ def _source_instance_for_candidate(candidate: dict[str, Any], *, for_update: boo
     model = {COMMISSION_PAYOUT_SOURCE_MODEL: CommissionPayoutBatch, COMMISSION_SOURCE_MODEL: Commission, "Payment": Payment, RECEIPT_SOURCE_MODEL: ReceiptDocument, BILLING_INVOICE_SOURCE_MODEL: BillingInvoice, RENT_LEASE_DEMAND_SOURCE_MODEL: RentLeaseBillingDemand, CREDIT_NOTE_SOURCE_MODEL: BillingCreditNote, DEBIT_NOTE_SOURCE_MODEL: BillingDebitNote, DIRECT_SALE_RETURN_SOURCE_MODEL: DirectSaleReturn}[candidate["source_model"]]
     qs = model.objects
     if for_update:
-        qs = qs.select_for_update()
+        qs = qs.select_for_update(of=("self",))
     return qs.get(pk=candidate["source_id"])
 
 
@@ -1421,7 +1421,7 @@ def batch_post_bridge_candidates(*, candidate_ids: list[str], idempotency_keys: 
 
 @transaction.atomic
 def verify_bridge_reconciliation_item(*, item_id: int, actor, note: str = "", run_id: int | None = None) -> dict[str, Any]:
-    item = ReconciliationItem.objects.select_for_update().get(pk=item_id)
+    item = ReconciliationItem.objects.select_for_update(of=("self",)).get(pk=item_id)
     if item.module != "ACCOUNTING_BRIDGE_PHASE_F":
         raise ValueError("Only accounting bridge reconciliation items can be verified here.")
     if item.status == ReconciliationItemStatus.MATCHED:

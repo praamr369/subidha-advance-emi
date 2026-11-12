@@ -101,9 +101,9 @@ def create_vendor_quote_request(
 
 @transaction.atomic
 def accept_vendor_quote(*, quote_pk: int, accepted_by):
-    selected = VendorQuote.objects.select_related("quote_request").select_for_update().get(pk=quote_pk)
+    selected = VendorQuote.objects.select_related("quote_request").select_for_update(of=("self",)).get(pk=quote_pk)
 
-    rq = VendorQuoteRequest.objects.select_for_update().get(pk=selected.quote_request_id)
+    rq = VendorQuoteRequest.objects.select_for_update(of=("self",)).get(pk=selected.quote_request_id)
     if rq.status in ("CANCELLED", "CLOSED"):
         raise ValueError("Quote request is not open.")
 
@@ -124,9 +124,9 @@ def accept_vendor_quote(*, quote_pk: int, accepted_by):
 
 @transaction.atomic
 def reject_vendor_quote(*, quote_pk: int, rejected_by=None):
-    quote = VendorQuote.objects.select_related("quote_request").select_for_update().get(pk=quote_pk)
+    quote = VendorQuote.objects.select_related("quote_request").select_for_update(of=("self",)).get(pk=quote_pk)
 
-    rq = VendorQuoteRequest.objects.select_for_update().get(pk=quote.quote_request_id)
+    rq = VendorQuoteRequest.objects.select_for_update(of=("self",)).get(pk=quote.quote_request_id)
     if rq.status in ("CLOSED", "CANCELLED"):
         raise ValueError("Quote request is closed.")
 

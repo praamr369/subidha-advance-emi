@@ -20,7 +20,7 @@ def _strip_reason(reason: str) -> str:
 
 @transaction.atomic
 def cancel_tax_invoice(*, tax_invoice_id: int, performed_by, reason: str):
-    invoice = TaxInvoice.objects.select_for_update().get(pk=tax_invoice_id)
+    invoice = TaxInvoice.objects.select_for_update(of=("self",)).get(pk=tax_invoice_id)
     if invoice.status == TaxDocumentStatus.CANCELLED:
         return invoice, False
     if invoice.status != TaxDocumentStatus.POSTED:
@@ -85,7 +85,7 @@ def cancel_tax_invoice(*, tax_invoice_id: int, performed_by, reason: str):
 
 @transaction.atomic
 def cancel_credit_note(*, credit_note_id: int, performed_by, reason: str):
-    note = CreditNote.objects.select_for_update().get(pk=credit_note_id)
+    note = CreditNote.objects.select_for_update(of=("self",)).get(pk=credit_note_id)
     if note.status == TaxDocumentStatus.CANCELLED:
         return note, False
     if note.status != TaxDocumentStatus.POSTED:
@@ -150,7 +150,7 @@ def cancel_credit_note(*, credit_note_id: int, performed_by, reason: str):
 
 @transaction.atomic
 def cancel_debit_note(*, debit_note_id: int, performed_by, reason: str):
-    note = DebitNote.objects.select_for_update().get(pk=debit_note_id)
+    note = DebitNote.objects.select_for_update(of=("self",)).get(pk=debit_note_id)
     if note.status == TaxDocumentStatus.CANCELLED:
         return note, False
     if note.status != TaxDocumentStatus.POSTED:

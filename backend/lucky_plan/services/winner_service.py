@@ -18,7 +18,7 @@ class WinnerService:
         """
 
         subscription = (
-            Subscription.objects.select_for_update()
+            Subscription.objects.select_for_update(of=("self",))
             .get(id=subscription_id)
         )
 

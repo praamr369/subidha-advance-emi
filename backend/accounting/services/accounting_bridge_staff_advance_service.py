@@ -255,7 +255,7 @@ def get_bridge_candidate(candidate_id: str, *, for_update: bool = False) -> dict
     source_kind, source_pk, event_key = base._parse_candidate_id(candidate_id)
     if source_kind != "staffadvance":
         raise ValueError("Bridge candidate is not a StaffAdvance source.")
-    qs = _qs().select_for_update() if for_update else _qs()
+    qs = _qs().select_for_update(of=("self",)) if for_update else _qs()
     candidate = candidate_for(qs.get(pk=source_pk))
     if candidate["event_key"] != event_key:
         raise ValueError("StaffAdvance candidate event no longer matches current source state.")
@@ -330,7 +330,7 @@ def post_bridge_candidate(*, candidate_id: str, idempotency_key: str, confirmed:
         raise ValueError("idempotency_key is required.")
     if candidate["event_key"] != EVENT_KEY:
         raise ValueError("Unsupported StaffAdvance bridge candidate source.")
-    existing = AccountingBridgePosting.objects.select_for_update().filter(source_model=SOURCE_MODEL, source_id=candidate["source_id"], purpose=PURPOSE).select_related("journal_entry").first()
+    existing = AccountingBridgePosting.objects.select_for_update(of=("self",)).filter(source_model=SOURCE_MODEL, source_id=candidate["source_id"], purpose=PURPOSE).select_related("journal_entry").first()
     if existing is not None:
         existing_key = ((existing.trace_metadata or {}).get("idempotency_key") or "").strip()
         if existing_key and existing_key == key:
@@ -341,7 +341,7 @@ def post_bridge_candidate(*, candidate_id: str, idempotency_key: str, confirmed:
     preview = preview_bridge_candidate(candidate_id)
     if not preview["can_post"]:
         raise ValueError("; ".join(preview["blockers"]) or "Candidate is not postable.")
-    row = _qs().select_for_update().get(pk=candidate["source_id"])
+    row = _qs().select_for_update(of=("self",)).get(pk=candidate["source_id"])
     source_before = _source_snapshot(row)
     lines, _warnings, finance_account = _lines_for_candidate(candidate)
     total_debit, total_credit = base._line_totals(lines)

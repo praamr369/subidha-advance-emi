@@ -176,7 +176,7 @@ class FinanceTransferService:
         )
         marker = _idempotency_marker(candidate_key)
         existing = (
-            MoneyMovement.objects.select_for_update()
+            MoneyMovement.objects.select_for_update(of=("self",))
             .select_related("from_finance_account", "to_finance_account", "posted_journal_entry")
             .filter(notes__contains=marker)
             .first()

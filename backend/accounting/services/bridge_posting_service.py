@@ -134,7 +134,7 @@ def post_bridge_entry(
         **_normalize_trace_metadata(trace_metadata),
     }
 
-    existing = AccountingBridgePosting.objects.select_for_update().filter(
+    existing = AccountingBridgePosting.objects.select_for_update(of=("self",)).filter(
         source_model=source_model,
         source_id=source_id,
         purpose=purpose,

@@ -84,8 +84,8 @@ def get_active_financial_year() -> FinancialYear | None:
 
 @transaction.atomic
 def activate_financial_year(financial_year_id: int, performed_by) -> FinancialYear:
-    financial_year = FinancialYear.objects.select_for_update().get(pk=financial_year_id)
-    FinancialYear.objects.select_for_update().filter(is_active=True).exclude(pk=financial_year.pk).update(
+    financial_year = FinancialYear.objects.select_for_update(of=("self",)).get(pk=financial_year_id)
+    FinancialYear.objects.select_for_update(of=("self",)).filter(is_active=True).exclude(pk=financial_year.pk).update(
         is_active=False,
         activated_at=None,
         activated_by=None,
@@ -116,7 +116,7 @@ def _next_month_start(value: date) -> date:
 
 @transaction.atomic
 def generate_monthly_periods(financial_year_id: int, performed_by) -> dict:
-    financial_year = FinancialYear.objects.select_for_update().get(pk=financial_year_id)
+    financial_year = FinancialYear.objects.select_for_update(of=("self",)).get(pk=financial_year_id)
     periods: list[AccountingPeriod] = []
     created_count = 0
     current = financial_year.start_date
@@ -331,7 +331,7 @@ def set_accounting_period_status(
     if normalized_status not in AccountingPeriodStatus.values:
         raise ValueError("Invalid accounting period status.")
 
-    period = AccountingPeriod.objects.select_for_update().get(pk=period_id)
+    period = AccountingPeriod.objects.select_for_update(of=("self",)).get(pk=period_id)
     updated = period.status != normalized_status
     period.status = normalized_status
     period.lock_reason = (reason or "").strip()
@@ -439,7 +439,7 @@ def create_posting_lock(*, lock_date: date, performed_by, reason: str = "") -> t
 
 @transaction.atomic
 def remove_posting_lock(*, posting_lock_id: int, performed_by, reason: str = "") -> tuple[PostingLock, bool]:
-    posting_lock = PostingLock.objects.select_for_update().get(pk=posting_lock_id)
+    posting_lock = PostingLock.objects.select_for_update(of=("self",)).get(pk=posting_lock_id)
     metadata = {
         "event": "ACCOUNTING_POSTING_LOCK_REMOVED",
         "lock_id": posting_lock.id,

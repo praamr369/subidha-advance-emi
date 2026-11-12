@@ -53,7 +53,7 @@ def approve_staff_advance(*, staff_advance_id: int, performed_by) -> StaffAdvanc
 
 @transaction.atomic
 def disburse_staff_advance(*, staff_advance_id: int, finance_account, disbursement_date, reference_no: str, performed_by) -> StaffAdvance:
-    row = StaffAdvance.objects.select_for_update().select_related("employee").get(pk=staff_advance_id)
+    row = StaffAdvance.objects.select_for_update(of=("self",)).select_related("employee").get(pk=staff_advance_id)
     if row.status == StaffAdvanceStatus.DISBURSED and row.posted_journal_entry_id:
         return row
     if row.status != StaffAdvanceStatus.APPROVED:
@@ -85,7 +85,7 @@ def disburse_staff_advance(*, staff_advance_id: int, finance_account, disburseme
 
 @transaction.atomic
 def recover_staff_advance(*, staff_advance_id: int, amount, finance_account, recovery_date, reference_no: str, performed_by) -> StaffAdvanceRecovery:
-    row = StaffAdvance.objects.select_for_update().select_related("employee").get(pk=staff_advance_id)
+    row = StaffAdvance.objects.select_for_update(of=("self",)).select_related("employee").get(pk=staff_advance_id)
     if row.status not in {StaffAdvanceStatus.DISBURSED, StaffAdvanceStatus.PARTIALLY_RECOVERED}:
         raise ValueError("Only disbursed staff advances can receive recovery payments.")
     value = _money(amount)
@@ -151,7 +151,7 @@ def recover_staff_advance_via_salary(*, staff_advance_id: int, amount, salary_sh
     Asset. It does not touch Salary Payable again -- that was already set
     correctly (net of deductions) by the salary sheet posting itself.
     """
-    row = StaffAdvance.objects.select_for_update().select_related("employee").get(pk=staff_advance_id)
+    row = StaffAdvance.objects.select_for_update(of=("self",)).select_related("employee").get(pk=staff_advance_id)
     if row.status not in {StaffAdvanceStatus.DISBURSED, StaffAdvanceStatus.PARTIALLY_RECOVERED}:
         raise ValueError("Only disbursed staff advances can receive recovery payments.")
     value = _money(amount)

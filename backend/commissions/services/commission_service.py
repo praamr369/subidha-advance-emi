@@ -195,7 +195,7 @@ def settle_commission(
         raise ValueError("commission_id is required.")
 
     try:
-        commission = Commission.objects.select_for_update().get(id=commission_id)
+        commission = Commission.objects.select_for_update(of=("self",)).get(id=commission_id)
     except Commission.DoesNotExist:
         raise ValueError("Commission not found.")
 

@@ -397,7 +397,7 @@ def modify_pre_activation_contract(
                     new_lucky = lucky_input
                 else:
                     try:
-                        new_lucky = LuckyId.objects.select_for_update().get(pk=int(lucky_input))
+                        new_lucky = LuckyId.objects.select_for_update(of=("self",)).get(pk=int(lucky_input))
                     except (LuckyId.DoesNotExist, ValueError):
                         raise ValidationError({"lucky_id": "Lucky ID not found."})
 

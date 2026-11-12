@@ -79,7 +79,7 @@ def update_enquiry_follow_up(
     changed_by=None,
     history_note: str = "",
 ) -> BrochureEnquiry:
-    locked = BrochureEnquiry.objects.select_for_update().get(pk=enquiry.pk)
+    locked = BrochureEnquiry.objects.select_for_update(of=("self",)).get(pk=enquiry.pk)
     old_status = locked.status
     old_assigned_to_id = locked.assigned_to_id
     old_priority = locked.priority

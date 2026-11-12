@@ -74,7 +74,7 @@ def assign_subscription_number(subscription: Subscription) -> str:
     year = timezone.localdate().year
 
     # Lock all subscriptions for this prefix/year to avoid race conditions.
-    Subscription.objects.select_for_update().filter(
+    Subscription.objects.select_for_update(of=("self",)).filter(
         subscription_number__startswith=f"{prefix}-{year}-"
     ).values_list("id", flat=True)
 

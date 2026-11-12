@@ -308,7 +308,7 @@ def post_bridge_candidate(*, candidate_id: str, idempotency_key: str, confirmed:
         raise ValueError("idempotency_key is required.")
     if candidate["event_key"] != EVENT_KEY:
         raise ValueError("Unsupported CustomerAdvance bridge candidate source.")
-    existing = AccountingBridgePosting.objects.select_for_update().filter(source_model=SOURCE_MODEL, source_id=candidate["source_id"], purpose=PURPOSE).select_related("journal_entry").first()
+    existing = AccountingBridgePosting.objects.select_for_update(of=("self",)).filter(source_model=SOURCE_MODEL, source_id=candidate["source_id"], purpose=PURPOSE).select_related("journal_entry").first()
     if existing is not None:
         existing_key = ((existing.trace_metadata or {}).get("idempotency_key") or "").strip()
         if existing_key and existing_key == key:

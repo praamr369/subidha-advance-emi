@@ -103,7 +103,7 @@ def record_customer_advance_refund(*, customer_advance_id: int, amount, refunded
     normalized_method = (payment_method or "CASH").strip().upper()
     normalized_idempotency = (idempotency_key or "").strip()
 
-    advance = CustomerAdvance.objects.select_for_update().select_related("customer").get(pk=customer_advance_id)
+    advance = CustomerAdvance.objects.select_for_update(of=("self",)).select_related("customer").get(pk=customer_advance_id)
     finance_account = FinancePostingService.resolve_operational_finance_account(finance_account_id=finance_account_id)
     if finance_account.branch_id:
         assert_user_branch_access(user=refunded_by, branch_id=finance_account.branch_id)
@@ -112,7 +112,7 @@ def record_customer_advance_refund(*, customer_advance_id: int, amount, refunded
     duplicate_filter = Q(refund_reference_no=normalized_reference)
     if normalized_idempotency:
         duplicate_filter |= Q(idempotency_key=normalized_idempotency)
-    existing = CustomerAdvanceRefund.objects.select_for_update().filter(duplicate_filter).order_by("id").first()
+    existing = CustomerAdvanceRefund.objects.select_for_update(of=("self",)).filter(duplicate_filter).order_by("id").first()
     if existing is not None:
         if _refund_matches(existing, advance_id=advance.id, customer_id=advance.customer_id, amount=normalized_amount, finance_account_id=finance_account.id, payment_method=normalized_method, refund_date=refund_date):
             return existing

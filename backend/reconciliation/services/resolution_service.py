@@ -25,7 +25,7 @@ def resolve_item(
     if not normalized_note:
         raise ValueError("note is required.")
 
-    item = ReconciliationItem.objects.select_for_update().get(pk=item_id)
+    item = ReconciliationItem.objects.select_for_update(of=("self",)).get(pk=item_id)
     before_status = item.status
 
     resolved_status = new_status or _status_for_action(action)
@@ -52,7 +52,7 @@ def reopen_item(*, item_id: int, note: str, actor, metadata: dict | None = None)
     if not normalized_note:
         raise ValueError("note is required.")
 
-    item = ReconciliationItem.objects.select_for_update().get(pk=item_id)
+    item = ReconciliationItem.objects.select_for_update(of=("self",)).get(pk=item_id)
     before_status = item.status
 
     item.status = ReconciliationItemStatus.NEEDS_REVIEW

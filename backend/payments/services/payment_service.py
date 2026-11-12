@@ -579,7 +579,7 @@ def record_emi_payment(
         )
 
     emi = (
-        Emi.objects.select_for_update()
+        Emi.objects.select_for_update(of=("self",))
         .select_related("subscription", "subscription__customer")
         .get(id=emi_id)
     )

@@ -67,9 +67,9 @@ def create_partner_emi_subscription(
     rounding = total_amount - (monthly * tenure)
 
     with transaction.atomic():
-        locked_batch = Batch.objects.select_for_update().get(pk=batch.pk)
+        locked_batch = Batch.objects.select_for_update(of=("self",)).get(pk=batch.pk)
         locked_lucky = (
-            LuckyId.objects.select_for_update()
+            LuckyId.objects.select_for_update(of=("self",))
             .select_related("batch")
             .get(pk=lucky.pk)
         )

@@ -527,7 +527,7 @@ def sync_delivery_rental_asset(*, delivery, performed_by=None) -> dict:
         return {"changed": False, "reason": "not_rent_or_lease"}
 
     asset = (
-        RentalAsset.objects.select_for_update()
+        RentalAsset.objects.select_for_update(of=("self",))
         .filter(current_subscription=subscription)
         .exclude(status=RentalAssetStatus.RETIRED)
         .order_by("id")
