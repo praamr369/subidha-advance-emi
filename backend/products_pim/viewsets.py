@@ -328,7 +328,47 @@ class PimProductViewSet(viewsets.ModelViewSet):
             qs = qs.filter(match).distinct()
         if is_published is not None:
             qs = qs.filter(is_published=is_published.lower() == "true")
+        in_stock = request.query_params.get("in_stock")
+        if in_stock is not None:
+            is_in_stock = in_stock.lower() in ("true", "1", "yes")
+            from inventory.models import InventoryItem
+            from inventory.services.stock_on_hand_service import _annotate_stock_qty
+            from products_pim.models import ProductVariant
+
+            in_stock_inv = _annotate_stock_qty(InventoryItem.objects.all()).filter(physical_qty__gt=0)
+            in_stock_prod_ids = list(in_stock_inv.values_list("product_id", flat=True))
+            in_stock_skus = list(in_stock_inv.values_list("sku", flat=True))
+            variant_skus = list(ProductVariant.objects.filter(quantity_on_hand__gt=0).values_list("sku", flat=True))
+            all_in_stock_skus = set(in_stock_skus) | set(variant_skus)
+
+            stock_q = (
+                Q(source_product_id__in=in_stock_prod_ids)
+                | Q(code__in=all_in_stock_skus)
+                | Q(child_pim_products__source_product_id__in=in_stock_prod_ids)
+                | Q(child_pim_products__code__in=all_in_stock_skus)
+            )
+            if is_in_stock:
+                qs = qs.filter(stock_q).distinct()
+            else:
+                qs = qs.exclude(stock_q).distinct()
         return qs
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            from .serializers import get_pim_stock_map
+            stock_map = get_pim_stock_map(page)
+            context = {**self.get_serializer_context(), "stock_map": stock_map}
+            serializer = self.get_serializer(page, many=True, context=context)
+            return self.get_paginated_response(serializer.data)
+
+        from .serializers import get_pim_stock_map
+        stock_map = get_pim_stock_map(queryset)
+        context = {**self.get_serializer_context(), "stock_map": stock_map}
+        serializer = self.get_serializer(queryset, many=True, context=context)
+        return Response(serializer.data)
 
     def get_serializer_class(self):
         if self.action in ("create", "update", "partial_update"):

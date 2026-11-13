@@ -80,3 +80,45 @@ class PimTreePagingTests(APITestCase):
 
         self.assertEqual(response.data["blueprints"], 1)
         self.assertEqual(response.data["variant_skus"], 0)
+
+    def test_stock_quantity_and_in_stock_filter(self):
+        from inventory.models import InventoryItem
+        from products_core.models import Product
+
+        # Create operational product with inventory item for king variant
+        core_prod = Product.objects.create(
+            name="Alpha Bed King Master",
+            product_code="TR-BED-K",
+            base_price=Decimal("1500"),
+        )
+        self.king.source_product = core_prod
+        self.king.save(update_fields=["source_product"])
+
+        InventoryItem.objects.create(
+            product=core_prod,
+            sku="TR-BED-K",
+            opening_stock_qty=Decimal("4.000"),
+        )
+
+        # Check list response includes current_stock_qty
+        resp = self.client.get(URL, {"category": self.category.id})
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        results = resp.data.get("results", resp.data)
+        by_code = {r["code"]: r for r in results}
+
+        # King variant has stock 4
+        self.assertEqual(by_code["TR-BED-K"]["current_stock_qty"], 4)
+        # Queen variant has stock 0
+        self.assertEqual(by_code["TR-BED-Q"]["current_stock_qty"], 0)
+        # Parent blueprint rolls up child variant stock (4)
+        self.assertEqual(by_code["TR-BED"]["current_stock_qty"], 4)
+        # Sofa has stock 0
+        self.assertEqual(by_code["TR-SOFA"]["current_stock_qty"], 0)
+
+        # Filter in_stock=true
+        in_stock_resp = self.client.get(URL, {"in_stock": "true", "category": self.category.id})
+        in_stock_codes = self._codes(in_stock_resp)
+        self.assertIn("TR-BED-K", in_stock_codes)
+        self.assertIn("TR-BED", in_stock_codes)
+        self.assertNotIn("TR-BED-Q", in_stock_codes)
+        self.assertNotIn("TR-SOFA", in_stock_codes)

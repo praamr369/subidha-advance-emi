@@ -98,6 +98,8 @@ function pimProductToQRLabel(p: PimProduct): QRLabelItem {
     }
   }
 
+  const stock = typeof p.current_stock_qty === "number" ? p.current_stock_qty : Number(p.current_stock_qty || 0);
+
   return {
     id: p.id,
     productName: fullName,
@@ -108,6 +110,7 @@ function pimProductToQRLabel(p: PimProduct): QRLabelItem {
     price: p.base_price != null && Number(p.base_price) > 0 ? Number(p.base_price) : undefined,
     qrValue: publicUrl,
     publicUrl,
+    stockQuantity: Number.isFinite(stock) && stock >= 0 ? Math.floor(stock) : 0,
   };
 }
 
@@ -129,7 +132,7 @@ function productRecordToQRLabel(r: ProductRecord): QRLabelItem {
       .filter(([k, v]) => v != null && v !== "" && typeof v !== "object")
       .map(([k, v]) => `${k}: ${v}`);
     if (entries.length > 0) {
-      fullName = `${r.name} (${entries.join(", ")})`;
+      fullName = `${r.name} — ${entries.join(" / ")}`;
     }
   }
 
@@ -348,6 +351,23 @@ function PimProductRow({
         {formatRupee(Number(p.base_price))}
       </td>
 
+      {/* Physical Stock */}
+      <td className="px-4 py-2.5 text-center">
+        {p.current_stock_qty != null && p.current_stock_qty > 0 ? (
+          <span
+            className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800 rounded-full px-2.5 py-0.5"
+            title={`${p.current_stock_qty} units in physical stock`}
+          >
+            <Boxes className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+            <span>{p.current_stock_qty} stock</span>
+          </span>
+        ) : (
+          <span className="inline-flex items-center text-xs text-muted-foreground/60 bg-muted/40 rounded-full px-2 py-0.5 font-medium">
+            0 stock
+          </span>
+        )}
+      </td>
+
       {/* SKUs (variants) */}
       <td className="px-4 py-2.5 text-center">
         {isChild ? (
@@ -462,11 +482,16 @@ function rememberProductsWorkspaceState(partial: Partial<ProductsWorkspaceState>
 }
 
 /** Every variant SKU of the given blueprints, following pages until all are loaded. */
-async function fetchVariantSkus(parentIds: number[]): Promise<PimProduct[]> {
+async function fetchVariantSkus(parentIds: number[], inStock?: boolean): Promise<PimProduct[]> {
   if (parentIds.length === 0) return [];
   const all: PimProduct[] = [];
   for (let page = 1; ; page += 1) {
-    const { results, count } = await pimService.getProducts({ parent: parentIds, page, page_size: PIM_CHILD_PAGE_SIZE });
+    const { results, count } = await pimService.getProducts({
+      parent: parentIds,
+      in_stock: inStock,
+      page,
+      page_size: PIM_CHILD_PAGE_SIZE,
+    });
     all.push(...results);
     if (results.length === 0 || all.length >= count) return all;
   }
@@ -539,6 +564,8 @@ function PimPanel({
   const [bulkPublishing, setBulkPublishing] = useState(false);
   const [bulkPublishResult, setBulkPublishResult] = useState<string | null>(null);
   const [togglingPimId, setTogglingPimId] = useState<number | null>(null);
+  const [pimStockFilter, setPimStockFilter] = useState<"ALL" | "IN_STOCK" | "OUT_OF_STOCK">("ALL");
+  const [qrModalStockMode, setQrModalStockMode] = useState<boolean>(false);
   const [qrModalItem, setQrModalItem] = useState<QRLabelItem | null>(null);
   const [qrModalItems, setQrModalItems] = useState<QRLabelItem[] | null>(null);
   const [quickEditPimProduct, setQuickEditPimProduct] = useState<PimProduct | null>(null);
@@ -578,13 +605,19 @@ function PimPanel({
   const loadPimProducts = useCallback(async () => {
     setPimLoading(true);
     setPimError(null);
-    const filters = { search: pimSearch || undefined, category: pimCat || undefined };
+    const inStockParam =
+      pimStockFilter === "IN_STOCK" ? true : pimStockFilter === "OUT_OF_STOCK" ? false : undefined;
+    const filters = {
+      search: pimSearch || undefined,
+      category: pimCat || undefined,
+      in_stock: inStockParam,
+    };
     try {
       const [blueprintPage, summary] = await Promise.all([
         pimService.getProducts({ ...filters, roots_only: true, page: pimPage, page_size: pimPageSize }),
         pimService.getTreeSummary(filters),
       ]);
-      const skus = await fetchVariantSkus(blueprintPage.results.map((p) => p.id));
+      const skus = await fetchVariantSkus(blueprintPage.results.map((p) => p.id), inStockParam);
       setPimProducts([...blueprintPage.results, ...skus]);
       setBlueprintTotal(blueprintPage.count);
       setTreeSummary(summary);
@@ -593,13 +626,13 @@ function PimPanel({
     } finally {
       setPimLoading(false);
     }
-  }, [pimSearch, pimCat, pimPage, pimPageSize]);
+  }, [pimSearch, pimCat, pimStockFilter, pimPage, pimPageSize]);
 
   useEffect(() => { void loadPimProducts(); }, [loadPimProducts]);
 
   useEffect(() => {
     setSelectedPimIds(new Set());
-  }, [pimSearch, pimCat, pimPage, pimPageSize]);
+  }, [pimSearch, pimCat, pimStockFilter, pimPage, pimPageSize]);
 
   const handleToggleSinglePublish = useCallback(async (product: PimProduct) => {
     setTogglingPimId(product.id);
@@ -655,9 +688,51 @@ function PimPanel({
     }
   }, [loadPimProducts, onSyncRegister]);
 
-  const { roots, orphanChildren } = useMemo(() => buildPimTree(pimProducts), [pimProducts]);
+  const displayedProducts = useMemo(() => {
+    if (pimStockFilter === "IN_STOCK") {
+      return pimProducts.filter((p) => (p.current_stock_qty ?? 0) > 0);
+    }
+    if (pimStockFilter === "OUT_OF_STOCK") {
+      return pimProducts.filter((p) => (p.current_stock_qty ?? 0) <= 0);
+    }
+    return pimProducts;
+  }, [pimProducts, pimStockFilter]);
+
+  const { roots, orphanChildren } = useMemo(() => buildPimTree(displayedProducts), [displayedProducts]);
   const visibleRootIds = useMemo(() => roots.map((node) => node.product.id), [roots]);
   const allVisibleRootsSelected = visibleRootIds.length > 0 && visibleRootIds.every((id) => selectedPimIds.has(id));
+
+  // Compute all in-stock leaf products on this page and total label copies
+  const { allInStockProducts, totalInStockLabels } = useMemo(() => {
+    const list: PimProduct[] = [];
+    for (const node of roots) {
+      if (node.children.length > 0) {
+        const inStockChildren = node.children.filter((c) => (c.current_stock_qty ?? 0) > 0);
+        if (inStockChildren.length > 0) {
+          list.push(...inStockChildren);
+        } else if ((node.product.current_stock_qty ?? 0) > 0) {
+          list.push(node.product);
+        }
+      } else if ((node.product.current_stock_qty ?? 0) > 0) {
+        list.push(node.product);
+      }
+    }
+    for (const orphan of orphanChildren) {
+      if ((orphan.current_stock_qty ?? 0) > 0) {
+        list.push(orphan);
+      }
+    }
+    const totalLabels = list.reduce((sum, p) => sum + Math.max(0, p.current_stock_qty ?? 0), 0);
+    return { allInStockProducts: list, totalInStockLabels: totalLabels };
+  }, [roots, orphanChildren]);
+
+  const selectedProducts = useMemo(() => {
+    return pimProducts.filter((p) => selectedPimIds.has(p.id));
+  }, [pimProducts, selectedPimIds]);
+
+  const selectedTotalStock = useMemo(() => {
+    return selectedProducts.reduce((sum, p) => sum + Math.max(0, p.current_stock_qty ?? 0), 0);
+  }, [selectedProducts]);
 
   const toggleExpand = useCallback((id: number) => {
     setExpandedIds((prev) => {
@@ -746,17 +821,17 @@ function PimPanel({
               <button
                 type="button"
                 onClick={() => {
-                  const selectedProducts = pimProducts.filter((p) => selectedPimIds.has(p.id));
                   if (selectedProducts.length > 0) {
                     setQrModalItems(selectedProducts.map(pimProductToQRLabel));
                     setQrModalItem(null);
+                    setQrModalStockMode(selectedTotalStock > 0);
                   }
                 }}
                 className="inline-flex items-center gap-1.5 rounded-xl bg-primary text-primary-foreground px-3 py-2 text-sm hover:opacity-90 font-medium shadow-sm"
-                title="Print or download Showroom QR codes for selected products"
+                title="Print or download Showroom QR codes for selected products (with physical stock multiplier option)"
               >
                 <QrCode className="h-4 w-4" />
-                Bulk QR Labels ({selectedPimIds.size})
+                Bulk QR Labels ({selectedPimIds.size}{selectedTotalStock > 0 ? ` · ${selectedTotalStock} QRs` : ""})
               </button>
               <button
                 type="button"
@@ -781,10 +856,27 @@ function PimPanel({
           <button
             type="button"
             onClick={() => {
+              if (allInStockProducts.length > 0) {
+                setQrModalItems(allInStockProducts.map(pimProductToQRLabel));
+                setQrModalItem(null);
+                setQrModalStockMode(true);
+              }
+            }}
+            disabled={allInStockProducts.length === 0}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 dark:bg-emerald-950/30 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 px-3 py-2 text-sm hover:bg-emerald-100 dark:hover:bg-emerald-900/40 disabled:opacity-50 font-medium shadow-2xs"
+            title="Bulk print QR labels for only physical stock items: if product A has 5 units in stock, prints 5 QR labels"
+          >
+            <Boxes className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+            Print In-Stock QRs ({allInStockProducts.length} prods · {totalInStockLabels} labels)
+          </button>
+          <button
+            type="button"
+            onClick={() => {
               const list = roots.map((n) => n.product);
               if (list.length > 0) {
                 setQrModalItems(list.map(pimProductToQRLabel));
                 setQrModalItem(null);
+                setQrModalStockMode(false);
               }
             }}
             disabled={roots.length === 0}
@@ -813,7 +905,7 @@ function PimPanel({
       </div>
 
       {/* Filters */}
-      <div className="flex gap-3 flex-wrap">
+      <div className="flex gap-3 flex-wrap items-center">
         <div className="relative flex-1 min-w-45">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
@@ -834,6 +926,44 @@ function PimPanel({
           <option value="">All Categories</option>
           {pimCategories.map((c) => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
         </select>
+        {/* Stock Filter Pills */}
+        <div className="flex items-center gap-1 rounded-xl border border-border bg-background p-1 text-xs font-medium">
+          <button
+            type="button"
+            onClick={() => { setPimStockFilter("ALL"); setPimPage(1); }}
+            className={`px-2.5 py-1.5 rounded-lg transition ${
+              pimStockFilter === "ALL"
+                ? "bg-muted text-foreground font-semibold shadow-2xs"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            All Stock
+          </button>
+          <button
+            type="button"
+            onClick={() => { setPimStockFilter("IN_STOCK"); setPimPage(1); }}
+            className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg transition ${
+              pimStockFilter === "IN_STOCK"
+                ? "bg-emerald-600 text-white font-semibold shadow-2xs"
+                : "text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+            }`}
+            title="Filter to show only products that have physical stock > 0"
+          >
+            <Boxes className="h-3.5 w-3.5" />
+            In Stock Only
+          </button>
+          <button
+            type="button"
+            onClick={() => { setPimStockFilter("OUT_OF_STOCK"); setPimPage(1); }}
+            className={`px-2.5 py-1.5 rounded-lg transition ${
+              pimStockFilter === "OUT_OF_STOCK"
+                ? "bg-muted text-foreground font-semibold shadow-2xs"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Out of Stock
+          </button>
+        </div>
       </div>
 
       <div ref={tableTopRef} className="scroll-mt-24">
@@ -867,6 +997,7 @@ function PimPanel({
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Name / Type</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Category</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">Price</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground">Physical Stock</th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground">SKUs</th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground">Status</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Actions</th>
@@ -893,6 +1024,7 @@ function PimPanel({
                       onPrintQR={(prod) => {
                         setQrModalItem(pimProductToQRLabel(prod));
                         setQrModalItems(null);
+                        setQrModalStockMode((prod.current_stock_qty ?? 0) > 0);
                       }}
                       onQuickEdit={(prod) => setQuickEditPimProduct(prod)}
                       onOpenPublishControl={(prod) => setPublishControlProduct(prod)}
@@ -913,6 +1045,7 @@ function PimPanel({
                         onPrintQR={(prod) => {
                           setQrModalItem(pimProductToQRLabel(prod));
                           setQrModalItems(null);
+                          setQrModalStockMode((prod.current_stock_qty ?? 0) > 0);
                         }}
                         onQuickEdit={(prod) => setQuickEditPimProduct(prod)}
                         onOpenPublishControl={(prod) => setPublishControlProduct(prod)}
@@ -938,6 +1071,7 @@ function PimPanel({
                   onPrintQR={(prod) => {
                     setQrModalItem(pimProductToQRLabel(prod));
                     setQrModalItems(null);
+                    setQrModalStockMode((prod.current_stock_qty ?? 0) > 0);
                   }}
                   onQuickEdit={(prod) => setQuickEditPimProduct(prod)}
                   onOpenPublishControl={(prod) => setPublishControlProduct(prod)}
@@ -954,9 +1088,11 @@ function PimPanel({
         <QRLabelPrintModal
           item={qrModalItem}
           items={qrModalItems ?? undefined}
+          initialStockMode={qrModalStockMode}
           onClose={() => {
             setQrModalItem(null);
             setQrModalItems(null);
+            setQrModalStockMode(false);
           }}
         />
       )}

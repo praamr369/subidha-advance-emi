@@ -1,5 +1,6 @@
 # pyright: reportMissingImports=false, reportMissingModuleSource=false
 from django.conf import settings  # pyright: ignore[reportMissingModuleSource]
+from django.db.models import Q
 from django.utils.text import slugify # type: ignore
 from rest_framework import serializers
 from .models import (
@@ -282,6 +283,92 @@ class ProductVariantSerializer(serializers.ModelSerializer):
         return "0.00"
 
 
+def get_pim_stock_map(pim_products):
+    """
+    Returns a dict mapping pim_product_id -> int(stock_qty).
+    Fetches physical stock from InventoryItem and ProductVariant in batch queries.
+    """
+    if not pim_products:
+        return {}
+
+    op_ids = {p.source_product_id for p in pim_products if p.source_product_id}
+    skus = {p.code for p in pim_products if p.code}
+
+    from inventory.models import InventoryItem
+    from inventory.services.stock_on_hand_service import _annotate_stock_qty
+    from products_pim.models import ProductVariant
+
+    inv_items = _annotate_stock_qty(
+        InventoryItem.objects.filter(Q(product_id__in=op_ids) | Q(sku__in=skus))
+    ).values("product_id", "sku", "physical_qty")
+
+    stock_by_op = {item["product_id"]: max(0, int(item["physical_qty"])) for item in inv_items if item["product_id"]}
+    stock_by_sku = {item["sku"]: max(0, int(item["physical_qty"])) for item in inv_items if item["sku"]}
+
+    variant_stocks = dict(
+        ProductVariant.objects.filter(sku__in=skus).values_list("sku", "quantity_on_hand")
+    )
+
+    stock_map = {}
+    child_map = {}
+
+    for p in pim_products:
+        qty = 0
+        if p.source_product_id and p.source_product_id in stock_by_op:
+            qty = stock_by_op[p.source_product_id]
+        elif p.code in stock_by_sku:
+            qty = stock_by_sku[p.code]
+        elif p.code in variant_stocks and variant_stocks[p.code] is not None:
+            qty = max(0, int(variant_stocks[p.code]))
+        stock_map[p.id] = qty
+
+        if p.parent_id:
+            child_map.setdefault(p.parent_id, []).append(qty)
+
+    # For blueprints whose child variant SKUs were not in this batch, fetch them in one query
+    root_ids_without_children = [p.id for p in pim_products if not p.parent_id and p.id not in child_map]
+    if root_ids_without_children:
+        child_pims = list(PimProduct.objects.filter(parent_id__in=root_ids_without_children))
+        if child_pims:
+            child_stock_map = get_pim_stock_map(child_pims)
+            for cp in child_pims:
+                child_map.setdefault(cp.parent_id, []).append(child_stock_map.get(cp.id, 0))
+
+    # For parent blueprints, if they have children, blueprint stock = sum of child stock (or own stock if higher)
+    for p in pim_products:
+        if not p.parent_id and p.id in child_map:
+            total_child_stock = sum(child_map[p.id])
+            stock_map[p.id] = max(stock_map.get(p.id, 0), total_child_stock)
+
+    return stock_map
+
+
+def get_single_pim_stock(obj):
+    """Fallback single-item physical stock calculation."""
+    from inventory.models import InventoryItem
+    from inventory.services.stock_on_hand_service import _annotate_stock_qty
+    from products_pim.models import ProductVariant
+
+    if obj.source_product_id:
+        inv = _annotate_stock_qty(InventoryItem.objects.filter(product_id=obj.source_product_id)).values("physical_qty").first()
+        if inv:
+            return max(0, int(inv["physical_qty"]))
+    if obj.code:
+        inv = _annotate_stock_qty(InventoryItem.objects.filter(sku=obj.code)).values("physical_qty").first()
+        if inv:
+            return max(0, int(inv["physical_qty"]))
+        var = ProductVariant.objects.filter(sku=obj.code).values("quantity_on_hand").first()
+        if var and var["quantity_on_hand"] is not None:
+            return max(0, int(var["quantity_on_hand"]))
+
+    if not obj.parent_id:
+        children = list(obj.child_pim_products.all())
+        if children:
+            cmap = get_pim_stock_map(children)
+            return sum(cmap.values())
+    return 0
+
+
 class PimProductListSerializer(serializers.ModelSerializer):
     category_name = serializers.SerializerMethodField()
     subcategory_name = serializers.SerializerMethodField()
@@ -293,6 +380,7 @@ class PimProductListSerializer(serializers.ModelSerializer):
     parent_is_published = serializers.SerializerMethodField()
     child_count = serializers.SerializerMethodField()
     full_name = serializers.SerializerMethodField()
+    current_stock_qty = serializers.SerializerMethodField()
 
     class Meta:
         model = PimProduct
@@ -301,8 +389,14 @@ class PimProductListSerializer(serializers.ModelSerializer):
             "subcategory", "subcategory_name", "base_price",
             "is_active", "is_published", "product_type", "variant_count",
             "parent_id", "parent_code", "parent_name", "parent_is_published", "child_count",
-            "attributes",
+            "attributes", "current_stock_qty",
         ]
+
+    def get_current_stock_qty(self, obj):
+        stock_map = self.context.get("stock_map")
+        if stock_map is not None and obj.id in stock_map:
+            return stock_map[obj.id]
+        return get_single_pim_stock(obj)
 
     def get_parent_is_published(self, obj):
         if obj.parent_id and obj.parent:
@@ -349,6 +443,9 @@ class PimProductListSerializer(serializers.ModelSerializer):
     def get_variant_count(self, obj):
         return obj.variants.filter(is_active=True).count()
 
+    def get_current_stock_qty(self, obj):
+        return get_single_pim_stock(obj)
+
     def get_child_count(self, obj):
         return obj.child_pim_products.count()
 
@@ -366,6 +463,7 @@ class PimProductDetailSerializer(serializers.ModelSerializer):
     inherited_attribute_values = serializers.SerializerMethodField()
     # For variant PimProducts: the SKU-specific VariantAttributeValues from ProductVariant
     variant_attribute_values = serializers.SerializerMethodField()
+    current_stock_qty = serializers.SerializerMethodField()
 
     class Meta:
         model = PimProduct
@@ -381,7 +479,7 @@ class PimProductDetailSerializer(serializers.ModelSerializer):
             "rent_monthly_yield_percent", "lease_monthly_yield_percent",
             "is_emi_enabled", "is_rent_enabled", "is_lease_enabled", "is_direct_sale_enabled",
             "attributes", "variants", "variant_count",
-            "inherited_attribute_values", "variant_attribute_values",
+            "inherited_attribute_values", "variant_attribute_values", "current_stock_qty",
         ]
 
     def _effective_category(self, obj):
@@ -409,6 +507,9 @@ class PimProductDetailSerializer(serializers.ModelSerializer):
 
     def get_variant_count(self, obj):
         return obj.variants.filter(is_active=True).count()
+
+    def get_current_stock_qty(self, obj):
+        return get_single_pim_stock(obj)
 
     def get_inherited_attribute_values(self, obj):
         """Return base product's ProductAttribute values for variant PimProducts."""
