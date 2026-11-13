@@ -196,6 +196,15 @@ class PimProductViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         from audit.models import AuditLog
         product = serializer.save()
+        # Keep operational product item_type in sync if linked
+        if product.source_product_id:
+            sp = product.source_product
+            if getattr(sp, "item_type", None) != product.product_type:
+                sp.item_type = product.product_type
+                sp.save(update_fields=["item_type"])
+        if product.product_type:
+            product.child_pim_products.exclude(product_type=product.product_type).update(product_type=product.product_type)
+
         self._record_pim_product_audit(
             product,
             old_snapshot=None,
@@ -225,10 +234,26 @@ class PimProductViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         instance = self.get_object()
+        old_type = instance.product_type
         old_code = instance.code
         old_name = instance.name
         
         pim_product = serializer.save()
+
+        # Synchronize product_type across operational source product, child PIM items, and variants
+        if pim_product.product_type != old_type or pim_product.product_type:
+            if pim_product.source_product_id:
+                sp = pim_product.source_product
+                if getattr(sp, "item_type", None) != pim_product.product_type:
+                    sp.item_type = pim_product.product_type
+                    sp.save(update_fields=["item_type"])
+            # Sync all child variant PIM products
+            pim_product.child_pim_products.exclude(product_type=pim_product.product_type).update(product_type=pim_product.product_type)
+            # Sync operational products linked to ProductVariants
+            for variant in pim_product.variants.select_related("operational_product").all():
+                if variant.operational_product and getattr(variant.operational_product, "item_type", None) != pim_product.product_type:
+                    variant.operational_product.item_type = pim_product.product_type
+                    variant.operational_product.save(update_fields=["item_type"])
         
         name_changed = pim_product.name != old_name
         code_changed = pim_product.code != old_code
@@ -278,7 +303,7 @@ class PimProductViewSet(viewsets.ModelViewSet):
         subcategory_id = request.query_params.get("subcategory")
         search = request.query_params.get("search")
         is_published = request.query_params.get("is_published")
-        product_type = request.query_params.get("type")
+        product_type = request.query_params.get("product_type") or request.query_params.get("type")
         # Tree view: page through blueprints only (?roots_only=true), then load their
         # variant SKUs with ?parent=<id>,<id>,… so every blueprint is reachable page by page.
         roots_only = (
@@ -287,8 +312,9 @@ class PimProductViewSet(viewsets.ModelViewSet):
         )
         parent_ids = [p for p in (request.query_params.get("parent") or "").split(",") if p.isdigit()]
         if product_type:
+            resolved_type = product_type.strip().upper()
             # Variants inherit product_type from base blueprint, but checking parent__product_type is safe too
-            qs = qs.filter(Q(product_type=product_type) | Q(parent__product_type=product_type))
+            qs = qs.filter(Q(product_type=resolved_type) | Q(parent__product_type=resolved_type))
         if roots_only:
             qs = qs.filter(parent__isnull=True)
         if parent_ids:

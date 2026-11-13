@@ -12,6 +12,72 @@ from decimal import Decimal
 from django.db import transaction
 
 
+def infer_product_type(product) -> str:
+    """Infer the correct PIM product classification from product attributes and heuristics."""
+    # 1. Direct explicit classification on operational product
+    item_type = getattr(product, "item_type", "") or ""
+    if item_type in ("ACCESSORY", "ADD_ON"):
+        return "ACCESSORY"
+    if item_type == "RAW_MATERIAL":
+        return "RAW_MATERIAL"
+    if item_type == "SERVICE":
+        return "SERVICE"
+
+    # 2. Heuristic inference from code, name, category
+    code = (getattr(product, "product_code", "") or getattr(product, "code", "") or "").upper()
+    name = (getattr(product, "name", "") or "").lower()
+    category_val = getattr(product, "category", "") or ""
+    cat = str(getattr(category_val, "name", category_val) or "").lower()
+
+    # Accessories: Commercial Plyboard, cushions, fittings, hardware, handles, drawer slides
+    if (
+        code.startswith("ACC-")
+        or code.startswith("COMM-PLYB")
+        or "plyboard" in name
+        or "ply board" in name
+        or "commercial ply" in name
+        or "cushion" in name
+        or "fitting" in name
+        or "hardware" in name
+        or "handle" in name
+        or "drawer slide" in name
+        or "hinge" in name
+        or "bedside tool" in name
+        or "accessory" in cat
+        or "accessories" in cat
+    ):
+        return "ACCESSORY"
+
+    # Raw Materials: Timber, screws, nails, adhesive, raw foam sheets
+    if (
+        code.startswith("RAW-")
+        or "raw material" in cat
+        or "timber" in name
+        or "sal wood" in name
+        or "screw" in name
+        or "foam sheet" in name
+        or "adhesive" in name
+        or "fevicol" in name
+    ):
+        return "RAW_MATERIAL"
+
+    # Services: Labor, polish finish, assembly, delivery, repair
+    if (
+        code.startswith("SRV-")
+        or code.startswith("SVC-")
+        or "service" in cat
+        or "service" in name
+        or "labor" in name
+        or "labour" in name
+        or "polish finish" in name
+        or "assembly charge" in name
+        or "delivery charge" in name
+    ):
+        return "SERVICE"
+
+    return "FINISHED_GOOD"
+
+
 def ensure_pim_product_for_product(product) -> "object | None":
     """Return the PimProduct for an operational product, creating and linking one
     if it does not exist yet. Idempotent and safe to call on every save.
@@ -25,26 +91,47 @@ def ensure_pim_product_for_product(product) -> "object | None":
     existing = PimProduct.objects.filter(source_product=product).first()
     if existing is not None:
         needs_save = False
+        fields_to_update = []
         if existing.code != product.product_code:
             existing.code = product.product_code
             needs_save = True
+            fields_to_update.append("code")
         if existing.name != product.name:
             existing.name = product.name
             needs_save = True
+            fields_to_update.append("name")
         if existing.base_price != product.base_price:
             existing.base_price = product.base_price
             needs_save = True
-        
+            fields_to_update.append("base_price")
+
+        target_type = infer_product_type(product)
+        if target_type != "FINISHED_GOOD" and existing.product_type == "FINISHED_GOOD":
+            existing.product_type = target_type
+            needs_save = True
+            fields_to_update.append("product_type")
+        elif getattr(product, "item_type", None) and getattr(product, "item_type") in ("ACCESSORY", "RAW_MATERIAL", "SERVICE") and existing.product_type != getattr(product, "item_type"):
+            existing.product_type = getattr(product, "item_type")
+            needs_save = True
+            fields_to_update.append("product_type")
+
         if needs_save:
-            existing.save(update_fields=["code", "name", "base_price"])
+            existing.save(update_fields=fields_to_update)
         return existing
 
     # Link an existing PIM record that matches by code but predates the FK.
     by_code = PimProduct.objects.filter(code=product.product_code).first()
     if by_code is not None:
+        fields = ["source_product"]
+        target_type = infer_product_type(product)
+        if target_type != "FINISHED_GOOD" and by_code.product_type == "FINISHED_GOOD":
+            by_code.product_type = target_type
+            fields.append("product_type")
         if by_code.source_product_id != product.id:
             by_code.source_product = product
-            by_code.save(update_fields=["source_product"])
+            by_code.save(update_fields=fields)
+        elif len(fields) > 1:
+            by_code.save(update_fields=["product_type"])
         return by_code
 
     # Otherwise create a fresh linked PIM record under the Unclassified catch-all.
@@ -71,6 +158,7 @@ def ensure_pim_product_for_product(product) -> "object | None":
         is_active=getattr(product, "is_active", True),
         is_published=False,
         parent_id=parent_id,
+        product_type=infer_product_type(product),
     )
 
 

@@ -893,6 +893,70 @@ export default function PimProductForm({
     setVariants(p.variants ?? []);
   }, [activeProductId]);
 
+  const handleNameChange = (val: string) => {
+    setName(val);
+    if (!isEdit) {
+      const lower = val.toLowerCase();
+      if (
+        lower.includes("plyboard") ||
+        lower.includes("ply board") ||
+        lower.includes("commercial ply") ||
+        lower.includes("cushion") ||
+        lower.includes("fitting") ||
+        lower.includes("hardware") ||
+        lower.includes("handle") ||
+        lower.includes("drawer slide") ||
+        lower.includes("hinge")
+      ) {
+        if (productType !== "ACCESSORY") {
+          setProductType("ACCESSORY");
+          setChannelDirectSale(true);
+          setChannelEmi(false);
+          setChannelRent(false);
+          setChannelLease(false);
+          if (!code || ["FG-", "RAW-", "SRV-"].some((p) => code.startsWith(p))) {
+            setCode(lower.includes("plyboard") ? "COMM-PLYB-" : "ACC-");
+          }
+        }
+      } else if (
+        lower.includes("raw timber") ||
+        lower.includes("foam sheet") ||
+        lower.includes("screw") ||
+        lower.includes("adhesive") ||
+        lower.includes("fevicol")
+      ) {
+        if (productType !== "RAW_MATERIAL") {
+          setProductType("RAW_MATERIAL");
+          setChannelDirectSale(false);
+          setChannelEmi(false);
+          setChannelRent(false);
+          setChannelLease(false);
+          if (!code || ["FG-", "ACC-", "SRV-"].some((p) => code.startsWith(p))) {
+            setCode("RAW-");
+          }
+        }
+      } else if (
+        lower.includes("service") ||
+        lower.includes("labor") ||
+        lower.includes("labour") ||
+        lower.includes("polish finish") ||
+        lower.includes("assembly charge") ||
+        lower.includes("delivery charge")
+      ) {
+        if (productType !== "SERVICE") {
+          setProductType("SERVICE");
+          setChannelDirectSale(true);
+          setChannelEmi(false);
+          setChannelRent(false);
+          setChannelLease(false);
+          if (!code || ["FG-", "ACC-", "RAW-"].some((p) => code.startsWith(p))) {
+            setCode("SRV-");
+          }
+        }
+      }
+    }
+  };
+
   // Live product search for drawer mode
   useEffect(() => {
     if (!searchMode) return;
@@ -1642,10 +1706,31 @@ export default function PimProductForm({
                 key={item.type}
                 type="button"
                 onClick={() => {
-                  setProductType(item.type as any);
-                  if (!isEdit && (!code || ["FG-", "ACC-", "RAW-", "SRV-"].some(p => code.startsWith(p)))) {
+                  const newType = item.type as any;
+                  setProductType(newType);
+                  if (!isEdit && (!code || ["FG-", "ACC-", "RAW-", "SRV-", "COMM-PLYB-"].some(p => code.startsWith(p)))) {
                     const prefix = item.type === "FINISHED_GOOD" ? "FG-" : item.type === "ACCESSORY" ? "ACC-" : item.type === "RAW_MATERIAL" ? "RAW-" : "SRV-";
                     setCode(prefix);
+                  }
+                  // Automatically adjust channel availability for non-finished-goods
+                  if (newType === "ACCESSORY") {
+                    setChannelDirectSale(true);
+                    setChannelEmi(false);
+                    setChannelRent(false);
+                    setChannelLease(false);
+                  } else if (newType === "RAW_MATERIAL") {
+                    setChannelDirectSale(false);
+                    setChannelEmi(false);
+                    setChannelRent(false);
+                    setChannelLease(false);
+                  } else if (newType === "SERVICE") {
+                    setChannelDirectSale(true);
+                    setChannelEmi(false);
+                    setChannelRent(false);
+                    setChannelLease(false);
+                  } else if (newType === "FINISHED_GOOD") {
+                    setChannelDirectSale(true);
+                    setChannelEmi(true);
                   }
                 }}
                 className={cn(
@@ -1668,6 +1753,58 @@ export default function PimProductForm({
             );
           })}
         </div>
+
+        {/* Classification Role Guidance Banner */}
+        {productType === "ACCESSORY" && (
+          <div className="rounded-xl border border-purple-200 bg-purple-50/70 dark:border-purple-900/40 dark:bg-purple-950/20 p-3.5 text-xs text-purple-900 dark:text-purple-200 flex items-start gap-2.5">
+            <Puzzle className="h-4 w-4 text-purple-600 dark:text-purple-400 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <div className="font-bold flex items-center gap-1.5 flex-wrap">
+                <span>Accessory / Add-on Configuration</span>
+                <span className="text-[10px] font-normal px-2 py-0.5 rounded-full bg-purple-200/70 dark:bg-purple-900/60 text-purple-800 dark:text-purple-300">
+                  e.g. Commercial Plyboard, Cushions, Bedside tool, Hardware
+                </span>
+              </div>
+              <p className="text-purple-700 dark:text-purple-300/90 leading-relaxed">
+                Accessories are physical add-on items or components bundled with furniture (e.g. 78&quot;×36&quot;×16mm Commercial Plyboard attached to bed frames). They can be sold directly or bundled via stock recipes, and are <strong>excluded from monthly SFEMI subscriptions</strong>.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {productType === "RAW_MATERIAL" && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50/70 dark:border-amber-900/40 dark:bg-amber-950/20 p-3.5 text-xs text-amber-900 dark:text-amber-200 flex items-start gap-2.5">
+            <Factory className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <div className="font-bold flex items-center gap-1.5 flex-wrap">
+                <span>Workshop Raw Material Configuration</span>
+                <span className="text-[10px] font-normal px-2 py-0.5 rounded-full bg-amber-200/70 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300">
+                  e.g. Timber, Raw Sheets, Screws, Foam, Adhesive
+                </span>
+              </div>
+              <p className="text-amber-700 dark:text-amber-300/90 leading-relaxed">
+                Raw materials are manufacturing and workshop stock used in production Bills of Materials (BOM). They are tracked in warehouse inventory, but <strong>customer room AR 3D preview, long structural furniture warranties, and SFEMI plans are disabled</strong>.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {productType === "SERVICE" && (
+          <div className="rounded-xl border border-teal-200 bg-teal-50/70 dark:border-teal-900/40 dark:bg-teal-950/20 p-3.5 text-xs text-teal-900 dark:text-teal-200 flex items-start gap-2.5">
+            <Wrench className="h-4 w-4 text-teal-600 dark:text-teal-400 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <div className="font-bold flex items-center gap-1.5 flex-wrap">
+                <span>Labor &amp; Workshop Service Configuration</span>
+                <span className="text-[10px] font-normal px-2 py-0.5 rounded-full bg-teal-200/70 dark:bg-teal-900/60 text-teal-800 dark:text-teal-300">
+                  e.g. Carpenter Labor, Hand Polish, Assembly, Transport
+                </span>
+              </div>
+              <p className="text-teal-700 dark:text-teal-300/90 leading-relaxed">
+                Services represent labor and non-tangible work charges. <strong>Physical dimensions (AR 3D), physical stock tracking, and structural furniture warranties are completely disabled</strong>. Billed via Direct Sale or service orders.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Publish & Channel Control Card */}
@@ -1889,9 +2026,33 @@ export default function PimProductForm({
               required
               className="w-full rounded-md border px-3 py-2 text-sm bg-background"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => handleNameChange(e.target.value)}
               placeholder="Teak Queen Bed with Storage"
             />
+            {name && (name.toLowerCase().includes("plyboard") || name.toLowerCase().includes("commercial ply")) && productType === "FINISHED_GOOD" && (
+              <div className="mt-2 flex items-center justify-between p-2.5 rounded-lg border border-purple-200 bg-purple-50 dark:bg-purple-950/30 dark:border-purple-800 text-xs text-purple-900 dark:text-purple-200 gap-2 flex-wrap">
+                <div className="flex items-center gap-1.5 font-medium">
+                  <Puzzle className="h-4 w-4 text-purple-600 dark:text-purple-400 shrink-0" />
+                  <span>Detected Commercial Plyboard: classify as an <strong>Accessory</strong>?</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProductType("ACCESSORY");
+                    setChannelDirectSale(true);
+                    setChannelEmi(false);
+                    setChannelRent(false);
+                    setChannelLease(false);
+                    if (!isEdit && (!code || ["FG-", "RAW-", "SRV-"].some((p) => code.startsWith(p)))) {
+                      setCode("COMM-PLYB-");
+                    }
+                  }}
+                  className="px-2.5 py-1 rounded-md bg-purple-600 text-white font-semibold hover:bg-purple-700 transition shrink-0 cursor-pointer"
+                >
+                  Switch to Accessory
+                </button>
+              </div>
+            )}
           </div>
           <div className="sm:col-span-2">
             <div className="flex items-center justify-between mb-1">
@@ -2000,86 +2161,110 @@ export default function PimProductForm({
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2">
             <h3 className="font-semibold">Warranty Information</h3>
-            {variants.length > 0 && (
+            {productType === "SERVICE" ? (
+              <span className="text-[10px] rounded-full bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300 px-2 py-0.5 font-medium border border-teal-200 dark:border-teal-800">
+                Service Item
+              </span>
+            ) : productType === "RAW_MATERIAL" ? (
+              <span className="text-[10px] rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 px-2 py-0.5 font-medium border border-amber-200 dark:border-amber-800">
+                Raw Material
+              </span>
+            ) : variants.length > 0 ? (
               <span className="text-[10px] rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 px-2 py-0.5 font-medium border border-blue-200 dark:border-blue-800">
                 Default for {variants.length} variant{variants.length !== 1 ? "s" : ""}
               </span>
-            )}
+            ) : null}
           </div>
-          <div className="flex items-center gap-3">
-            {isEdit && variants.length > 0 && (
-              <button
-                type="button"
-                onClick={() => { setShowPushPanel(true); setPushWarranty(true); setPushResult(null); }}
-                className="inline-flex items-center gap-1 rounded-md border bg-background px-2.5 py-1 text-xs font-medium text-primary hover:bg-muted transition"
-                title="Push this warranty setup to all variants"
-              >
-                <Send className="h-3 w-3" />
-                Push warranty to variants
-              </button>
-            )}
-            <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
-              <input 
-                type="checkbox" 
-                checked={warrantyEnabled} 
-                onChange={(e) => setWarrantyEnabled(e.target.checked)} 
-                className="accent-primary h-4 w-4 rounded" 
-              />
-              Enable Warranty
-            </label>
-          </div>
+          {productType === "SERVICE" ? null : productType === "RAW_MATERIAL" ? null : (
+            <div className="flex items-center gap-3">
+              {isEdit && variants.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => { setShowPushPanel(true); setPushWarranty(true); setPushResult(null); }}
+                  className="inline-flex items-center gap-1 rounded-md border bg-background px-2.5 py-1 text-xs font-medium text-primary hover:bg-muted transition"
+                  title="Push this warranty setup to all variants"
+                >
+                  <Send className="h-3 w-3" />
+                  Push warranty to variants
+                </button>
+              )}
+              <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  checked={warrantyEnabled} 
+                  onChange={(e) => setWarrantyEnabled(e.target.checked)} 
+                  className="accent-primary h-4 w-4 rounded" 
+                />
+                Enable Warranty
+              </label>
+            </div>
+          )}
         </div>
         
-        {variants.length > 0 && (
-          <p className="text-[11px] text-muted-foreground">
-            Base warranty terms apply to this product. Each variant inherits these terms automatically, or can be overridden with variant-specific warranty terms below.
-          </p>
-        )}
-        
-        {warrantyEnabled && (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4 pt-2">
-            <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1">Manufacturing (Months)</label>
-              <input
-                type="number"
-                min="0"
-                className="w-full rounded-md border px-3 py-2 text-sm bg-background"
-                value={warrantyMonthsManufacturing}
-                onChange={(e) => setWarrantyMonthsManufacturing(Number(e.target.value))}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1">Structural (Months)</label>
-              <input
-                type="number"
-                min="0"
-                className="w-full rounded-md border px-3 py-2 text-sm bg-background"
-                value={warrantyMonthsStructural}
-                onChange={(e) => setWarrantyMonthsStructural(Number(e.target.value))}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1">Extended Max (Months)</label>
-              <input
-                type="number"
-                min="0"
-                className="w-full rounded-md border px-3 py-2 text-sm bg-background"
-                value={warrantyMonthsExtendedMax}
-                onChange={(e) => setWarrantyMonthsExtendedMax(Number(e.target.value))}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1">Extended Cost (%)</label>
-              <input
-                type="number"
-                step="0.1"
-                min="0"
-                className="w-full rounded-md border px-3 py-2 text-sm bg-background"
-                value={extendedWarrantyCostPercentage}
-                onChange={(e) => setExtendedWarrantyCostPercentage(e.target.value)}
-              />
-            </div>
+        {productType === "SERVICE" ? (
+          <div className="p-3.5 rounded-lg border border-dashed border-teal-300 dark:border-teal-800 bg-teal-50/50 dark:bg-teal-950/20 text-xs text-teal-800 dark:text-teal-300 flex items-center gap-2">
+            <Wrench className="h-4 w-4 shrink-0 text-teal-600 dark:text-teal-400" />
+            <span>Labor and workshop services do not carry structural furniture warranties. Workmanship guarantee is recorded in service orders.</span>
           </div>
+        ) : productType === "RAW_MATERIAL" ? (
+          <div className="p-3.5 rounded-lg border border-dashed border-amber-300 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20 text-xs text-amber-800 dark:text-amber-300 flex items-center gap-2">
+            <Factory className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+            <span>Raw materials (timber, screws, foam, adhesive) carry manufacturer batch specifications rather than consumer furniture warranties.</span>
+          </div>
+        ) : (
+          <>
+            {variants.length > 0 && (
+              <p className="text-[11px] text-muted-foreground">
+                Base warranty terms apply to this product. Each variant inherits these terms automatically, or can be overridden with variant-specific warranty terms below.
+              </p>
+            )}
+            
+            {warrantyEnabled && (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4 pt-2">
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">Manufacturing (Months)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    className="w-full rounded-md border px-3 py-2 text-sm bg-background"
+                    value={warrantyMonthsManufacturing}
+                    onChange={(e) => setWarrantyMonthsManufacturing(Number(e.target.value))}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">Structural (Months)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    className="w-full rounded-md border px-3 py-2 text-sm bg-background"
+                    value={warrantyMonthsStructural}
+                    onChange={(e) => setWarrantyMonthsStructural(Number(e.target.value))}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">Extended Max (Months)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    className="w-full rounded-md border px-3 py-2 text-sm bg-background"
+                    value={warrantyMonthsExtendedMax}
+                    onChange={(e) => setWarrantyMonthsExtendedMax(Number(e.target.value))}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">Extended Cost (%)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    className="w-full rounded-md border px-3 py-2 text-sm bg-background"
+                    value={extendedWarrantyCostPercentage}
+                    onChange={(e) => setExtendedWarrantyCostPercentage(e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
+          </>
         )}
       </section>
 
@@ -2170,80 +2355,98 @@ export default function PimProductForm({
         </div>
       </section>
 
-      {/* Rent / Lease pricing */}
-      <section className="rounded-lg border p-5 space-y-4">
-        <div>
-          <h3 className="font-semibold">Rent / Lease pricing</h3>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Monthly amount is calculated from product price × yield rate. Leave blank to use the business default rate.
-          </p>
-        </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <label className="block text-sm font-medium">
-            Rent monthly yield rate (%)
-            <input type="number" min="0.01" max="100" step="0.01" value={rentYieldPercent} onChange={(e) => setRentYieldPercent(e.target.value)} placeholder="Business default" className="mt-1 w-full rounded-md border px-3 py-2 text-sm bg-background" />
-          </label>
-          <label className="block text-sm font-medium">
-            Lease monthly yield rate (%)
-            <input type="number" min="0.01" max="100" step="0.01" value={leaseYieldPercent} onChange={(e) => setLeaseYieldPercent(e.target.value)} placeholder="Business default" className="mt-1 w-full rounded-md border px-3 py-2 text-sm bg-background" />
-          </label>
-        </div>
-      </section>
-
-      {/* Room view (AR) size */}
-      <section className="rounded-lg border p-5 space-y-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="max-w-2xl">
-            <h3 className="font-semibold">Room view (AR) size</h3>
+      {/* Rent / Lease pricing — Only for Finished Goods */}
+      {productType === "FINISHED_GOOD" && (
+        <section className="rounded-lg border p-5 space-y-4">
+          <div>
+            <h3 className="font-semibold">Rent / Lease pricing</h3>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Outer size in centimetres. With width and depth set, customers can place this product in their room at
-              true size, even before a 3D model is uploaded (they see a block of this size with the product photo).
-              Leave height blank to show only the floor space.
-              {product?.parent_id ? " Leave all blank to use the base product's size." : ""}
+              Monthly amount is calculated from product price × yield rate. Leave blank to use the business default rate.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => void handleSuggestArSize()}
-            disabled={!productId || arSuggesting}
-            title={productId ? "Read the size from this product's attributes" : "Save the product first"}
-            className="rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50"
-          >
-            {arSuggesting ? "Reading…" : "Fill from attributes"}
-          </button>
-        </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {(
-            [
-              ["f-ar-width", "Width", "side to side", arWidth, setArWidth],
-              ["f-ar-depth", "Depth", "front to back", arDepth, setArDepth],
-              ["f-ar-height", "Height", "optional", arHeight, setArHeight],
-            ] as const
-          ).map(([id, label, hint, value, setValue]) => (
-            <div key={id}>
-              <label htmlFor={id} className="block text-sm font-medium mb-1">
-                {label}
-                <span className="ml-1.5 text-xs font-normal text-muted-foreground">{hint}</span>
-              </label>
-              <div className="relative">
-                <input
-                  id={id}
-                  type="number"
-                  min="1"
-                  max="500"
-                  step="0.1"
-                  className="w-full rounded-md border px-3 py-2 pr-10 text-sm bg-background"
-                  value={value}
-                  onChange={(e) => setValue(e.target.value)}
-                  placeholder="—"
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">cm</span>
-              </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <label className="block text-sm font-medium">
+              Rent monthly yield rate (%)
+              <input type="number" min="0.01" max="100" step="0.01" value={rentYieldPercent} onChange={(e) => setRentYieldPercent(e.target.value)} placeholder="Business default" className="mt-1 w-full rounded-md border px-3 py-2 text-sm bg-background" />
+            </label>
+            <label className="block text-sm font-medium">
+              Lease monthly yield rate (%)
+              <input type="number" min="0.01" max="100" step="0.01" value={leaseYieldPercent} onChange={(e) => setLeaseYieldPercent(e.target.value)} placeholder="Business default" className="mt-1 w-full rounded-md border px-3 py-2 text-sm bg-background" />
+            </label>
+          </div>
+        </section>
+      )}
+
+      {/* Room view (AR) size */}
+      {productType === "SERVICE" ? (
+        <section className="rounded-lg border border-dashed border-teal-200 bg-teal-50/40 dark:border-teal-900/40 dark:bg-teal-950/20 p-5 space-y-2">
+          <div className="flex items-center gap-2 text-teal-800 dark:text-teal-300 font-semibold text-sm">
+            <Wrench className="h-4 w-4" />
+            <span>Room View (AR) Disabled for Services</span>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Services (labor, assembly, polishing, delivery) are non-tangible work charges and do not have physical 3D outer dimensions or room placement models.
+          </p>
+        </section>
+      ) : (
+        <section className="rounded-lg border p-5 space-y-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="max-w-2xl">
+              <h3 className="font-semibold">
+                {productType === "RAW_MATERIAL" ? "Raw Material Dimensions" : "Room view (AR) size"}
+              </h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {productType === "RAW_MATERIAL"
+                  ? "Sheet, block, or pack outer dimensions in centimetres (Width, Depth, Height). Raw materials are workshop inputs and excluded from consumer AR room placement."
+                  : "Outer size in centimetres. With width and depth set, customers can place this product in their room at true size, even before a 3D model is uploaded."}
+                {product?.parent_id ? " Leave all blank to use the base product's size." : ""}
+              </p>
             </div>
-          ))}
-        </div>
-        {arHint && <p className="text-xs text-muted-foreground">{arHint}</p>}
-      </section>
+            {productType !== "RAW_MATERIAL" && (
+              <button
+                type="button"
+                onClick={() => void handleSuggestArSize()}
+                disabled={!productId || arSuggesting}
+                title={productId ? "Read the size from this product's attributes" : "Save the product first"}
+                className="rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50"
+              >
+                {arSuggesting ? "Reading…" : "Fill from attributes"}
+              </button>
+            )}
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            {(
+              [
+                ["f-ar-width", "Width", "side to side", arWidth, setArWidth],
+                ["f-ar-depth", "Depth", "front to back", arDepth, setArDepth],
+                ["f-ar-height", "Height", "optional", arHeight, setArHeight],
+              ] as const
+            ).map(([id, label, hint, value, setValue]) => (
+              <div key={id}>
+                <label htmlFor={id} className="block text-sm font-medium mb-1">
+                  {label}
+                  <span className="ml-1.5 text-xs font-normal text-muted-foreground">{hint}</span>
+                </label>
+                <div className="relative">
+                  <input
+                    id={id}
+                    type="number"
+                    min="1"
+                    max="500"
+                    step="0.1"
+                    className="w-full rounded-md border px-3 py-2 pr-10 text-sm bg-background"
+                    value={value}
+                    onChange={(e) => setValue(e.target.value)}
+                    placeholder="—"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">cm</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          {arHint && <p className="text-xs text-muted-foreground">{arHint}</p>}
+        </section>
+      )}
 
       {/* Dynamic Attributes */}
       {true && (

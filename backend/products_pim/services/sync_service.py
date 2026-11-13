@@ -133,6 +133,8 @@ class PIMSyncService:
         core_product.warranty_months_structural = effective_struct
         core_product.warranty_months_extended_max = effective_ext_max
         core_product.extended_warranty_cost_percentage = effective_ext_cost
+        if pim_product.product_type:
+            core_product.item_type = pim_product.product_type
 
         child_pim = PimProduct.objects.filter(code=variant.sku, parent_id=pim_product.id).first()
         if child_pim:
@@ -147,6 +149,8 @@ class PIMSyncService:
             child_pim.warranty_months_structural = effective_struct
             child_pim.warranty_months_extended_max = effective_ext_max
             child_pim.extended_warranty_cost_percentage = effective_ext_cost
+            if pim_product.product_type:
+                child_pim.product_type = pim_product.product_type
             child_pim.save()
 
         

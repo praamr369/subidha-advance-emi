@@ -359,6 +359,7 @@ export const pimService = {
     search?: string;
     is_published?: boolean;
     in_stock?: boolean;
+    product_type?: string;
     page?: number;
     page_size?: number;
     /** Blueprints only (no variant SKUs); search then also matches their SKUs. */
@@ -374,6 +375,7 @@ export const pimService = {
     if (filters?.search) params.set("search", filters.search);
     if (filters?.is_published !== undefined) params.set("is_published", String(filters.is_published));
     if (filters?.in_stock !== undefined) params.set("in_stock", String(filters.in_stock));
+    if (filters?.product_type) params.set("type", filters.product_type);
     if (filters?.roots_only) params.set("roots_only", "true");
     if (filters?.parent?.length) params.set("parent", filters.parent.join(","));
     return request<PaginatedOrArray<PimProduct>>(`${BASE}/products/?${params}`).then((raw) => {
@@ -383,11 +385,12 @@ export const pimService = {
   },
 
   /** Blueprint / variant-SKU counts for the PIM tree view under the same filters. */
-  getTreeSummary: (filters?: { category?: string | number; search?: string; in_stock?: boolean }): Promise<PimTreeSummary> => {
+  getTreeSummary: (filters?: { category?: string | number; search?: string; in_stock?: boolean; product_type?: string }): Promise<PimTreeSummary> => {
     const params = new URLSearchParams();
     if (filters?.category) params.set("category", String(filters.category));
     if (filters?.search) params.set("search", filters.search);
     if (filters?.in_stock !== undefined) params.set("in_stock", String(filters.in_stock));
+    if (filters?.product_type) params.set("type", filters.product_type);
     return request<PimTreeSummary>(`${BASE}/products/tree_summary/?${params}`);
   },
 

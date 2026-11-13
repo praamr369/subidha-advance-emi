@@ -122,3 +122,48 @@ class PimTreePagingTests(APITestCase):
         self.assertIn("TR-BED", in_stock_codes)
         self.assertNotIn("TR-BED-Q", in_stock_codes)
         self.assertNotIn("TR-SOFA", in_stock_codes)
+
+    def test_pim_product_type_classification_and_sync(self):
+        from products_core.models import Product
+        from products_pim.models import PimProduct
+        from products_pim.services.core import infer_product_type, ensure_pim_product_for_product
+
+        # 1. Test inference for Commercial Plyboard items
+        ply1 = Product.objects.create(
+            name='Commercial Plyboard 78"*36"*16mm',
+            product_code="COMM-PLYB-7836",
+            base_price=Decimal("1250"),
+        )
+        ply2 = Product.objects.create(
+            name='Commercial Plyboard 78"*48"*16mm',
+            product_code="COMM-PLYB-7848",
+            base_price=Decimal("1650"),
+        )
+        self.assertEqual(infer_product_type(ply1), "ACCESSORY")
+        self.assertEqual(infer_product_type(ply2), "ACCESSORY")
+
+        # 2. Test ensure_pim_product_for_product creates them as ACCESSORY
+        pim_ply1 = ensure_pim_product_for_product(ply1)
+        self.assertIsNotNone(pim_ply1)
+        self.assertEqual(pim_ply1.product_type, "ACCESSORY")
+
+        # 3. Test API filtering by product_type/type
+        resp = self.client.get(URL, {"type": "ACCESSORY"})
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        codes = self._codes(resp)
+        self.assertIn("COMM-PLYB-7836", codes)
+        self.assertNotIn("TR-BED", codes)
+
+        resp2 = self.client.get(URL, {"product_type": "ACCESSORY"})
+        self.assertEqual(resp2.status_code, status.HTTP_200_OK)
+        codes2 = self._codes(resp2)
+        self.assertIn("COMM-PLYB-7836", codes2)
+
+        # 4. Test updating product_type via API syncs to source_product and child variants
+        detail_url = f"{URL}{pim_ply1.id}/"
+        update_resp = self.client.patch(detail_url, {"product_type": "RAW_MATERIAL"})
+        self.assertEqual(update_resp.status_code, status.HTTP_200_OK)
+        pim_ply1.refresh_from_db()
+        self.assertEqual(pim_ply1.product_type, "RAW_MATERIAL")
+        ply1.refresh_from_db()
+        self.assertEqual(ply1.item_type, "RAW_MATERIAL")

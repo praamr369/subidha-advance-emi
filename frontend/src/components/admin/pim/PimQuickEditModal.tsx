@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { X, ExternalLink, Layers, Sparkles, CheckCircle2 } from "lucide-react";
+import { X, ExternalLink, Layers, Sparkles, CheckCircle2, Puzzle, Factory, Wrench, Box } from "lucide-react";
 import dynamic from "next/dynamic";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import { pimService, type PimProduct } from "@/services/pim";
@@ -122,9 +122,30 @@ export default function PimQuickEditModal({
                 >
                   {isPublished ? "Published (Live)" : "Draft (Private)"}
                 </span>
-                <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-                  {productType.replace(/_/g, " ")}
-                </span>
+                {productType === "ACCESSORY" && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-700 bg-purple-50 border border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800 rounded-full px-2 py-0.5">
+                    <Puzzle className="h-3 w-3 text-purple-600 dark:text-purple-400" />
+                    Accessory
+                  </span>
+                )}
+                {productType === "RAW_MATERIAL" && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800 rounded-full px-2 py-0.5">
+                    <Factory className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                    Raw Material
+                  </span>
+                )}
+                {productType === "SERVICE" && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-teal-700 bg-teal-50 border border-teal-200 dark:bg-teal-950/40 dark:text-teal-300 dark:border-teal-800 rounded-full px-2 py-0.5">
+                    <Wrench className="h-3 w-3 text-teal-600 dark:text-teal-400" />
+                    Service
+                  </span>
+                )}
+                {productType === "FINISHED_GOOD" && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800 rounded-full px-2 py-0.5">
+                    <Box className="h-3 w-3 text-blue-600 dark:text-blue-400" />
+                    Finished Good
+                  </span>
+                )}
               </div>
               <h2
                 id="modal-quick-edit-title"

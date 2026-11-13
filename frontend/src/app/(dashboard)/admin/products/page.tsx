@@ -5,7 +5,7 @@ import { formatRupee } from "@/lib/utils/currency";
 import Link from "next/link";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { Download, RefreshCw, Search, SlidersHorizontal, X, Layers, ExternalLink, ChevronRight, ChevronDown, GitBranch, CheckCircle2, AlertCircle, Star, Package2, CircleHelp, QrCode, Boxes, Sparkles, Eye, EyeOff } from "lucide-react";
+import { Download, RefreshCw, Search, SlidersHorizontal, X, Layers, ExternalLink, ChevronRight, ChevronDown, GitBranch, CheckCircle2, AlertCircle, Star, Package2, CircleHelp, QrCode, Boxes, Sparkles, Eye, EyeOff, Puzzle, Factory, Wrench, Box } from "lucide-react";
 import PimHelpGuideTab from "@/components/admin/help/PimHelpGuideTab";
 import PimPurchaseStockPanel from "@/components/admin/pim/PimPurchaseStockPanel";
 import { pimService, type PimProduct, type PimCategory, type PimTreeSummary } from "@/services/pim";
@@ -329,6 +329,34 @@ function PimProductRow({
               Variant SKU
             </span>
           )}
+          {/* Classification Badge */}
+          {p.product_type === "ACCESSORY" && (
+            <span
+              className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-700 bg-purple-50 border border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800 rounded-full px-2 py-0.5"
+              title="Accessory: Fittings, cushions, plyboard, and hardware"
+            >
+              <Puzzle className="h-3 w-3 text-purple-600 dark:text-purple-400" />
+              <span>Accessory</span>
+            </span>
+          )}
+          {p.product_type === "RAW_MATERIAL" && (
+            <span
+              className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800 rounded-full px-2 py-0.5"
+              title="Raw Material: Timber, fabric, foam, screws, and workshop inputs"
+            >
+              <Factory className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+              <span>Raw Material</span>
+            </span>
+          )}
+          {p.product_type === "SERVICE" && (
+            <span
+              className="inline-flex items-center gap-1 text-[10px] font-bold text-teal-700 bg-teal-50 border border-teal-200 dark:bg-teal-950/40 dark:text-teal-300 dark:border-teal-800 rounded-full px-2 py-0.5"
+              title="Service: Labor, assembly, polishing, or delivery charge"
+            >
+              <Wrench className="h-3 w-3 text-teal-600 dark:text-teal-400" />
+              <span>Service</span>
+            </span>
+          )}
         </div>
         {isChild && p.parent_code && (
           <p className="text-[10px] text-muted-foreground mt-0.5">
@@ -482,13 +510,14 @@ function rememberProductsWorkspaceState(partial: Partial<ProductsWorkspaceState>
 }
 
 /** Every variant SKU of the given blueprints, following pages until all are loaded. */
-async function fetchVariantSkus(parentIds: number[], inStock?: boolean): Promise<PimProduct[]> {
+async function fetchVariantSkus(parentIds: number[], inStock?: boolean, productType?: string): Promise<PimProduct[]> {
   if (parentIds.length === 0) return [];
   const all: PimProduct[] = [];
   for (let page = 1; ; page += 1) {
     const { results, count } = await pimService.getProducts({
       parent: parentIds,
       in_stock: inStock,
+      product_type: productType,
       page,
       page_size: PIM_CHILD_PAGE_SIZE,
     });
@@ -565,6 +594,7 @@ function PimPanel({
   const [bulkPublishResult, setBulkPublishResult] = useState<string | null>(null);
   const [togglingPimId, setTogglingPimId] = useState<number | null>(null);
   const [pimStockFilter, setPimStockFilter] = useState<"ALL" | "IN_STOCK" | "OUT_OF_STOCK">("ALL");
+  const [pimTypeFilter, setPimTypeFilter] = useState<"ALL" | "FINISHED_GOOD" | "ACCESSORY" | "RAW_MATERIAL" | "SERVICE">("ALL");
   const [qrModalStockMode, setQrModalStockMode] = useState<boolean>(false);
   const [qrModalItem, setQrModalItem] = useState<QRLabelItem | null>(null);
   const [qrModalItems, setQrModalItems] = useState<QRLabelItem[] | null>(null);
@@ -607,17 +637,19 @@ function PimPanel({
     setPimError(null);
     const inStockParam =
       pimStockFilter === "IN_STOCK" ? true : pimStockFilter === "OUT_OF_STOCK" ? false : undefined;
+    const typeParam = pimTypeFilter === "ALL" ? undefined : pimTypeFilter;
     const filters = {
       search: pimSearch || undefined,
       category: pimCat || undefined,
       in_stock: inStockParam,
+      product_type: typeParam,
     };
     try {
       const [blueprintPage, summary] = await Promise.all([
         pimService.getProducts({ ...filters, roots_only: true, page: pimPage, page_size: pimPageSize }),
         pimService.getTreeSummary(filters),
       ]);
-      const skus = await fetchVariantSkus(blueprintPage.results.map((p) => p.id), inStockParam);
+      const skus = await fetchVariantSkus(blueprintPage.results.map((p) => p.id), inStockParam, typeParam);
       setPimProducts([...blueprintPage.results, ...skus]);
       setBlueprintTotal(blueprintPage.count);
       setTreeSummary(summary);
@@ -626,7 +658,7 @@ function PimPanel({
     } finally {
       setPimLoading(false);
     }
-  }, [pimSearch, pimCat, pimStockFilter, pimPage, pimPageSize]);
+  }, [pimSearch, pimCat, pimStockFilter, pimTypeFilter, pimPage, pimPageSize]);
 
   useEffect(() => { void loadPimProducts(); }, [loadPimProducts]);
 
@@ -962,6 +994,73 @@ function PimPanel({
             }`}
           >
             Out of Stock
+          </button>
+        </div>
+
+        {/* Classification / Product Type Filter Pills */}
+        <div className="flex items-center gap-1 rounded-xl border border-border bg-background p-1 text-xs font-medium flex-wrap">
+          <button
+            type="button"
+            onClick={() => { setPimTypeFilter("ALL"); setPimPage(1); }}
+            className={`px-2.5 py-1.5 rounded-lg transition ${
+              pimTypeFilter === "ALL"
+                ? "bg-muted text-foreground font-semibold shadow-2xs"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            All Types
+          </button>
+          <button
+            type="button"
+            onClick={() => { setPimTypeFilter("FINISHED_GOOD"); setPimPage(1); }}
+            className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg transition ${
+              pimTypeFilter === "FINISHED_GOOD"
+                ? "bg-blue-600 text-white font-semibold shadow-2xs"
+                : "text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+            }`}
+            title="Finished Good: Furniture & retail products"
+          >
+            <Box className="h-3.5 w-3.5" />
+            Finished Goods
+          </button>
+          <button
+            type="button"
+            onClick={() => { setPimTypeFilter("ACCESSORY"); setPimPage(1); }}
+            className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg transition ${
+              pimTypeFilter === "ACCESSORY"
+                ? "bg-purple-600 text-white font-semibold shadow-2xs"
+                : "text-purple-700 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/30"
+            }`}
+            title="Accessory: Fittings, cushions, commercial plyboard, hardware"
+          >
+            <Puzzle className="h-3.5 w-3.5" />
+            Accessories
+          </button>
+          <button
+            type="button"
+            onClick={() => { setPimTypeFilter("RAW_MATERIAL"); setPimPage(1); }}
+            className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg transition ${
+              pimTypeFilter === "RAW_MATERIAL"
+                ? "bg-amber-600 text-white font-semibold shadow-2xs"
+                : "text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30"
+            }`}
+            title="Raw Material: Timber, fabric, foam, screws, adhesive"
+          >
+            <Factory className="h-3.5 w-3.5" />
+            Raw Materials
+          </button>
+          <button
+            type="button"
+            onClick={() => { setPimTypeFilter("SERVICE"); setPimPage(1); }}
+            className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg transition ${
+              pimTypeFilter === "SERVICE"
+                ? "bg-teal-600 text-white font-semibold shadow-2xs"
+                : "text-teal-700 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-950/30"
+            }`}
+            title="Service: Labor, assembly, polishing, delivery charge"
+          >
+            <Wrench className="h-3.5 w-3.5" />
+            Services
           </button>
         </div>
       </div>
