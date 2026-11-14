@@ -80,6 +80,14 @@ const CONTROLS: SettingsDef[] = [
     dotCls: "bg-muted-foreground/60",
   },
   {
+    title: "Two-Factor Auth (MFA)",
+    description: "Enforce phone-based Google Authenticator OTP for unbreakable admin login security.",
+    href: ROUTES.admin.settingsMfa,
+    Icon: ShieldCheck,
+    iconCls: "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
+    dotCls: "bg-emerald-400",
+  },
+  {
     title: "Session Policy",
     description: "Authentication expiry, route protection, and restricted admin surface exposure.",
     href: ROUTES.admin.settingsRolesPermissions,

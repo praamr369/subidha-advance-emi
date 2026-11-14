@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { BookOpen, CircleHelp, MessageCircle, Settings, ShieldCheck } from "lucide-react";
+import { AppWindow, BookOpen, CircleHelp, MessageCircle, Settings, ShieldCheck } from "lucide-react";
 
 import {
   Menubar,
@@ -16,6 +16,7 @@ import { ROUTES } from "@/lib/routes";
 import { openWhatsAppDirectModal } from "@/components/whatsapp/WhatsAppDirectSenderModal";
 import { openAdminHelp } from "@/components/admin/help/AdminHelpDrawer";
 import { openEodReconciliationDrawer } from "@/components/admin/finance/EodReconciliationDrawer";
+import { useAdminWorkspaceDock } from "@/components/layout/AdminWorkspaceDockContext";
 
 type AdminWorkspaceMenubarProps = {
   role: NavigationRole;
@@ -29,6 +30,18 @@ export default function AdminWorkspaceMenubar({
   onOpenCommandPalette,
   onOpenQuickActions,
 }: AdminWorkspaceMenubarProps) {
+  const {
+    windows,
+    openInDock,
+    restoreWindow,
+    tileWindows,
+    minimizeAll,
+    restoreAll,
+    closeAll,
+    lastClosedWindow,
+    reopenLastClosed,
+  } = useAdminWorkspaceDock();
+
   if (role !== "ADMIN") {
     return null;
   }
@@ -124,6 +137,82 @@ export default function AdminWorkspaceMenubar({
           <MenubarItem asChild>
             <Link href={ROUTES.admin.customers}>Customers</Link>
           </MenubarItem>
+        </MenubarContent>
+      </MenubarMenu>
+
+      {/* Window — Multi-window Workspace Dock controls */}
+      <MenubarMenu>
+        <MenubarTrigger className="gap-1.5 font-medium">
+          <AppWindow className="size-3.5 shrink-0" aria-hidden />
+          Window
+          {windows.length > 0 && (
+            <span className="ml-1 rounded-full bg-primary/20 px-1.5 py-0.2 text-[9px] font-bold text-primary">
+              {windows.length}
+            </span>
+          )}
+        </MenubarTrigger>
+        <MenubarContent align="start" className="min-w-60">
+          <MenubarItem
+            onClick={() => openInDock(ROUTES.admin.customers)}
+            className="justify-between cursor-pointer"
+          >
+            <span>New Workspace Window…</span>
+            <span className="text-[10px] text-muted-foreground font-mono">Alt W</span>
+          </MenubarItem>
+          <MenubarItem
+            onClick={() => tileWindows("horizontal")}
+            disabled={windows.length < 2}
+            className="cursor-pointer"
+          >
+            Tile Windows Side-by-Side (50/50)
+          </MenubarItem>
+          <MenubarItem
+            onClick={() => minimizeAll()}
+            disabled={windows.length === 0}
+            className="justify-between cursor-pointer"
+          >
+            <span>Show Dashboard (Minimize All)</span>
+            <span className="text-[10px] text-muted-foreground font-mono">Alt D</span>
+          </MenubarItem>
+          <MenubarItem
+            onClick={() => restoreAll()}
+            disabled={windows.length === 0}
+            className="cursor-pointer"
+          >
+            Restore All Windows
+          </MenubarItem>
+          <MenubarItem
+            onClick={() => closeAll()}
+            disabled={windows.length === 0}
+            className="text-red-600 focus:text-red-600 cursor-pointer"
+          >
+            Close All Windows
+          </MenubarItem>
+          {lastClosedWindow && (
+            <MenubarItem
+              onClick={() => reopenLastClosed()}
+              className="text-primary font-medium cursor-pointer"
+            >
+              Reopen Closed Window ({lastClosedWindow.title})
+            </MenubarItem>
+          )}
+          {windows.length > 0 && (
+            <>
+              <MenubarSeparator />
+              {windows.map((w) => (
+                <MenubarItem
+                  key={w.id}
+                  onClick={() => restoreWindow(w.id)}
+                  className="justify-between text-xs cursor-pointer"
+                >
+                  <span className="truncate max-w-[170px]">{w.title}</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {w.state === "minimized" ? "(min)" : "active"}
+                  </span>
+                </MenubarItem>
+              ))}
+            </>
+          )}
         </MenubarContent>
       </MenubarMenu>
 

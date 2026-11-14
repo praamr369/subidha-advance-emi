@@ -1,7 +1,7 @@
 // frontend/src/app/(auth)/login/page.tsx
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState, Suspense } from "react";
+import { FormEvent, useEffect, useMemo, useState, useRef, Suspense } from "react";
 import Link from "next/link";
 import {
   Eye,
@@ -76,6 +76,14 @@ function LoginContent() {
     email?: string;
     name?: string;
   } | null>(null);
+
+  const mfaInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (mfaRequired) {
+      mfaInputRef.current?.focus();
+    }
+  }, [mfaRequired]);
 
   const nextUrl = useMemo(() => {
     const next = searchParams.get("next");
@@ -201,6 +209,11 @@ function LoginContent() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    if (mfaRequired && mfaCode.trim().length !== 6) {
+      setError("Please enter the complete 6-digit verification code from your phone.");
+      return;
+    }
+
     try {
       setSubmitting(true);
       setError(null);
@@ -237,7 +250,11 @@ function LoginContent() {
       }
 
       const msg = toMessage(err);
-      if (msg === "MFA code is required.") {
+      const isMfa =
+        (err && typeof err === "object" && (err as { mfa_required?: boolean }).mfa_required) ||
+        msg === "MFA code is required." ||
+        msg.toLowerCase().includes("mfa code is required");
+      if (isMfa && !mfaRequired) {
         setMfaRequired(true);
         setError(null);
       } else {
@@ -257,24 +274,76 @@ function LoginContent() {
     >
       <form onSubmit={handleSubmit} className="space-y-5">
         {mfaRequired ? (
-          <div className="space-y-2">
-            <label htmlFor="mfaCode" className="text-sm font-medium text-foreground">
-              Authenticator Code (MFA)
-            </label>
-            <div className="relative">
-              <ShieldCheck className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <input
-                id="mfaCode"
-                name="mfaCode"
-                type="text"
-                autoComplete="one-time-code"
-                value={mfaCode}
-                onChange={(e) => setMfaCode(e.target.value)}
-                placeholder="6-digit code"
-                className="h-12 w-full rounded-xl border border-border bg-card pl-10 pr-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:border-[var(--ring)] focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
-                required
-                disabled={submitting}
-              />
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 space-y-2">
+              <div className="flex items-center gap-2.5">
+                <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
+                  <ShieldCheck className="h-5 w-5" />
+                </span>
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground">
+                    Two-Factor Authentication
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    User: <span className="font-mono font-medium text-foreground">{identifier}</span>
+                  </p>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground leading-relaxed pt-1">
+                Open <strong>Google Authenticator</strong> or your authenticator app on your phone and enter the current 6-digit code.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="mfaCode" className="text-sm font-medium text-foreground">
+                6-Digit Security Code
+              </label>
+              <div className="relative">
+                <ShieldCheck className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  ref={mfaInputRef}
+                  id="mfaCode"
+                  name="mfaCode"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={6}
+                  autoComplete="one-time-code"
+                  autoFocus
+                  value={mfaCode}
+                  onPaste={(e) => {
+                    e.preventDefault();
+                    const text = e.clipboardData.getData("text");
+                    const cleaned = text.replace(/\D/g, "").slice(0, 6);
+                    setMfaCode(cleaned);
+                  }}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, "").slice(0, 6);
+                    setMfaCode(val);
+                  }}
+                  placeholder="000 000"
+                  className="h-14 w-full rounded-xl border border-border bg-card pl-11 pr-3 text-center font-mono text-xl tracking-[0.35em] text-foreground outline-none transition placeholder:tracking-normal placeholder:text-muted-foreground focus-visible:border-[var(--ring)] focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
+                  required
+                  disabled={submitting}
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setMfaRequired(false);
+                  setMfaCode("");
+                  setError(null);
+                }}
+                className="text-xs font-medium text-muted-foreground hover:text-foreground transition underline underline-offset-4"
+              >
+                ← Back to Password
+              </button>
+              <span className="text-[11px] text-muted-foreground">
+                Dynamic • Rotates every 30s
+              </span>
             </div>
           </div>
         ) : (
@@ -367,29 +436,39 @@ function LoginContent() {
 
         <ActionButton
           type="submit"
-          disabled={submitting || googleSubmitting}
+          disabled={submitting || googleSubmitting || (mfaRequired && mfaCode.length < 6)}
           className="public-action-primary h-12 w-full justify-center disabled:opacity-50"
         >
-          {submitting ? t("auth.login.authenticating") : t("auth.login.signIn")}
+          {submitting
+            ? mfaRequired
+              ? "Verifying Code..."
+              : t("auth.login.authenticating")
+            : mfaRequired
+            ? "Verify OTP & Sign In"
+            : t("auth.login.signIn")}
           {!submitting && <ArrowRight className="h-4 w-4 ml-2" />}
         </ActionButton>
 
-        {/* 100% Free Google Sign-In for Customers */}
-        <div className="relative flex items-center justify-center my-3">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-border" />
-          </div>
-          <div className="relative bg-card px-3 text-xs uppercase tracking-wider text-muted-foreground">
-            or customer sign in with
-          </div>
-        </div>
+        {!mfaRequired && (
+          <>
+            {/* 100% Free Google Sign-In for Customers */}
+            <div className="relative flex items-center justify-center my-3">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-border" />
+              </div>
+              <div className="relative bg-card px-3 text-xs uppercase tracking-wider text-muted-foreground">
+                or customer sign in with
+              </div>
+            </div>
 
-        <GoogleSignInButton
-          onSuccess={handleGoogleSuccess}
-          onError={(msg) => setError(msg)}
-          disabled={submitting || googleSubmitting}
-          text="signin_with"
-        />
+            <GoogleSignInButton
+              onSuccess={handleGoogleSuccess}
+              onError={(msg) => setError(msg)}
+              disabled={submitting || googleSubmitting}
+              text="signin_with"
+            />
+          </>
+        )}
 
         <div className="rounded-2xl border border-border bg-card space-y-3 p-4">
           <div className="flex items-start gap-3">

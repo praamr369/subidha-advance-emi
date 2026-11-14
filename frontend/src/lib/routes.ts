@@ -124,6 +124,7 @@ export const ROUTES = {
     auditLogs: "/admin/audit-logs",
     auditEvents: "/admin/audit-logs", // repointed: canonical audit page is /admin/audit-logs
     settings: "/admin/settings",
+    settingsMfa: "/admin/settings/mfa",
     settingsNavigation: "/admin/settings/navigation",
     settingsUsers: "/admin/settings/users",
     settingsRolesPermissions: "/admin/settings/roles-permissions",

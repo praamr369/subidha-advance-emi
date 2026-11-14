@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactElement } from "react";
-import { Bookmark, Command as CommandIcon, CornerDownLeft, History, Search, Star, X } from "lucide-react";
+import { Bookmark, Command as CommandIcon, CornerDownLeft, History, LayoutGrid, Search, Star, X } from "lucide-react";
+import { useAdminWorkspaceDock } from "@/components/layout/AdminWorkspaceDockContext";
 
 import { ADMIN_ROUTE_REGISTRY } from "@/config/admin-route-registry";
 import { getNavigationGroupsForRole, type NavGroup, type NavigationRole } from "@/config/navigation";
@@ -168,6 +169,7 @@ function shouldIgnoreShortcutTarget(target: EventTarget | null) {
 
 export default function CommandPalette({ open, onClose, role, sessionId, currentPathname }: CommandPaletteProps) {
   const { openWorkflow } = useWorkflowLauncher();
+  const { openInDock } = useAdminWorkspaceDock();
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState<string>("ALL");
@@ -440,6 +442,20 @@ export default function CommandPalette({ open, onClose, role, sessionId, current
     return (
       <div key={`${item.kind}:${item.href}:${item.label}`} className="flex items-start gap-2">
         {linkRow}
+        {role === "ADMIN" && item.href?.startsWith("/admin") ? (
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              openInDock(item.href, item.label);
+            }}
+            className="mt-0.5 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border bg-[var(--surface-card-elevated)] text-muted-foreground transition hover:border-primary/50 hover:bg-primary/10 hover:text-primary"
+            title="Open in Workspace Dock (Alt+Click)"
+            aria-label="Open in Workspace Dock"
+          >
+            <LayoutGrid className="h-4 w-4" />
+          </button>
+        ) : null}
         {sessionId ? (
           <button
             type="button"

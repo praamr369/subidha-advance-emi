@@ -2,6 +2,7 @@ from django.urls import path
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from accounts.serializers import CustomTokenSerializer
+from django.core.cache import cache
 from api.v1.throttles.auth_password_reset import AuthLoginThrottle
 from api.v1.views.auth_password_reset import (
     confirm_password_reset_view,
@@ -84,12 +85,84 @@ class CustomTokenView(TokenObtainPairView):
                         mfa_code = request.data.get("mfa_code")
                         if not mfa_code:
                             # Required but not provided
-                            return Response({"mfa_required": True, "detail": "MFA code is required."}, status=status.HTTP_401_UNAUTHORIZED)
+                            return Response(
+                                {
+                                    "mfa_required": True,
+                                    "detail": "MFA code is required.",
+                                    "identifier": user.username,
+                                },
+                                status=status.HTTP_401_UNAUTHORIZED,
+                            )
+
+                        # 1. Per-account brute-force throttle on MFA guesses
+                        mfa_lockout_key = f"mfa_failures:{user.id}"
+                        failed_mfa_count = cache.get(mfa_lockout_key, 0)
+                        if failed_mfa_count >= 5:
+                            security_logger.warning(
+                                "auth.mfa_locked_out",
+                                extra={"user_id": user.id, "ip": ip, "attempts": failed_mfa_count},
+                            )
+                            return Response(
+                                {
+                                    "detail": "Too many failed verification attempts for this account. Please wait 5 minutes before trying again.",
+                                    "mfa_required": True,
+                                    "locked_out": True,
+                                },
+                                status=status.HTTP_429_TOO_MANY_REQUESTS,
+                            )
+
+                        # 2. Strict format sanitization (strip whitespace/dashes, validate 6 digits)
+                        raw_code = str(mfa_code).replace(" ", "").replace("-", "").strip()
+                        if not raw_code.isdigit() or len(raw_code) != 6:
+                            return Response(
+                                {
+                                    "detail": "Verification code must be exactly 6 digits.",
+                                    "mfa_required": True,
+                                },
+                                status=status.HTTP_400_BAD_REQUEST,
+                            )
+                        clean_code = raw_code
+
+                        # 3. Anti-Replay: Verify this specific OTP has not already been used within its window
+                        replay_cache_key = f"totp_used:{user.id}:{clean_code}"
+                        if cache.get(replay_cache_key):
+                            security_logger.warning(
+                                "auth.mfa_replay_blocked",
+                                extra={"user_id": user.id, "ip": ip},
+                            )
+                            return Response(
+                                {
+                                    "detail": "This verification code has already been used. Please wait for the next 30-second code on your phone.",
+                                    "mfa_required": True,
+                                },
+                                status=status.HTTP_401_UNAUTHORIZED,
+                            )
+
+                        # 4. Cryptographic TOTP Verification with +/- 30s clock drift tolerance
                         import pyotp
                         totp = pyotp.TOTP(totp_device.secret_key)
-                        if not totp.verify(mfa_code):
+                        if not totp.verify(clean_code, valid_window=1):
+                            cache.set(mfa_lockout_key, failed_mfa_count + 1, timeout=300)
                             LoginAudit.objects.create(user=user, ip_address=ip, user_agent=ua, status="FAILED")
-                            return Response({"detail": "Invalid MFA code."}, status=status.HTTP_401_UNAUTHORIZED)
+                            security_logger.warning(
+                                "auth.mfa_failed",
+                                extra={"user_id": user.id, "ip": ip, "attempt": failed_mfa_count + 1},
+                            )
+                            return Response(
+                                {
+                                    "detail": "Invalid verification code. Please check Google Authenticator on your phone.",
+                                    "mfa_required": True,
+                                },
+                                status=status.HTTP_401_UNAUTHORIZED,
+                            )
+
+                        # 5. Success: clear failure counter & record code in anti-replay cache
+                        cache.delete(mfa_lockout_key)
+                        cache.set(replay_cache_key, True, timeout=120)
+                        security_logger.info(
+                            "auth.mfa_success",
+                            extra={"user_id": user.id, "ip": ip},
+                        )
                 except TOTPDevice.DoesNotExist:
                     pass
 
@@ -108,6 +181,11 @@ class CustomTokenView(TokenObtainPairView):
 
             data = serializer.validated_data
             data["session_token"] = session_token
+            if user.role == UserRole.ADMIN:
+                has_mfa = bool(hasattr(user, "totp_device") and user.totp_device.is_verified)
+                if isinstance(data.get("user"), dict):
+                    data["user"]["mfa_enabled"] = has_mfa
+                data["mfa_enabled"] = has_mfa
             return Response(data, status=status.HTTP_200_OK)
 
         except Exception as e:

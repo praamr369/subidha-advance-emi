@@ -173,6 +173,16 @@ export async function loginRequest(
   if (payloadBody && typeof payloadBody === "object") {
     const record = payloadBody as Record<string, unknown>;
 
+    if (record.mfa_required === true) {
+      const err = new Error(
+        typeof record.detail === "string" && record.detail.trim()
+          ? record.detail
+          : "MFA code is required."
+      );
+      (err as unknown as Record<string, unknown>).mfa_required = true;
+      throw err;
+    }
+
     if (typeof record.detail === "string" && record.detail.trim()) {
       throw new Error(record.detail);
     }

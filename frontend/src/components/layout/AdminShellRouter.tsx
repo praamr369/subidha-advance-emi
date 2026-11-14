@@ -9,6 +9,7 @@ import DashboardShell from "@/components/layout/DashboardShell";
 import DesktopTopNavProgress from "@/components/layout/DesktopTopNavProgress";
 import { AdminStandardHubSkeleton } from "@/components/feedback/RouteLoadingSkeleton";
 import { applyAdminDesktopScale } from "@/lib/admin-desktop-zoom";
+import { AdminWorkspaceDockProvider } from "@/components/layout/AdminWorkspaceDockContext";
 
 function isPrintDocumentRoute(pathname: string): boolean {
   return /\/print\/?$/.test(pathname) || /\/contract\/print\/?$/.test(pathname);
@@ -43,7 +44,9 @@ export default function AdminShellRouter({ children }: { children: ReactNode }) 
         }
       >
         <DesktopTopNavProgress />
-        <DashboardShell>{children}</DashboardShell>
+        <AdminWorkspaceDockProvider isDockSupported={true}>
+          <DashboardShell>{children}</DashboardShell>
+        </AdminWorkspaceDockProvider>
       </Suspense>
     </RoleGuard>
   );

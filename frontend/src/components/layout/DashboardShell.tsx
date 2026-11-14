@@ -119,6 +119,11 @@ const AdminOfflineControlCenter = dynamic(
   () => import("@/components/admin/offline/AdminOfflineControlCenter"),
   { ssr: false }
 );
+const AdminWorkspaceDock = dynamic(
+  () => import("@/components/layout/AdminWorkspaceDock"),
+  { ssr: false }
+);
+import { useAdminWorkspaceDock } from "@/components/layout/AdminWorkspaceDockContext";
 import { openAdminHelp } from "@/components/admin/help/AdminHelpDrawer";
 
 const DashboardShellContext = createContext(false);
@@ -241,6 +246,23 @@ function parseSessionSnapshot(snapshot: string): ReturnType<typeof getStoredSess
 
 function readExpandedGroups(): Record<string, boolean> {
   return {};
+}
+
+function subscribeWindowFrame() {
+  return () => undefined;
+}
+
+function getIsFrame() {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.self !== window.top;
+  } catch {
+    return true;
+  }
+}
+
+function getIsFrameServer() {
+  return false;
 }
 
 function readWorkspaceWidthPresetSnapshot(): string {
@@ -1349,6 +1371,43 @@ function SidebarContent({
   );
 }
 
+function AdminDockTopbarButton() {
+  const { windows, openInDock, restoreAll, minimizeAll } = useAdminWorkspaceDock();
+  const count = windows.length;
+  const activeCount = windows.filter((w) => w.state !== "minimized").length;
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        if (count === 0) {
+          openInDock(ROUTES.admin.customers, "Customers");
+        } else if (activeCount > 0) {
+          minimizeAll();
+        } else {
+          restoreAll();
+        }
+      }}
+      className={cn(
+        "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold transition cursor-pointer",
+        count > 0
+          ? "border-primary/60 bg-primary/15 text-primary hover:bg-primary/25 shadow-sm"
+          : "border-[var(--topbar-border)] bg-[var(--topbar-control)] text-foreground hover:bg-muted/50"
+      )}
+      aria-label="Workspace Dock (Alt+W)"
+      title="Admin Workspace Dock (Alt+W) — Multi-window multitasking"
+    >
+      <LayoutGrid className="h-3.5 w-3.5 text-primary shrink-0" />
+      <span className="hidden md:inline">Workspace</span>
+      {count > 0 && (
+        <span className="rounded-full bg-primary/20 px-1.5 py-0.2 text-[10px] font-bold text-primary">
+          {count}
+        </span>
+      )}
+    </button>
+  );
+}
+
 function Topbar({
   title,
   pathname,
@@ -1509,6 +1568,7 @@ function Topbar({
               <span className="hidden md:inline">Help</span>
             </button>
 
+            <AdminDockTopbarButton />
             <AdminOfflineControlCenter />
             <ThemeToggle variant="dashboard" />
             <NotificationBellDropdown role={role} />
@@ -1682,8 +1742,51 @@ export default function DashboardShell({ children }: DashboardShellProps) {
     setMobileMenuOpen(true);
   }, []);
 
+  const isInFrame = useSyncExternalStore(subscribeWindowFrame, getIsFrame, getIsFrameServer);
+  const searchParams = useSearchParams();
+  const isDockedParam =
+    searchParams?.get("workspace_docked") === "1" || searchParams?.get("docked") === "1";
+  const isWorkspaceDocked = isDockedParam || isInFrame;
+  const { openInDock } = useAdminWorkspaceDock();
+
+  // Global Alt+Click Interceptor: Admin can Alt+Click any link to open directly in dock
+  useEffect(() => {
+    if (nested || role !== "ADMIN" || isWorkspaceDocked) return;
+
+    function handleGlobalLinkClick(e: MouseEvent) {
+      if (!e.altKey) return;
+      const target = e.target as HTMLElement | null;
+      const anchor = target?.closest("a") as HTMLAnchorElement | null;
+      if (!anchor || !anchor.href) return;
+
+      try {
+        const url = new URL(anchor.href, window.location.origin);
+        if (url.origin === window.location.origin && url.pathname.startsWith("/admin")) {
+          e.preventDefault();
+          e.stopPropagation();
+          const route = url.pathname + url.search;
+          const text = anchor.textContent?.trim() || undefined;
+          openInDock(route, text);
+        }
+      } catch {
+        // safe fallback
+      }
+    }
+
+    window.addEventListener("click", handleGlobalLinkClick, { capture: true });
+    return () => window.removeEventListener("click", handleGlobalLinkClick, { capture: true });
+  }, [nested, role, isWorkspaceDocked, openInDock]);
+
   if (nested) {
     return <>{children}</>;
+  }
+
+  if (isWorkspaceDocked) {
+    return (
+      <div className="min-h-screen bg-background text-foreground antialiased p-3 sm:p-4 pb-12 overflow-x-hidden">
+        {children}
+      </div>
+    );
   }
 
   return (
@@ -1691,7 +1794,13 @@ export default function DashboardShell({ children }: DashboardShellProps) {
       <WorkflowProvider role={role}>
         <div className="relative overflow-x-clip" style={workspaceShellStyle}>
           <PortalShell
-            mainClassName={role === "PARTNER" || role === "CUSTOMER" ? "pb-16 md:pb-0" : undefined}
+            mainClassName={
+              role === "ADMIN"
+                ? "pb-14 md:pb-12"
+                : role === "PARTNER" || role === "CUSTOMER"
+                ? "pb-16 md:pb-0"
+                : undefined
+            }
             sidebar={
               <RoleSidebar collapsed={sidebarCollapsed}>
                 <SidebarContent
@@ -1789,6 +1898,7 @@ export default function DashboardShell({ children }: DashboardShellProps) {
               <WhatsAppDirectSenderModal />
               <AdminHelpDrawer />
               <EodReconciliationDrawer />
+              <AdminWorkspaceDock />
             </>
           ) : null}
         </div>
