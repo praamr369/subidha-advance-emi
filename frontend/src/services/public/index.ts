@@ -252,6 +252,10 @@ export type PublicBusinessProfile = {
   business_hours?: string;
   public_logo_url?: string;
   updated_at?: string;
+  upi_id?: string;
+  merchant_name?: string;
+  is_gateway_enabled?: boolean;
+  is_autopay_enabled?: boolean;
 };
 
 export type PublicPolicyPage = {

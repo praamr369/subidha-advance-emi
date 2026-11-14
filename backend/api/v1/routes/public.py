@@ -21,6 +21,7 @@ from api.v1.views.public_policy_site import (
     PublicPolicyPageListView,
 )
 from api.v1.views.public_site import PublicAnnouncementsView, PublicBusinessProfileView
+from api.v1.views.public_online_payments import PhonePeWebhookView
 from subscriptions.models import (
     AuditLog,
     Batch,
@@ -1006,6 +1007,7 @@ urlpatterns = [
     path("mobile-handover/sessions/", create_handover_session_view, name="public-handover-session-create"),
     path("mobile-handover/sessions/<str:session_id>/", get_handover_session_view, name="public-handover-session-detail"),
     path("mobile-handover/sessions/<str:session_id>/submit/", submit_handover_session_view, name="public-handover-session-submit"),
+    path("payments/phonepe/webhook/", PhonePeWebhookView.as_view(), name="public-phonepe-webhook"),
     path("health/", PublicLivenessView.as_view(), name="public-health"),
     path("readiness/", PublicReadinessView.as_view(), name="public-readiness"),
 ]

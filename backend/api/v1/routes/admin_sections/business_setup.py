@@ -1,6 +1,10 @@
 from django.urls import include, path
 from api.v1.views.admin_business_setup import AdminBusinessLogoUploadView
 from api.v1.views.admin_business_setup import AdminBusinessProfileView
+from api.v1.views.admin_payment_gateway import (
+    AdminPaymentGatewaySettingsView,
+    AdminPaymentGatewayTestView,
+)
 from api.v1.views.admin_business_setup import AdminEmailSmtpSettingsView
 from api.v1.views.admin_business_setup import AdminEmailSmtpTestView
 from api.v1.views.admin_business_setup import AdminLocalSandboxResetView
@@ -60,6 +64,8 @@ urlpatterns = [
     path("business-setup/checklist/", BusinessSetupChecklistView.as_view()),
     path("settings/email-smtp/", AdminEmailSmtpSettingsView.as_view()),
     path("settings/email-smtp/test/", AdminEmailSmtpTestView.as_view()),
+    path("business-setup/payment-gateway/", AdminPaymentGatewaySettingsView.as_view()),
+    path("business-setup/payment-gateway/test/", AdminPaymentGatewayTestView.as_view()),
     path("public-site/profile/", AdminPublicBusinessProfileView.as_view()),
     path("public-site/announcements/", AdminPublicAnnouncementListCreateView.as_view()),
     path("public-site/announcements/upload/", AdminPublicBannerImageUploadView.as_view()),

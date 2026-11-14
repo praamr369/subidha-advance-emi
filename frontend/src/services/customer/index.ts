@@ -1618,3 +1618,55 @@ export async function downloadCustomerLuckyDrawCertificate(
     throw new Error("Failed to download certificate");
   }
 }
+
+export type ReportDirectUpiPayload = {
+  amount: number | string;
+  utr_number: string;
+  source_type?: string;
+  source_id?: number | string;
+  payer_upi_id?: string;
+  notes?: string;
+};
+
+export type ReportDirectUpiResponse = {
+  success: boolean;
+  transaction_id: string;
+  utr_number: string;
+  status: string;
+  message: string;
+};
+
+export async function reportCustomerDirectUpiPayment(
+  payload: ReportDirectUpiPayload
+): Promise<ReportDirectUpiResponse> {
+  return apiFetch<ReportDirectUpiResponse>("/customer/payments/report-direct-upi/", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export type InitiateOnlinePaymentPayload = {
+  amount: number | string;
+  source_type?: string;
+  source_id?: number | string;
+  payment_type?: "STANDARD" | "AUTOPAY_MANDATE";
+  redirect_url?: string;
+};
+
+export type InitiateOnlinePaymentResponse = {
+  success: boolean;
+  checkout_url?: string;
+  merchant_transaction_id?: string;
+  provider_reference_id?: string;
+  error?: string;
+};
+
+export async function initiateCustomerOnlinePayment(
+  payload: InitiateOnlinePaymentPayload
+): Promise<InitiateOnlinePaymentResponse> {
+  return apiFetch<InitiateOnlinePaymentResponse>("/customer/payments/online/initiate/", {
+    method: "POST",
+    body: payload,
+  });
+}
+

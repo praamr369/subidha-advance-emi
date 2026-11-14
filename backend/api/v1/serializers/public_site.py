@@ -89,6 +89,11 @@ class PublicBusinessProfileSerializer(BusinessSetupModelSerializer):
 
 
 class PublicBusinessProfilePublicSerializer(serializers.ModelSerializer):
+    upi_id = serializers.SerializerMethodField()
+    merchant_name = serializers.SerializerMethodField()
+    is_gateway_enabled = serializers.SerializerMethodField()
+    is_autopay_enabled = serializers.SerializerMethodField()
+
     class Meta:
         model = PublicBusinessProfile
         fields = [
@@ -108,8 +113,32 @@ class PublicBusinessProfilePublicSerializer(serializers.ModelSerializer):
             "business_hours",
             "public_logo_url",
             "updated_at",
+            "upi_id",
+            "merchant_name",
+            "is_gateway_enabled",
+            "is_autopay_enabled",
         ]
         read_only_fields = fields
+
+    def get_upi_id(self, instance):
+        from business_setup.models.core import BusinessProfile
+        bp = BusinessProfile.get_current()
+        return (bp.upi_id if bp and bp.upi_id else "") or "subidha@upi"
+
+    def get_merchant_name(self, instance):
+        from business_setup.models.core import BusinessProfile
+        bp = BusinessProfile.get_current()
+        return (bp.trade_name or bp.legal_name) if bp else (instance.display_name or "Subidha Core")
+
+    def get_is_gateway_enabled(self, instance):
+        from business_setup.models.payment_gateway import PaymentGatewaySettings
+        pg = PaymentGatewaySettings.objects.filter(is_active=True).first()
+        return bool(pg and pg.is_enabled)
+
+    def get_is_autopay_enabled(self, instance):
+        from business_setup.models.payment_gateway import PaymentGatewaySettings
+        pg = PaymentGatewaySettings.objects.filter(is_active=True).first()
+        return bool(pg and pg.is_enabled and pg.autopay_enabled)
 
 
 class PublicAnnouncementBannerSerializer(serializers.ModelSerializer):

@@ -1,8 +1,9 @@
 "use client";
 import { formatRupee } from "@/lib/utils/currency";
-import { AlertCircle, CheckCircle, Clock } from "lucide-react";
+import { AlertCircle, CheckCircle, Clock, Smartphone } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import UpiPayDialog from "@/components/payments/UpiPayDialog";
 import {
   ERPAuditNote,
   ERPEmptyState,
@@ -62,11 +63,12 @@ function statusFilterClass(active: boolean, color: string) {
   }`;
 }
 
-function EmiMobileCard({ emi }: { emi: EmiRecord }) {
+function EmiMobileCard({ emi, onPay }: { emi: EmiRecord; onPay: (emi: EmiRecord) => void }) {
   const status = emiStatus(emi);
   const isOverdue = status === "OVERDUE";
   const isPaid = status === "PAID";
   const isWaived = status === "WAIVED";
+  const canPay = isOverdue || status === "PENDING";
 
   return (
     <div
@@ -132,12 +134,24 @@ function EmiMobileCard({ emi }: { emi: EmiRecord }) {
           Waived {formatRupee(emi.waived_amount || 0)}
         </div>
       ) : null}
+
+      {canPay ? (
+        <button
+          type="button"
+          onClick={() => onPay(emi)}
+          className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 active:scale-[0.99]"
+        >
+          <Smartphone className="h-3.5 w-3.5" />
+          Pay via UPI / Autopay
+        </button>
+      ) : null}
     </div>
   );
 }
 
 export default function CustomerEmisPage() {
   const [allEmis, setAllEmis] = useState<EmiRecord[]>([]);
+  const [selectedPayEmi, setSelectedPayEmi] = useState<EmiRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -249,6 +263,27 @@ export default function CustomerEmisPage() {
       title: "Status",
       render: (row) => <ERPStatusBadge status={emiStatus(row)} />,
     },
+    {
+      key: "actions",
+      title: "Payment",
+      align: "center",
+      render: (row) => {
+        const s = emiStatus(row);
+        if (s === "PENDING" || s === "OVERDUE") {
+          return (
+            <button
+              type="button"
+              onClick={() => setSelectedPayEmi(row)}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 transition"
+            >
+              <Smartphone className="h-3.5 w-3.5" />
+              Pay via UPI
+            </button>
+          );
+        }
+        return <span className="text-xs text-muted-foreground">—</span>;
+      },
+    },
   ];
 
   const statTiles = [
@@ -354,7 +389,7 @@ export default function CustomerEmisPage() {
             {/* Mobile card view */}
             <div className="grid gap-3 md:hidden">
               {filteredEmis.map((emi, i) => (
-                <EmiMobileCard key={`${emi.id ?? i}`} emi={emi} />
+                <EmiMobileCard key={`${emi.id ?? i}`} emi={emi} onPay={(e) => setSelectedPayEmi(e)} />
               ))}
             </div>
 
@@ -373,6 +408,23 @@ export default function CustomerEmisPage() {
               </DataTableShell>
             </ERPSectionShell>
           </>
+        ) : null}
+
+        {selectedPayEmi ? (
+          <UpiPayDialog
+            isOpen={Boolean(selectedPayEmi)}
+            onClose={() => setSelectedPayEmi(null)}
+            amount={selectedPayEmi.outstanding_amount || selectedPayEmi.amount || 0}
+            sequenceNo={selectedPayEmi.sequence_no ?? selectedPayEmi.month_no}
+            subscriptionNumber={selectedPayEmi.subscription_number}
+            productName={selectedPayEmi.product_name}
+            dueDate={formatDate(selectedPayEmi.due_date)}
+            sourceType="EMI"
+            sourceId={selectedPayEmi.id}
+            onPaymentReported={() => {
+              void loadData();
+            }}
+          />
         ) : null}
 
         <ERPAuditNote title="EMI Status Guide">

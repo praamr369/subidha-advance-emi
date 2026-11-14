@@ -10,9 +10,11 @@ import {
   ArrowRight,
   Package,
   RefreshCw,
+  Smartphone,
   Sparkles,
   Tag,
 } from "lucide-react";
+import UpiPayDialog from "@/components/payments/UpiPayDialog";
 import { listPublicProducts, type PublicProduct } from "@/services/public";
 import { resolveApiMediaUrl } from "@/lib/media";
 
@@ -115,6 +117,15 @@ function QuickLinkCard({ title, description, href }: QuickLink) {
 
 export default function CustomerDashboardPage() {
   const [productCategoryFilter, setProductCategoryFilter] = useState("");
+  const [selectedDuePayItem, setSelectedDuePayItem] = useState<{
+    subscription_number?: string | null;
+    pending_amount?: string | number | null;
+    amount?: string | number | null;
+    due_date?: string | null;
+    product_name?: string | null;
+    emi_id?: number | string | null;
+    subscription_id?: number | string | null;
+  } | null>(null);
   const [windowPreset, setWindowPreset] =
     useState<DashboardWindowPreset>("DEFAULT");
   const [startDate, setStartDate] = useState("");
@@ -416,7 +427,8 @@ export default function CustomerDashboardPage() {
   ];
 
   return (
-    <SelfServicePageShell
+    <>
+      <SelfServicePageShell
       glance={
         <>
           <ERPPageHeader
@@ -715,6 +727,22 @@ export default function CustomerDashboardPage() {
                   <div className="mt-1 text-xs text-slate-500">
                     {summary.next_due_subscription_number || "No contract pending"}
                   </div>
+                  {summary.next_due_amount && Number(summary.next_due_amount) > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSelectedDuePayItem({
+                          subscription_number: summary.next_due_subscription_number || undefined,
+                          pending_amount: summary.next_due_amount,
+                          due_date: summary.next_due_date || undefined,
+                        })
+                      }
+                      className="mt-2.5 flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 active:scale-[0.99]"
+                    >
+                      <Smartphone className="h-3.5 w-3.5" />
+                      <span>Pay Now</span>
+                    </button>
+                  ) : null}
                 </div>
                 <div className="rounded-[1.3rem] border border-white/80 bg-white/80 p-4">
                   <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
@@ -839,6 +867,28 @@ export default function CustomerDashboardPage() {
                         {item.is_overdue && item.overdue_days
                           ? ` · ${item.overdue_days} day(s) overdue`
                           : ""}
+                      </div>
+                      <div className="mt-3 flex items-center justify-between gap-2 border-t border-slate-100 pt-2.5">
+                        <div className="text-xs font-semibold text-foreground">
+                          Pending: {money(item.pending_amount)}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSelectedDuePayItem({
+                              subscription_number: item.subscription_number,
+                              product_name: item.product_name,
+                              pending_amount: item.pending_amount,
+                              due_date: item.due_date,
+                              emi_id: item.emi_id,
+                              subscription_id: item.subscription_id,
+                            })
+                          }
+                          className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 active:scale-[0.99]"
+                        >
+                          <Smartphone className="h-3.5 w-3.5" />
+                          <span>Pay via UPI / Autopay</span>
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -1092,5 +1142,22 @@ export default function CustomerDashboardPage() {
         ) : null
       }
     />
+    {selectedDuePayItem ? (
+      <UpiPayDialog
+        isOpen={Boolean(selectedDuePayItem)}
+        onClose={() => setSelectedDuePayItem(null)}
+        amount={selectedDuePayItem.pending_amount || selectedDuePayItem.amount || 0}
+        subscriptionNumber={selectedDuePayItem.subscription_number || undefined}
+        productName={selectedDuePayItem.product_name || undefined}
+        dueDate={selectedDuePayItem.due_date ? formatDate(selectedDuePayItem.due_date) : undefined}
+        sourceType="EMI"
+        sourceId={selectedDuePayItem.emi_id || undefined}
+        onPaymentReported={() => {
+          void canonicalQuery.refetch();
+          void overdueQuery.refetch();
+        }}
+      />
+    ) : null}
+  </>
   );
 }

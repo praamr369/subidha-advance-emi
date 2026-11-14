@@ -9,6 +9,8 @@ import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import { getCustomerPaymentSchedule } from "@/services/phase4-finance";
 import Link from "next/link";
+import { Smartphone } from "lucide-react";
+import UpiPayDialog from "@/components/payments/UpiPayDialog";
 
 type ScheduleRow = {
   emi_id?: number;
@@ -40,6 +42,7 @@ export default function CustomerPaymentSchedulePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<ScheduleRow[]>([]);
+  const [selectedSchedulePayRow, setSelectedSchedulePayRow] = useState<ScheduleRow | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -89,7 +92,13 @@ export default function CustomerPaymentSchedulePage() {
       {!loading && !error && overdue.length > 0 ? (
         <CPageSection title={`⚠️ Overdue (${overdue.length})`}>
           <div className="space-y-2">
-            {overdue.map((row) => <ScheduleCard key={row.schedule_id || row.emi_id} row={row} />)}
+            {overdue.map((row) => (
+              <ScheduleCard
+                key={row.schedule_id || row.emi_id}
+                row={row}
+                onPay={setSelectedSchedulePayRow}
+              />
+            ))}
           </div>
         </CPageSection>
       ) : null}
@@ -97,7 +106,13 @@ export default function CustomerPaymentSchedulePage() {
       {!loading && !error && pending.length > 0 ? (
         <CPageSection title={`Upcoming (${pending.length})`}>
           <div className="space-y-2">
-            {pending.map((row) => <ScheduleCard key={row.schedule_id || row.emi_id} row={row} />)}
+            {pending.map((row) => (
+              <ScheduleCard
+                key={row.schedule_id || row.emi_id}
+                row={row}
+                onPay={setSelectedSchedulePayRow}
+              />
+            ))}
           </div>
         </CPageSection>
       ) : null}
@@ -105,15 +120,40 @@ export default function CustomerPaymentSchedulePage() {
       {!loading && !error && paid.length > 0 ? (
         <CPageSection title={`Paid (${paid.length})`}>
           <div className="space-y-2">
-            {paid.map((row) => <ScheduleCard key={row.schedule_id || row.emi_id} row={row} />)}
+            {paid.map((row) => (
+              <ScheduleCard key={row.schedule_id || row.emi_id} row={row} />
+            ))}
           </div>
         </CPageSection>
+      ) : null}
+
+      {selectedSchedulePayRow ? (
+        <UpiPayDialog
+          isOpen={Boolean(selectedSchedulePayRow)}
+          onClose={() => setSelectedSchedulePayRow(null)}
+          amount={selectedSchedulePayRow.outstanding_amount || selectedSchedulePayRow.amount || 0}
+          sequenceNo={selectedSchedulePayRow.month_no}
+          subscriptionNumber={selectedSchedulePayRow.subscription_number || undefined}
+          productName={selectedSchedulePayRow.product_name}
+          dueDate={selectedSchedulePayRow.due_date}
+          sourceType="EMI"
+          sourceId={selectedSchedulePayRow.emi_id}
+          onPaymentReported={() => {
+            void load();
+          }}
+        />
       ) : null}
     </CustomerPageShell>
   );
 }
 
-function ScheduleCard({ row }: { row: ScheduleRow }) {
+function ScheduleCard({
+  row,
+  onPay,
+}: {
+  row: ScheduleRow;
+  onPay?: (r: ScheduleRow) => void;
+}) {
   const chipCls = statusChip(row.status, row.is_overdue);
   return (
     <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
@@ -148,6 +188,19 @@ function ScheduleCard({ row }: { row: ScheduleRow }) {
         <div className="mt-2 rounded-xl bg-amber-50 dark:bg-amber-950/30 px-3 py-1.5 text-xs font-medium text-amber-700 dark:text-amber-400">
           Outstanding: {formatRupee(row.outstanding_amount)}
         </div>
+      ) : null}
+      {Number(row.outstanding_amount ?? 0) > 0 &&
+      (row.status || "").toUpperCase() !== "PAID" &&
+      (row.status || "").toUpperCase() !== "WAIVED" &&
+      onPay ? (
+        <button
+          type="button"
+          onClick={() => onPay(row)}
+          className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 active:scale-[0.99]"
+        >
+          <Smartphone className="h-3.5 w-3.5" />
+          <span>Pay via UPI / Autopay</span>
+        </button>
       ) : null}
       {row.receipt_pdf_url || row.deposit_pdf_url ? (
         <button

@@ -5,7 +5,7 @@ import { downloadAuthenticatedFile } from "@/lib/export/auth-download";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { RotateCcw, CheckCircle2, X, ArrowRight } from "lucide-react";
+import { RotateCcw, CheckCircle2, X, ArrowRight, Smartphone } from "lucide-react";
 
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
@@ -16,6 +16,7 @@ import ERPStatusBadge from "@/components/erp/ERPStatusBadge";
 import { getCustomerDirectSale, type CustomerDirectSaleDetail } from "@/services/customer";
 import { createCustomerSupportTicket } from "@/services/support";
 import CustomerProductLink from "@/components/customers/CustomerProductInspectModal";
+import UpiPayDialog from "@/components/payments/UpiPayDialog";
 
 
 function stringify(value: unknown): string {
@@ -41,6 +42,7 @@ export default function CustomerDirectSaleDetailPage() {
   const [submittingReturn, setSubmittingReturn] = useState(false);
   const [returnSuccessTicket, setReturnSuccessTicket] = useState<{ id: number; ticket_no: string } | null>(null);
   const [returnError, setReturnError] = useState<string | null>(null);
+  const [showPayDialog, setShowPayDialog] = useState(false);
 
   const toggleLine = (idx: number) => {
     setSelectedLines((prev) => ({ ...prev, [idx]: !prev[idx] }));
@@ -257,7 +259,23 @@ export default function CustomerDirectSaleDetailPage() {
                   </tr>
                   <tr className="bg-muted/30">
                     <td className="px-3 py-2 text-muted-foreground">Due</td>
-                    <td className="px-3 py-2 text-right font-medium">{formatRupee(row.outstanding_amount)}</td>
+                    <td className="px-3 py-2 text-right font-medium">
+                      <div className="flex items-center justify-end gap-2.5">
+                        <span className={`font-semibold ${Number(row.outstanding_amount || 0) > 0 ? "text-amber-600" : ""}`}>
+                          {formatRupee(row.outstanding_amount)}
+                        </span>
+                        {Number(row.outstanding_amount || 0) > 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => setShowPayDialog(true)}
+                            className="flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 active:scale-[0.99]"
+                          >
+                            <Smartphone className="h-3.5 w-3.5" />
+                            <span>Pay Due</span>
+                          </button>
+                        ) : null}
+                      </div>
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -507,6 +525,21 @@ export default function CustomerDirectSaleDetailPage() {
             </form>
           </div>
         </div>
+      ) : null}
+
+      {showPayDialog && row ? (
+        <UpiPayDialog
+          isOpen={showPayDialog}
+          onClose={() => setShowPayDialog(false)}
+          amount={row.outstanding_amount || 0}
+          subscriptionNumber={row.invoice_number || `SALE-${row.id}`}
+          productName={`Direct Sale #${row.invoice_number || row.id}`}
+          sourceType="DIRECT_SALE"
+          sourceId={row.id}
+          onPaymentReported={() => {
+            void load();
+          }}
+        />
       ) : null}
     </ERPPageShell>
   );

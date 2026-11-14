@@ -2123,3 +2123,10 @@ class AdvanceForfeiture(TimeStampedModel):
     def __str__(self):
         return f"Forfeiture CA#{self.advance_id} [{self.status}] ₹{self.forfeited_amount}"
 
+
+from .models_online_gateway import (  # noqa: E402
+    OnlineGatewayPaymentType,
+    OnlineGatewayStatus,
+    OnlineGatewayTransaction,
+)
+

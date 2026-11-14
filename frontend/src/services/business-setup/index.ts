@@ -142,6 +142,49 @@ export async function listRestoreJobs(): Promise<{ jobs: Array<Record<string, un
 
 export async function getServerDate(): Promise<{ server_date: string; server_datetime: string }> { return apiFetch<{ server_date: string; server_datetime: string }>("/admin/server-date/"); }
 
+export type PaymentGatewaySettings = {
+  id?: number;
+  merchant_id: string;
+  has_salt_key: boolean;
+  salt_index: number;
+  environment: "UAT" | "PROD";
+  is_enabled: boolean;
+  autopay_enabled: boolean;
+  is_active: boolean;
+  last_test_at?: string | null;
+  last_test_success?: boolean | null;
+  last_test_message?: string;
+  updated_at?: string;
+};
+
+export type PaymentGatewayUpdatePayload = {
+  merchant_id?: string;
+  salt_key?: string;
+  salt_index?: number;
+  environment?: "UAT" | "PROD";
+  is_enabled?: boolean;
+  autopay_enabled?: boolean;
+};
+
+export async function getPaymentGatewaySettings(): Promise<PaymentGatewaySettings> {
+  const res = await apiFetch<{ settings: PaymentGatewaySettings }>("/admin/business-setup/payment-gateway/");
+  return res.settings;
+}
+
+export async function savePaymentGatewaySettings(payload: PaymentGatewayUpdatePayload): Promise<PaymentGatewaySettings> {
+  const res = await apiFetch<{ settings: PaymentGatewaySettings; message: string }>("/admin/business-setup/payment-gateway/", {
+    method: "POST",
+    body: payload,
+  });
+  return res.settings;
+}
+
+export async function testPaymentGatewayConnection(): Promise<{ success: boolean; message: string }> {
+  return apiFetch<{ success: boolean; message: string }>("/admin/business-setup/payment-gateway/test/", {
+    method: "POST",
+  });
+}
+
 export type PolicyGovernanceSeedResult = { status: string; seed_result?: Record<string, unknown>; public_published?: number; internal_accepted?: number; skipped?: number; errors?: string[]; safety_contract?: string };
 export async function previewSeedPolicyGovernance(): Promise<Record<string, unknown>> { return apiFetch<Record<string, unknown>>("/admin/setup/seed-policy-governance/"); }
 export async function seedAndPublishPolicyGovernance(): Promise<PolicyGovernanceSeedResult> { return apiFetch<PolicyGovernanceSeedResult>("/admin/setup/seed-policy-governance/", { method: "POST" }); }

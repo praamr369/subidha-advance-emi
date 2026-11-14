@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import QRCode from "react-qr-code";
 
 import BusinessSetupLinks from "@/components/admin/business-setup/BusinessSetupLinks";
+import PaymentGatewayCard from "@/components/admin/business-setup/PaymentGatewayCard";
 import ErrorState from "@/components/feedback/ErrorState";
 import LoadingBlock from "@/components/feedback/LoadingBlock";
 import FormActions from "@/components/ui/FormActions";
@@ -672,6 +673,10 @@ export default function UnifiedBusinessProfilePage() {
                 <InputField label="UPI ID" name="upi_id" value={form.upi_id as string | undefined} onChange={handleChange} disabled={loading || saving} placeholder="E.g., subidha@upi or 9876543210@ybl" hint="Used for QR code on receipts. Most customers pay via UPI." />
               </div>
             </FormSection>
+          </section>
+
+          <section className="grid gap-5">
+            <PaymentGatewayCard />
           </section>
 
           <section className="grid gap-5 lg:grid-cols-2">

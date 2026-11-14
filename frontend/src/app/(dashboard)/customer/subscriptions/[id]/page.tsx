@@ -1,7 +1,7 @@
 "use client";
 
 import { formatRupee } from "@/lib/utils/currency";
-import { RefreshCw, Camera, ExternalLink, FileText, Loader2 } from "lucide-react";
+import { RefreshCw, Camera, ExternalLink, FileText, Loader2, Smartphone } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
@@ -9,6 +9,7 @@ import Link from "next/link";
 import CustomerProductLink from "@/components/customers/CustomerProductInspectModal";
 import { customerRentContractPdfUrl, customerLeaseContractPdfUrl } from "@/services/customer-portal";
 import { openAuthenticatedFile } from "@/lib/export/auth-download";
+import UpiPayDialog from "@/components/payments/UpiPayDialog";
 
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
@@ -121,6 +122,7 @@ export default function CustomerSubscriptionDetailPage() {
   const loadPage = useCallback(async () => { await query.refetch(); }, [query]);
 
   const [openingPdf, setOpeningPdf] = useState(false);
+  const [selectedPayEmi, setSelectedPayEmi] = useState<EmiRow | null>(null);
 
   const handleOpenContractPdf = useCallback(async () => {
     if (!subscription) return;
@@ -739,6 +741,19 @@ export default function CustomerSubscriptionDetailPage() {
                           <div className={`font-semibold mt-0.5 ${row.outstanding_amount > 0 ? "text-amber-600" : "text-foreground"}`}>{formatRupee(row.outstanding_amount)}</div>
                         </div>
                       </div>
+
+                      {row.outstanding_amount > 0 &&
+                      (row.status.toUpperCase() === "PENDING" ||
+                        row.status.toUpperCase() === "OVERDUE") ? (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedPayEmi(row)}
+                          className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 active:scale-[0.99]"
+                        >
+                          <Smartphone className="h-3.5 w-3.5" />
+                          Pay via UPI / Autopay
+                        </button>
+                      ) : null}
                     </CPageCard>
                   );
                 })}
@@ -830,6 +845,23 @@ export default function CustomerSubscriptionDetailPage() {
               </div>
             </CPageCard>
           </CPageSection>
+
+          {selectedPayEmi && subscription ? (
+            <UpiPayDialog
+              isOpen={Boolean(selectedPayEmi)}
+              onClose={() => setSelectedPayEmi(null)}
+              amount={selectedPayEmi.outstanding_amount || selectedPayEmi.amount}
+              sequenceNo={selectedPayEmi.month_no}
+              subscriptionNumber={subscription.subscription_number}
+              productName={subscription.product_name}
+              dueDate={formatDate(selectedPayEmi.due_date)}
+              sourceType="EMI"
+              sourceId={selectedPayEmi.id}
+              onPaymentReported={() => {
+                void loadPage();
+              }}
+            />
+          ) : null}
         </>
       ) : null}
     </CustomerPageShell>

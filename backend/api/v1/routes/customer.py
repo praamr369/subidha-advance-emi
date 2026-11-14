@@ -5,6 +5,10 @@ from api.v1.views.catalog import (
     CustomerCatalogFacetsView,
     CustomerCatalogListView,
 )
+from api.v1.views.customer_online_payments import (
+    CustomerOnlinePaymentInitiateView,
+    CustomerReportDirectUpiView,
+)
 from api.v1.views.customer import (
     CustomerDashboard,
     CustomerDeliveryDetailView,
@@ -107,6 +111,8 @@ urlpatterns = [
     path("deliveries/<int:pk>/pdf/", CustomerDeliveryPdfView.as_view()),
     path("payments/", CustomerPaymentListView.as_view()),
     path("payments/<int:pk>/", CustomerPaymentDetailView.as_view()),
+    path("payments/report-direct-upi/", CustomerReportDirectUpiView.as_view(), name="customer-report-direct-upi"),
+    path("payments/online/initiate/", CustomerOnlinePaymentInitiateView.as_view(), name="customer-online-payment-initiate"),
     path("direct-sales/", CustomerDirectSaleListView.as_view()),
     path("direct-sales/summary/", CustomerDirectSaleSummaryView.as_view()),
     path("direct-sales/<int:pk>/", CustomerDirectSaleDetailView.as_view()),
