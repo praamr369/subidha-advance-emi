@@ -13,7 +13,7 @@ from .services import suggestion_service
 class SmartPincodeLookupView(APIView):
     """GET /api/v1/admin/smart/pincode/<pincode>/ -> location options."""
 
-    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, pincode: str):
         return Response(suggestion_service.lookup_pincode(pincode))

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
+import { usePincodeAutofill } from "@/hooks/usePincodeAutofill";
 import { accountingErrorMessage } from "@/components/accounting/shared";
 import ERPDataToolbar from "@/components/erp/ERPDataToolbar";
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
@@ -41,6 +42,12 @@ export default function AdminVendorQuotesPage() {
   const [city, setCity] = useState("");
   const [district, setDistrict] = useState("");
   const [state, setState] = useState("");
+
+  usePincodeAutofill(pincode, (option) => {
+    if (option.city) setCity(option.city);
+    if (option.district) setDistrict(option.district);
+    if (option.state) setState(option.state);
+  });
   const [sendToVendors, setSendToVendors] = useState(true);
 
   const [submitting, setSubmitting] = useState(false);

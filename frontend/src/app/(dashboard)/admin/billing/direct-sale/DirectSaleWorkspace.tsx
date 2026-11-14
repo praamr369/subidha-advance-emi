@@ -59,6 +59,7 @@ import { ApiError } from "@/lib/api";
 import {
   invalidateAfterDirectSaleCreate,
 } from "@/lib/operational-query-invalidation";
+import { usePincodeAutofill } from "@/hooks/usePincodeAutofill";
 import {
   directSalesKeys,
   financeAccountKeys,
@@ -418,6 +419,15 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
   const lineSearchTimers = useRef<Record<string, number>>({});
   const customerSearchTimer = useRef<number | null>(null);
   const createAttemptKey = useRef<string | null>(null);
+
+  usePincodeAutofill(form.customer_snapshot_pincode, (option) => {
+    setForm((current) => ({
+      ...current,
+      customer_snapshot_city: option.city || current.customer_snapshot_city,
+      customer_snapshot_district: option.district || current.customer_snapshot_district,
+      customer_snapshot_state: option.state || current.customer_snapshot_state,
+    }));
+  });
 
   // Quick Barcode / QR Code Billing Scanner State
   const [quickScanCode, setQuickScanCode] = useState("");
@@ -1946,6 +1956,17 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
                           />
                         </label>
                         <label className="grid gap-2 text-sm">
+                          <span className="font-medium text-foreground">Pincode (Auto-fills location)</span>
+                          <input
+                            value={form.customer_snapshot_pincode}
+                            onChange={(event) => setForm((current) => ({ ...current, customer_snapshot_pincode: event.target.value }))}
+                            placeholder="e.g. 713301"
+                            maxLength={6}
+                            disabled={submitting}
+                            className={FIELD_CLASS}
+                          />
+                        </label>
+                        <label className="grid gap-2 text-sm">
                           <span className="font-medium text-foreground">City</span>
                           <input value={form.customer_snapshot_city} onChange={(event) => setForm((current) => ({ ...current, customer_snapshot_city: event.target.value }))} disabled={submitting} className={FIELD_CLASS} />
                         </label>
@@ -1956,10 +1977,6 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
                         <label className="grid gap-2 text-sm">
                           <span className="font-medium text-foreground">State</span>
                           <input value={form.customer_snapshot_state} onChange={(event) => setForm((current) => ({ ...current, customer_snapshot_state: event.target.value }))} disabled={submitting} className={FIELD_CLASS} />
-                        </label>
-                        <label className="grid gap-2 text-sm">
-                          <span className="font-medium text-foreground">Pincode</span>
-                          <input value={form.customer_snapshot_pincode} onChange={(event) => setForm((current) => ({ ...current, customer_snapshot_pincode: event.target.value }))} disabled={submitting} className={FIELD_CLASS} />
                         </label>
                         {form.customer_mode === "WALK_IN" ? (
                           <label className="sm:col-span-2 flex items-center gap-3 rounded-lg border border-border bg-background px-3 py-2 text-sm">

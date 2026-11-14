@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
+import { usePincodeAutofill } from "@/hooks/usePincodeAutofill";
 import { accountingErrorMessage } from "@/components/accounting/shared";
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
@@ -61,6 +62,12 @@ export default function AdminVendorSourcingPage() {
   const [city, setCity] = useState("");
   const [district, setDistrict] = useState("");
   const [state, setState] = useState("");
+
+  usePincodeAutofill(pincode, (option) => {
+    if (option.city) setCity(option.city);
+    if (option.district) setDistrict(option.district);
+    if (option.state) setState(option.state);
+  });
   const [branchHint, setBranchHint] = useState("");
   const [productId, setProductId] = useState("");
   const [productName, setProductName] = useState("");

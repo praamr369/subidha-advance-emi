@@ -11,6 +11,7 @@ import FormActions from "@/components/ui/FormActions";
 import PageHeader from "@/components/ui/PageHeader";
 import { FormSection } from "@/components/ui/operations";
 import { WorkspaceNotice } from "@/components/ui/role-workspace";
+import { usePincodeAutofill } from "@/hooks/usePincodeAutofill";
 import { invalidateAfterBusinessSetupMutation } from "@/lib/operational-query-invalidation";
 import { ApiError, apiFetch } from "@/lib/api";
 
@@ -322,6 +323,15 @@ export default function UnifiedBusinessProfilePage() {
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
   const [docSeqs, setDocSeqs] = useState<DocumentNumberingSequence[]>([]);
 
+  usePincodeAutofill(form.postal_code, (option) => {
+    setForm((current) => ({
+      ...current,
+      city: option.city || current.city,
+      district: option.district || current.district,
+      state: option.state || current.state,
+    }));
+  });
+
   async function loadProfiles() {
     try {
       setLoading(true);
@@ -627,10 +637,10 @@ export default function UnifiedBusinessProfilePage() {
                 <InputField label="Address Line 1" name="address_line_1" value={form.address_line_1 as string | undefined} onChange={handleChange} disabled={loading || saving}  />
                 <InputField label="Address Line 2" name="address_line_2" value={form.address_line_2 as string | undefined} onChange={handleChange} disabled={loading || saving}  />
                 <div className="grid gap-4 md:grid-cols-2">
+                  <InputField label="Postal PIN Code" name="postal_code" value={form.postal_code as string | undefined} onChange={handleChange} disabled={loading || saving} hint="6-digit PIN auto-fills city, district & state" placeholder="e.g. 713301" />
                   <InputField label="City" name="city" value={form.city as string | undefined} onChange={handleChange} disabled={loading || saving}  />
                   <InputField label="District" name="district" value={form.district as string | undefined} onChange={handleChange} disabled={loading || saving}  />
                   <InputField label="State" name="state" value={form.state as string | undefined} onChange={handleChange} disabled={loading || saving}  />
-                  <InputField label="Postal Code" name="postal_code" value={form.postal_code as string | undefined} onChange={handleChange} disabled={loading || saving}  />
                 </div>
               </div>
 

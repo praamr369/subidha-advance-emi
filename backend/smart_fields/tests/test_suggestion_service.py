@@ -45,6 +45,53 @@ class PincodeLookupTests(TestCase):
             PincodeLocation.objects.filter(pincode="400001", city="Mumbai").exists()
         )
 
+    def test_offline_pincode_lookup_west_bengal(self):
+        # Asansol (Paschim Bardhaman, West Bengal)
+        res_asansol = svc.lookup_pincode("713301")
+        self.assertIsNotNone(res_asansol["primary"])
+        self.assertEqual(res_asansol["primary"]["district"], "Paschim Bardhaman")
+        self.assertEqual(res_asansol["primary"]["state"], "West Bengal")
+        self.assertEqual(res_asansol["primary"]["state_code"], "19")
+
+        # Kolkata (West Bengal)
+        res_kolkata = svc.lookup_pincode("700001")
+        self.assertIsNotNone(res_kolkata["primary"])
+        self.assertEqual(res_kolkata["primary"]["district"], "Kolkata")
+        self.assertEqual(res_kolkata["primary"]["state"], "West Bengal")
+        self.assertEqual(res_kolkata["primary"]["state_code"], "19")
+
+        # Durgapur (Paschim Bardhaman, West Bengal)
+        res_durgapur = svc.lookup_pincode("713216")
+        self.assertIsNotNone(res_durgapur["primary"])
+        self.assertEqual(res_durgapur["primary"]["district"], "Paschim Bardhaman")
+        self.assertEqual(res_durgapur["primary"]["state"], "West Bengal")
+        self.assertEqual(res_durgapur["primary"]["state_code"], "19")
+
+        # Siliguri (Darjeeling, West Bengal)
+        res_siliguri = svc.lookup_pincode("734001")
+        self.assertIsNotNone(res_siliguri["primary"])
+        self.assertEqual(res_siliguri["primary"]["state"], "West Bengal")
+        self.assertEqual(res_siliguri["primary"]["state_code"], "19")
+
+    def test_offline_pincode_lookup_all_india(self):
+        # New Delhi (Delhi)
+        res_delhi = svc.lookup_pincode("110001")
+        self.assertIsNotNone(res_delhi["primary"])
+        self.assertEqual(res_delhi["primary"]["state"], "Delhi")
+        self.assertEqual(res_delhi["primary"]["state_code"], "07")
+
+        # Mumbai (Maharashtra)
+        res_mumbai = svc.lookup_pincode("400001")
+        self.assertIsNotNone(res_mumbai["primary"])
+        self.assertEqual(res_mumbai["primary"]["state"], "Maharashtra")
+        self.assertEqual(res_mumbai["primary"]["state_code"], "27")
+
+        # Bengaluru (Karnataka)
+        res_blr = svc.lookup_pincode("560001")
+        self.assertIsNotNone(res_blr["primary"])
+        self.assertEqual(res_blr["primary"]["state"], "Karnataka")
+        self.assertEqual(res_blr["primary"]["state_code"], "29")
+
 
 class HsnSuggestionTests(TestCase):
     def setUp(self):

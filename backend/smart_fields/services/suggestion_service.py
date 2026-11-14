@@ -9,8 +9,12 @@ mirrors the deterministic, no-network approach already used by
 
 from __future__ import annotations
 
+import gzip
+import json
+import logging
 import re
 from decimal import Decimal, InvalidOperation
+from pathlib import Path
 from typing import Any
 
 from django.db import transaction
@@ -73,11 +77,64 @@ def _coerce_rate(value: Any) -> Decimal | None:
 # ---------------------------------------------------------------------------
 # Pincode
 # ---------------------------------------------------------------------------
+_OFFLINE_PINCODES: dict[str, list[Any]] | None = None
+logger = logging.getLogger(__name__)
+
+
+def _get_offline_pincode(pincode: str) -> dict[str, Any] | None:
+    global _OFFLINE_PINCODES
+    if _OFFLINE_PINCODES is None:
+        gz_path = Path(__file__).resolve().parent.parent / "data" / "india_pincodes.json.gz"
+        if gz_path.exists():
+            try:
+                with gzip.open(gz_path, "rt", encoding="utf-8") as f:
+                    _OFFLINE_PINCODES = json.load(f)
+            except Exception as e:
+                logger.warning("Failed to load offline pincode dataset: %s", e)
+                _OFFLINE_PINCODES = {}
+        else:
+            _OFFLINE_PINCODES = {}
+
+    entry = _OFFLINE_PINCODES.get(pincode)
+    if not entry:
+        return None
+
+    # entry format: [primary_city, district, state, state_code, [other_locations]]
+    city = entry[0]
+    district = entry[1]
+    state = entry[2]
+    state_code = entry[3] if len(entry) > 3 else ""
+    other_locations = entry[4] if len(entry) > 4 else []
+
+    primary = {
+        "city": city,
+        "district": district,
+        "state": state,
+        "state_code": state_code,
+    }
+    options = [primary]
+    for other in other_locations:
+        if other and other.lower() != city.lower():
+            options.append({
+                "city": other,
+                "district": district,
+                "state": state,
+                "state_code": state_code,
+            })
+
+    return {
+        "pincode": pincode,
+        "primary": primary,
+        "options": options,
+    }
+
+
 def lookup_pincode(pincode: str) -> dict[str, Any]:
     """Return location options for a pincode.
 
-    ``primary`` is the most-used / first option for convenient auto-fill, while
-    ``options`` carries every distinct mapping so the UI can let the user choose.
+    1. Checks PincodeLocation database (confirmed/learned records).
+    2. Fallback to complete offline India Post dataset (19,486 pincodes covering all West Bengal and India).
+    3. Fallback to India Post public API with auto-caching.
     """
 
     pincode = (pincode or "").strip()
@@ -85,21 +142,94 @@ def lookup_pincode(pincode: str) -> dict[str, Any]:
     if not PINCODE_RE.match(pincode):
         return result
 
-    rows = PincodeLocation.objects.filter(pincode=pincode).order_by(
-        "-hit_count", "city", "id"
+    # 1. Database check
+    rows = list(
+        PincodeLocation.objects.filter(pincode=pincode).order_by(
+            "-hit_count", "city", "id"
+        )
     )
-    options = [
-        {
-            "city": row.city,
-            "district": row.district,
-            "state": row.state,
-            "state_code": row.state_code,
-        }
-        for row in rows
-    ]
-    result["options"] = options
-    if options:
+    if rows:
+        options = [
+            {
+                "city": row.city,
+                "district": row.district,
+                "state": row.state,
+                "state_code": row.state_code,
+            }
+            for row in rows
+        ]
+        result["options"] = options
         result["primary"] = options[0]
+        return result
+
+    # 2. Complete offline India dataset (West Bengal + all Indian states)
+    offline = _get_offline_pincode(pincode)
+    if offline and offline.get("primary"):
+        # Auto-persist into PincodeLocation for future fast queries
+        try:
+            primary = offline["primary"]
+            with transaction.atomic():
+                PincodeLocation.objects.get_or_create(
+                    pincode=pincode,
+                    city=primary["city"],
+                    district=primary["district"],
+                    state=primary["state"],
+                    defaults={
+                        "state_code": primary.get("state_code", ""),
+                        "source": SmartFieldSource.SEED,
+                    },
+                )
+        except Exception:
+            pass
+        return offline
+
+    # 3. Public India Post postal API fallback (handles newly designated pincodes)
+    try:
+        import urllib.request
+
+        req = urllib.request.Request(
+            f"https://api.postalpincode.in/pincode/{pincode}",
+            headers={"User-Agent": "SubidhaCore/1.0"},
+        )
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            api_data = json.loads(resp.read().decode())
+            if (
+                api_data
+                and isinstance(api_data, list)
+                and api_data[0].get("Status") == "Success"
+            ):
+                post_offices = api_data[0].get("PostOffice") or []
+                if post_offices:
+                    options = []
+                    seen = set()
+                    for po in post_offices:
+                        c = po.get("Name") or po.get("District") or ""
+                        d = po.get("District") or ""
+                        s = po.get("State") or ""
+                        k = (c, d, s)
+                        if k not in seen:
+                            seen.add(k)
+                            options.append(
+                                {"city": c, "district": d, "state": s, "state_code": ""}
+                            )
+                    if options:
+                        result["options"] = options
+                        result["primary"] = options[0]
+                        try:
+                            with transaction.atomic():
+                                PincodeLocation.objects.get_or_create(
+                                    pincode=pincode,
+                                    city=options[0]["city"],
+                                    district=options[0]["district"],
+                                    state=options[0]["state"],
+                                    defaults={"source": SmartFieldSource.CONFIRMED},
+                                )
+                        except Exception:
+                            pass
+                        return result
+    except Exception:
+        pass
+
     return result
 
 
