@@ -22,16 +22,12 @@ class PublicBusinessProfileView(APIView):
             from business_setup.models.core import BusinessProfile, PublicBusinessProfile
             bp = BusinessProfile.get_current()
             if bp:
+                addr_parts = [bp.address_line_1, bp.city, bp.state, bp.postal_code]
                 profile = PublicBusinessProfile(
                     display_name=bp.trade_name or bp.legal_name or "Subidha Core",
-                    primary_phone=bp.primary_phone,
-                    support_phone=bp.support_phone or bp.primary_phone,
-                    primary_email=bp.primary_email,
-                    support_email=bp.support_email or bp.primary_email,
-                    address_text=f"{bp.address_line_1}, {bp.city}, {bp.state} {bp.postal_code}".strip(", "),
-                    city=bp.city,
-                    state=bp.state,
-                    postal_code=bp.postal_code,
+                    support_phone=bp.support_phone or bp.primary_phone or "",
+                    support_email=bp.support_email or bp.primary_email or "",
+                    address_text=", ".join(p for p in addr_parts if p),
                     is_active=True,
                 )
             else:
