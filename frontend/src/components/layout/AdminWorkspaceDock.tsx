@@ -724,8 +724,10 @@ export default function AdminWorkspaceDock() {
                   try {
                     const iframe = e.currentTarget;
                     const path = iframe.contentWindow?.location?.pathname;
-                    if (path && path !== w.route) {
-                      updateWindowRoute(w.id, path);
+                    const cleanCurrent = w.route.split("?")[0].replace(/\/+$/, "");
+                    const cleanPath = path ? path.replace(/\/+$/, "") : "";
+                    if (cleanPath && cleanPath !== cleanCurrent) {
+                      updateWindowRoute(w.id, cleanPath);
                     }
                   } catch {
                     // cross-origin protection safe fallback

@@ -61,8 +61,11 @@ export default function RoleGuard({
 
   if (!isReady) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        Loading...
+      <div className="flex h-screen items-center justify-center bg-background text-muted-foreground select-none">
+        <div className="flex flex-col items-center gap-2.5">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <span className="text-xs font-medium text-muted-foreground animate-pulse">Loading workspace…</span>
+        </div>
       </div>
     );
   }

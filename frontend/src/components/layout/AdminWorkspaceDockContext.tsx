@@ -12,6 +12,7 @@ import {
 } from "react";
 
 import { ADMIN_ROUTE_REGISTRY, ADMIN_ROUTE_ALIASES } from "@/config/admin-route-registry";
+import { getSession } from "@/lib/auth/session";
 
 export type DockWindowState = "minimized" | "normal" | "maximized";
 
@@ -215,8 +216,17 @@ function calculateDefaultPosition(index: number): DockWindowPosition {
   return { x, y, width, height };
 }
 
+function isRunningInFrame(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.self !== window.top;
+  } catch {
+    return true;
+  }
+}
+
 function loadInitialSession(): { windows: DockWindow[]; activeWindowId: string | null } {
-  if (typeof window === "undefined") {
+  if (typeof window === "undefined" || isRunningInFrame()) {
     return { windows: [], activeWindowId: null };
   }
   try {
@@ -248,7 +258,12 @@ export function AdminWorkspaceDockProvider({
   children: ReactNode;
   isDockSupported?: boolean;
 }) {
-  const [initialSession] = useState(loadInitialSession);
+  const isInIframe = isRunningInFrame();
+  const effectiveDockSupported = isDockSupported && !isInIframe;
+
+  const [initialSession] = useState(() =>
+    effectiveDockSupported ? loadInitialSession() : { windows: [], activeWindowId: null }
+  );
   const [windows, setWindows] = useState<DockWindow[]>(initialSession.windows);
   const [activeWindowId, setActiveWindowId] = useState<string | null>(initialSession.activeWindowId);
   const [isDraggingOrResizing, setDraggingOrResizing] = useState(false);
@@ -260,13 +275,18 @@ export function AdminWorkspaceDockProvider({
   } | null>(null);
   const maxZRef = useRef(100 + initialSession.windows.length);
 
-  // Clean up on session logout
+  // Clean up on session logout (ignoring unrelated storage events)
   useEffect(() => {
-    function handleSessionChange() {
+    if (!effectiveDockSupported) return;
+
+    function handleSessionChange(e: Event) {
+      // Ignore storage events that do not touch auth session
+      if (e instanceof StorageEvent && e.key && e.key !== "subidha_session") {
+        return;
+      }
       try {
-        const session = window.sessionStorage.getItem("subidha:session");
-        const local = window.localStorage.getItem("subidha_auth_tokens");
-        if (!session && !local) {
+        const session = getSession();
+        if (!session) {
           setWindows([]);
           setActiveWindowId(null);
           window.sessionStorage.removeItem(STORAGE_KEY);
@@ -282,11 +302,11 @@ export function AdminWorkspaceDockProvider({
       window.removeEventListener("subidha:session", handleSessionChange);
       window.removeEventListener("storage", handleSessionChange);
     };
-  }, []);
+  }, [effectiveDockSupported]);
 
   // Save session state to sessionStorage
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || !effectiveDockSupported) return;
     try {
       if (windows.length === 0) {
         window.sessionStorage.removeItem(STORAGE_KEY);
@@ -310,7 +330,7 @@ export function AdminWorkspaceDockProvider({
     } catch {
       // non-critical persistence
     }
-  }, [windows, activeWindowId]);
+  }, [windows, activeWindowId, effectiveDockSupported]);
 
   const focusWindow = useCallback((id: string) => {
     maxZRef.current += 1;
@@ -561,7 +581,7 @@ export function AdminWorkspaceDockProvider({
       setDraggingOrResizing,
       isDockCollapsed,
       setIsDockCollapsed,
-      isDockSupported,
+      isDockSupported: effectiveDockSupported,
       lastClosedWindow,
       reopenLastClosed,
     }),
@@ -583,7 +603,7 @@ export function AdminWorkspaceDockProvider({
       isDraggingOrResizing,
       setDraggingOrResizing,
       isDockCollapsed,
-      isDockSupported,
+      effectiveDockSupported,
       lastClosedWindow,
       reopenLastClosed,
     ]
