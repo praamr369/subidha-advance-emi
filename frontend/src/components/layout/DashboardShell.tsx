@@ -1783,9 +1783,13 @@ export default function DashboardShell({ children }: DashboardShellProps) {
 
   if (isWorkspaceDocked) {
     return (
-      <div className="min-h-screen bg-background text-foreground antialiased p-3 sm:p-4 pb-12 overflow-x-hidden">
-        {children}
-      </div>
+      <DashboardShellContext.Provider value={true}>
+        <WorkflowProvider role={role}>
+          <div className="min-h-screen bg-background text-foreground antialiased p-3 sm:p-4 pb-12 overflow-x-hidden">
+            {children}
+          </div>
+        </WorkflowProvider>
+      </DashboardShellContext.Provider>
     );
   }
 

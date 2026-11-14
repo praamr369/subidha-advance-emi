@@ -50,10 +50,20 @@ function buildQueryString(query: WorkflowLaunchContext["query"] | undefined): st
   return raw ? `?${raw}` : "";
 }
 
-export function useWorkflowLauncher() {
+export function useWorkflowLauncher(): WorkflowContextValue {
   const value = useContext(WorkflowContext);
+  const router = useRouter();
   if (!value) {
-    throw new Error("useWorkflowLauncher must be used within WorkflowProvider");
+    return {
+      role: "ADMIN",
+      workflows: [],
+      activeWorkflow: null,
+      openWorkflow: (id: WorkflowId, context?: WorkflowLaunchContext) => {
+        const queryStr = buildQueryString(context?.query);
+        router.push(`/admin/${id}${queryStr}`);
+      },
+      closeWorkflow: () => {},
+    };
   }
   return value;
 }
