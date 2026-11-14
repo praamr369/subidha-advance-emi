@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type MouseEvent as ReactMouseEvent,
@@ -10,7 +11,10 @@ import {
 import {
   ArrowLeft,
   ArrowRight,
+  BarChart3,
   Boxes,
+  Briefcase,
+  Building2,
   Check,
   ChevronDown,
   ChevronUp,
@@ -18,6 +22,7 @@ import {
   Columns2,
   CreditCard,
   ExternalLink,
+  Factory,
   Handshake,
   Landmark,
   LayoutGrid,
@@ -29,6 +34,8 @@ import {
   ReceiptText,
   RotateCw,
   Search,
+  Settings,
+  Sparkles,
   Truck,
   Undo2,
   Users,
@@ -38,22 +45,45 @@ import {
 import {
   useAdminWorkspaceDock,
   sanitizeAdminRoute,
+  routeToDefaultIcon,
   type DockWindow,
   type DockWindowPosition,
 } from "./AdminWorkspaceDockContext";
 import { cn } from "@/lib/utils";
 import { ROUTES } from "@/lib/routes";
+import { ADMIN_ROUTE_REGISTRY, type AdminRouteRegistryItem } from "@/config/admin-route-registry";
 
 const QUICK_DOCK_PRESETS = [
-  { label: "Customers", route: ROUTES.admin.customers, icon: "users" },
-  { label: "New SFEMI Contract", route: ROUTES.admin.subscriptionsAdvanceEmiCreate, icon: "clipboard" },
-  { label: "Collect Payment", route: ROUTES.admin.financeCollect, icon: "credit-card" },
-  { label: "Direct Sale (Billing)", route: ROUTES.admin.billingDirectSaleCreate, icon: "receipt" },
-  { label: "Inventory & Stock Needs", route: "/admin/inventory/stock-needs", icon: "boxes" },
-  { label: "Day Close & Accounting", route: ROUTES.admin.accounting, icon: "landmark" },
-  { label: "Deliveries", route: ROUTES.admin.delivery, icon: "truck" },
-  { label: "CRM Workbench", route: ROUTES.admin.crm, icon: "handshake" },
+  { label: "Customers", route: ROUTES.admin.customers, icon: "users", description: "Customer ledger, accounts, verification and status." },
+  { label: "New SFEMI Contract", route: ROUTES.admin.subscriptionsAdvanceEmiCreate, icon: "clipboard", description: "New subscription, plan selection, schedule preview." },
+  { label: "Collect Payment", route: ROUTES.admin.financeCollect, icon: "credit-card", description: "Collect and allocate EMI, direct sales, advance and fines." },
+  { label: "Direct Sale (Billing)", route: ROUTES.admin.billingDirectSaleCreate, icon: "receipt", description: "Direct retail sales POS and billing invoice creation." },
+  { label: "Inventory & Stock Needs", route: "/admin/inventory/stock-needs", icon: "boxes", description: "Real-time stock requirement, replenishment and shortages." },
+  { label: "Day Close & Accounting", route: ROUTES.admin.accounting, icon: "landmark", description: "Daily closing, drawer reconciliation and ledger audits." },
+  { label: "Deliveries", route: ROUTES.admin.delivery, icon: "truck", description: "Delivery dispatches, challans, and customer drop-offs." },
+  { label: "CRM Workbench", route: ROUTES.admin.crm, icon: "handshake", description: "Leads, customer requests, pipeline and service tickets." },
 ];
+
+const MODULE_CATEGORIES = [
+  "All",
+  "★ Quick Presets",
+  "Command Center",
+  "Collections & Cashier",
+  "Finance Operations",
+  "Accounting & Reconciliation",
+  "Sales & Contracts",
+  "SFEMI Control",
+  "CRM & Customers",
+  "Inventory & Stock",
+  "Purchases & Vendors",
+  "Delivery & Service",
+  "HR & Staff",
+  "Manufacturing",
+  "BI & Reports",
+  "Settings & Governance",
+] as const;
+
+type ModuleCategory = (typeof MODULE_CATEGORIES)[number];
 
 function getWindowIcon(iconKey?: string) {
   switch (iconKey) {
@@ -73,6 +103,58 @@ function getWindowIcon(iconKey?: string) {
       return Truck;
     case "handshake":
       return Handshake;
+    case "building":
+      return Building2;
+    case "factory":
+      return Factory;
+    case "briefcase":
+      return Briefcase;
+    case "chart":
+      return BarChart3;
+    case "sparkles":
+      return Sparkles;
+    case "settings":
+      return Settings;
+    case "dashboard":
+    case "layout":
+    default:
+      return LayoutGrid;
+  }
+}
+
+function getGroupIcon(group?: string) {
+  switch (group) {
+    case "Command Center":
+      return LayoutGrid;
+    case "CRM & Customers":
+    case "Profiles & Parties":
+      return Users;
+    case "Sales & Contracts":
+      return ReceiptText;
+    case "SFEMI Control":
+      return ClipboardList;
+    case "Collections & Cashier":
+      return CreditCard;
+    case "Finance Operations":
+    case "Accounting & Reconciliation":
+      return Landmark;
+    case "Inventory & Stock":
+      return Boxes;
+    case "Purchases & Vendors":
+      return Building2;
+    case "Manufacturing":
+      return Factory;
+    case "Delivery & Service":
+      return Truck;
+    case "HR & Staff":
+      return Briefcase;
+    case "BI & Reports":
+      return BarChart3;
+    case "Growth & Offers":
+      return Sparkles;
+    case "Enterprise Control":
+    case "Settings & Governance":
+      return Settings;
     default:
       return LayoutGrid;
   }
@@ -104,10 +186,12 @@ export default function AdminWorkspaceDock() {
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [routeSearch, setRouteSearch] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<ModuleCategory>("All");
   const [customRouteInput, setCustomRouteInput] = useState("");
   const [copiedWindowId, setCopiedWindowId] = useState<string | null>(null);
   const [frameLoading, setFrameLoading] = useState<Record<string, boolean>>({});
   const [customRouteError, setCustomRouteError] = useState<string | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Dragging & Resizing state
   const dragRef = useRef<{
@@ -275,14 +359,101 @@ export default function AdminWorkspaceDock() {
     restoreWindow,
   ]);
 
-  if (!isDockSupported) {
-    return null;
-  }
+  // Auto-focus search input when menu opens
+  useEffect(() => {
+    if (!menuOpen) return;
+    const timer = setTimeout(() => {
+      searchInputRef.current?.focus();
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [menuOpen]);
 
-  const filteredPresets = QUICK_DOCK_PRESETS.filter((p) =>
-    p.label.toLowerCase().includes(routeSearch.toLowerCase()) ||
-    p.route.toLowerCase().includes(routeSearch.toLowerCase())
-  );
+  // Deduplicate all registered admin routes (covers 348 concrete pages)
+  const uniqueRegistryItems = useMemo(() => {
+    const seen = new Set<string>();
+    const items: AdminRouteRegistryItem[] = [];
+    for (const it of ADMIN_ROUTE_REGISTRY) {
+      if (!it.href || seen.has(it.href)) continue;
+      seen.add(it.href);
+      items.push(it);
+    }
+    return items;
+  }, []);
+
+  // Filter routes by category pill and search query
+  const filteredRoutes = useMemo(() => {
+    const q = routeSearch.trim().toLowerCase();
+
+    return uniqueRegistryItems.filter((item) => {
+      // 1. Module category filter
+      if (selectedCategory !== "All" && selectedCategory !== "★ Quick Presets") {
+        if (item.group !== selectedCategory) {
+          if (selectedCategory === "CRM & Customers" && item.group === "Profiles & Parties") {
+            // merge into CRM
+          } else if (
+            selectedCategory === "Settings & Governance" &&
+            item.group === "Enterprise Control"
+          ) {
+            // merge into Settings
+          } else {
+            return false;
+          }
+        }
+      }
+
+      // 2. Search query matching across label, href, group, and description
+      if (!q) return true;
+
+      return (
+        item.label.toLowerCase().includes(q) ||
+        item.href.toLowerCase().includes(q) ||
+        item.group.toLowerCase().includes(q) ||
+        (item.description && item.description.toLowerCase().includes(q))
+      );
+    });
+  }, [uniqueRegistryItems, routeSearch, selectedCategory]);
+
+  const filteredPresets = useMemo(() => {
+    const q = routeSearch.trim().toLowerCase();
+    if (!q) return QUICK_DOCK_PRESETS;
+    return QUICK_DOCK_PRESETS.filter(
+      (p) =>
+        p.label.toLowerCase().includes(q) ||
+        p.route.toLowerCase().includes(q) ||
+        p.description.toLowerCase().includes(q)
+    );
+  }, [routeSearch]);
+
+  const handleSearchSubmit = () => {
+    const q = routeSearch.trim();
+    if (!q) return;
+
+    if (selectedCategory === "★ Quick Presets" && !q) {
+      if (filteredPresets.length > 0) {
+        const topPreset = filteredPresets[0];
+        openInDock(topPreset.route, topPreset.label, topPreset.icon);
+        setMenuOpen(false);
+        setRouteSearch("");
+      }
+      return;
+    }
+
+    if (filteredRoutes.length > 0) {
+      const topMatch = filteredRoutes[0];
+      openInDock(topMatch.href, topMatch.label, routeToDefaultIcon(topMatch.href));
+      setMenuOpen(false);
+      setRouteSearch("");
+      return;
+    }
+
+    // Try custom route input if user typed a direct URL
+    const sanitized = sanitizeAdminRoute(q);
+    if (sanitized) {
+      openInDock(sanitized);
+      setMenuOpen(false);
+      setRouteSearch("");
+    }
+  };
 
   const startDrag = (
     e: ReactMouseEvent,
@@ -327,6 +498,10 @@ export default function AdminWorkspaceDock() {
     setCustomRouteInput("");
     setMenuOpen(false);
   };
+
+  if (!isDockSupported) {
+    return null;
+  }
 
   return (
     <>
@@ -603,94 +778,287 @@ export default function AdminWorkspaceDock() {
             )}
           </button>
 
-          {/* Launcher Popover Menu */}
+          {/* Full Admin Workspace Launch Center Popover */}
           {menuOpen && (
             <div
-              className="absolute bottom-11 left-0 w-80 rounded-xl border border-border bg-popover/98 p-3 shadow-2xl backdrop-blur-md z-[140] animate-in fade-in slide-in-from-bottom-2"
+              className="fixed sm:absolute bottom-11 left-1 sm:left-2 w-[calc(100vw-8px)] sm:w-[680px] max-h-[82vh] rounded-2xl border border-[var(--topbar-border)] bg-popover/98 p-0 shadow-2xl backdrop-blur-xl z-[140] flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-2"
               onMouseDown={(e) => e.stopPropagation()}
             >
-              <div className="flex items-center justify-between pb-2 border-b border-border/60">
-                <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                  <LayoutGrid className="size-3.5 text-primary" />
-                  Quick Launch Workbench
-                </span>
+              {/* Popover Header */}
+              <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/60 bg-muted/30 select-none">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0">
+                    <LayoutGrid className="size-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-semibold text-foreground flex items-center gap-2">
+                      <span>Admin Workspace Launch Center</span>
+                      <span className="rounded-full bg-primary/15 text-primary text-[10px] px-2 py-0.2 font-bold shrink-0">
+                        {uniqueRegistryItems.length} Pages
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground truncate">
+                      Open any module, page, report, or workflow inside your desktop dock
+                    </p>
+                  </div>
+                </div>
                 <button
                   type="button"
                   onClick={() => setMenuOpen(false)}
-                  className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition shrink-0 ml-2"
+                  title="Close Launcher (Esc)"
                 >
-                  <X className="size-3.5" />
+                  <X className="size-4" />
                 </button>
               </div>
 
-              {/* Search Presets */}
-              <div className="relative mt-2">
-                <Search className="absolute left-2.5 top-2 size-3.5 text-muted-foreground" />
-                <input
-                  type="text"
-                  placeholder="Filter admin routes…"
-                  value={routeSearch}
-                  onChange={(e) => setRouteSearch(e.target.value)}
-                  className="h-8 w-full rounded-md border border-input bg-background/80 pl-8 pr-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                />
-              </div>
-
-              {/* Presets List */}
-              <div className="mt-2 max-h-56 overflow-y-auto space-y-1">
-                {filteredPresets.map((preset) => {
-                  const Icon = getWindowIcon(preset.icon);
-                  return (
-                    <button
-                      key={preset.route}
-                      type="button"
-                      onClick={() => {
-                        openInDock(preset.route, preset.label, preset.icon);
-                        setMenuOpen(false);
-                      }}
-                      className="w-full flex items-center justify-between rounded-md px-2 py-1.5 text-xs text-foreground hover:bg-muted/70 transition text-left"
-                    >
-                      <span className="flex items-center gap-2 truncate">
-                        <Icon className="size-3.5 text-primary shrink-0" />
-                        <span className="font-medium truncate">{preset.label}</span>
-                      </span>
-                      <span className="text-[10px] text-muted-foreground font-mono">
-                        {preset.route.split("?")[0]}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Custom Route Input */}
-              <form onSubmit={handleLaunchCustomRoute} className="mt-3 pt-2 border-t border-border/60">
-                <div className="text-[11px] font-medium text-muted-foreground mb-1">
-                  Custom Admin Route:
-                </div>
-                <div className="flex gap-1.5">
+              {/* Search & Category Filter Section */}
+              <div className="p-3 border-b border-border/40 bg-background/50 space-y-2">
+                <div className="relative">
+                  <Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" />
                   <input
+                    ref={searchInputRef}
                     type="text"
-                    placeholder="/admin/..."
-                    value={customRouteInput}
-                    onChange={(e) => setCustomRouteInput(e.target.value)}
-                    className="h-7 flex-1 rounded border border-input bg-background px-2 text-xs font-mono"
+                    placeholder="Search all 348 admin pages by name, module, route, or keyword (Press Enter to open)..."
+                    value={routeSearch}
+                    onChange={(e) => setRouteSearch(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleSearchSubmit();
+                      } else if (e.key === "Escape") {
+                        setMenuOpen(false);
+                      }
+                    }}
+                    className="h-9 w-full rounded-lg border border-input bg-background/90 pl-9 pr-8 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1.5 focus:ring-primary shadow-sm"
                   />
+                  {routeSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setRouteSearch("")}
+                      className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground p-0.5"
+                      title="Clear search"
+                    >
+                      <X className="size-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Category Filter Pills */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none text-[11px]">
+                  {MODULE_CATEGORIES.map((cat) => {
+                    const isSelected = selectedCategory === cat;
+                    return (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => setSelectedCategory(cat)}
+                        className={cn(
+                          "shrink-0 rounded-full px-2.5 py-1 font-medium transition cursor-pointer select-none",
+                          isSelected
+                            ? "bg-primary text-primary-foreground shadow-sm"
+                            : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground border border-border/50"
+                        )}
+                      >
+                        {cat}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Results List Section */}
+              <div className="flex-1 max-h-[360px] overflow-y-auto p-2 space-y-1 scrollbar-thin">
+                {/* 1. Quick Presets View (When selected and no query) */}
+                {selectedCategory === "★ Quick Presets" && !routeSearch.trim() && (
+                  <div className="space-y-1">
+                    <div className="px-2 py-1 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                      Essential Daily Workbenches
+                    </div>
+                    {filteredPresets.map((preset) => {
+                      const Icon = getWindowIcon(preset.icon);
+                      return (
+                        <div
+                          key={preset.route}
+                          className="group flex items-center justify-between rounded-lg border border-border/50 p-2 text-xs hover:border-primary/50 hover:bg-muted/60 transition"
+                        >
+                          <div className="flex items-start gap-2.5 min-w-0 pr-2">
+                            <div className="mt-0.5 flex h-7 w-7 items-center justify-center rounded-md border border-border/60 bg-muted/60 text-primary shrink-0 group-hover:bg-primary/10">
+                              <Icon className="size-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold text-foreground truncate">{preset.label}</span>
+                                <span className="rounded bg-muted px-1.5 py-0.2 font-mono text-[10px] text-muted-foreground truncate max-w-[150px]">
+                                  {preset.route.split("?")[0]}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-muted-foreground line-clamp-1">
+                                {preset.description}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <a
+                              href={preset.route}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition"
+                              title="Open in new browser tab"
+                            >
+                              <ExternalLink className="size-3.5" />
+                            </a>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                openInDock(preset.route, preset.label, preset.icon);
+                                setMenuOpen(false);
+                              }}
+                              className="rounded-md bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition shadow-sm"
+                            >
+                              Open
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* 2. All Registry Routes / Filtered Results */}
+                {(selectedCategory !== "★ Quick Presets" || Boolean(routeSearch.trim())) && (
+                  <>
+                    {filteredRoutes.length > 0 ? (
+                      <div className="space-y-1">
+                        <div className="px-2 py-1 text-[11px] font-medium text-muted-foreground flex items-center justify-between">
+                          <span>
+                            Showing {filteredRoutes.length} {filteredRoutes.length === 1 ? "page" : "pages"}
+                            {routeSearch.trim() ? ` matching "${routeSearch}"` : ` in ${selectedCategory}`}
+                          </span>
+                          <span className="text-[10px]">Press Enter to open top result</span>
+                        </div>
+                        {filteredRoutes.map((item) => {
+                          const Icon = getGroupIcon(item.group);
+                          return (
+                            <div
+                              key={item.href}
+                              className="group flex items-center justify-between rounded-lg border border-border/40 p-2 text-xs hover:border-primary/50 hover:bg-muted/60 transition"
+                            >
+                              <div className="flex items-start gap-2.5 min-w-0 pr-2">
+                                <div className="mt-0.5 flex h-7 w-7 items-center justify-center rounded-md border border-border/60 bg-muted/60 text-primary shrink-0 group-hover:bg-primary/10">
+                                  <Icon className="size-4" />
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="font-semibold text-foreground">{item.label}</span>
+                                    <span className="rounded bg-primary/10 text-primary px-1.5 py-0.2 text-[10px] font-medium shrink-0">
+                                      {item.group}
+                                    </span>
+                                    <span className="rounded bg-muted px-1.5 py-0.2 font-mono text-[10px] text-muted-foreground truncate max-w-[170px]">
+                                      {item.href.split("?")[0]}
+                                    </span>
+                                  </div>
+                                  {item.description && (
+                                    <p className="text-[11px] text-muted-foreground line-clamp-1 mt-0.5">
+                                      {item.description}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <a
+                                  href={item.href}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition"
+                                  title="Open in new browser tab"
+                                >
+                                  <ExternalLink className="size-3.5" />
+                                </a>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    openInDock(item.href, item.label, routeToDefaultIcon(item.href));
+                                    setMenuOpen(false);
+                                    setRouteSearch("");
+                                  }}
+                                  className="rounded-md bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition shadow-sm"
+                                >
+                                  Open
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="p-6 text-center text-muted-foreground space-y-2">
+                        <p className="text-xs">
+                          No registered page found for &ldquo;<span className="text-foreground font-semibold">{routeSearch}</span>&rdquo;
+                        </p>
+                        {routeSearch.trim().startsWith("/") && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const sanitized = sanitizeAdminRoute(routeSearch.trim());
+                              if (sanitized) {
+                                openInDock(sanitized);
+                                setMenuOpen(false);
+                                setRouteSearch("");
+                              }
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-md bg-primary/10 text-primary border border-primary/30 px-3 py-1.5 text-xs font-semibold hover:bg-primary/20 transition"
+                          >
+                            <Plus className="size-3.5" />
+                            Open custom route &ldquo;{routeSearch.trim()}&rdquo; in dock
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* Popover Footer: Custom Route Direct Input & Keyboard Shortcuts */}
+              <div className="p-3 border-t border-border/60 bg-muted/20 select-none">
+                <form onSubmit={handleLaunchCustomRoute} className="flex gap-2 items-center">
+                  <span className="text-[11px] font-semibold text-muted-foreground shrink-0 hidden sm:inline">
+                    Direct Route:
+                  </span>
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      placeholder="/admin/... (e.g. /admin/inventory/stock-needs)"
+                      value={customRouteInput}
+                      onChange={(e) => {
+                        setCustomRouteInput(e.target.value);
+                        if (customRouteError) setCustomRouteError(null);
+                      }}
+                      className="h-8 w-full rounded-md border border-input bg-background px-2.5 text-xs font-mono placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-primary shadow-sm"
+                    />
+                  </div>
                   <button
                     type="submit"
-                    className="h-7 rounded bg-primary px-2 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+                    className="h-8 rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition shadow-sm shrink-0"
                   >
                     Open
                   </button>
-                </div>
+                </form>
                 {customRouteError && (
                   <div className="mt-1 text-[11px] text-red-500 font-medium">
                     {customRouteError}
                   </div>
                 )}
-              </form>
 
-              <div className="mt-2.5 pt-1.5 border-t border-border/40 text-[10px] text-muted-foreground flex justify-between">
-                <span>Hold <kbd className="px-1 border rounded bg-muted">Alt</kbd> + click any link</span>
-                <span>Alt+W to toggle</span>
+                <div className="mt-2.5 flex items-center justify-between text-[10px] text-muted-foreground border-t border-border/40 pt-1.5">
+                  <span className="flex items-center gap-1">
+                    💡 Hold <kbd className="px-1 py-0.5 border rounded bg-muted font-sans font-medium text-[9px]">Alt</kbd> + click any link in the dashboard to dock
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <span><kbd className="px-1 border rounded bg-muted font-sans font-medium text-[9px]">Alt+W</kbd> Toggle</span>
+                    <span><kbd className="px-1 border rounded bg-muted font-sans font-medium text-[9px]">Alt+D</kbd> Dashboard</span>
+                  </span>
+                </div>
               </div>
             </div>
           )}

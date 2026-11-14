@@ -185,7 +185,7 @@ function securityCspHeaders(): Array<{ key: string; value: string }> {
     "default-src 'self'",
     "base-uri 'self'",
     "object-src 'none'",
-    "frame-ancestors 'none'",
+    "frame-ancestors 'self'",
     "form-action 'self'",
     "img-src 'self' data: blob: https:",
     "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://www.googletagmanager.com",

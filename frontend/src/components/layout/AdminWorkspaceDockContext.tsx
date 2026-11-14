@@ -11,6 +11,8 @@ import {
   type ReactNode,
 } from "react";
 
+import { ADMIN_ROUTE_REGISTRY, ADMIN_ROUTE_ALIASES } from "@/config/admin-route-registry";
+
 export type DockWindowState = "minimized" | "normal" | "maximized";
 
 export type DockWindowPosition = {
@@ -96,14 +98,27 @@ export function sanitizeAdminRoute(input: string): string | null {
     trimmed = `/admin${trimmed}`;
   }
 
-  return trimmed;
+  // Resolve legacy or convenience route aliases (e.g. /admin/sales -> /admin/billing/direct-sale/workspace)
+  const [pathname, search] = trimmed.split("?");
+  const canonicalPath = ADMIN_ROUTE_ALIASES[pathname] || pathname;
+  return search ? `${canonicalPath}?${search}` : canonicalPath;
 }
 
 const AdminWorkspaceDockContext = createContext<AdminWorkspaceDockContextType | null>(null);
 
 function routeToDefaultTitle(route: string): string {
-  const clean = route.split("?")[0].replace(/^\/+|\/+$/g, "");
-  const segments = clean.split("/").filter(Boolean);
+  const clean = route.split("?")[0].replace(/\/+$/, "") || "/admin";
+
+  // 1. Check exact match in full admin route registry (covers all 348 admin pages)
+  const registryMatch = ADMIN_ROUTE_REGISTRY.find(
+    (item) => item.href === clean || item.href === route
+  );
+  if (registryMatch?.label) {
+    return registryMatch.label;
+  }
+
+  // 2. Dynamic pattern matching for deep detail / edit / action pages
+  const segments = clean.replace(/^\/+|\/+$/g, "").split("/").filter(Boolean);
   if (segments.length <= 1) return "Admin Dashboard";
 
   const sub = segments.slice(1).join("/");
@@ -129,15 +144,57 @@ function routeToDefaultTitle(route: string): string {
 }
 
 export function routeToDefaultIcon(route: string): string {
-  const clean = route.toLowerCase();
-  if (clean.includes("customer")) return "users";
-  if (clean.includes("subscription") || clean.includes("contract")) return "clipboard";
-  if (clean.includes("collect") || clean.includes("payment") || clean.includes("finance")) return "credit-card";
-  if (clean.includes("direct-sale") || clean.includes("billing")) return "receipt";
-  if (clean.includes("inventory") || clean.includes("stock") || clean.includes("product")) return "boxes";
-  if (clean.includes("accounting") || clean.includes("ledger") || clean.includes("reconciliation")) return "landmark";
-  if (clean.includes("delivery")) return "truck";
-  if (clean.includes("crm")) return "handshake";
+  const clean = route.split("?")[0].replace(/\/+$/, "") || "/admin";
+
+  // Check registry group mapping
+  const registryMatch = ADMIN_ROUTE_REGISTRY.find(
+    (item) => item.href === clean || item.href === route
+  );
+  if (registryMatch?.group) {
+    switch (registryMatch.group) {
+      case "Command Center":
+        return "dashboard";
+      case "CRM & Customers":
+      case "Profiles & Parties":
+        return "users";
+      case "Sales & Contracts":
+        return "receipt";
+      case "SFEMI Control":
+        return "clipboard";
+      case "Collections & Cashier":
+        return "credit-card";
+      case "Finance Operations":
+      case "Accounting & Reconciliation":
+        return "landmark";
+      case "Inventory & Stock":
+        return "boxes";
+      case "Purchases & Vendors":
+        return "building";
+      case "Manufacturing":
+        return "factory";
+      case "Delivery & Service":
+        return "truck";
+      case "HR & Staff":
+        return "briefcase";
+      case "BI & Reports":
+        return "chart";
+      case "Growth & Offers":
+        return "sparkles";
+      case "Enterprise Control":
+      case "Settings & Governance":
+        return "settings";
+    }
+  }
+
+  const lower = clean.toLowerCase();
+  if (lower.includes("customer")) return "users";
+  if (lower.includes("subscription") || lower.includes("contract")) return "clipboard";
+  if (lower.includes("collect") || lower.includes("payment") || lower.includes("finance")) return "credit-card";
+  if (lower.includes("direct-sale") || lower.includes("billing")) return "receipt";
+  if (lower.includes("inventory") || lower.includes("stock") || lower.includes("product")) return "boxes";
+  if (lower.includes("accounting") || lower.includes("ledger") || lower.includes("reconciliation")) return "landmark";
+  if (lower.includes("delivery")) return "truck";
+  if (lower.includes("crm")) return "handshake";
   return "layout";
 }
 
