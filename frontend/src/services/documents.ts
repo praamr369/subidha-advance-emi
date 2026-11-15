@@ -44,7 +44,23 @@ export async function listDocuments(params?: {
   if (params?.date_to) q.set("date_to", params.date_to);
   if (params?.search) q.set("search", params.search);
   const qs = q.toString();
-  return apiFetch(`/admin/documents/${qs ? `?${qs}` : ""}`);
+  try {
+    const raw = await apiFetch<DocumentListResponse | DocumentRecord[]>(
+      `/admin/documents/${qs ? `?${qs}` : ""}`
+    );
+    if (Array.isArray(raw)) {
+      return { results: raw, categories: [] };
+    }
+    if (raw && typeof raw === "object" && Array.isArray(raw.results)) {
+      return {
+        results: raw.results,
+        categories: Array.isArray(raw.categories) ? raw.categories : [],
+      };
+    }
+    return { results: [], categories: [] };
+  } catch {
+    return { results: [], categories: [] };
+  }
 }
 
 export async function uploadDocument(formData: FormData): Promise<DocumentRecord> {
@@ -88,7 +104,8 @@ export async function generatePdf(
   return save ? (result.document ?? null) : null;
 }
 
-export function formatFileSize(bytes: number): string {
+export function formatFileSize(bytes?: number | null): string {
+  if (bytes == null || isNaN(bytes) || bytes <= 0) return "0 B";
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
