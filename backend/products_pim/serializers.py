@@ -593,35 +593,11 @@ class PimProductCreateUpdateSerializer(serializers.ModelSerializer):
 
     def _sync_to_register(self, pim_product):
         try:
-            from subscriptions.models import Product as SubProduct
-            sub_product = SubProduct.objects.filter(product_code=pim_product.code).first()
-            if not sub_product:
-                if not pim_product.is_published:
-                    return
-                sub_product = SubProduct(product_code=pim_product.code)
-            
-            sub_product.name = pim_product.name
-            sub_product.base_price = pim_product.base_price
-            sub_product.rent_monthly_yield_percent = pim_product.rent_monthly_yield_percent
-            sub_product.lease_monthly_yield_percent = pim_product.lease_monthly_yield_percent
-            if pim_product.category:
-                sub_product.category = pim_product.category.name
-            if pim_product.subcategory:
-                sub_product.subcategory = pim_product.subcategory.name
-            sub_product.save()
-            
-            if hasattr(sub_product, "inventory_profile") and sub_product.inventory_profile:
-                if pim_product.cost_price is not None:
-                    sub_product.inventory_profile.standard_unit_cost = pim_product.cost_price
-                    sub_product.inventory_profile.save(update_fields=['standard_unit_cost'])
-            
-            # Cascade updates to all variant operational products
             from products_pim.services.sync_service import PIMSyncService
-            for variant in pim_product.variants.all():
-                PIMSyncService.sync_variant_to_operational_product(variant)
-                
-        except ImportError:
-            pass
+            PIMSyncService.sync_pim_product_to_operational_product(pim_product)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning("Failed to sync PIM product to operational product: %s", e)
 
     def create(self, validated_data):
         attrs_data = validated_data.pop("attributes", [])

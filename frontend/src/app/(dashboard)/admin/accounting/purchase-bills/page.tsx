@@ -113,15 +113,59 @@ interface ItemComboboxProps {
 function ItemCombobox({ items, value, onChange, required }: ItemComboboxProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [remoteResults, setRemoteResults] = useState<InventoryItem[]>([]);
+  const [searching, setSearching] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  const selectedItem = items.find((it) => String(it.id) === value) ?? null;
+  // Combine parent items and any remote search results (deduped by ID)
+  const allKnownItems = useMemo(() => {
+    const map = new Map<number, InventoryItem>();
+    for (const item of items) {
+      map.set(item.id, item);
+    }
+    for (const item of remoteResults) {
+      if (!map.has(item.id)) {
+        map.set(item.id, item);
+      }
+    }
+    return Array.from(map.values());
+  }, [items, remoteResults]);
+
+  const selectedItem = allKnownItems.find((it) => String(it.id) === value) ?? null;
+
+  useEffect(() => {
+    const q = query.trim();
+    if (!q || q.length < 2) {
+      setRemoteResults([]);
+      setSearching(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const res = await listInventoryItems({
+          search: q,
+          is_active: 1,
+          stock_tracking_enabled: 1,
+          page_size: 50,
+        });
+        setRemoteResults(res.results || []);
+      } catch {
+        // Fallback gracefully
+      } finally {
+        setSearching(false);
+      }
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [query]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return items.slice(0, 80);
-    return items
+    if (!q) return allKnownItems.slice(0, 80);
+    return allKnownItems
       .filter(
         (it) =>
           (it.sku ?? "").toLowerCase().includes(q) ||
@@ -130,7 +174,7 @@ function ItemCombobox({ items, value, onChange, required }: ItemComboboxProps) {
           (it.stock_item_type ?? "").toLowerCase().includes(q)
       )
       .slice(0, 60);
-  }, [items, query]);
+  }, [allKnownItems, query]);
 
   function handleSelect(item: InventoryItem) {
     onChange(String(item.id), item);
@@ -196,8 +240,16 @@ function ItemCombobox({ items, value, onChange, required }: ItemComboboxProps) {
           ref={listRef}
           className="absolute z-50 mt-1 max-h-64 w-full overflow-y-auto rounded-xl border border-border bg-background shadow-lg"
         >
+          {searching && (
+            <div className="flex items-center gap-2 border-b border-border/40 px-3 py-1.5 text-[10px] text-muted-foreground bg-muted/30">
+              <span className="h-2.5 w-2.5 animate-spin rounded-full border border-primary border-t-transparent" />
+              Searching catalog…
+            </div>
+          )}
           {filtered.length === 0 ? (
-            <p className="px-4 py-3 text-xs text-muted-foreground">No items found.</p>
+            <p className="px-4 py-3 text-xs text-muted-foreground">
+              {searching ? "Searching inventory catalog…" : query ? `No items found matching "${query}".` : "No items found."}
+            </p>
           ) : (
             filtered.map((item) => (
               <button
@@ -249,7 +301,7 @@ export default function AccountingPurchaseBillsPage() {
           listVendors({ is_active: 1 }),
           listFinanceAccounts({ is_active: 1 }),
           listStockLocations({ is_active: 1 }),
-          listInventoryItems({ is_active: 1, stock_tracking_enabled: 1 }),
+          listInventoryItems({ is_active: 1, stock_tracking_enabled: 1, page_size: 500 }),
           getComplianceTaxProfile(),
           listVendorBills({ page_size: 100 }),
         ]);
@@ -623,6 +675,9 @@ export default function AccountingPurchaseBillsPage() {
                           items={inventoryItems}
                           value={line.inventory_item}
                           onChange={(itemId, item) => {
+                            if (item && !inventoryItems.some((it) => it.id === item.id)) {
+                              setInventoryItems((prev) => [...prev, item]);
+                            }
                             setForm((current) => ({
                               ...current,
                               lines: current.lines.map((entry, entryIndex) =>

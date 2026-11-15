@@ -154,6 +154,36 @@ class InventoryItemViewSet(AdminInventoryModelViewSet):
         if category:
             queryset = queryset.filter(Q(product__category__icontains=category) | Q(product__subcategory__icontains=category))
         if search:
+            try:
+                from products_pim.models import PimProduct, ProductVariant
+                from products_pim.services.sync_service import PIMSyncService
+                from products_core.models import Product as CoreProduct
+                from inventory.services.inventory_profile_service import prepare_inventory_profile_for_product
+
+                # If any CoreProduct matches search and has no inventory profile, prepare it
+                for cp in CoreProduct.objects.filter(
+                    Q(product_code__iexact=search) | Q(sku__iexact=search) | Q(product_code__icontains=search),
+                    inventory_profile__isnull=True
+                )[:5]:
+                    prepare_inventory_profile_for_product(product_id=cp.id, stock_tracking_enabled=True)
+
+                # If any PimProduct matches search and has no inventory profile, sync it
+                for pim in PimProduct.objects.filter(
+                    Q(code__iexact=search) | Q(name__icontains=search) | Q(code__icontains=search)
+                )[:5]:
+                    if not pim.source_product or not hasattr(pim.source_product, "inventory_profile") or not pim.source_product.inventory_profile:
+                        PIMSyncService.sync_pim_product_to_operational_product(pim)
+
+                # If any ProductVariant matches search and has no inventory profile, sync it
+                for var in ProductVariant.objects.filter(
+                    Q(sku__iexact=search) | Q(sku__icontains=search)
+                )[:5]:
+                    if not var.operational_product or not hasattr(var.operational_product, "inventory_profile") or not var.operational_product.inventory_profile:
+                        PIMSyncService.sync_variant_to_operational_product(var)
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning("Auto-sync inventory profile on search failed: %s", e)
+
             queryset = queryset.filter(
                 Q(product__name__icontains=search)
                 | Q(product__product_code__icontains=search)

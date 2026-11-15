@@ -25,6 +25,36 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         dry_run = options["dry_run"]
+
+        # Ensure all active PIM products and variant SKUs have operational products and inventory profiles
+        try:
+            from products_pim.models import PimProduct, ProductVariant
+            from products_pim.services.sync_service import PIMSyncService
+
+            pim_products = PimProduct.objects.filter(is_active=True)
+            for pim in pim_products:
+                if not pim.source_product or not hasattr(pim.source_product, "inventory_profile") or not pim.source_product.inventory_profile:
+                    if not dry_run:
+                        try:
+                            PIMSyncService.sync_pim_product_to_operational_product(pim)
+                        except Exception as exc:
+                            self.stdout.write(self.style.WARNING(f"Could not sync PIM product {pim.code}: {exc}"))
+                    else:
+                        self.stdout.write(f"  would sync PIM product code={pim.code}")
+
+            variants = ProductVariant.objects.filter(is_active=True)
+            for var in variants:
+                if not var.operational_product or not hasattr(var.operational_product, "inventory_profile") or not var.operational_product.inventory_profile:
+                    if not dry_run:
+                        try:
+                            PIMSyncService.sync_variant_to_operational_product(var)
+                        except Exception as exc:
+                            self.stdout.write(self.style.WARNING(f"Could not sync variant {var.sku}: {exc}"))
+                    else:
+                        self.stdout.write(f"  would sync variant sku={var.sku}")
+        except Exception as exc:
+            self.stdout.write(self.style.WARNING(f"PIM sync check encountered an issue: {exc}"))
+
         missing_product_ids = list(
             Product.objects.filter(is_active=True, inventory_profile__isnull=True).values_list(
                 "id", flat=True

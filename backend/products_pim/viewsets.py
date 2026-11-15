@@ -425,6 +425,15 @@ class PimProductViewSet(viewsets.ModelViewSet):
         child_count = product.child_pim_products.filter(is_published=False).update(is_published=True)
         variant_count = product.variants.filter(is_active=False).update(is_active=True)
 
+        from products_pim.services.sync_service import PIMSyncService
+        try:
+            PIMSyncService.sync_pim_product_to_operational_product(product)
+            for child in product.child_pim_products.all():
+                PIMSyncService.sync_pim_product_to_operational_product(child)
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning("Publish sync error for %s: %s", product.code, exc)
+
         from audit.models import AuditLog
         self._record_pim_product_audit(
             product,
@@ -510,6 +519,14 @@ class PimProductViewSet(viewsets.ModelViewSet):
                 activated_variants += ProductVariant.objects.filter(sku__in=affected_codes, is_active=False).update(is_active=True)
                 for product in products:
                     activated_variants += product.variants.filter(is_active=False).update(is_active=True)
+
+            from products_pim.services.sync_service import PIMSyncService
+            for prod in PimProduct.objects.filter(id__in=affected_ids):
+                try:
+                    PIMSyncService.sync_pim_product_to_operational_product(prod)
+                except Exception as exc:
+                    import logging
+                    logging.getLogger(__name__).warning("Bulk publish sync error for %s: %s", prod.code, exc)
 
         return Response({
             "published": published,

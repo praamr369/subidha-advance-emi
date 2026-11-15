@@ -279,6 +279,14 @@ class VariantGenerationService:
                         value_text=option.value
                     )
 
+                # Sync to ERP operational product and inventory profile
+                try:
+                    from products_pim.services.sync_service import PIMSyncService
+                    PIMSyncService.sync_variant_to_operational_product(variant)
+                except Exception as exc:
+                    import logging
+                    logging.getLogger(__name__).warning("Failed to sync generated variant %s: %s", variant.sku, exc)
+
                 created_count += 1
 
             return {

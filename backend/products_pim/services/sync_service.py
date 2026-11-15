@@ -138,6 +138,8 @@ class PIMSyncService:
 
         child_pim = PimProduct.objects.filter(code=variant.sku, parent_id=pim_product.id).first()
         if child_pim:
+            if child_pim.source_product_id != core_product.id:
+                child_pim.source_product = core_product
             child_pim.name = core_product.name
             child_pim.brand = effective_brand
             if variant.description and variant.description.strip():
@@ -212,9 +214,13 @@ class PIMSyncService:
 
         try:
             from inventory.services.inventory_profile_service import prepare_inventory_profile_for_product
-            prepare_inventory_profile_for_product(product_id=core_product.id)
-        except Exception:
-            pass
+            item, _ = prepare_inventory_profile_for_product(product_id=core_product.id, stock_tracking_enabled=True)
+            if variant.cost_price is not None and item:
+                item.standard_unit_cost = variant.cost_price
+                item.save(update_fields=["standard_unit_cost"])
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning("Failed to prepare inventory profile for variant %s: %s", variant.sku, e)
             
         if old_product_code and old_product_code != variant.sku:
             try:
@@ -225,5 +231,111 @@ class PIMSyncService:
                     register.save(update_fields=["product_code"])
             except Exception:
                 pass
+
+        return core_product
+
+    @staticmethod
+    @transaction.atomic
+    def sync_pim_product_to_operational_product(pim_product: PimProduct) -> Product:
+        """
+        Syncs a PimProduct (blueprint, standalone, or variant SKU) to an operational
+        products_core.Product and ensures its InventoryItem profile is prepared.
+        """
+        from decimal import Decimal
+        from inventory.services.inventory_profile_service import prepare_inventory_profile_for_product
+
+        # 1. Resolve or create operational Product
+        core_product = None
+        if pim_product.source_product:
+            core_product = pim_product.source_product
+        else:
+            sku_key = (pim_product.code or "")[:50]
+            core_product = Product.objects.filter(product_code=sku_key).first()
+            if not core_product and pim_product.code:
+                core_product = Product.objects.filter(sku=(pim_product.code or "")[:60]).first()
+            if not core_product:
+                core_product = Product.objects.create(
+                    product_code=sku_key,
+                    sku=(pim_product.code or "")[:60],
+                    name=(pim_product.name or pim_product.code)[:255],
+                    base_price=pim_product.base_price or Decimal("0.00"),
+                    is_active=pim_product.is_active,
+                )
+            pim_product.source_product = core_product
+            pim_product.save(update_fields=["source_product"])
+
+        # 2. Update core_product fields
+        core_product.name = (pim_product.name or core_product.name or pim_product.code)[:255]
+        if pim_product.base_price is not None:
+            core_product.base_price = pim_product.base_price
+        core_product.product_code = (pim_product.code or "")[:50]
+        core_product.sku = (pim_product.code or "")[:60]
+        core_product.is_active = pim_product.is_active
+        if pim_product.brand:
+            core_product.brand = pim_product.brand
+        if pim_product.description:
+            core_product.description = pim_product.description
+        if pim_product.product_type:
+            core_product.item_type = pim_product.product_type
+        if pim_product.category:
+            core_product.category = pim_product.category.name
+            try:
+                cat = ProductCategoryMaster.objects.filter(name=pim_product.category.name).first()
+                if cat:
+                    core_product.category_master = cat
+            except Exception:
+                pass
+        if pim_product.subcategory:
+            core_product.subcategory = pim_product.subcategory.name
+            try:
+                subcat = ProductSubcategoryMaster.objects.filter(name=pim_product.subcategory.name).first()
+                if subcat:
+                    core_product.subcategory_master = subcat
+            except Exception:
+                pass
+
+        core_product.save()
+
+        # 3. Ensure InventoryItem profile exists
+        try:
+            item, _ = prepare_inventory_profile_for_product(
+                product_id=core_product.id,
+                stock_tracking_enabled=True,
+            )
+            if pim_product.cost_price is not None and item:
+                item.standard_unit_cost = pim_product.cost_price
+                item.save(update_fields=["standard_unit_cost"])
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning("Failed to prepare inventory profile for PIM product %s: %s", pim_product.code, e)
+
+        # 4. If this is a child variant product, link with ProductVariant
+        if pim_product.parent_id:
+            variant = ProductVariant.objects.filter(product_id=pim_product.parent_id, sku=pim_product.code).first()
+            if not variant:
+                variant = ProductVariant.objects.filter(sku=pim_product.code).first()
+            if variant:
+                if variant.operational_product_id != core_product.id:
+                    variant.operational_product = core_product
+                    variant.save(update_fields=["operational_product"])
+            else:
+                try:
+                    ProductVariant.objects.create(
+                        product=pim_product.parent,
+                        operational_product=core_product,
+                        sku=pim_product.code,
+                        price=pim_product.base_price or Decimal("0.00"),
+                        cost_price=pim_product.cost_price,
+                        quantity_on_hand=0,
+                        reorder_level=2,
+                        is_active=pim_product.is_active,
+                    )
+                except Exception as e:
+                    import logging
+                    logging.getLogger(__name__).warning("Could not auto-create ProductVariant for child PIM %s: %s", pim_product.code, e)
+
+        # 5. Also sync any variants if this is a parent product
+        for variant in pim_product.variants.all():
+            PIMSyncService.sync_variant_to_operational_product(variant)
 
         return core_product
