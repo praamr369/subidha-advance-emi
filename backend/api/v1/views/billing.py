@@ -400,6 +400,35 @@ class DirectSaleViewSet(AdminBillingModelViewSet):
             status=status.HTTP_200_OK,
         )
 
+    @action(detail=True, methods=["post"], url_path="recall-signature")
+    def recall_signature(self, request, pk=None):
+        sale = self.get_object()
+        from billing.services.direct_sale_signing_service import (
+            get_direct_sale_signing_payload,
+            recall_direct_sale_signature,
+        )
+
+        action_name = request.data.get("action", "assign_to_customer")
+        history_index = request.data.get("history_index")
+        target_role = request.data.get("target_role", "CUSTOMER")
+
+        try:
+            recall_direct_sale_signature(
+                sale,
+                action=action_name,
+                history_index=history_index,
+                target_role=target_role,
+                performed_by=request.user,
+            )
+        except ValueError as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
+
+        sale.refresh_from_db()
+        return Response(
+            get_direct_sale_signing_payload(sale, request=request),
+            status=status.HTTP_200_OK,
+        )
+
     @action(detail=True, methods=["post"], url_path="resync-stock")
     def resync_stock(self, request, pk=None):
         sale = self.get_object()

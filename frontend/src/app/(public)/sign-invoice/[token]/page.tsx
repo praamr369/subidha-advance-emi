@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import React, { useEffect, useState, use } from "react";
+import { useSearchParams } from "next/navigation";
 
 import SignatureCanvas from "@/components/forms/SignatureCanvas";
 import { formatDocumentDateTime, formatDocumentMoney } from "@/lib/documents/formatters";
@@ -20,11 +21,16 @@ export default function PublicDirectSaleSignPage({ params }: PageProps) {
   const rawToken = resolvedParams?.token || "";
   const token = rawToken ? decodeURIComponent(rawToken) : "";
 
+  const searchParams = useSearchParams();
+  const rawRole = searchParams.get("role")?.toUpperCase();
+  const initialRole: "AUTHORIZED" | "CUSTOMER" =
+    rawRole === "AUTHORIZED" ? "AUTHORIZED" : "CUSTOMER";
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sale, setSale] = useState<DirectSaleSigningPayload | null>(null);
 
-  const [signerType, setSignerType] = useState<"AUTHORIZED" | "CUSTOMER">("AUTHORIZED");
+  const [signerType, setSignerType] = useState<"AUTHORIZED" | "CUSTOMER">(initialRole);
   const [signerName, setSignerName] = useState("");
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
 
@@ -46,8 +52,26 @@ export default function PublicDirectSaleSignPage({ params }: PageProps) {
       .then((data) => {
         if (!mounted) return;
         setSale(data);
-        if (data.customer_name) {
-          setSignerName(data.customer_name);
+        if (rawRole === "AUTHORIZED") {
+          setSignerType("AUTHORIZED");
+          setSignerName("Subidha Furniture");
+        } else if (rawRole === "CUSTOMER") {
+          setSignerType("CUSTOMER");
+          setSignerName(data.customer_name || "");
+        } else {
+          // Smart selection based on existing signatures
+          if (data.authorized_signed && !data.customer_signed) {
+            setSignerType("CUSTOMER");
+            setSignerName(data.customer_name || "");
+          } else if (data.customer_signed && !data.authorized_signed) {
+            setSignerType("AUTHORIZED");
+            setSignerName("Subidha Furniture");
+          } else {
+            setSignerType("CUSTOMER");
+            if (data.customer_name) {
+              setSignerName(data.customer_name);
+            }
+          }
         }
       })
       .catch((err) => {
@@ -61,7 +85,16 @@ export default function PublicDirectSaleSignPage({ params }: PageProps) {
     return () => {
       mounted = false;
     };
-  }, [token]);
+  }, [token, rawRole]);
+
+  const handleRoleChange = (newRole: "AUTHORIZED" | "CUSTOMER") => {
+    setSignerType(newRole);
+    if (newRole === "CUSTOMER") {
+      setSignerName(sale?.customer_name || "");
+    } else {
+      setSignerName("Subidha Furniture");
+    }
+  };
 
   const handleSignatureCanvasChange = (_file: File | null, dataUrl: string | null) => {
     setSignatureDataUrl(dataUrl);
@@ -221,11 +254,81 @@ export default function PublicDirectSaleSignPage({ params }: PageProps) {
           )}
         </div>
 
-        {/* Existing Signature Notice if already signed */}
-        {sale.has_signature && (
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">
-            <strong>Note:</strong> A signature has already been recorded for this invoice. Submitting below will update
-            the signature.
+        {/* Signature Status Overview */}
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          <div
+            className={`rounded-xl border p-2.5 ${
+              sale.customer_signed
+                ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                : "border-amber-200 bg-amber-50/70 text-amber-900"
+            }`}
+          >
+            <div className="flex items-center gap-1.5 font-bold">
+              <span
+                className={`inline-block h-2 w-2 rounded-full ${
+                  sale.customer_signed ? "bg-emerald-600" : "bg-amber-500 animate-pulse"
+                }`}
+              />
+              <span>Customer Signature</span>
+            </div>
+            <p className="mt-1 text-[11px] text-stone-600">
+              {sale.customer_signed ? "✓ Verified & Recorded" : "⏳ Pending Customer Sign"}
+            </p>
+          </div>
+
+          <div
+            className={`rounded-xl border p-2.5 ${
+              sale.authorized_signed
+                ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                : "border-stone-200 bg-stone-50 text-stone-700"
+            }`}
+          >
+            <div className="flex items-center gap-1.5 font-bold">
+              <span
+                className={`inline-block h-2 w-2 rounded-full ${
+                  sale.authorized_signed ? "bg-emerald-600" : "bg-stone-400"
+                }`}
+              />
+              <span>Store Signature</span>
+            </div>
+            <p className="mt-1 text-[11px] text-stone-600">
+              {sale.authorized_signed ? "✓ Store Signed" : "⏳ Pending Counter Sign"}
+            </p>
+          </div>
+        </div>
+
+        {/* Captured signatures preview if any */}
+        {(sale.customer_signature || sale.authorized_signature) && (
+          <div className="rounded-xl border border-stone-200 bg-white p-3 text-xs space-y-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400 block">
+              Recorded Signatures on File:
+            </span>
+            <div className="grid grid-cols-2 gap-2 text-center">
+              {sale.customer_signature && (
+                <div className="rounded-lg border border-stone-100 bg-stone-50 p-2">
+                  <img
+                    src={sale.customer_signature}
+                    alt="Customer Signature"
+                    className="h-10 mx-auto object-contain"
+                  />
+                  <span className="text-[10px] font-medium text-stone-600 block mt-1">
+                    Customer: {sale.customer_name}
+                  </span>
+                </div>
+              )}
+              {sale.authorized_signature && (
+                <div className="rounded-lg border border-stone-100 bg-stone-50 p-2">
+                  <img
+                    src={sale.authorized_signature}
+                    alt="Store Signature"
+                    className="h-10 mx-auto object-contain"
+                  />
+                  <span className="text-[10px] font-medium text-stone-600 block mt-1">
+                    Subidha Furniture
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -238,21 +341,7 @@ export default function PublicDirectSaleSignPage({ params }: PageProps) {
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => setSignerType("AUTHORIZED")}
-                className={`rounded-xl border p-2.5 text-xs font-semibold transition ${
-                  signerType === "AUTHORIZED"
-                    ? "border-[#8a5a22] bg-[#fbf5ea] text-[#5e3818] shadow-xs"
-                    : "border-stone-200 bg-white text-stone-600 hover:bg-stone-50"
-                }`}
-              >
-                Store / Owner Sign
-                <span className="block text-[10px] font-normal text-[#8a5a22] mt-0.5">
-                  (For Subidha Furniture)
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setSignerType("CUSTOMER")}
+                onClick={() => handleRoleChange("CUSTOMER")}
                 className={`rounded-xl border p-2.5 text-xs font-semibold transition ${
                   signerType === "CUSTOMER"
                     ? "border-[#8a5a22] bg-[#fbf5ea] text-[#5e3818] shadow-xs"
@@ -262,6 +351,20 @@ export default function PublicDirectSaleSignPage({ params }: PageProps) {
                 Customer Sign
                 <span className="block text-[10px] font-normal text-[#8a5a22] mt-0.5">
                   (Customer / Receiver)
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleRoleChange("AUTHORIZED")}
+                className={`rounded-xl border p-2.5 text-xs font-semibold transition ${
+                  signerType === "AUTHORIZED"
+                    ? "border-[#8a5a22] bg-[#fbf5ea] text-[#5e3818] shadow-xs"
+                    : "border-stone-200 bg-white text-stone-600 hover:bg-stone-50"
+                }`}
+              >
+                Store / Owner Sign
+                <span className="block text-[10px] font-normal text-[#8a5a22] mt-0.5">
+                  (For Subidha Furniture)
                 </span>
               </button>
             </div>

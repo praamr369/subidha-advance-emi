@@ -901,6 +901,19 @@ export type DirectSaleSigningPayload = {
   token: string;
   signing_path: string;
   signing_url?: string;
+  customer_signing_path?: string;
+  customer_signing_url?: string;
+  authorized_signing_path?: string;
+  authorized_signing_url?: string;
+  can_recall?: boolean;
+  signature_history?: Array<{
+    index: number;
+    signer_type: string;
+    signer_name: string;
+    signed_at: string;
+    file_url?: string;
+    has_data?: boolean;
+  }>;
   has_signature: boolean;
   authorized_signed: boolean;
   authorized_signed_at?: string | null;
@@ -930,6 +943,20 @@ export async function signDirectSale(
   }
 ): Promise<DirectSaleSigningPayload> {
   return apiFetch<DirectSaleSigningPayload>(`/billing/direct-sales/${saleId}/sign/`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function recallDirectSaleSignature(
+  saleId: number | string,
+  payload: {
+    action: "assign_to_customer" | "copy_to_customer" | "swap" | "restore_from_history";
+    history_index?: number;
+    target_role?: "CUSTOMER" | "AUTHORIZED";
+  }
+): Promise<DirectSaleSigningPayload> {
+  return apiFetch<DirectSaleSigningPayload>(`/billing/direct-sales/${saleId}/recall-signature/`, {
     method: "POST",
     body: JSON.stringify(payload),
   });

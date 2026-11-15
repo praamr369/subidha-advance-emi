@@ -181,3 +181,95 @@ class DirectSaleDigitalSignatureTests(APITestCase):
         self.sale.refresh_from_db()
         self.assertEqual(self.sale.authorized_signature, self.sample_png_data)
         self.assertEqual(self.sale.customer_signature, self.sample_png_data)
+
+    def test_dual_independent_signatures_and_recall_flow(self):
+        token = generate_direct_sale_signing_token(self.sale.id)
+
+        # 1. Customer signs via public mobile link with default or CUSTOMER role
+        cust_png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR42mNk+M9QzwAEjDAGAC4mBAMb5ZupAAAAAElFTkSuQmCC"
+        post_res = self.client.post(
+            f"/api/v1/public/direct-sales/sign/{token}/",
+            data={
+                "signature_data": cust_png,
+                "signer_type": "CUSTOMER",
+                "signer_name": "Signing Customer",
+            },
+            format="json",
+        )
+        self.assertEqual(post_res.status_code, status.HTTP_200_OK)
+        self.sale.refresh_from_db()
+        self.assertEqual(self.sale.customer_signature, cust_png)
+        self.assertEqual(self.sale.authorized_signature, "")
+
+        # 2. Store owner/admin signs via counter/desktop modal as AUTHORIZED
+        self.client.force_authenticate(user=self.admin)
+        store_png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAMAAAADCAYAAABWKLW/AAAAGElEQVR42mNk+M9QzwAFjDAGBiYoBwB4twb1p8e8eQAAAABJRU5ErkJggg=="
+        auth_res = self.client.post(
+            f"/api/v1/billing/direct-sales/{self.sale.id}/sign/",
+            data={
+                "signature_data": store_png,
+                "signer_type": "AUTHORIZED",
+                "signer_name": "Roy (Owner)",
+            },
+            format="json",
+        )
+        self.assertEqual(auth_res.status_code, status.HTTP_200_OK)
+
+        # 3. VERIFY BOTH SIGNATURES COEXIST - CUSTOMER SIGNATURE WAS NOT OVERWRITTEN!
+        self.sale.refresh_from_db()
+        self.assertEqual(self.sale.customer_signature, cust_png)
+        self.assertEqual(self.sale.authorized_signature, store_png)
+        self.assertTrue(auth_res.data["authorized_signed"])
+        self.assertTrue(auth_res.data["customer_signed"])
+        self.assertGreaterEqual(len(auth_res.data["signature_history"]), 2)
+
+        # 4. Test Recall Endpoint: swap signatures
+        swap_res = self.client.post(
+            f"/api/v1/billing/direct-sales/{self.sale.id}/recall-signature/",
+            data={"action": "swap"},
+            format="json",
+        )
+        self.assertEqual(swap_res.status_code, status.HTTP_200_OK)
+        self.sale.refresh_from_db()
+        self.assertEqual(self.sale.customer_signature, store_png)
+        self.assertEqual(self.sale.authorized_signature, cust_png)
+
+        # Swap back
+        swap_back_res = self.client.post(
+            f"/api/v1/billing/direct-sales/{self.sale.id}/recall-signature/",
+            data={"action": "swap"},
+            format="json",
+        )
+        self.assertEqual(swap_back_res.status_code, status.HTTP_200_OK)
+        self.sale.refresh_from_db()
+        self.assertEqual(self.sale.customer_signature, cust_png)
+        self.assertEqual(self.sale.authorized_signature, store_png)
+
+    def test_recall_assign_to_customer_when_accidentally_saved_as_authorized(self):
+        # Scenario where a signature was saved as authorized (e.g. customer signed under wrong role)
+        self.client.force_authenticate(user=self.admin)
+        cust_accidental_png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
+        self.client.post(
+            f"/api/v1/billing/direct-sales/{self.sale.id}/sign/",
+            data={
+                "signature_data": cust_accidental_png,
+                "signer_type": "AUTHORIZED",
+                "signer_name": "Customer by mistake",
+            },
+            format="json",
+        )
+        self.sale.refresh_from_db()
+        self.assertEqual(self.sale.authorized_signature, cust_accidental_png)
+        self.assertEqual(self.sale.customer_signature, "")
+
+        # Call recall action: assign_to_customer
+        recall_res = self.client.post(
+            f"/api/v1/billing/direct-sales/{self.sale.id}/recall-signature/",
+            data={"action": "assign_to_customer"},
+            format="json",
+        )
+        self.assertEqual(recall_res.status_code, status.HTTP_200_OK)
+        self.sale.refresh_from_db()
+        # Customer signature now has the signature, authorized is cleared so owner can sign
+        self.assertEqual(self.sale.customer_signature, cust_accidental_png)
+        self.assertEqual(self.sale.authorized_signature, "")

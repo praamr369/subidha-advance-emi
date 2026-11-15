@@ -99,6 +99,18 @@ def save_direct_sale_signature(
         "file_url": file_saved_url,
     }
 
+    # Append to immutable signature history so prior signatures can always be recalled/restored
+    history = list(metadata.get("history") or [])
+    history.append({
+        "signer_type": type_upper,
+        "signer_name": sig_entry["signer_name"],
+        "signed_at": sig_entry["signed_at"],
+        "ip_address": ip_address,
+        "signature_data": clean_data_uri,
+        "file_url": file_saved_url,
+    })
+    metadata["history"] = history[-20:]
+
     if type_upper in ("AUTHORIZED", "BOTH"):
         sale.authorized_signature = clean_data_uri
         sale.authorized_signed_at = now
@@ -151,11 +163,181 @@ def save_direct_sale_signature(
     }
 
 
+def recall_direct_sale_signature(
+    sale: DirectSale,
+    *,
+    action: str = "assign_to_customer",
+    history_index: int | None = None,
+    target_role: str = "CUSTOMER",
+    performed_by: Any | None = None,
+) -> dict:
+    """
+    Recalls or reassigns signatures for DirectSale:
+    - "assign_to_customer": Takes the current authorized signature (or latest history item)
+      and sets it as the customer signature. Clears authorized signature so owner can sign.
+    - "copy_to_customer": Copies the current authorized signature to customer signature without clearing.
+    - "assign_to_authorized": Copies/moves customer signature to authorized signature.
+    - "swap": Swaps customer and authorized signatures.
+    - "restore_from_history": Restores signature from history (history_index) to target_role.
+    """
+    now = timezone.now()
+    metadata = dict(sale.signature_metadata or {})
+    history = list(metadata.get("history") or [])
+    update_fields = ["updated_at"]
+
+    if action == "assign_to_customer":
+        sig_data = sale.authorized_signature
+        sig_signed_at = sale.authorized_signed_at or now
+        sig_name = sale.customer_name_snapshot or (sale.customer.name if sale.customer else "Customer")
+
+        if not sig_data and history:
+            # Fall back to latest signature in history
+            sig_data = history[-1].get("signature_data") or ""
+            sig_signed_at = now
+
+        if not sig_data:
+            raise ValueError("No signature available to assign to customer.")
+
+        sale.customer_signature = sig_data
+        sale.customer_signed_at = sig_signed_at
+        sale.authorized_signature = ""
+        sale.authorized_signed_at = None
+        update_fields.extend(["customer_signature", "customer_signed_at", "authorized_signature", "authorized_signed_at"])
+
+        metadata["customer"] = {
+            "signer_type": "CUSTOMER",
+            "signer_name": sig_name,
+            "signed_at": sig_signed_at.isoformat() if hasattr(sig_signed_at, "isoformat") else str(sig_signed_at),
+            "recalled_from": "authorized",
+        }
+        metadata.pop("authorized", None)
+
+    elif action == "copy_to_customer":
+        sig_data = sale.authorized_signature
+        sig_signed_at = sale.authorized_signed_at or now
+        sig_name = sale.customer_name_snapshot or (sale.customer.name if sale.customer else "Customer")
+
+        if not sig_data and history:
+            sig_data = history[-1].get("signature_data") or ""
+            sig_signed_at = now
+
+        if not sig_data:
+            raise ValueError("No signature available to copy to customer.")
+
+        sale.customer_signature = sig_data
+        sale.customer_signed_at = sig_signed_at
+        update_fields.extend(["customer_signature", "customer_signed_at"])
+
+        metadata["customer"] = {
+            "signer_type": "CUSTOMER",
+            "signer_name": sig_name,
+            "signed_at": sig_signed_at.isoformat() if hasattr(sig_signed_at, "isoformat") else str(sig_signed_at),
+            "copied_from": "authorized",
+        }
+
+    elif action == "swap":
+        if not sale.authorized_signature and not sale.customer_signature:
+            raise ValueError("No signatures available to swap.")
+        sale.authorized_signature, sale.customer_signature = sale.customer_signature, sale.authorized_signature
+        sale.authorized_signed_at, sale.customer_signed_at = sale.customer_signed_at, sale.authorized_signed_at
+        update_fields.extend(["authorized_signature", "authorized_signed_at", "customer_signature", "customer_signed_at"])
+
+        auth_meta = metadata.get("authorized")
+        cust_meta = metadata.get("customer")
+        if auth_meta:
+            metadata["customer"] = auth_meta
+        else:
+            metadata.pop("customer", None)
+        if cust_meta:
+            metadata["authorized"] = cust_meta
+        else:
+            metadata.pop("authorized", None)
+
+    elif action == "restore_from_history":
+        if not history:
+            raise ValueError("No signature history available.")
+        if history_index is None:
+            history_index = len(history) - 1
+        if history_index < 0 or history_index >= len(history):
+            raise ValueError(f"Invalid history index {history_index}.")
+        entry = history[history_index]
+        sig_data = entry.get("signature_data")
+        if not sig_data:
+            raise ValueError("No signature drawing data available in this history entry.")
+
+        target_upper = (target_role or "CUSTOMER").upper()
+        if target_upper == "CUSTOMER":
+            sale.customer_signature = sig_data
+            sale.customer_signed_at = now
+            update_fields.extend(["customer_signature", "customer_signed_at"])
+            metadata["customer"] = {
+                "signer_type": "CUSTOMER",
+                "signer_name": entry.get("signer_name") or sale.customer_name_snapshot or "Customer",
+                "signed_at": now.isoformat(),
+                "restored_from_history_index": history_index,
+            }
+        else:
+            sale.authorized_signature = sig_data
+            sale.authorized_signed_at = now
+            update_fields.extend(["authorized_signature", "authorized_signed_at"])
+            metadata["authorized"] = {
+                "signer_type": "AUTHORIZED",
+                "signer_name": entry.get("signer_name") or "Subidha Furniture",
+                "signed_at": now.isoformat(),
+                "restored_from_history_index": history_index,
+            }
+    else:
+        raise ValueError(f"Unknown recall action: {action}")
+
+    metadata["last_recalled_at"] = now.isoformat()
+    sale.signature_metadata = metadata
+    update_fields.append("signature_metadata")
+
+    DirectSale.objects.filter(pk=sale.pk).update(
+        **{f: getattr(sale, f) for f in update_fields if hasattr(sale, f)}
+    )
+
+    try:
+        from subscriptions.models import AuditLog
+        from subscriptions.services.audit_service import log_audit
+
+        log_audit(
+            action_type=AuditLog.ActionType.PAYMENT_FLAGGED,
+            instance=sale,
+            performed_by=performed_by,
+            metadata={
+                "event": "DIRECT_SALE_SIGNATURE_RECALLED",
+                "direct_sale_id": sale.id,
+                "sale_no": sale.sale_no,
+                "action": action,
+                "target_role": target_role,
+                "history_index": history_index,
+            },
+        )
+    except Exception:
+        pass
+
+    return {
+        "success": True,
+        "direct_sale_id": sale.id,
+        "action": action,
+        "authorized_signature": sale.authorized_signature or None,
+        "customer_signature": sale.customer_signature or None,
+        "authorized_signed_at": sale.authorized_signed_at.isoformat() if sale.authorized_signed_at else None,
+        "customer_signed_at": sale.customer_signed_at.isoformat() if sale.customer_signed_at else None,
+    }
+
+
 def get_direct_sale_signing_payload(sale: DirectSale, request=None) -> dict:
     """Builds serialization for both admin modal and public mobile signing page."""
     token = generate_direct_sale_signing_token(sale.id)
-    signing_path = f"/sign-invoice/{token}"
+    signing_path = f"/sign-invoice/{token}?role=customer"
+    customer_signing_path = f"/sign-invoice/{token}?role=customer"
+    authorized_signing_path = f"/sign-invoice/{token}?role=authorized"
+
     signing_url = request.build_absolute_uri(signing_path) if request else signing_path
+    customer_signing_url = request.build_absolute_uri(customer_signing_path) if request else customer_signing_path
+    authorized_signing_url = request.build_absolute_uri(authorized_signing_path) if request else authorized_signing_path
 
     # Extract invoice number
     inv = sale.billing_invoices.order_by("-id").first() if hasattr(sale, "billing_invoices") else None
@@ -176,6 +358,21 @@ def get_direct_sale_signing_payload(sale: DirectSale, request=None) -> dict:
             "line_total": str(line.line_total),
         })
 
+    metadata = sale.signature_metadata or {}
+    history = metadata.get("history") or []
+    history_summary = []
+    for idx, item in enumerate(history):
+        history_summary.append({
+            "index": idx,
+            "signer_type": item.get("signer_type", ""),
+            "signer_name": item.get("signer_name", ""),
+            "signed_at": item.get("signed_at", ""),
+            "file_url": item.get("file_url", ""),
+            "has_data": bool(item.get("signature_data")),
+        })
+
+    can_recall = bool(sale.authorized_signature and not sale.customer_signature) or len(history) > 0
+
     return {
         "success": True,
         "direct_sale_id": sale.id,
@@ -191,6 +388,10 @@ def get_direct_sale_signing_payload(sale: DirectSale, request=None) -> dict:
         "token": token,
         "signing_path": signing_path,
         "signing_url": signing_url,
+        "customer_signing_path": customer_signing_path,
+        "customer_signing_url": customer_signing_url,
+        "authorized_signing_path": authorized_signing_path,
+        "authorized_signing_url": authorized_signing_url,
         "has_signature": bool(sale.authorized_signature or sale.customer_signature),
         "authorized_signed": bool(sale.authorized_signature),
         "authorized_signed_at": sale.authorized_signed_at.isoformat() if sale.authorized_signed_at else None,
@@ -198,6 +399,8 @@ def get_direct_sale_signing_payload(sale: DirectSale, request=None) -> dict:
         "customer_signed_at": sale.customer_signed_at.isoformat() if sale.customer_signed_at else None,
         "authorized_signature": sale.authorized_signature or None,
         "customer_signature": sale.customer_signature or None,
+        "signature_history": history_summary,
+        "can_recall": can_recall,
         "lines": lines_summary,
     }
 

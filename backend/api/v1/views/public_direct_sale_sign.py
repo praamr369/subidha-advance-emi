@@ -65,7 +65,7 @@ def public_direct_sale_sign_view(request, token: str):
     # POST: Process digital signature
     signature_data = request.data.get("signature_data")
     signature_image = request.FILES.get("signature_image")
-    signer_type = (request.data.get("signer_type") or "AUTHORIZED").upper()
+    signer_type = (request.data.get("signer_type") or "CUSTOMER").upper()
     signer_name = request.data.get("signer_name", "").strip()
 
     if not signature_data and not signature_image:

@@ -83,6 +83,20 @@ export default function DirectSaleInvoicePrintPage() {
   const [copyLabel, setCopyLabel] = useState<DocumentCopyLabel>("Original");
   const [printFormat, setPrintFormat] = useState<PrintDocumentFormat>("A4");
   const [signModalOpen, setSignModalOpen] = useState(false);
+  const [signModalRole, setSignModalRole] = useState<"CUSTOMER" | "AUTHORIZED" | "BOTH">("CUSTOMER");
+
+  const openSignModal = (role?: "CUSTOMER" | "AUTHORIZED" | "BOTH") => {
+    if (role) {
+      setSignModalRole(role);
+    } else {
+      if (sale?.customer_signature && !sale?.authorized_signature) {
+        setSignModalRole("AUTHORIZED");
+      } else {
+        setSignModalRole("CUSTOMER");
+      }
+    }
+    setSignModalOpen(true);
+  };
 
   const reloadSale = async () => {
     if (!params?.id) return;
@@ -153,7 +167,7 @@ export default function DirectSaleInvoicePrintPage() {
         backHref={backHref}
         format={printFormat}
         onFormatChange={setPrintFormat}
-        onSignClick={() => setSignModalOpen(true)}
+        onSignClick={() => openSignModal()}
         onWhatsAppShare={() => {
           openWhatsAppDirectModal({
             phone: sale.customer_phone_snapshot || "",
@@ -629,7 +643,7 @@ export default function DirectSaleInvoicePrintPage() {
                     <div className="text-center">
                       <button
                         type="button"
-                        onClick={() => setSignModalOpen(true)}
+                        onClick={() => openSignModal("CUSTOMER")}
                         className="group relative flex flex-col items-center justify-center w-full min-h-[48px] rounded border border-dashed border-[#8a5a22]/30 hover:border-[#8a5a22] hover:bg-[#8a5a22]/5 transition cursor-pointer print:border-none print:bg-transparent"
                         title="Click to capture Customer signature"
                       >
@@ -660,7 +674,7 @@ export default function DirectSaleInvoicePrintPage() {
                     <div className="text-center">
                       <button
                         type="button"
-                        onClick={() => setSignModalOpen(true)}
+                        onClick={() => openSignModal("AUTHORIZED")}
                         className="group relative flex flex-col items-center justify-center w-full min-h-[48px] rounded border border-dashed border-[#8a5a22]/30 hover:border-[#8a5a22] hover:bg-[#8a5a22]/5 transition cursor-pointer print:border-none print:bg-transparent"
                         title="Click to capture Authorized Store signature"
                       >
@@ -756,6 +770,7 @@ export default function DirectSaleInvoicePrintPage() {
         <DirectSaleSignatureModal
           saleId={sale.id}
           isOpen={signModalOpen}
+          initialRole={signModalRole}
           onClose={() => setSignModalOpen(false)}
           onSignatureSaved={reloadSale}
         />
