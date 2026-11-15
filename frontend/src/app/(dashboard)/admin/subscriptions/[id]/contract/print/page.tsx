@@ -296,7 +296,7 @@ export default function AdminSubscriptionContractPrintPage() {
   const resolvedMerchantName = (subidhaDocumentTheme.businessName || "").trim() || "Subidha Furniture";
   const monthlyEmiAmount = Number(subscription?.monthly_amount || 0);
 
-  const subscriptionEmiUpiUri = useMemo(() => {
+  const subscriptionEmiUpiUri = (() => {
     if (!subscription) return "";
     const params = new URLSearchParams();
     params.set("pa", resolvedUpiId);
@@ -307,7 +307,7 @@ export default function AdminSubscriptionContractPrintPage() {
     params.set("cu", "INR");
     params.set("tn", `SFEMI EMI ${reference}`);
     return `upi://pay?${params.toString()}`;
-  }, [subscription, monthlyEmiAmount, resolvedUpiId, resolvedMerchantName, reference]);
+  })();
 
   return (
     <>

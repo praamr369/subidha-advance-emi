@@ -33,7 +33,7 @@ import {
 } from "@/lib/documents/formatters";
 import { buildAdminSubscriptionRoute } from "@/lib/route-builders";
 import QRCode from "react-qr-code";
-import DynamicUpiQrModal, { type UpiQrPreset } from "@/components/payments/DynamicUpiQrModal";
+import DynamicUpiQrModal from "@/components/payments/DynamicUpiQrModal";
 
 type PlanType = "RENT" | "LEASE";
 
@@ -321,7 +321,7 @@ export default function AdminRentLeaseContractPrintPage() {
   const monthlyAmt = Number(subscription?.monthly_amount || 0);
   const depositAmt = Number(profile?.security_deposit_amount || 0);
 
-  const rentUpiUri = useMemo(() => {
+  const rentUpiUri = (() => {
     if (!subscription || monthlyAmt <= 0) return "";
     const params = new URLSearchParams();
     params.set("pa", resolvedUpiId);
@@ -330,9 +330,9 @@ export default function AdminRentLeaseContractPrintPage() {
     params.set("cu", "INR");
     params.set("tn", `Monthly Rent ${reference}`);
     return `upi://pay?${params.toString()}`;
-  }, [subscription, monthlyAmt, resolvedUpiId, resolvedMerchantName, reference]);
+  })();
 
-  const depositUpiUri = useMemo(() => {
+  const depositUpiUri = (() => {
     if (!subscription || depositAmt <= 0) return "";
     const params = new URLSearchParams();
     params.set("pa", resolvedUpiId);
@@ -341,7 +341,7 @@ export default function AdminRentLeaseContractPrintPage() {
     params.set("cu", "INR");
     params.set("tn", `Security Deposit ${reference}`);
     return `upi://pay?${params.toString()}`;
-  }, [subscription, depositAmt, resolvedUpiId, resolvedMerchantName, reference]);
+  })();
 
   return (
     <>
