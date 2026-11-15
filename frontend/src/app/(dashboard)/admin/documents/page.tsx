@@ -10,6 +10,7 @@ import {
   deleteDocument,
   documentDownloadUrl,
   documentZipExportUrl,
+  resolveDocumentFileUrl,
   formatFileSize,
   type DocumentRecord,
 } from "@/services/documents";
@@ -282,60 +283,90 @@ export default function DocumentCenterPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {(docs || []).map((doc) => (
-                      <tr key={doc.id} className="hover:bg-muted/30 transition-colors">
-                        <td className="px-4 py-3">
-                          <div className="font-medium text-foreground truncate max-w-[200px]">
-                            {doc.title || doc.original_filename || "Untitled"}
-                          </div>
-                          <div className="text-xs text-muted-foreground truncate max-w-[200px]">
-                            {doc.original_filename || "—"}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span
-                            className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
-                              CATEGORY_COLORS[doc.category] || CATEGORY_COLORS.other
-                            }`}
-                          >
-                            {doc.category_label || doc.category}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">
-                          {formatFileSize(doc.file_size)}
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground hidden lg:table-cell">
-                          {doc.created_at && !isNaN(new Date(doc.created_at).getTime())
-                            ? new Date(doc.created_at).toLocaleDateString("en-IN")
-                            : "—"}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center justify-end gap-2">
-                            {isPreviewable(doc.mime_type, doc.original_filename) && (
-                              <button
-                                onClick={() => setPreviewDoc(doc)}
-                                className="text-blue-600 dark:text-blue-400 hover:underline text-xs"
+                    {(docs || []).map((doc) => {
+                      const docAny = doc as unknown as Record<string, unknown>;
+                      const displayTitle =
+                        doc.title ||
+                        doc.original_filename ||
+                        (typeof docAny.file_name === "string" ? docAny.file_name : "") ||
+                        `Document #${doc.id}`;
+                      const displayFilename =
+                        doc.original_filename ||
+                        (typeof docAny.file_name === "string" ? docAny.file_name : "") ||
+                        "—";
+                      const displayCategory =
+                        doc.category_label ||
+                        doc.category ||
+                        (typeof docAny.document_type === "string" ? String(docAny.document_type) : "") ||
+                        "Contract";
+                      const docDate =
+                        doc.created_at ||
+                        (typeof docAny.generated_at === "string" ? docAny.generated_at : null);
+                      const isPreview = isPreviewable(
+                        doc.mime_type,
+                        displayFilename !== "—" ? displayFilename : ""
+                      );
+                      const fileDownloadHref = documentDownloadUrl(doc.id);
+
+                      return (
+                        <tr key={doc.id} className="hover:bg-muted/30 transition-colors">
+                          <td className="px-4 py-3">
+                            <div className="font-medium text-foreground truncate max-w-[240px]">
+                              {displayTitle}
+                            </div>
+                            <div className="text-xs text-muted-foreground truncate max-w-[240px]">
+                              {displayFilename}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span
+                              className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
+                                CATEGORY_COLORS[doc.category] ||
+                                CATEGORY_COLORS.contract ||
+                                CATEGORY_COLORS.other
+                              }`}
+                            >
+                              {displayCategory}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">
+                            {formatFileSize(doc.file_size)}
+                          </td>
+                          <td className="px-4 py-3 text-muted-foreground hidden lg:table-cell">
+                            {docDate && !isNaN(new Date(docDate).getTime())
+                              ? new Date(docDate).toLocaleDateString("en-IN")
+                              : "—"}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center justify-end gap-2">
+                              {isPreview && (
+                                <button
+                                  onClick={() => setPreviewDoc(doc)}
+                                  className="text-blue-600 dark:text-blue-400 hover:underline text-xs"
+                                >
+                                  Preview
+                                </button>
+                              )}
+                              <a
+                                href={fileDownloadHref}
+                                target="_blank"
+                                rel="noreferrer"
+                                download={displayFilename !== "—" ? displayFilename : `document_${doc.id}`}
+                                className="text-green-600 dark:text-green-400 hover:underline text-xs"
                               >
-                                Preview
+                                Download
+                              </a>
+                              <button
+                                onClick={() => setDeleteTarget(doc)}
+                                className="text-red-500 dark:text-red-400 hover:underline text-xs"
+                              >
+                                Delete
                               </button>
-                            )}
-                            <a
-                              href={documentDownloadUrl(doc.id)}
-                              download={doc.original_filename || `document_${doc.id}`}
-                              className="text-green-600 dark:text-green-400 hover:underline text-xs"
-                            >
-                              Download
-                            </a>
-                            <button
-                              onClick={() => setDeleteTarget(doc)}
-                              className="text-red-500 dark:text-red-400 hover:underline text-xs"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
                 <div className="px-4 py-2 border-t border-border text-xs text-muted-foreground">
@@ -504,15 +535,19 @@ export default function DocumentCenterPage() {
               </div>
               <div className="flex-1 overflow-auto p-2 flex items-center justify-center bg-muted/30">
                 {previewDoc.mime_type === "application/pdf" ||
-                previewDoc.original_filename?.endsWith(".pdf") ? (
+                previewDoc.original_filename?.endsWith(".pdf") ||
+                Boolean(
+                  (previewDoc as unknown as Record<string, unknown>).file_name &&
+                    String((previewDoc as unknown as Record<string, unknown>).file_name).endsWith(".pdf")
+                ) ? (
                   <iframe
-                    src={documentDownloadUrl(previewDoc.id)}
+                    src={resolveDocumentFileUrl(previewDoc.file_url) || documentDownloadUrl(previewDoc.id)}
                     className="w-full h-[70vh] border-0"
                     title="PDF Preview"
                   />
                 ) : (
                   <img
-                    src={previewDoc.file_url ?? documentDownloadUrl(previewDoc.id)}
+                    src={resolveDocumentFileUrl(previewDoc.file_url) || documentDownloadUrl(previewDoc.id)}
                     alt={previewDoc.title || "Preview"}
                     className="max-w-full max-h-[70vh] object-contain rounded"
                   />

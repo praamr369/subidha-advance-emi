@@ -57,7 +57,7 @@ urlpatterns = [
     path("inventory/requirements/", AdminInventoryRequirementListView.as_view()),
     path("receipts/", AdminReceiptRegisterView.as_view()),
     path("receipts/<int:pk>/pdf/", AdminReceiptPdfView.as_view()),
-    path("documents/", AdminDocumentCenterView.as_view()),
+    path("finance/documents/", AdminDocumentCenterView.as_view()),
     path("documents/<int:pk>/regenerate/", AdminDocumentRegenerateView.as_view()),
     path("customer/<int:pk>/statement/", AdminCustomerStatementView.as_view()),
     path("commission-payout-batches/", AdminPayoutBatchCreateView.as_view()),

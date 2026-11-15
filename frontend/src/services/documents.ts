@@ -1,4 +1,5 @@
 import { apiFetch } from "@/lib/api";
+import { API_BASE_URL } from "@/lib/constants";
 
 export type DocumentCategory =
   | "invoice"
@@ -74,8 +75,26 @@ export async function deleteDocument(id: number): Promise<void> {
   await apiFetch(`/admin/documents/${id}/`, { method: "DELETE" });
 }
 
+export function getBackendBaseUrl(): string {
+  return API_BASE_URL.replace(/\/+$/, "");
+}
+
+export function getBackendMediaRoot(): string {
+  return API_BASE_URL.replace(/\/api\/v1\/?$/, "");
+}
+
+export function resolveDocumentFileUrl(fileUrl?: string | null): string {
+  if (!fileUrl) return "";
+  if (fileUrl.startsWith("http://") || fileUrl.startsWith("https://")) {
+    return fileUrl;
+  }
+  const root = getBackendMediaRoot();
+  return `${root}${fileUrl.startsWith("/") ? "" : "/"}${fileUrl}`;
+}
+
 export function documentDownloadUrl(id: number): string {
-  return `/api/v1/admin/documents/${id}/download/`;
+  const base = getBackendBaseUrl();
+  return `${base}/admin/documents/${id}/download/`;
 }
 
 export function documentZipExportUrl(params?: {
@@ -88,7 +107,8 @@ export function documentZipExportUrl(params?: {
   if (params?.date_from) q.set("date_from", params.date_from);
   if (params?.date_to) q.set("date_to", params.date_to);
   const qs = q.toString();
-  return `/api/v1/admin/documents/export/zip/${qs ? `?${qs}` : ""}`;
+  const base = getBackendBaseUrl();
+  return `${base}/admin/documents/export/zip/${qs ? `?${qs}` : ""}`;
 }
 
 export async function generatePdf(
