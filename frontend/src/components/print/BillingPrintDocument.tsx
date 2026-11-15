@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import QRCode from "react-qr-code";
 import {
   AmountSummary,
@@ -46,6 +46,8 @@ type BillingPrintDocumentProps = {
   footerNote?: string;
   showUpiQr?: boolean;
   upiId?: string;
+  amount?: number | string;
+  merchantName?: string;
 };
 
 export default function BillingPrintDocument({
@@ -67,10 +69,32 @@ export default function BillingPrintDocument({
   footerNote = "Generated from live SUBIDHA CORE records. Print or save as PDF for business filing.",
   showUpiQr,
   upiId,
+  amount,
+  merchantName,
 }: BillingPrintDocumentProps) {
   const theme = useDocumentTheme();
   const resolvedShowUpiQr = showUpiQr ?? theme.showUpiQr;
-  const resolvedUpiId = upiId ?? theme.upiId;
+  const resolvedUpiId = ((upiId ?? theme.upiId) || "").trim() || "subidha@upi";
+  const resolvedMerchantName = (merchantName || theme.businessName || "Subidha Furniture").trim();
+
+  const numAmount = useMemo(() => {
+    const n = Number(amount);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  }, [amount]);
+
+  const resolvedUpiUri = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set("pa", resolvedUpiId);
+    params.set("pn", resolvedMerchantName);
+    if (numAmount > 0) {
+      params.set("am", numAmount.toFixed(2));
+    }
+    params.set("cu", "INR");
+    if (reference) {
+      params.set("tn", `Invoice ${reference}`);
+    }
+    return `upi://pay?${params.toString()}`;
+  }, [resolvedUpiId, resolvedMerchantName, numAmount, reference]);
 
   const statusTone =
     statusToneClassName?.includes("emerald")
@@ -133,11 +157,14 @@ export default function BillingPrintDocument({
           {resolvedShowUpiQr && resolvedUpiId ? (
             <div className="flex shrink-0 items-center gap-3 rounded-xl border border-border bg-card p-3">
               <div className="rounded-lg bg-white p-2">
-                <QRCode value={`upi://pay?pa=${resolvedUpiId}`} size={64} />
+                <QRCode value={resolvedUpiUri} size={64} />
               </div>
               <div className="text-xs">
                 <p className="font-semibold text-foreground">Pay via UPI</p>
-                <p className="text-muted-foreground">{resolvedUpiId}</p>
+                {numAmount > 0 ? (
+                  <p className="font-bold text-emerald-600 font-mono">₹{numAmount.toFixed(2)}</p>
+                ) : null}
+                <p className="text-muted-foreground font-mono text-[11px]">{resolvedUpiId}</p>
               </div>
             </div>
           ) : null}

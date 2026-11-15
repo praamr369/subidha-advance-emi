@@ -113,3 +113,12 @@ class AdminOptInPagination(PageNumberPagination):
         if not wants_pagination:
             return None
         return super().paginate_queryset(queryset, request, view=view)
+
+
+class AdminInventoryPagination(PageNumberPagination):
+    """Always-on pagination for inventory and procurement registers that honors ``?page_size`` up to 500."""
+
+    page_size = 50
+    page_size_query_param = "page_size"
+    max_page_size = 500
+

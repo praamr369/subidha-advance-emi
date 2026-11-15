@@ -32,6 +32,8 @@ import {
   safeDocumentText,
 } from "@/lib/documents/formatters";
 import { buildAdminSubscriptionRoute } from "@/lib/route-builders";
+import QRCode from "react-qr-code";
+import DynamicUpiQrModal, { type UpiQrPreset } from "@/components/payments/DynamicUpiQrModal";
 
 type PlanType = "RENT" | "LEASE";
 
@@ -180,6 +182,7 @@ export default function AdminRentLeaseContractPrintPage() {
   const [copyLabel, setCopyLabel] = useState<DocumentCopyLabel>("Original");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [upiQrModalOpen, setUpiQrModalOpen] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -313,12 +316,40 @@ export default function AdminRentLeaseContractPrintPage() {
     ? formatDocumentDateTime(customerSignatureDoc.created_at)
     : null;
 
+  const resolvedUpiId = (subidhaDocumentTheme.upiId || "").trim() || "subidha@upi";
+  const resolvedMerchantName = (subidhaDocumentTheme.businessName || "").trim() || "Subidha Furniture";
+  const monthlyAmt = Number(subscription?.monthly_amount || 0);
+  const depositAmt = Number(profile?.security_deposit_amount || 0);
+
+  const rentUpiUri = useMemo(() => {
+    if (!subscription || monthlyAmt <= 0) return "";
+    const params = new URLSearchParams();
+    params.set("pa", resolvedUpiId);
+    params.set("pn", resolvedMerchantName);
+    params.set("am", monthlyAmt.toFixed(2));
+    params.set("cu", "INR");
+    params.set("tn", `Monthly Rent ${reference}`);
+    return `upi://pay?${params.toString()}`;
+  }, [subscription, monthlyAmt, resolvedUpiId, resolvedMerchantName, reference]);
+
+  const depositUpiUri = useMemo(() => {
+    if (!subscription || depositAmt <= 0) return "";
+    const params = new URLSearchParams();
+    params.set("pa", resolvedUpiId);
+    params.set("pn", resolvedMerchantName);
+    params.set("am", depositAmt.toFixed(2));
+    params.set("cu", "INR");
+    params.set("tn", `Security Deposit ${reference}`);
+    return `upi://pay?${params.toString()}`;
+  }, [subscription, depositAmt, resolvedUpiId, resolvedMerchantName, reference]);
+
   return (
     <>
       <PrintToolbar
         copyLabel={copyLabel}
         onCopyLabelChange={setCopyLabel}
         backHref={buildAdminSubscriptionRoute(subscription.id)}
+        onUpiQrClick={() => setUpiQrModalOpen(true)}
       />
       <DocumentPage watermark={watermark}>
         <DocumentHeader
@@ -478,6 +509,54 @@ export default function AdminRentLeaseContractPrintPage() {
               { label: "Outstanding / Balance", value: formatDocumentMoney(outstanding), strong: true, danger: Number(outstanding ?? 0) > 0 },
             ]}
           />
+          <div className="my-3 grid gap-3 sm:grid-cols-2">
+            {monthlyAmt > 0 && rentUpiUri ? (
+              <div className="document-card flex items-center justify-between rounded-xl border border-indigo-200 bg-indigo-50/50 p-3">
+                <div>
+                  <div className="text-[10px] font-black uppercase tracking-wider text-indigo-900">
+                    Monthly {planType === "RENT" ? "Rent" : "Lease"} · UPI Scan
+                  </div>
+                  <div className="mt-0.5 text-xs text-indigo-950 font-bold font-mono">
+                    {formatDocumentMoney(subscription.monthly_amount)}
+                  </div>
+                  <div className="text-[9px] text-stone-500 font-mono">
+                    UPI: {resolvedUpiId}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setUpiQrModalOpen(true)}
+                  className="shrink-0 bg-white p-1 rounded-lg border border-indigo-200 shadow-2xs hover:border-indigo-400 transition cursor-pointer print:cursor-default"
+                  title="Click to open dynamic price-written QR pay dialog"
+                >
+                  <QRCode value={rentUpiUri} size={54} />
+                </button>
+              </div>
+            ) : null}
+            {depositAmt > 0 && depositUpiUri ? (
+              <div className="document-card flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50/50 p-3">
+                <div>
+                  <div className="text-[10px] font-black uppercase tracking-wider text-amber-900">
+                    Security Deposit · UPI Scan
+                  </div>
+                  <div className="mt-0.5 text-xs text-amber-950 font-bold font-mono">
+                    {formatDocumentMoney(profile?.security_deposit_amount)}
+                  </div>
+                  <div className="text-[9px] text-stone-500 font-mono">
+                    UPI: {resolvedUpiId}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setUpiQrModalOpen(true)}
+                  className="shrink-0 bg-white p-1 rounded-lg border border-amber-200 shadow-2xs hover:border-amber-400 transition cursor-pointer print:cursor-default"
+                  title="Click to open dynamic price-written QR pay dialog"
+                >
+                  <QRCode value={depositUpiUri} size={54} />
+                </button>
+              </div>
+            ) : null}
+          </div>
         </div>
 
         <section className="document-card my-5 rounded-xl border border-border bg-card p-4">
@@ -557,6 +636,48 @@ export default function AdminRentLeaseContractPrintPage() {
 
         <DocumentAuditFooter generatedAt={generatedAt} />
       </DocumentPage>
+
+      {upiQrModalOpen && subscription && (
+        <DynamicUpiQrModal
+          isOpen={upiQrModalOpen}
+          onClose={() => setUpiQrModalOpen(false)}
+          title={`${planType === "RENT" ? "Rent" : "Lease"} Agreement Payment QR`}
+          subtitle={`${reference} · ${subscription.customer_name || ""}`}
+          referenceNo={reference}
+          customerName={subscription.customer_name || customer?.name || ""}
+          customerPhone={subscription.customer_phone || customer?.phone || ""}
+          customerId={subscription.customer_id ?? subscription.customer ?? null}
+          defaultAmount={depositAmt > 0 ? depositAmt : monthlyAmt > 0 ? monthlyAmt : Number(outstanding || 0)}
+          sourceType="SUBSCRIPTION"
+          sourceId={subscription.id}
+          presets={[
+            ...(depositAmt > 0 ? [{
+              label: "Security Deposit",
+              amount: depositAmt,
+              description: "Security deposit amount",
+              defaultNote: `Security Deposit for ${reference}`,
+            }] : []),
+            ...(monthlyAmt > 0 ? [{
+              label: `Monthly ${planType === "RENT" ? "Rent" : "Lease"}`,
+              amount: monthlyAmt,
+              description: `Monthly installment`,
+              defaultNote: `Monthly Rent for ${reference}`,
+            }] : []),
+            ...(depositAmt > 0 && monthlyAmt > 0 ? [{
+              label: "Rent + Security Deposit",
+              amount: monthlyAmt + depositAmt,
+              description: "Combined monthly rent and security deposit",
+              defaultNote: `Rent & Security Deposit for ${reference}`,
+            }] : []),
+            ...(Number(outstanding || 0) > 0 ? [{
+              label: "Total Outstanding",
+              amount: Number(outstanding),
+              description: "Total contract dues",
+              defaultNote: `Contract Outstanding for ${reference}`,
+            }] : []),
+          ]}
+        />
+      )}
     </>
   );
 }

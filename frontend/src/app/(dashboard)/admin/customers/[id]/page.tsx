@@ -17,6 +17,7 @@ import {
   ChevronRight,
   Database,
   RefreshCw,
+  QrCode,
 } from "lucide-react";
 
 import EmptyState from "@/components/feedback/EmptyState";
@@ -45,6 +46,7 @@ import ProductPostureCard, {
 } from "@/components/customers/ProductPostureCard";
 import type { CollectionPrimaryAction } from "@/services/receivables";
 import { openWhatsAppDirectModal } from "@/components/whatsapp/WhatsAppDirectSenderModal";
+import DynamicUpiQrModal, { type UpiQrPreset } from "@/components/payments/DynamicUpiQrModal";
 
 // =====================================================
 // TYPES
@@ -1399,6 +1401,7 @@ export default function AdminCustomerDetailPage() {
   const [usernameSaving, setUsernameSaving] = useState(false);
   const [usernameError, setUsernameError] = useState<string | null>(null);
   const [usernameSuccess, setUsernameSuccess] = useState<string | null>(null);
+  const [customerUpiQrOpen, setCustomerUpiQrOpen] = useState(false);
 
   const rqQuery = useQuery({
     queryKey: ["admin", "customers", customerId],
@@ -1621,6 +1624,89 @@ export default function AdminCustomerDetailPage() {
     [passwordResetIdentifier]
   );
 
+  const directSaleOutstanding = useMemo(
+    () => Number(operationalProfile?.overview.direct_sale_outstanding_total || 0),
+    [operationalProfile]
+  );
+  const subscriptionOutstanding = useMemo(
+    () => Number(operationalProfile?.overview.subscription_outstanding_amount || 0),
+    [operationalProfile]
+  );
+  const legacyOutstanding = useMemo(
+    () => Number(operationalProfile?.overview.legacy_outstanding_amount || 0),
+    [operationalProfile]
+  );
+  const totalCustomerOutstanding = useMemo(
+    () => directSaleOutstanding + subscriptionOutstanding + legacyOutstanding,
+    [directSaleOutstanding, subscriptionOutstanding, legacyOutstanding]
+  );
+
+  const customerUpiPresets = useMemo<UpiQrPreset[]>(() => {
+    if (!customer) return [];
+    const list: UpiQrPreset[] = [];
+
+    if (directSaleOutstanding > 0) {
+      list.push({
+        label: `Direct Sale Dues (${formatRupee(directSaleOutstanding)})`,
+        amount: directSaleOutstanding,
+        defaultNote: `Direct Sale balance for ${customer.name}`,
+        description: `Direct sale receivables outstanding across all invoices`,
+      });
+    }
+
+    if (subscriptionOutstanding > 0) {
+      list.push({
+        label: `SFEMI / Rent Dues (${formatRupee(subscriptionOutstanding)})`,
+        amount: subscriptionOutstanding,
+        defaultNote: `SFEMI/Rent dues for ${customer.name}`,
+        description: `Active contract / monthly rent / EMI outstanding`,
+      });
+    }
+
+    if (legacyOutstanding > 0) {
+      list.push({
+        label: `Legacy Outstanding (${formatRupee(legacyOutstanding)})`,
+        amount: legacyOutstanding,
+        defaultNote: `Legacy balance clearance for ${customer.name}`,
+        description: `Pre-migration legacy ledger receivables`,
+      });
+    }
+
+    if (totalCustomerOutstanding > 0 && list.length > 1) {
+      list.push({
+        label: `Total All Dues (${formatRupee(totalCustomerOutstanding)})`,
+        amount: totalCustomerOutstanding,
+        defaultNote: `Total outstanding clearance for ${customer.name}`,
+        description: `Settle all direct-sale, contract, and legacy receivables in one payment`,
+      });
+    }
+
+    if (firstOutstandingDirectSale) {
+      const invBal = Number(firstOutstandingDirectSale.active_outstanding_total || firstOutstandingDirectSale.balance_total || 0);
+      const invoiceRef =
+        firstOutstandingDirectSale.billing_invoice_no ||
+        firstOutstandingDirectSale.sale_no ||
+        `Direct Sale #${firstOutstandingDirectSale.id}`;
+      if (invBal > 0 && invBal !== directSaleOutstanding) {
+        list.push({
+          label: `Bill #${invoiceRef} (${formatRupee(invBal)})`,
+          amount: invBal,
+          defaultNote: `Bill ${invoiceRef} for ${customer.name}`,
+          description: `Specific invoice direct-sale balance`,
+        });
+      }
+    }
+
+    return list;
+  }, [customer, directSaleOutstanding, subscriptionOutstanding, legacyOutstanding, totalCustomerOutstanding, firstOutstandingDirectSale]);
+
+  const customerInitialUpiAmount = useMemo(() => {
+    if (customerUpiPresets.length > 0) {
+      return customerUpiPresets[0].amount;
+    }
+    return totalCustomerOutstanding > 0 ? totalCustomerOutstanding : 1000;
+  }, [customerUpiPresets, totalCustomerOutstanding]);
+
   const actions = useMemo(() => {
     const nextActions: Array<{
       href?: string;
@@ -1641,6 +1727,12 @@ export default function AdminCustomerDetailPage() {
     ];
 
     if (customer) {
+      nextActions.push({
+        onClick: () => setCustomerUpiQrOpen(true),
+        label: "💳 UPI Payment QR",
+        variant: (totalCustomerOutstanding > 0 || !!firstOutstandingDirectSale) ? "primary" : "secondary",
+      });
+
       nextActions.push({
         onClick: () => {
           openWhatsAppDirectModal({
@@ -1689,7 +1781,7 @@ export default function AdminCustomerDetailPage() {
     }
 
     return nextActions;
-  }, [customer, firstOutstandingDirectSale, latestSubscription]);
+  }, [customer, totalCustomerOutstanding, firstOutstandingDirectSale, latestSubscription]);
 
   async function handleKycDecision(
     status: "APPROVED" | "VERIFIED" | "REJECTED" | "PENDING" | "SUBMITTED"
@@ -2255,12 +2347,22 @@ export default function AdminCustomerDetailPage() {
                           Open Direct Sales
                         </Link>
                         {firstOutstandingDirectSale ? (
-                          <Link
-                            href={`/admin/finance/collect?workflow=direct-sale&sale_id=${firstOutstandingDirectSale.id}`}
-                            className="inline-flex items-center rounded-md border border-amber-900 bg-amber-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-amber-800"
-                          >
-                            Collect Direct-Sale Balance
-                          </Link>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Link
+                              href={`/admin/finance/collect?workflow=direct-sale&sale_id=${firstOutstandingDirectSale.id}`}
+                              className="inline-flex items-center rounded-md border border-amber-900 bg-amber-900 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-amber-800"
+                            >
+                              Collect Direct-Sale Balance
+                            </Link>
+                            <button
+                              type="button"
+                              onClick={() => setCustomerUpiQrOpen(true)}
+                              className="inline-flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-100/60 px-3 py-2 text-sm font-semibold text-amber-950 shadow-sm transition hover:bg-amber-200"
+                            >
+                              <QrCode className="h-4 w-4" />
+                              <span>QR Pay</span>
+                            </button>
+                          </div>
                         ) : draftDirectSales.length > 0 ? (
                           <Link
                             href={`/admin/billing/direct-sales?focus_sale=${draftDirectSales[0].id}`}
@@ -2311,12 +2413,22 @@ export default function AdminCustomerDetailPage() {
                           Create Subscription
                         </Link>
                         {latestSubscription ? (
-                          <Link
-                            href={`/admin/finance/collect?subscription=${latestSubscription.id}`}
-                            className="inline-flex items-center rounded-md border border-emerald-900 bg-card px-3 py-2 text-sm font-medium text-emerald-950 shadow-sm transition hover:bg-emerald-100/60"
-                          >
-                            Collect EMI
-                          </Link>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Link
+                              href={`/admin/finance/collect?subscription=${latestSubscription.id}`}
+                              className="inline-flex items-center rounded-md border border-emerald-900 bg-card px-3 py-2 text-sm font-medium text-emerald-950 shadow-sm transition hover:bg-emerald-100/60"
+                            >
+                              Collect EMI
+                            </Link>
+                            <button
+                              type="button"
+                              onClick={() => setCustomerUpiQrOpen(true)}
+                              className="inline-flex items-center gap-1.5 rounded-md border border-emerald-300 bg-emerald-100/60 px-3 py-2 text-sm font-semibold text-emerald-950 shadow-sm transition hover:bg-emerald-200"
+                            >
+                              <QrCode className="h-4 w-4" />
+                              <span>QR Pay</span>
+                            </button>
+                          </div>
                         ) : (
                           <span className="inline-flex items-center rounded-md border border-border bg-muted px-3 py-2 text-sm font-medium text-muted-foreground">
                             No active EMI collect action
@@ -3032,6 +3144,19 @@ export default function AdminCustomerDetailPage() {
           </>
         ) : null}
       </div>
+
+      {customer ? (
+        <DynamicUpiQrModal
+          isOpen={customerUpiQrOpen}
+          onClose={() => setCustomerUpiQrOpen(false)}
+          customerName={customer.name}
+          customerPhone={customer.phone}
+          customerId={customer.id}
+          defaultAmount={customerInitialUpiAmount}
+          referenceNo={`CUST-${customer.id}`}
+          presets={customerUpiPresets}
+        />
+      ) : null}
     </ERPPageShell>
   );
 }

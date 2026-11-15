@@ -45,6 +45,7 @@ import {
 import { recheckStockNeed } from "@/services/inventory-ops";
 import AccessorySelectionPanel, { type AccessorySelectionResult } from "@/components/inventory/AccessorySelectionPanel";
 import DirectSaleSignatureModal from "@/components/billing/DirectSaleSignatureModal";
+import DynamicUpiQrModal from "@/components/payments/DynamicUpiQrModal";
 import SearchCombobox, { SearchComboboxRow, CodeBadge } from "@/components/ui/SearchCombobox";
 import MobileHandoverModal from "@/components/handover/MobileHandoverModal";
 import { extractCustomerQuery } from "@/services/mobile-handover";
@@ -346,6 +347,7 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [collectSaleId, setCollectSaleId] = useState<number | null>(null);
   const [signatureModalSaleId, setSignatureModalSaleId] = useState<number | null>(null);
+  const [upiQrDirectSale, setUpiQrDirectSale] = useState<DirectSale | null>(null);
   const [cancelSaleTarget, setCancelSaleTarget] = useState<DirectSale | null>(null);
   const [cancelSubmitting, setCancelSubmitting] = useState(false);
   const [eligibilityLoadingSaleId, setEligibilityLoadingSaleId] = useState<number | null>(null);
@@ -707,7 +709,23 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
     {
       key: "balance_total",
       header: "Balance",
-      render: (row) => accountingMoney(row.balance_total),
+      render: (row) => {
+        const bal = toNumber(row.balance_total);
+        if (bal > 0) {
+          return (
+            <button
+              type="button"
+              onClick={() => setUpiQrDirectSale(row)}
+              className="group flex items-center gap-1.5 font-semibold text-amber-900 dark:text-amber-300 hover:underline cursor-pointer"
+              title="Click to send balance payment QR to customer"
+            >
+              <span>{accountingMoney(row.balance_total)}</span>
+              <QrCode className="h-3.5 w-3.5 text-amber-700 opacity-60 group-hover:opacity-100" />
+            </button>
+          );
+        }
+        return accountingMoney(row.balance_total);
+      },
     },
     {
       key: "receipt_status",
@@ -821,6 +839,15 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
               >
                 Collect Direct-Sale Balance
               </Link>
+              <button
+                type="button"
+                onClick={() => setUpiQrDirectSale(row)}
+                className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-indigo-500/30 bg-indigo-50 px-3 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition dark:bg-indigo-950/30 dark:text-indigo-300 cursor-pointer"
+                title="Send dynamic UPI payment QR with pre-filled balance to customer"
+              >
+                <QrCode className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                <span>QR Pay</span>
+              </button>
               <button
                 type="button"
                 onClick={() => setCancelSaleTarget(row)}
@@ -3082,6 +3109,44 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
         initialProduct={stockDrawer.product}
         onStockPosted={handleStockPosted}
       />
+
+      {/* Dynamic UPI Payment QR Modal */}
+      {upiQrDirectSale && (() => {
+        const bal = Number(upiQrDirectSale.balance_total || 0);
+        const grand = Number(upiQrDirectSale.grand_total || 0);
+        const ref = upiQrDirectSale.billing_invoice_no || upiQrDirectSale.sale_no || `Sale #${upiQrDirectSale.id}`;
+        return (
+          <DynamicUpiQrModal
+            isOpen={Boolean(upiQrDirectSale)}
+            onClose={() => setUpiQrDirectSale(null)}
+            title="Direct Sale Invoice Payment QR"
+            subtitle={`Sale ${ref} · ${upiQrDirectSale.customer_name_snapshot || upiQrDirectSale.customer_name || "Customer"}`}
+            referenceNo={ref}
+            customerName={upiQrDirectSale.customer_name_snapshot || upiQrDirectSale.customer_name || ""}
+            customerPhone={upiQrDirectSale.customer_phone_snapshot || ""}
+            customerId={upiQrDirectSale.customer || null}
+            defaultAmount={bal > 0 ? bal : grand}
+            sourceType="DIRECT_SALE"
+            sourceId={upiQrDirectSale.id}
+            presets={[
+              ...(bal > 0
+                ? [{
+                    label: "Remaining Outstanding Balance",
+                    amount: bal,
+                    description: "Unpaid invoice balance",
+                    defaultNote: `Outstanding Balance for Invoice ${ref}`,
+                  }]
+                : []),
+              {
+                label: "Total Invoice Amount",
+                amount: grand,
+                description: "Full invoice grand total",
+                defaultNote: `Full Payment for Invoice ${ref}`,
+              },
+            ]}
+          />
+        );
+      })()}
     </ERPPageShell>
     );
   }
@@ -3469,6 +3534,44 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
         initialProduct={stockDrawer.product}
         onStockPosted={handleStockPosted}
       />
+
+      {/* Dynamic UPI Payment QR Modal */}
+      {upiQrDirectSale && (() => {
+        const bal = Number(upiQrDirectSale.balance_total || 0);
+        const grand = Number(upiQrDirectSale.grand_total || 0);
+        const ref = upiQrDirectSale.billing_invoice_no || upiQrDirectSale.sale_no || `Sale #${upiQrDirectSale.id}`;
+        return (
+          <DynamicUpiQrModal
+            isOpen={Boolean(upiQrDirectSale)}
+            onClose={() => setUpiQrDirectSale(null)}
+            title="Direct Sale Invoice Payment QR"
+            subtitle={`Sale ${ref} · ${upiQrDirectSale.customer_name_snapshot || upiQrDirectSale.customer_name || "Customer"}`}
+            referenceNo={ref}
+            customerName={upiQrDirectSale.customer_name_snapshot || upiQrDirectSale.customer_name || ""}
+            customerPhone={upiQrDirectSale.customer_phone_snapshot || ""}
+            customerId={upiQrDirectSale.customer || null}
+            defaultAmount={bal > 0 ? bal : grand}
+            sourceType="DIRECT_SALE"
+            sourceId={upiQrDirectSale.id}
+            presets={[
+              ...(bal > 0
+                ? [{
+                    label: "Remaining Outstanding Balance",
+                    amount: bal,
+                    description: "Unpaid invoice balance",
+                    defaultNote: `Outstanding Balance for Invoice ${ref}`,
+                  }]
+                : []),
+              {
+                label: "Total Invoice Amount",
+                amount: grand,
+                description: "Full invoice grand total",
+                defaultNote: `Full Payment for Invoice ${ref}`,
+              },
+            ]}
+          />
+        );
+      })()}
     </ERPPageShell>
   );
 }

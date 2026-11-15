@@ -15,6 +15,7 @@ import ProcurementConfirmDialog from "@/components/procurement/ProcurementConfir
 import { useWorkflowLauncher } from "@/components/workflows/WorkflowProvider";
 import { buildAdminPurchaseBillPrintRoute } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
+import SearchableItemSelect from "@/components/inventory/SearchableItemSelect";
 import VendorPayablesToggle from "@/components/vendors/VendorPayablesToggle";
 import {
   createVendorBill,
@@ -215,14 +216,21 @@ function CreateBillForm({ vendors, receipts, items, locations, onSaved, onCancel
         <div className="space-y-2">
           {lines.map((line, i) => (
             <div key={i} className="grid grid-cols-[1fr_80px_90px_80px_32px] gap-2 items-center">
-              <select
-                value={line.inventory_item || ""}
-                onChange={(e) => setLine(i, { inventory_item: Number(e.target.value) })}
-                className={inputCls}
-              >
-                <option value="">— Item —</option>
-                {items.map((it) => <option key={it.id} value={it.id}>{it.product_name}</option>)}
-              </select>
+              <SearchableItemSelect
+                value={line.inventory_item}
+                allItems={items}
+                placeholder="Search product by name, code, SKU…"
+                onChange={(val, it) => {
+                  const itemId = Number(val) || 0;
+                  const autoCost = it?.purchase_unit_cost || it?.standard_unit_cost;
+                  const shouldFillCost = (!line.unit_cost || line.unit_cost === "0.00" || line.unit_cost === "0") && autoCost;
+                  setLine(i, {
+                    inventory_item: itemId,
+                    description: it ? (it.product_name || it.product_code || "") : line.description,
+                    unit_cost: shouldFillCost ? String(autoCost) : line.unit_cost,
+                  });
+                }}
+              />
               <input type="number" min="0.001" step="0.001" placeholder="Qty" value={line.quantity} onChange={(e) => setLine(i, { quantity: e.target.value })} className={inputCls} />
               <input type="number" min="0" step="0.01" placeholder="Unit cost" value={line.unit_cost} onChange={(e) => setLine(i, { unit_cost: e.target.value })} className={inputCls} />
               <input type="number" min="0" step="0.01" placeholder="Tax" value={line.tax_amount ?? ""} onChange={(e) => setLine(i, { tax_amount: e.target.value })} className={inputCls} />

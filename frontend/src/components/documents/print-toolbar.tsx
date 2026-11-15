@@ -1,6 +1,6 @@
 "use client";
 
-import { MessageCircle } from "lucide-react";
+import { MessageCircle, QrCode } from "lucide-react";
 import { documentCopyLabels, type DocumentCopyLabel } from "@/lib/documents/document-theme";
 
 export type PrintDocumentFormat = "A4" | "THERMAL_80MM" | "A4_EXPANDED";
@@ -11,6 +11,7 @@ export function PrintToolbar({
   backHref,
   onWhatsAppShare,
   onSignClick,
+  onUpiQrClick,
   format = "A4",
   onFormatChange,
 }: {
@@ -19,6 +20,7 @@ export function PrintToolbar({
   backHref?: string;
   onWhatsAppShare?: () => void;
   onSignClick?: () => void;
+  onUpiQrClick?: () => void;
   format?: PrintDocumentFormat;
   onFormatChange?: (format: PrintDocumentFormat) => void;
 }) {
@@ -75,6 +77,17 @@ export function PrintToolbar({
               title="Capture digital signature via mobile QR or counter"
             >
               <span>✍️ Sign Invoice</span>
+            </button>
+          ) : null}
+          {onUpiQrClick ? (
+            <button
+              type="button"
+              onClick={onUpiQrClick}
+              className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-indigo-500/30 bg-indigo-500/10 hover:bg-indigo-500/20 px-3.5 text-sm font-semibold text-indigo-700 dark:text-indigo-300 transition cursor-pointer"
+              title="Open dynamic UPI QR with direct price setup & customer WhatsApp share"
+            >
+              <QrCode className="size-4 text-indigo-600 dark:text-indigo-400" />
+              <span>UPI QR Pay</span>
             </button>
           ) : null}
           {onWhatsAppShare ? (

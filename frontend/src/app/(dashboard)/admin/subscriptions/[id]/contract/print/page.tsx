@@ -33,6 +33,8 @@ import {
 } from "@/lib/documents/formatters";
 import { buildAdminSubscriptionRoute } from "@/lib/route-builders";
 import { openWhatsAppDirectModal } from "@/components/whatsapp/WhatsAppDirectSenderModal";
+import QRCode from "react-qr-code";
+import DynamicUpiQrModal from "@/components/payments/DynamicUpiQrModal";
 
 type FinancialSummary = {
   total_amount?: string;
@@ -170,6 +172,7 @@ export default function AdminSubscriptionContractPrintPage() {
   const [copyLabel, setCopyLabel] = useState<DocumentCopyLabel>("Original");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [upiQrModalOpen, setUpiQrModalOpen] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -289,12 +292,30 @@ export default function AdminSubscriptionContractPrintPage() {
     ? formatDocumentDateTime(customerSignatureDoc.created_at)
     : null;
 
+  const resolvedUpiId = (subidhaDocumentTheme.upiId || "").trim() || "subidha@upi";
+  const resolvedMerchantName = (subidhaDocumentTheme.businessName || "").trim() || "Subidha Furniture";
+  const monthlyEmiAmount = Number(subscription?.monthly_amount || 0);
+
+  const subscriptionEmiUpiUri = useMemo(() => {
+    if (!subscription) return "";
+    const params = new URLSearchParams();
+    params.set("pa", resolvedUpiId);
+    params.set("pn", resolvedMerchantName);
+    if (monthlyEmiAmount > 0) {
+      params.set("am", monthlyEmiAmount.toFixed(2));
+    }
+    params.set("cu", "INR");
+    params.set("tn", `SFEMI EMI ${reference}`);
+    return `upi://pay?${params.toString()}`;
+  }, [subscription, monthlyEmiAmount, resolvedUpiId, resolvedMerchantName, reference]);
+
   return (
     <>
       <PrintToolbar
         copyLabel={copyLabel}
         onCopyLabelChange={setCopyLabel}
         backHref={buildAdminSubscriptionRoute(subscription.id)}
+        onUpiQrClick={() => setUpiQrModalOpen(true)}
         onWhatsAppShare={() => {
           openWhatsAppDirectModal({
             phone: customerDisplayPhone,
@@ -470,6 +491,29 @@ export default function AdminSubscriptionContractPrintPage() {
               { label: "Outstanding / Balance", value: formatDocumentMoney(outstandingAmount), strong: true, danger: Number(outstandingAmount ?? 0) > 0 },
             ]}
           />
+          {monthlyEmiAmount > 0 && subscriptionEmiUpiUri ? (
+            <div className="document-card my-3 flex items-center justify-between rounded-xl border border-indigo-200 bg-indigo-50/50 p-3">
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-wider text-indigo-900">
+                  SFEMI Monthly EMI · Direct UPI Scan
+                </div>
+                <div className="mt-0.5 text-xs text-indigo-950">
+                  Pay monthly installment of <span className="font-bold font-mono">{formatDocumentMoney(subscription.monthly_amount)}</span> via any UPI app
+                </div>
+                <div className="mt-0.5 text-[9px] text-stone-500 font-mono">
+                  UPI: {resolvedUpiId} · Ref: {reference}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setUpiQrModalOpen(true)}
+                className="shrink-0 bg-white p-1.5 rounded-lg border border-indigo-200 shadow-2xs hover:border-indigo-400 transition cursor-pointer print:cursor-default"
+                title="Click to open dynamic price-written QR pay dialog"
+              >
+                <QRCode value={subscriptionEmiUpiUri} size={60} />
+              </button>
+            </div>
+          ) : null}
         </div>
 
         <DocumentTermsBlock terms={buildTerms(subscription)} />
@@ -510,6 +554,31 @@ export default function AdminSubscriptionContractPrintPage() {
 
         <DocumentAuditFooter generatedAt={generatedAt} />
       </DocumentPage>
+
+      {upiQrModalOpen && subscription && (
+        <DynamicUpiQrModal
+          isOpen={upiQrModalOpen}
+          onClose={() => setUpiQrModalOpen(false)}
+          title="SFEMI Subscription Payment QR"
+          subtitle={`Subscription ${reference} · ${customerDisplayName}`}
+          referenceNo={reference}
+          customerName={customerDisplayName}
+          customerPhone={customerDisplayPhone}
+          customerId={subscription.customer || customer?.id || null}
+          defaultAmount={monthlyEmiAmount > 0 ? monthlyEmiAmount : Number(outstandingAmount || 0)}
+          sourceType="SUBSCRIPTION"
+          sourceId={subscription.id}
+          presets={[
+            ...(monthlyEmiAmount > 0
+              ? [{ label: "Monthly EMI", amount: monthlyEmiAmount, description: "Next monthly installment" }]
+              : []),
+            ...(Number(outstandingAmount || 0) > 0
+              ? [{ label: "Outstanding Dues", amount: Number(outstandingAmount), description: "Remaining contract balance" }]
+              : []),
+            { label: "Full Contract", amount: Number(subscription.total_amount || 0), description: "Total contract amount" },
+          ]}
+        />
+      )}
     </>
   );
 }

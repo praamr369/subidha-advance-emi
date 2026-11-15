@@ -8,6 +8,7 @@ import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import ProcurementConfirmDialog from "@/components/procurement/ProcurementConfirmDialog";
+import SearchableItemSelect from "@/components/inventory/SearchableItemSelect";
 import { ROUTES } from "@/lib/routes";
 import {
   createGoodsReceipt,
@@ -139,16 +140,20 @@ function CreateGRForm({ purchaseOrders, items, onSaved, onCancel }: CreateGRForm
         <div className="space-y-2">
           {lines.map((line, i) => (
             <div key={i} className="grid grid-cols-[1fr_100px_90px_32px] gap-2 items-center">
-              <select
-                value={line.inventory_item || ""}
-                onChange={(e) => setLine(i, { inventory_item: Number(e.target.value) })}
-                className={inputCls}
-              >
-                <option value="">— Item —</option>
-                {items.map((it) => (
-                  <option key={it.id} value={it.id}>{line.inventory_item === it.id && line.inventory_item_product_name ? line.inventory_item_product_name : it.product_name}</option>
-                ))}
-              </select>
+              <SearchableItemSelect
+                value={line.inventory_item}
+                initialLabel={line.inventory_item_product_name}
+                allItems={items}
+                placeholder="Search product by name, code, SKU…"
+                onChange={(val, it) => {
+                  const itemId = Number(val) || 0;
+                  setLine(i, {
+                    inventory_item: itemId,
+                    inventory_item_sku: it?.sku || line.inventory_item_sku,
+                    inventory_item_product_name: it?.product_name || line.inventory_item_product_name,
+                  });
+                }}
+              />
               <input
                 type="number"
                 min="0.001"

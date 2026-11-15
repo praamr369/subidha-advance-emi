@@ -8,6 +8,7 @@ import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
+import SearchableItemSelect from "@/components/inventory/SearchableItemSelect";
 import { ROUTES } from "@/lib/routes";
 import {
   approvePurchaseRequest,
@@ -125,14 +126,17 @@ function CreateRequestForm({ vendors, items, onSaved, onCancel }: CreateRequestF
         <div className="space-y-2">
           {lines.map((line, i) => (
             <div key={i} className="grid grid-cols-[1fr_100px_32px] gap-2 items-center">
-              <select
-                value={line.inventory_item || ""}
-                onChange={(e) => setLine(i, { inventory_item: Number(e.target.value) })}
-                className={inputCls}
-              >
-                <option value="">— Item —</option>
-                {items.map((it) => <option key={it.id} value={it.id}>{it.product_name}</option>)}
-              </select>
+              <SearchableItemSelect
+                value={line.inventory_item}
+                allItems={items}
+                placeholder="Search product by name, code, SKU…"
+                onChange={(val) => {
+                  const itemId = Number(val) || 0;
+                  setLine(i, {
+                    inventory_item: itemId,
+                  });
+                }}
+              />
               <input
                 type="number"
                 min="1"

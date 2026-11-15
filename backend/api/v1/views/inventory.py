@@ -73,6 +73,7 @@ from billing.services.reversal_service import _location_quantity
 from subscriptions.models import AuditLog
 from inventory.services.valuation_service import build_inventory_valuation
 from api.v1.permissions import IsAdmin
+from api.v1.pagination import AdminInventoryPagination
 from api.v1.serializers.inventory import (
     EmptyInventoryActionSerializer,
     InventoryItemSerializer,
@@ -96,6 +97,7 @@ from api.v1.serializers.inventory import (
 
 class AdminInventoryModelViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
+    pagination_class = AdminInventoryPagination
     http_method_names = ["get", "post", "patch", "head", "options"]
 
 
@@ -184,13 +186,16 @@ class InventoryItemViewSet(AdminInventoryModelViewSet):
                 import logging
                 logging.getLogger(__name__).warning("Auto-sync inventory profile on search failed: %s", e)
 
-            queryset = queryset.filter(
-                Q(product__name__icontains=search)
-                | Q(product__product_code__icontains=search)
-                | Q(sku__icontains=search)
-                | Q(barcode__icontains=search)
-                | Q(product__category__icontains=search)
-            )
+            terms = [t for t in search.split() if t]
+            for term in terms:
+                queryset = queryset.filter(
+                    Q(product__name__icontains=term)
+                    | Q(product__product_code__icontains=term)
+                    | Q(sku__icontains=term)
+                    | Q(barcode__icontains=term)
+                    | Q(product__category__icontains=term)
+                    | Q(product__subcategory__icontains=term)
+                )
 
         return queryset
 

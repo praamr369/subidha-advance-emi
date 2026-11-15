@@ -27,6 +27,7 @@ import { ROUTES } from "@/lib/routes";
 import { formatRupee } from "@/lib/utils/currency";
 import { openWhatsAppDirectModal } from "@/components/whatsapp/WhatsAppDirectSenderModal";
 import { getDirectSale, type DirectSale } from "@/services/billing";
+import DynamicUpiQrModal from "@/components/payments/DynamicUpiQrModal";
 
 function formatDate(val: string | null | undefined): string {
   if (!val) return "—";
@@ -64,6 +65,7 @@ export default function AdminDirectSaleDetailPage() {
 
   const [collectOpen, setCollectOpen] = useState(false);
   const [signatureModalOpen, setSignatureModalOpen] = useState(false);
+  const [upiQrModalOpen, setUpiQrModalOpen] = useState(false);
 
   const loadSale = useCallback(async () => {
     if (!saleId || Number.isNaN(saleId)) {
@@ -271,6 +273,15 @@ export default function AdminDirectSaleDetailPage() {
                 <Printer className="h-3.5 w-3.5 text-muted-foreground" />
                 Print A4 Invoice
               </Link>
+              <button
+                type="button"
+                onClick={() => setUpiQrModalOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-500/20 transition dark:text-indigo-300"
+                title="Open dynamic price-written QR pay dialog & send to customer"
+              >
+                <QrCode className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                UPI Payment QR
+              </button>
               <button
                 type="button"
                 onClick={() => setSignatureModalOpen(true)}
@@ -582,6 +593,29 @@ export default function AdminDirectSaleDetailPage() {
             setSignatureModalOpen(false);
             void loadSale();
           }}
+        />
+      ) : null}
+
+      {/* Dynamic UPI Payment QR Modal */}
+      {upiQrModalOpen && sale ? (
+        <DynamicUpiQrModal
+          isOpen={upiQrModalOpen}
+          onClose={() => setUpiQrModalOpen(false)}
+          title="Direct Sale Payment QR"
+          subtitle={`Direct Sale #${sale.billing_invoice_no || sale.sale_no || sale.id}`}
+          referenceNo={sale.billing_invoice_no || sale.sale_no || `Sale #${sale.id}`}
+          customerName={customerName}
+          customerPhone={customerPhone}
+          customerId={sale.customer || null}
+          defaultAmount={balanceNumber > 0 ? balanceNumber : Number(sale.grand_total || 0)}
+          sourceType="DIRECT_SALE"
+          sourceId={sale.id}
+          presets={[
+            ...(balanceNumber > 0
+              ? [{ label: "Balance Due", amount: balanceNumber, description: "Remaining balance" }]
+              : []),
+            { label: "Grand Total", amount: Number(sale.grand_total || 0), description: "Full invoice total" },
+          ]}
         />
       ) : null}
     </>

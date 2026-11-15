@@ -30,6 +30,8 @@ import {
 import { getDirectSale, type DirectSale } from "@/services/billing";
 import { openWhatsAppDirectModal } from "@/components/whatsapp/WhatsAppDirectSenderModal";
 import DirectSaleSignatureModal from "@/components/billing/DirectSaleSignatureModal";
+import QRCode from "react-qr-code";
+import DynamicUpiQrModal from "@/components/payments/DynamicUpiQrModal";
 
 function lineTaxTotal(line: DirectSale["lines"][number]): string {
   const total =
@@ -84,6 +86,24 @@ export default function DirectSaleInvoicePrintPage() {
   const [printFormat, setPrintFormat] = useState<PrintDocumentFormat>("A4");
   const [signModalOpen, setSignModalOpen] = useState(false);
   const [signModalRole, setSignModalRole] = useState<"CUSTOMER" | "AUTHORIZED" | "BOTH">("CUSTOMER");
+  const [upiQrModalOpen, setUpiQrModalOpen] = useState(false);
+
+  const balanceAmount = Number(sale?.balance_total || 0);
+  const resolvedUpiId = (subidhaDocumentTheme.upiId || "").trim() || "subidha@upi";
+  const resolvedMerchantName = (subidhaDocumentTheme.businessName || "").trim() || "Subidha Furniture";
+
+  const directSaleBalanceUpiUri = useMemo(() => {
+    if (!sale) return "";
+    const params = new URLSearchParams();
+    params.set("pa", resolvedUpiId);
+    params.set("pn", resolvedMerchantName);
+    if (balanceAmount > 0) {
+      params.set("am", balanceAmount.toFixed(2));
+    }
+    params.set("cu", "INR");
+    params.set("tn", `Invoice ${sale.billing_invoice_no || sale.sale_no || `#${sale.id}`}`);
+    return `upi://pay?${params.toString()}`;
+  }, [sale, balanceAmount, resolvedUpiId, resolvedMerchantName]);
 
   const openSignModal = (role?: "CUSTOMER" | "AUTHORIZED" | "BOTH") => {
     if (role) {
@@ -168,6 +188,7 @@ export default function DirectSaleInvoicePrintPage() {
         format={printFormat}
         onFormatChange={setPrintFormat}
         onSignClick={() => openSignModal()}
+        onUpiQrClick={() => setUpiQrModalOpen(true)}
         onWhatsAppShare={() => {
           openWhatsAppDirectModal({
             phone: sale.customer_phone_snapshot || "",
@@ -291,6 +312,23 @@ export default function DirectSaleInvoicePrintPage() {
               </div>
             </div>
 
+            {balanceAmount > 0 && directSaleBalanceUpiUri ? (
+              <div className="my-2 border-t border-dashed border-stone-400 pt-2 text-center">
+                <button
+                  type="button"
+                  onClick={() => setUpiQrModalOpen(true)}
+                  className="inline-block bg-white p-1 rounded border border-stone-300 cursor-pointer print:cursor-default"
+                  title="Click to open dynamic price-written QR dialog"
+                >
+                  <QRCode value={directSaleBalanceUpiUri} size={68} />
+                </button>
+                <div className="text-[9px] font-bold text-black mt-1">
+                  Scan to Pay Balance: {formatDocumentMoney(sale.balance_total)}
+                </div>
+                <div className="text-[8px] font-mono text-stone-600">{resolvedUpiId}</div>
+              </div>
+            ) : null}
+
             <div className="mt-4 border-t border-dashed border-stone-400 pt-2 text-center text-[10px] text-stone-500">
               Thank you for choosing Subidha Furniture!
             </div>
@@ -368,15 +406,31 @@ export default function DirectSaleInvoicePrintPage() {
                   Outstanding Balance: {formatDocumentMoney(sale.balance_total)}
                 </span>
               </div>
-              {sale.terms || sale.notes ? (
-                <pre className="whitespace-pre-wrap font-sans text-xs leading-relaxed text-amber-950">
-                  {sale.terms || sale.notes}
-                </pre>
-              ) : (
-                <p className="text-amber-800 text-xs">
-                  Balance of {formatDocumentMoney(sale.balance_total)} is due as per agreed showroom installment schedule.
-                </p>
-              )}
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1">
+                  {sale.terms || sale.notes ? (
+                    <pre className="whitespace-pre-wrap font-sans text-xs leading-relaxed text-amber-950">
+                      {sale.terms || sale.notes}
+                    </pre>
+                  ) : (
+                    <p className="text-amber-800 text-xs">
+                      Balance of {formatDocumentMoney(sale.balance_total)} is due as per agreed showroom installment schedule.
+                    </p>
+                  )}
+                </div>
+                {directSaleBalanceUpiUri && (
+                  <button
+                    type="button"
+                    onClick={() => setUpiQrModalOpen(true)}
+                    className="shrink-0 flex flex-col items-center p-2 rounded-lg bg-white border border-amber-300 hover:border-amber-500 transition cursor-pointer print:cursor-default"
+                    title="Click to open dynamic price-written QR pay dialog"
+                  >
+                    <QRCode value={directSaleBalanceUpiUri} size={64} />
+                    <span className="text-[9px] font-bold text-amber-900 mt-1">Scan to Pay Balance</span>
+                    <span className="text-[8px] font-mono text-stone-600">{resolvedUpiId}</span>
+                  </button>
+                )}
+              </div>
             </div>
           ) : null}
           <DocumentTermsBlock />
@@ -740,19 +794,43 @@ export default function DirectSaleInvoicePrintPage() {
                     </div>
                   </div>
 
-                  <div className={`mt-2 rounded p-2 text-center border font-bold text-xs ${
+                  <div className={`mt-2 rounded p-2 border font-bold text-xs ${
                     Number(sale.balance_total || 0) > 0
                       ? "bg-amber-50 border-amber-300 text-amber-900"
                       : "bg-emerald-50 border-emerald-200 text-emerald-800"
                   }`}>
-                    <span className="uppercase text-[9px] tracking-wider block">
-                      {Number(sale.balance_total || 0) > 0 ? "Balance Remaining" : "Payment Status"}
-                    </span>
-                    <span className="text-sm font-mono font-black">
-                      {Number(sale.balance_total || 0) > 0
-                        ? formatDocumentMoney(sale.balance_total)
-                        : "FULLY PAID"}
-                    </span>
+                    {Number(sale.balance_total || 0) > 0 && directSaleBalanceUpiUri ? (
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-left flex-1">
+                          <span className="uppercase text-[9px] tracking-wider block text-amber-800">
+                            Balance Remaining
+                          </span>
+                          <span className="text-sm font-mono font-black block text-amber-950">
+                            {formatDocumentMoney(sale.balance_total)}
+                          </span>
+                          <span className="text-[8px] font-normal text-stone-600 block mt-0.5">
+                            Scan QR to pay exact balance
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setUpiQrModalOpen(true)}
+                          className="shrink-0 bg-white p-1 rounded border border-amber-300 shadow-2xs hover:border-amber-500 transition cursor-pointer print:cursor-default"
+                          title="Click to open dynamic price-written QR pay dialog"
+                        >
+                          <QRCode value={directSaleBalanceUpiUri} size={48} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="text-center">
+                        <span className="uppercase text-[9px] tracking-wider block">
+                          Payment Status
+                        </span>
+                        <span className="text-sm font-mono font-black">
+                          FULLY PAID
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -773,6 +851,28 @@ export default function DirectSaleInvoicePrintPage() {
           initialRole={signModalRole}
           onClose={() => setSignModalOpen(false)}
           onSignatureSaved={reloadSale}
+        />
+      )}
+
+      {upiQrModalOpen && sale && (
+        <DynamicUpiQrModal
+          isOpen={upiQrModalOpen}
+          onClose={() => setUpiQrModalOpen(false)}
+          title="Direct Sale Invoice Payment QR"
+          subtitle={`Direct Sale #${sale.billing_invoice_no || sale.sale_no || sale.id}`}
+          referenceNo={sale.billing_invoice_no || sale.sale_no || `Sale #${sale.id}`}
+          customerName={sale.customer_name_snapshot || sale.customer_name || ""}
+          customerPhone={sale.customer_phone_snapshot || ""}
+          customerId={sale.customer || null}
+          defaultAmount={balanceAmount > 0 ? balanceAmount : Number(sale.grand_total || 0)}
+          sourceType="DIRECT_SALE"
+          sourceId={sale.id}
+          presets={[
+            ...(balanceAmount > 0
+              ? [{ label: "Balance Remaining", amount: balanceAmount, description: "Unpaid balance" }]
+              : []),
+            { label: "Grand Total", amount: Number(sale.grand_total || 0), description: "Full invoice total" },
+          ]}
         />
       )}
     </>

@@ -36,6 +36,7 @@ import { cn } from "@/lib/utils";
 import GuarantorSection from "@/components/subscriptions/GuarantorSection";
 import { SubscriptionDocumentUploadPanel } from "@/components/subscriptions/SubscriptionDocumentUploadPanel";
 import { CustomerSignatureLinkModal } from "@/components/contracts/CustomerSignatureLinkModal";
+import DynamicUpiQrModal from "@/components/payments/DynamicUpiQrModal";
 import { GenerateRentLeaseLedgerModal } from "./GenerateRentLeaseLedgerModal";
 import { SettleRentLeaseContractModal } from "./SettleRentLeaseContractModal";
 import ProductAttributeBadges from "@/components/ui/ProductAttributeBadges";
@@ -812,6 +813,7 @@ export default function AdminSubscriptionDetailPage() {
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
   const [settleModalOpen, setSettleModalOpen] = useState(false);
   const [signatureModalOpen, setSignatureModalOpen] = useState(false);
+  const [upiQrModalOpen, setUpiQrModalOpen] = useState(false);
 
   const { data: queryData, isLoading: loading, isRefetching: refreshing, error: queryError, refetch } = useQuery({
     queryKey: ["admin_subscription_detail", subscriptionId],
@@ -1057,6 +1059,11 @@ export default function AdminSubscriptionDetailPage() {
                     ? `/admin/rent-lease/contracts/${subscription.id}/contract/print`
                     : `/admin/subscriptions/${subscription.id}/contract/print`,
                 label: "🖨 Print Contract",
+                variant: "secondary" as const,
+              },
+              {
+                onClick: () => setUpiQrModalOpen(true),
+                label: "💳 UPI Payment QR",
                 variant: "secondary" as const,
               },
               {
@@ -2556,6 +2563,86 @@ export default function AdminSubscriptionDetailPage() {
             onSignatureUpdated={() => void loadPage()}
           />
         ) : null}
+
+        {upiQrModalOpen && subscription ? (() => {
+          const isRentOrLease = subscription.plan_type === "RENT" || subscription.plan_type === "LEASE";
+          const ref = subscription.subscription_number || `SUB-${subscription.id}`;
+          const depositReceived = Number(contractProfile?.deposit_settlement?.received ?? 0);
+          const depositDue = Number(contractProfile?.security_deposit_amount ?? 0);
+          const remainingDeposit = Math.max(0, depositDue - depositReceived);
+          const monthlyAmt = Number(subscription.monthly_amount || 0);
+          const outstandingAmt = Number(financialSummary?.outstanding_amount ?? financialSummary?.remaining_amount ?? 0);
+
+          const presets = isRentOrLease ? [
+            ...(remainingDeposit > 0 ? [{
+              label: depositReceived > 0 ? "Rest Security Deposit" : "Security Deposit",
+              amount: remainingDeposit,
+              description: `Security deposit ${depositReceived > 0 ? "remaining balance" : "full deposit"}`,
+              defaultNote: `Rest Security Deposit for ${ref}`,
+            }] : []),
+            ...(monthlyAmt > 0 ? [{
+              label: "Monthly Rent",
+              amount: monthlyAmt,
+              description: "Monthly rent installment",
+              defaultNote: `Monthly Rent for ${ref}`,
+            }] : []),
+            ...(remainingDeposit > 0 && monthlyAmt > 0 ? [{
+              label: "Rent + Rest Deposit",
+              amount: monthlyAmt + remainingDeposit,
+              description: "Combined monthly rent and security deposit balance",
+              defaultNote: `Rent & Security Deposit for ${ref}`,
+            }] : []),
+            ...(outstandingAmt > 0 ? [{
+              label: "Total Outstanding",
+              amount: outstandingAmt,
+              description: "Total contract dues",
+              defaultNote: `Contract Outstanding for ${ref}`,
+            }] : []),
+          ] : [
+            ...(monthlyAmt > 0 ? [{
+              label: "Monthly EMI",
+              amount: monthlyAmt,
+              description: "Next monthly installment",
+              defaultNote: `SFEMI EMI ${ref}`,
+            }] : []),
+            ...(outstandingAmt > 0 ? [{
+              label: "Outstanding Dues",
+              amount: outstandingAmt,
+              description: "Remaining contract balance",
+              defaultNote: `SFEMI Outstanding ${ref}`,
+            }] : []),
+            ...(Number(subscription.total_amount || 0) > 0 ? [{
+              label: "Full Contract",
+              amount: Number(subscription.total_amount),
+              description: "Total contract amount",
+              defaultNote: `SFEMI Full Contract ${ref}`,
+            }] : []),
+          ];
+
+          const defaultAmount =
+            isRentOrLease && remainingDeposit > 0
+              ? remainingDeposit
+              : monthlyAmt > 0
+              ? monthlyAmt
+              : outstandingAmt;
+
+          return (
+            <DynamicUpiQrModal
+              isOpen={upiQrModalOpen}
+              onClose={() => setUpiQrModalOpen(false)}
+              title={isRentOrLease ? "Rent Contract Payment QR" : "SFEMI Subscription Payment QR"}
+              subtitle={`Subscription ${ref} · ${subscription.customer_name || ""}`}
+              referenceNo={ref}
+              customerName={subscription.customer_name || ""}
+              customerPhone={subscription.customer_phone || ""}
+              customerId={subscription.customer_id}
+              defaultAmount={defaultAmount}
+              sourceType="SUBSCRIPTION"
+              sourceId={subscription.id}
+              presets={presets}
+            />
+          );
+        })() : null}
       </div>
     </ERPPageShell>
   );

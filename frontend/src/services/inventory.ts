@@ -1283,10 +1283,23 @@ export async function setStockAdjustmentLineCosts(
 
 // Search
 export async function searchInventoryItems(
-  q: string
+  q: string,
+  params?: {
+    page?: number;
+    page_size?: number;
+    is_active?: number | boolean;
+    stock_item_type?: string;
+  }
 ): Promise<PaginatedResponse<InventoryItem>> {
+  const query = new URLSearchParams();
+  if (q) query.append("search", q);
+  query.append("page_size", String(params?.page_size || 50));
+  if (params?.page) query.append("page", String(params.page));
+  if (params?.is_active !== undefined) query.append("is_active", String(params.is_active));
+  if (params?.stock_item_type) query.append("stock_item_type", params.stock_item_type);
+
   return apiFetch<PaginatedResponse<InventoryItem>>(
-    `/admin/inventory/items/?q=${encodeURIComponent(q)}`,
+    `/admin/inventory/items/?${query.toString()}`,
     { method: "GET" }
   );
 }

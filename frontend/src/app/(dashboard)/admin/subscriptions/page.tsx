@@ -17,9 +17,10 @@ import ReturnedAssetReleaseButton from "@/components/customer-intelligence/Retur
 import { DataTableShell, DetailPanel, FormSection, WorkflowCard } from "@/components/ui/operations";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { RegistryPageShell } from "@/components/layout/page-shells";
-import { InfoIcon, CalendarClock, CheckCircle2, AlertCircle, Calendar } from "lucide-react";
+import { InfoIcon, CalendarClock, CheckCircle2, AlertCircle, Calendar, QrCode } from "lucide-react";
 import ProductAttributeBadges from "@/components/ui/ProductAttributeBadges";
 import { useWorkflowLauncher } from "@/components/workflows/WorkflowProvider";
+import DynamicUpiQrModal, { type UpiQrPreset } from "@/components/payments/DynamicUpiQrModal";
 import { apiFetch } from "@/lib/api";
 import { downloadCsv } from "@/lib/export/csv";
 import { ROUTES } from "@/lib/routes";
@@ -101,6 +102,8 @@ type SubscriptionRow = {
   };
   deposit_status?: string;
   security_deposit_amount?: string;
+  security_deposit_paid?: string;
+  security_deposit_pending?: string;
   security_deposit_percent?: string;
   next_payment_date?: string | null;
   next_payment_amount?: string | null;
@@ -372,6 +375,8 @@ function normalizeSubscriptionRow(raw: Record<string, unknown>): SubscriptionRow
     } : undefined,
     deposit_status: toStringValue(raw.deposit_status) || undefined,
     security_deposit_amount: toNullableString(raw.security_deposit_amount) ?? undefined,
+    security_deposit_paid: toNullableString(raw.security_deposit_paid) ?? undefined,
+    security_deposit_pending: toNullableString(raw.security_deposit_pending) ?? undefined,
     security_deposit_percent: toNullableString(raw.security_deposit_percent) ?? undefined,
     next_payment_date: toNullableString(raw.next_payment_date),
     next_payment_amount: toNullableString(raw.next_payment_amount),
@@ -585,6 +590,116 @@ export default function AdminSubscriptionsPage() {
 
   const [kpis, setKpis] = useState<SubscriptionKpis | null>(null);
   const [batchBreakdown, setBatchBreakdown] = useState<BatchBreakdownRow[]>([]);
+  const [upiQrTarget, setUpiQrTarget] = useState<{
+    row: SubscriptionRow;
+    defaultPreset?: "DEPOSIT" | "RENT" | "OUTSTANDING";
+  } | null>(null);
+
+  const upiQrModalProps = useMemo(() => {
+    if (!upiQrTarget) return null;
+    const { row, defaultPreset } = upiQrTarget;
+    const ref = row.subscription_number || `SUB-${row.id}`;
+    const custName = row.customer_name || "";
+    const custPhone = row.customer_phone || "";
+    const isRentOrLease = row.plan_type === "RENT" || row.plan_type === "LEASE";
+
+    const totalDeposit = Number(row.security_deposit_amount || 0);
+    const paidDeposit = Number(row.security_deposit_paid || 0);
+    const pendingDeposit =
+      row.security_deposit_pending !== undefined && Number(row.security_deposit_pending) > 0
+        ? Number(row.security_deposit_pending)
+        : Math.max(0, totalDeposit - paidDeposit);
+
+    const monthlyAmt = Number(row.monthly_amount || 0);
+    const outstandingAmt = Number(row.outstanding_amount ?? row.financial_summary?.outstanding_amount ?? 0);
+
+    const presets: UpiQrPreset[] = [];
+
+    if (isRentOrLease) {
+      if (pendingDeposit > 0) {
+        presets.push({
+          label: row.deposit_status === "PARTIAL" ? "Rest Security Deposit" : "Security Deposit",
+          amount: pendingDeposit,
+          description: `Security deposit ${row.deposit_status === "PARTIAL" ? "remaining balance" : "full deposit"}`,
+          defaultNote: `Rest Security Deposit for ${ref}`,
+        });
+      }
+
+      if (monthlyAmt > 0) {
+        presets.push({
+          label: "Monthly Rent",
+          amount: monthlyAmt,
+          description: "Monthly rent installment",
+          defaultNote: `Monthly Rent for ${ref}`,
+        });
+      }
+
+      if (pendingDeposit > 0 && monthlyAmt > 0) {
+        presets.push({
+          label: "Rent + Rest Deposit",
+          amount: monthlyAmt + pendingDeposit,
+          description: "Combined monthly rent and security deposit balance",
+          defaultNote: `Rent & Security Deposit for ${ref}`,
+        });
+      }
+
+      if (outstandingAmt > 0) {
+        presets.push({
+          label: "Total Outstanding",
+          amount: outstandingAmt,
+          description: "Total contract dues",
+          defaultNote: `Contract Outstanding for ${ref}`,
+        });
+      }
+    } else {
+      if (monthlyAmt > 0) {
+        presets.push({
+          label: "Monthly EMI",
+          amount: monthlyAmt,
+          description: "Next monthly installment",
+          defaultNote: `SFEMI EMI ${ref}`,
+        });
+      }
+      if (outstandingAmt > 0) {
+        presets.push({
+          label: "Outstanding Dues",
+          amount: outstandingAmt,
+          description: "Remaining contract balance",
+          defaultNote: `SFEMI Outstanding ${ref}`,
+        });
+      }
+      if (Number(row.total_amount || 0) > 0) {
+        presets.push({
+          label: "Full Contract",
+          amount: Number(row.total_amount),
+          description: "Total contract value",
+          defaultNote: `SFEMI Full Contract ${ref}`,
+        });
+      }
+    }
+
+    let defaultAmt = monthlyAmt;
+    if (defaultPreset === "DEPOSIT" && pendingDeposit > 0) {
+      defaultAmt = pendingDeposit;
+    } else if (defaultPreset === "OUTSTANDING" && outstandingAmt > 0) {
+      defaultAmt = outstandingAmt;
+    } else if (presets.length > 0) {
+      defaultAmt = Number(presets[0].amount);
+    }
+
+    return {
+      referenceNo: ref,
+      customerName: custName,
+      customerPhone: custPhone,
+      customerId: row.customer_id,
+      title: isRentOrLease ? "Rent Contract Payment QR" : "SFEMI Subscription Payment QR",
+      subtitle: `${ref} · ${custName}`,
+      sourceType: "SUBSCRIPTION" as const,
+      sourceId: row.id,
+      defaultAmount: defaultAmt,
+      presets,
+    };
+  }, [upiQrTarget]);
 
   useEffect(() => {
     setSearchInput(currentSearchQuery);
@@ -1555,20 +1670,28 @@ export default function AdminSubscriptionsPage() {
                               </span>
                               <div className="flex items-center gap-1.5">
                                 <span className="font-semibold text-foreground">{formatRupee(row.security_deposit_amount || "0.00")}</span>
-                                <span className={cn(
-                                  "text-[10px] font-semibold px-1.5 py-0.5 rounded",
-                                  row.deposit_status === "PAID" || row.deposit_status === "SUBMITTED"
-                                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400"
-                                    : row.deposit_status === "PARTIAL"
-                                    ? "bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-400"
-                                    : "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-400"
-                                )}>
-                                  {row.deposit_status === "PAID" || row.deposit_status === "SUBMITTED"
-                                    ? "Paid"
-                                    : row.deposit_status === "PARTIAL"
-                                    ? "Partial"
-                                    : "Deposit Pending"}
-                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setUpiQrTarget({ row, defaultPreset: "DEPOSIT" })}
+                                  className={cn(
+                                    "text-[10px] font-semibold px-2 py-0.5 rounded flex items-center gap-1 transition cursor-pointer hover:opacity-85",
+                                    row.deposit_status === "PAID" || row.deposit_status === "SUBMITTED"
+                                      ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400"
+                                      : row.deposit_status === "PARTIAL"
+                                      ? "bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-400 hover:bg-blue-200"
+                                      : "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-400 hover:bg-amber-200"
+                                  )}
+                                  title="Click to send Security Deposit UPI QR to customer"
+                                >
+                                  <QrCode className="h-3 w-3" />
+                                  <span>
+                                    {row.deposit_status === "PAID" || row.deposit_status === "SUBMITTED"
+                                      ? "Paid"
+                                      : row.deposit_status === "PARTIAL"
+                                      ? "Rest Deposit QR"
+                                      : "Deposit Pending QR"}
+                                  </span>
+                                </button>
                               </div>
                             </div>
                           )}
@@ -1640,6 +1763,19 @@ export default function AdminSubscriptionsPage() {
                             </Link>
                           )}
 
+                          <button
+                            type="button"
+                            onClick={() => setUpiQrTarget({
+                              row,
+                              defaultPreset: row.deposit_status === "PARTIAL" || row.deposit_status === "PENDING" ? "DEPOSIT" : "RENT",
+                            })}
+                            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-indigo-500/30 bg-indigo-50 px-3 text-xs font-semibold text-indigo-700 shadow-sm transition hover:bg-indigo-100 dark:bg-indigo-950/30 dark:text-indigo-300 cursor-pointer"
+                            title="Send dynamic UPI payment QR to customer (Rent, Rest Security Deposit, or Total)"
+                          >
+                            <QrCode className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                            <span>Send UPI QR</span>
+                          </button>
+
                           {/* The unit that came back on this contract — hidden when nothing is waiting */}
                           {(row.plan_type === "RENT" || row.plan_type === "LEASE") &&
                           (row.status === "RETURNED" || row.status === "CLOSED") ? (
@@ -1681,6 +1817,13 @@ export default function AdminSubscriptionsPage() {
           </>
         }
       />
+      {upiQrTarget && upiQrModalProps && (
+        <DynamicUpiQrModal
+          isOpen={Boolean(upiQrTarget)}
+          onClose={() => setUpiQrTarget(null)}
+          {...upiQrModalProps}
+        />
+      )}
     </ERPPageShell>
   );
 }
