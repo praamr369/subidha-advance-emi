@@ -17,6 +17,12 @@ export type PublicBusinessProfile = {
   business_hours?: string;
   public_logo_url?: string;
   is_active?: boolean;
+  google_analytics_id?: string;
+  google_search_console_id?: string;
+  seo_local_area?: string;
+  meta_title?: string;
+  meta_description?: string;
+  meta_keywords?: string;
   updated_at?: string;
 };
 

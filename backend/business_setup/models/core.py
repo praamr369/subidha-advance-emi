@@ -422,6 +422,42 @@ class PublicBusinessProfile(BusinessSetupTimeStampedModel):
     public_logo_url = models.URLField(blank=True, default="")
     is_active = models.BooleanField(default=True, db_index=True)
 
+    # Web, SEO & Analytics setup (zero .env required)
+    google_analytics_id = models.CharField(
+        max_length=50,
+        blank=True,
+        default="",
+        help_text="Google Analytics 4 Measurement ID (e.g. G-XXXXXXXXXX). Dynamically activates visitor tracking on the public site.",
+    )
+    google_search_console_id = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="Google Search Console verification meta tag or token (e.g. google-site-verification=...).",
+    )
+    seo_local_area = models.CharField(
+        max_length=255,
+        blank=True,
+        default="Asansol, Raniganj, Durgapur, Paschim Bardhaman",
+        help_text="Target service localities for local SEO rankings and JSON-LD schema.",
+    )
+    meta_title = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="Custom default SEO title displayed on Google Search.",
+    )
+    meta_description = models.TextField(
+        blank=True,
+        default="",
+        help_text="Custom default SEO meta description displayed in search engine snippets.",
+    )
+    meta_keywords = models.TextField(
+        blank=True,
+        default="",
+        help_text="Target search keywords (comma-separated).",
+    )
+
     class Meta:
         db_table = "public_business_profiles"
         ordering = ["-created_at", "-id"]
@@ -451,6 +487,12 @@ class PublicBusinessProfile(BusinessSetupTimeStampedModel):
         self.map_url = (self.map_url or "").strip()
         self.business_hours = (self.business_hours or "").strip()
         self.public_logo_url = (self.public_logo_url or "").strip()
+        self.google_analytics_id = (self.google_analytics_id or "").strip()
+        self.google_search_console_id = (self.google_search_console_id or "").strip()
+        self.seo_local_area = (self.seo_local_area or "").strip()
+        self.meta_title = (self.meta_title or "").strip()
+        self.meta_description = (self.meta_description or "").strip()
+        self.meta_keywords = (self.meta_keywords or "").strip()
 
         self.full_clean()
         super().save(*args, **kwargs)

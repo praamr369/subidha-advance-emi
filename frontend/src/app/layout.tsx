@@ -9,6 +9,7 @@ import "./globals.css";
 import AppProviders from "@/providers/AppProviders";
 import SkipNav from "@/components/ui/SkipNav";
 import { OfflineNetworkBanner } from "@/components/common/OfflineNetworkBanner";
+import { DynamicAnalyticsTracker } from "@/components/common/DynamicAnalyticsTracker";
 
 const publicLogoSrc = brandConfig.publicLogoSrc || undefined;
 const gaId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
@@ -43,9 +44,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <>
             <Script
               src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`}
-              strategy="afterInteractive"
+              strategy="lazyOnload"
             />
-            <Script id="google-analytics" strategy="afterInteractive">
+            <Script id="google-analytics" strategy="lazyOnload">
               {`
                 window.dataLayer = window.dataLayer || [];
                 function gtag(){dataLayer.push(arguments);}
@@ -59,7 +60,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         ) : null}
         <SkipNav />
         <OfflineNetworkBanner />
-        <AppProviders>{children}</AppProviders>
+        <AppProviders>
+          <DynamicAnalyticsTracker />
+          {children}
+        </AppProviders>
       </body>
     </html>
   );

@@ -84,7 +84,8 @@ export default function HomeHero({ copy, title, subtitle, companyName, stats }: 
             alt={copy.imageAlt}
             fill
             priority
-            sizes="(max-width: 1024px) 100vw, 46vw"
+            quality={75}
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 100vw, 46vw"
             className="object-cover"
           />
           {liveFigures.length > 0 ? (

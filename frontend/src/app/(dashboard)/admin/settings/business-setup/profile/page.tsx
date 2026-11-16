@@ -103,6 +103,14 @@ type UnifiedProfile = {
   map_url: string;
   business_hours: string;
 
+  // Web Analytics & Local SEO (Public / Brand - No .env Required)
+  google_analytics_id: string;
+  google_search_console_id: string;
+  seo_local_area: string;
+  meta_title: string;
+  meta_description: string;
+  meta_keywords: string;
+
   // Document Settings (BusinessProfile)
   default_currency_code: string;
   timezone_name: string;
@@ -124,6 +132,7 @@ const initialForm: UnifiedProfile = {
   website_url: "", whatsapp_link: "", facebook_url: "", instagram_url: "", youtube_url: "", justdial_url: "",
   address_line_1: "", address_line_2: "", landmark: "", city: "", district: "", state: "", postal_code: "", country: "India",
   address_text: "", map_url: "", business_hours: "",
+  google_analytics_id: "", google_search_console_id: "", seo_local_area: "", meta_title: "", meta_description: "", meta_keywords: "",
   default_currency_code: "INR", timezone_name: "Asia/Kolkata",
   is_active: true,
   is_legacy_migration: false,
@@ -406,6 +415,14 @@ export default function UnifiedBusinessProfilePage() {
         address_text: pub?.address_text || brand?.address_text || "",
         map_url: pub?.map_url || brand?.map_url || "",
         business_hours: pub?.business_hours || brand?.business_hours || "",
+
+        // Web Analytics & Local SEO
+        google_analytics_id: pub?.google_analytics_id || "",
+        google_search_console_id: pub?.google_search_console_id || "",
+        seo_local_area: pub?.seo_local_area || "",
+        meta_title: pub?.meta_title || "",
+        meta_description: pub?.meta_description || "",
+        meta_keywords: pub?.meta_keywords || "",
       });
     } catch (error) {
       setMessage({ text: toErrorMessage(error), type: "error" });
@@ -489,6 +506,12 @@ export default function UnifiedBusinessProfilePage() {
         map_url: form.map_url,
         business_hours: form.business_hours,
         public_logo_url: form.public_logo_url,
+        google_analytics_id: form.google_analytics_id,
+        google_search_console_id: form.google_search_console_id,
+        seo_local_area: form.seo_local_area,
+        meta_title: form.meta_title,
+        meta_description: form.meta_description,
+        meta_keywords: form.meta_keywords,
         is_active: form.is_active,
       };
 
@@ -671,6 +694,84 @@ export default function UnifiedBusinessProfilePage() {
                 </div>
                 <InputField label="Branch Name" name="bank_branch" value={form.bank_branch as string | undefined} onChange={handleChange} disabled={loading || saving} placeholder="E.g., Andheri West, Mumbai" />
                 <InputField label="UPI ID" name="upi_id" value={form.upi_id as string | undefined} onChange={handleChange} disabled={loading || saving} placeholder="E.g., subidha@upi or 9876543210@ybl" hint="Used for QR code on receipts. Most customers pay via UPI." />
+              </div>
+            </FormSection>
+          </section>
+
+          <section className="grid gap-5 lg:grid-cols-2">
+            <FormSection
+              title="Web Analytics & Search Console"
+              description="Configure Google Analytics 4 and Google Search Console directly in the web UI without editing .env or redeploying."
+            >
+              <div className="text-base font-semibold text-foreground">Google Free Analytics & Verification</div>
+              <div className="mt-4 grid gap-4">
+                <InputField
+                  label="Google Analytics 4 Measurement ID"
+                  name="google_analytics_id"
+                  value={form.google_analytics_id as string | undefined}
+                  onChange={handleChange}
+                  disabled={loading || saving}
+                  placeholder="G-XXXXXXXXXX"
+                  hint="Your GA4 Measurement ID (starts with G-). Automatically activates Google Analytics visitor tracking, realtime stats, and bot/crawler filters on all public pages."
+                />
+                <InputField
+                  label="Google Search Console Verification Token"
+                  name="google_search_console_id"
+                  value={form.google_search_console_id as string | undefined}
+                  onChange={handleChange}
+                  disabled={loading || saving}
+                  placeholder="e.g. google-site-verification token or code"
+                  hint="HTML tag verification code from Google Search Console. Auto-injects the verification meta tag without needing to upload any html file."
+                />
+              </div>
+              <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50/60 p-3 text-xs text-blue-900">
+                <span className="font-semibold">Zero Deployment Overhead:</span> Saving here instantly enables real-time visitor tracking and Google site indexing. No developer or Vercel rebuild required.
+              </div>
+            </FormSection>
+
+            <FormSection
+              title="Local SEO & Search Engine Ranking"
+              description="Control how your store appears on Google Search in Asansol, Raniganj, and surrounding areas."
+            >
+              <div className="text-base font-semibold text-foreground">Search Engine Optimization</div>
+              <div className="mt-4 grid gap-4">
+                <InputField
+                  label="Target Local Service Areas"
+                  name="seo_local_area"
+                  value={form.seo_local_area as string | undefined}
+                  onChange={handleChange}
+                  disabled={loading || saving}
+                  placeholder="Asansol, Raniganj, Durgapur, Kulti, Jamuria, West Bengal"
+                  hint="Local cities and regions served. Enriches Google structured data (LocalBusiness schema) for top local search ranking."
+                />
+                <InputField
+                  label="Default SEO Meta Title"
+                  name="meta_title"
+                  value={form.meta_title as string | undefined}
+                  onChange={handleChange}
+                  disabled={loading || saving}
+                  placeholder="Subidha Furniture | Best Furniture & SFEMI in Asansol"
+                  hint="Custom browser page title for Google Search results (recommended length: 50-60 characters)."
+                />
+                <InputField
+                  label="Default SEO Meta Description"
+                  name="meta_description"
+                  value={form.meta_description as string | undefined}
+                  onChange={handleChange}
+                  disabled={loading || saving}
+                  placeholder="Shop premium home & office furniture in Asansol & Raniganj. SFEMI flexible plans, direct sales, and fast delivery."
+                  multiline
+                  hint="Meta description shown under your store link in Google search results (recommended length: 140-160 characters)."
+                />
+                <InputField
+                  label="Target SEO Keywords"
+                  name="meta_keywords"
+                  value={form.meta_keywords as string | undefined}
+                  onChange={handleChange}
+                  disabled={loading || saving}
+                  placeholder="furniture store asansol, buy bed online raniganj, sfemi monthly emi furniture, wardrobe asansol"
+                  hint="Comma-separated keywords for search engine indexers."
+                />
               </div>
             </FormSection>
           </section>

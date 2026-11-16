@@ -251,6 +251,12 @@ export type PublicBusinessProfile = {
   map_url?: string;
   business_hours?: string;
   public_logo_url?: string;
+  google_analytics_id?: string;
+  google_search_console_id?: string;
+  seo_local_area?: string;
+  meta_title?: string;
+  meta_description?: string;
+  meta_keywords?: string;
   updated_at?: string;
   upi_id?: string;
   merchant_name?: string;

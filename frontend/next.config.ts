@@ -149,6 +149,7 @@ const ADMIN_PERMANENT_REDIRECTS: Array<{ source: string; destination: string }> 
 ];
 
 const ONE_HOUR = 60 * 60;
+const ONE_YEAR = 365 * 24 * 60 * 60;
 
 // Content-Security-Policy for production only. In development it is omitted so
 // Next's HMR / React Refresh (which need 'unsafe-eval') keep working.
@@ -203,7 +204,12 @@ const nextConfig: NextConfig = {
   compress: true,
   poweredByHeader: false,
   experimental: {
-    optimizePackageImports: ["lucide-react", "date-fns"],
+    optimizePackageImports: [
+      "lucide-react",
+      "date-fns",
+      "@radix-ui/react-navigation-menu",
+      "@radix-ui/react-accordion",
+    ],
     cpus: process.env.NEXT_BUILD_CPUS ? parseInt(process.env.NEXT_BUILD_CPUS, 10) : 1,
     staleTimes: {
       dynamic: 0,
@@ -217,12 +223,22 @@ const nextConfig: NextConfig = {
   },
   images: {
     dangerouslyAllowLocalIP: true,
+    formats: ["image/avif", "image/webp"],
+    deviceSizes: [360, 414, 640, 750, 828, 1080, 1200, 1920],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
     qualities: [70, 75, 78, 80, 90],
     remotePatterns: buildRemotePatterns(),
-    minimumCacheTTL: ONE_HOUR,
+    minimumCacheTTL: ONE_YEAR,
   },
   async headers() {
     return [
+      // Public static images (banners, categories, hero) - immutable long-term cache
+      {
+        source: "/images/:path*",
+        headers: [
+          { key: "Cache-Control", value: `public, max-age=${ONE_YEAR}, immutable` },
+        ],
+      },
       // Public uploaded/media assets
       {
         source: "/brand/:path*",

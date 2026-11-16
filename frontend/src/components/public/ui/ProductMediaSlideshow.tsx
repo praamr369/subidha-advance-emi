@@ -2,16 +2,22 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { ChevronLeft, ChevronRight, Maximize2, Play } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 
 import { useI18n } from "@/components/i18n/I18nProvider";
-import ProductImageLightbox from "@/components/public/ProductImageLightbox";
 import ProductImagePlaceholder from "@/components/public/ProductImagePlaceholder";
 import type { ProductSlide } from "@/components/public/ui/product-slides";
 import { shouldBypassNextImageOptimization } from "@/lib/media";
 import { cn } from "@/lib/utils";
+
+// Heavy modal component (portals, drag physics, zoom) dynamically imported on demand
+const ProductImageLightbox = dynamic(
+  () => import("@/components/public/ProductImageLightbox"),
+  { ssr: false }
+);
 
 type ProductMediaSlideshowProps = {
   slides: ProductSlide[];
@@ -44,7 +50,7 @@ export default function ProductMediaSlideshow({
 }: ProductMediaSlideshowProps) {
   const { t } = useI18n();
   const count = slides.length;
-  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: count > 1 });
+  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: count > 1, active: count > 1 });
   const [active, setActive] = useState(0);
   const [inView, setInView] = useState(false);
   const [failed, setFailed] = useState<ReadonlySet<string>>(() => new Set());
@@ -59,7 +65,7 @@ export default function ProductMediaSlideshow({
   }, [emblaApi]);
 
   useEffect(() => {
-    if (!emblaApi) return;
+    if (!emblaApi || count <= 1) return;
     onSelect();
     emblaApi.on("select", onSelect);
     emblaApi.on("reInit", onSelect);
@@ -67,7 +73,7 @@ export default function ProductMediaSlideshow({
       emblaApi.off("select", onSelect);
       emblaApi.off("reInit", onSelect);
     };
-  }, [emblaApi, onSelect]);
+  }, [emblaApi, onSelect, count]);
 
   useEffect(() => {
     const node = containerRef.current;
@@ -171,7 +177,7 @@ export default function ProductMediaSlideshow({
                         quality={75}
                         loading={index === 0 ? undefined : "lazy"}
                         className={cn(
-                          "object-cover will-change-transform",
+                          "object-cover",
                           count <= 1
                             ? "animate-single-photo group-hover/slides:scale-115"
                             : "transition-transform duration-500 ease-out group-hover/slides:scale-105"
@@ -180,9 +186,9 @@ export default function ProductMediaSlideshow({
                         onError={() => setFailed((prev) => new Set(prev).add(slide.src))}
                         draggable={false}
                       />
-                      {/* Dynamic sheen sweep highlight for single photo on hover */}
+                      {/* Dynamic sheen sweep highlight for single photo on hover (desktop only) */}
                       {count <= 1 && (
-                        <div className="photo-sheen-overlay">
+                        <div className="photo-sheen-overlay hidden lg:block">
                           <div className="photo-sheen-beam" />
                         </div>
                       )}
@@ -210,19 +216,21 @@ export default function ProductMediaSlideshow({
         <Maximize2 className="size-3.5" />
       </button>
 
-      {/* Lightbox Modal */}
-      <ProductImageLightbox
-        isOpen={lightboxOpen}
-        onClose={() => setLightboxOpen(false)}
-        items={slides.map((s, idx) => ({
-          id: `card-slide-${idx}`,
-          type: s.type,
-          url: s.src,
-          title: count > 1 ? `Photo ${idx + 1}` : undefined,
-        }))}
-        initialIndex={active}
-        productName={alt}
-      />
+      {/* Lightbox Modal — mounted on demand only when opened */}
+      {lightboxOpen ? (
+        <ProductImageLightbox
+          isOpen={lightboxOpen}
+          onClose={() => setLightboxOpen(false)}
+          items={slides.map((s, idx) => ({
+            id: `card-slide-${idx}`,
+            type: s.type,
+            url: s.src,
+            title: count > 1 ? `Photo ${idx + 1}` : undefined,
+          }))}
+          initialIndex={active}
+          productName={alt}
+        />
+      ) : null}
 
       {count > 1 ? (
         <>

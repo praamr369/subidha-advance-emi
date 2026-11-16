@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import dynamic from "next/dynamic";
 
 import { PublicMarketingShell } from "@/components/layout/page-shells";
 import { HOME_COPY } from "@/components/public/home/home-copy";
@@ -12,7 +13,6 @@ import HomeProductShowcase from "@/components/public/home/HomeProductShowcase";
 import HomeQuickLinks from "@/components/public/home/HomeQuickLinks";
 import HomeSectionHeading from "@/components/public/home/HomeSectionHeading";
 import HomeVision from "@/components/public/home/HomeVision";
-import EMICalculatorWidget from "@/components/public/ui/EMICalculatorWidget";
 import WhatsAppFab from "@/components/public/ui/WhatsAppFab";
 import HomeAnnouncementBanner from "@/components/public/home/HomeAnnouncementBanner";
 import { asLocale, getPublicDictionary, getText, publicContent } from "@/lib/public-i18n";
@@ -21,6 +21,12 @@ import { getPublicLatestWinner, getPublicStats, listPublicProducts } from "@/lib
 import { getPublicAnnouncements } from "@/services/public-site";
 import { getResolvedPublicBusinessProfile } from "@/lib/public-profile";
 import { buildPublicMetadata } from "@/lib/public-seo";
+
+// Dynamically code-split below-the-fold interactive widget while retaining SSR for SEO/a11y
+const EMICalculatorWidget = dynamic(
+  () => import("@/components/public/ui/EMICalculatorWidget"),
+  { ssr: true }
+);
 
 export const metadata: Metadata = buildPublicMetadata({
   title: "Home",

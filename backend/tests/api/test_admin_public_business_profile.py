@@ -107,3 +107,28 @@ class AdminPublicBusinessProfileApiTests(APITestCase):
         self.assertEqual(after, before + 1)
         last = AuditLog.objects.filter(action_type=AuditLog.ActionType.PUBLIC_SITE_UPDATED).order_by("-id").first()
         self.assertEqual(last.metadata.get("event"), "PUBLIC_SITE_PROFILE_UPDATED")
+
+    def test_admin_can_configure_web_seo_and_analytics(self):
+        self.client.force_authenticate(self.admin)
+        payload = {
+            "display_name": "Subidha Furniture",
+            "google_analytics_id": "G-TEST123456",
+            "google_search_console_id": "google-site-verification=abc123xyz",
+            "seo_local_area": "Raniganj, Asansol, Paschim Bardhaman",
+            "meta_title": "Best Furniture Showroom in Raniganj & Asansol",
+            "meta_description": "Buy wardrobes, beds, sofas on easy SFEMI Advance EMI.",
+            "meta_keywords": "furniture asansol, furniture raniganj, sfemi",
+            "is_active": True,
+        }
+        response = self.client.patch("/api/v1/admin/public-site/profile/", payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, msg=response.data)
+        self.assertEqual(response.data.get("google_analytics_id"), "G-TEST123456")
+        self.assertEqual(response.data.get("google_search_console_id"), "google-site-verification=abc123xyz")
+        self.assertEqual(response.data.get("seo_local_area"), "Raniganj, Asansol, Paschim Bardhaman")
+
+        public = self.client.get("/api/v1/public/business-profile/")
+        self.assertEqual(public.status_code, status.HTTP_200_OK)
+        prof = public.data["profile"]
+        self.assertEqual(prof["google_analytics_id"], "G-TEST123456")
+        self.assertEqual(prof["google_search_console_id"], "google-site-verification=abc123xyz")
+        self.assertEqual(prof["seo_local_area"], "Raniganj, Asansol, Paschim Bardhaman")

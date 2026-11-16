@@ -25,16 +25,13 @@ class PublicBusinessProfileView(APIView):
                 addr_parts = [bp.address_line_1, bp.city, bp.state, bp.postal_code]
                 profile = PublicBusinessProfile(
                     display_name=bp.trade_name or bp.legal_name or "Subidha Core",
-                    support_phone=bp.support_phone or bp.primary_phone or "",
-                    support_email=bp.support_email or bp.primary_email or "",
+                    support_phone=bp.primary_phone or "",
+                    support_email=bp.primary_email or "",
                     address_text=", ".join(p for p in addr_parts if p),
                     is_active=True,
                 )
             else:
-                profile = PublicBusinessProfile(
-                    display_name="Subidha Core",
-                    is_active=True,
-                )
+                return Response({"profile": None})
         return Response({"profile": PublicBusinessProfilePublicSerializer(profile).data})
 
 

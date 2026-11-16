@@ -99,13 +99,13 @@ export function buildOrganizationJsonLd(profile?: Partial<ResolvedPublicBusiness
     "@type": "FurnitureStore",
     "@id": `${url}/#organization`,
     name,
-    description: profile?.resolved_tagline || profile?.tagline || defaultDescription,
+    description: profile?.meta_description || profile?.resolved_tagline || profile?.tagline || defaultDescription,
     url,
     logo: absolutePublicUrl(logo),
     image: absolutePublicUrl(defaultSocialImagePath()),
     areaServed: {
       "@type": "AdministrativeArea",
-      name: "Asansol, West Bengal, India",
+      name: profile?.seo_local_area || "Asansol, West Bengal, India",
     },
     address: profile?.address_text
       ? {

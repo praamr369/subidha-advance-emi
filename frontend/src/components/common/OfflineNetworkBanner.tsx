@@ -13,11 +13,17 @@ export function OfflineNetworkBanner() {
 
     setIsOnline(navigator.onLine);
 
-    // Register Service Worker for counter offline caching
+    // Register Service Worker for counter offline caching after page load
+    // to prevent CPU/network contention during initial mobile paint and hydration
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker
-        .register("/sw.js")
-        .catch(() => {});
+      const registerSW = () => {
+        navigator.serviceWorker.register("/sw.js").catch(() => {});
+      };
+      if (document.readyState === "complete") {
+        registerSW();
+      } else {
+        window.addEventListener("load", registerSW, { once: true });
+      }
     }
 
     const handleOnline = () => {
