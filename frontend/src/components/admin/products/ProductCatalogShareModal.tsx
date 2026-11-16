@@ -10,6 +10,7 @@ import {
   ChevronDown,
   ChevronRight,
   Copy,
+  Download,
   ExternalLink,
   Eye,
   FileSpreadsheet,
@@ -777,10 +778,286 @@ export default function ProductCatalogShareModal({
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
-  // Print helper: prints seamless multi-page sheet across 100, 200, 500+ items
-  const handlePrint = () => {
-    window.print();
+  // Generate standalone, self-contained HTML document for pixel-perfect multi-page A4 printing
+  const generateFullPrintDocumentHtml = (layout: "matrix" | "cards"): string => {
+    const headerEl = document.getElementById("print-sheet-header");
+    const footerEl = document.getElementById("print-sheet-footer");
+    const bodyEl = document.getElementById(layout === "matrix" ? "print-matrix-section" : "print-cards-section");
+
+    const headerHtml = headerEl ? headerEl.innerHTML : "";
+    const bodyHtml = bodyEl ? bodyEl.innerHTML : "";
+    const footerHtml = footerEl ? footerEl.innerHTML : "";
+
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Subidha Furniture &amp; Appliances - Official Showroom Price List (${activeItems.length} Products)</title>
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 8mm 8mm 10mm 8mm;
+    }
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      color: #000000;
+      background: #ffffff;
+      padding: 0;
+      margin: 0;
+      font-size: 10px;
+      line-height: 1.35;
+    }
+    .print-wrapper {
+      width: 100%;
+      background: #ffffff;
+      padding: 4mm 6mm;
+    }
+    .header-box {
+      border-bottom: 2px solid #000000;
+      padding-bottom: 10px;
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+    }
+    .footer-box {
+      border-top: 2px solid #000000;
+      padding-top: 10px;
+      margin-top: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      font-size: 8.5px;
+      color: #374151;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    /* Table Styling for Multi-Page Matrix */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      page-break-inside: auto;
+      font-size: 9px;
+    }
+    thead {
+      display: table-header-group !important; /* Repeats table header across every page! */
+    }
+    tr {
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+    }
+    th {
+      background-color: #f3f4f6 !important;
+      color: #111827 !important;
+      font-weight: 800;
+      text-transform: uppercase;
+      font-size: 8px;
+      letter-spacing: 0.05em;
+      padding: 5px 6px;
+      border: 1px solid #9ca3af;
+      vertical-align: middle;
+    }
+    td {
+      padding: 4px 6px;
+      border: 1px solid #d1d5db;
+      vertical-align: middle;
+    }
+    /* Cards Grid Styling for Showroom Handover */
+    .grid {
+      display: grid !important;
+      grid-template-columns: repeat(2, 1fr) !important;
+      gap: 10px !important;
+    }
+    .print-card-item {
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+      border: 1.5px solid #9ca3af !important;
+      border-radius: 8px !important;
+      padding: 8px 10px !important;
+      background: #ffffff !important;
+      display: flex !important;
+      flex-direction: column !important;
+      justify-content: space-between !important;
+      min-height: 110px !important;
+      margin-bottom: 8px !important;
+    }
+    /* SVG QR Code crisp vector rendering */
+    svg {
+      display: block;
+      shape-rendering: crispEdges;
+    }
+    /* Standard layout utilities */
+    .flex { display: flex !important; }
+    .flex-col { flex-direction: column !important; }
+    .flex-wrap { flex-wrap: wrap !important; }
+    .items-center { align-items: center !important; }
+    .items-start { align-items: flex-start !important; }
+    .justify-between { justify-content: space-between !important; }
+    .justify-center { justify-content: center !important; }
+    .text-right { text-align: right !important; }
+    .text-center { text-align: center !important; }
+    .text-left { text-align: left !important; }
+    .font-bold { font-weight: 700 !important; }
+    .font-black { font-weight: 900 !important; }
+    .font-semibold { font-weight: 600 !important; }
+    .font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important; }
+    .text-xs { font-size: 11px !important; }
+    .text-sm { font-size: 12px !important; }
+    .text-base { font-size: 14px !important; }
+    .text-xl { font-size: 18px !important; }
+    .uppercase { text-transform: uppercase !important; }
+    .underline { text-decoration: underline !important; }
+    .whitespace-nowrap { white-space: nowrap !important; }
+    .text-black { color: #000000 !important; }
+    .bg-black { background-color: #000000 !important; color: #ffffff !important; }
+    .bg-gray-100 { background-color: #f3f4f6 !important; }
+    .bg-gray-50 { background-color: #f9fafb !important; }
+    .bg-sky-50 { background-color: #f0f9ff !important; }
+    .bg-indigo-50 { background-color: #eef2ff !important; }
+    .bg-emerald-50 { background-color: #ecfdf5 !important; }
+    .bg-amber-50 { background-color: #fffbeb !important; }
+    .text-sky-800 { color: #075985 !important; }
+    .text-indigo-800 { color: #3730a3 !important; }
+    .text-emerald-800 { color: #065f46 !important; }
+    .text-amber-800 { color: #92400e !important; }
+    .text-green-800 { color: #166534 !important; }
+    .border-gray-300 { border-color: #d1d5db !important; }
+    .border-sky-300 { border-color: #7dd3fc !important; }
+    .border-indigo-300 { border-color: #a5b4fc !important; }
+    .border-emerald-300 { border-color: #6ee7b7 !important; }
+    .border-amber-200 { border-color: #fde68a !important; }
+    .border { border: 1px solid #d1d5db !important; }
+    .rounded { border-radius: 4px !important; }
+    .rounded-md { border-radius: 6px !important; }
+    .rounded-lg { border-radius: 8px !important; }
+    .rounded-xl { border-radius: 10px !important; }
+    .p-0\\.5 { padding: 2px !important; }
+    .p-1 { padding: 4px !important; }
+    .p-1\\.5 { padding: 6px !important; }
+    .p-2 { padding: 8px !important; }
+    .p-3 { padding: 12px !important; }
+    .px-1 { padding-left: 4px !important; padding-right: 4px !important; }
+    .px-1\\.5 { padding-left: 6px !important; padding-right: 6px !important; }
+    .px-2 { padding-left: 8px !important; padding-right: 8px !important; }
+    .px-3 { padding-left: 12px !important; padding-right: 12px !important; }
+    .py-0\\.2 { padding-top: 1px !important; padding-bottom: 1px !important; }
+    .py-0\\.5 { padding-top: 2px !important; padding-bottom: 2px !important; }
+    .py-1 { padding-top: 4px !important; padding-bottom: 4px !important; }
+    .py-2 { padding-top: 8px !important; padding-bottom: 8px !important; }
+    .gap-1 { gap: 4px !important; }
+    .gap-1\\.5 { gap: 6px !important; }
+    .gap-2 { gap: 8px !important; }
+    .gap-2\\.5 { gap: 10px !important; }
+    .gap-3 { gap: 12px !important; }
+    .gap-4 { gap: 16px !important; }
+    .mt-0\\.5 { margin-top: 2px !important; }
+    .mt-1 { margin-top: 4px !important; }
+    .mt-2 { margin-top: 8px !important; }
+    .w-12 { width: 48px !important; }
+    .w-14 { width: 56px !important; }
+    .w-16 { width: 64px !important; }
+    .min-w-0 { min-width: 0 !important; }
+    .flex-1 { flex: 1 1 0% !important; }
+    .shrink-0 { flex-shrink: 0 !important; }
+    button, input, textarea, [role="button"], .no-print {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+  <div class="print-wrapper">
+    <div class="header-box">${headerHtml}</div>
+    <div class="body-box">${bodyHtml}</div>
+    <div class="footer-box">${footerHtml}</div>
+  </div>
+  <script>
+    window.onload = function() {
+      setTimeout(function() {
+        window.focus();
+        window.print();
+      }, 150);
+    };
+  <\/script>
+</body>
+</html>`;
   };
+
+  // Print helper: prints seamless multi-page sheet across 100, 200, 500+ items
+  const handlePrint = (layoutOverride?: "matrix" | "cards") => {
+    const layout = layoutOverride || printLayout;
+    const fullHtml = generateFullPrintDocumentHtml(layout);
+
+    // 1. Try dedicated print window:
+    const printWindow = window.open("", "_blank", "width=1024,height=800,menubar=no,toolbar=no,status=no");
+    if (printWindow) {
+      printWindow.document.open();
+      printWindow.document.write(fullHtml);
+      printWindow.document.close();
+      return;
+    }
+
+    // 2. Fallback to hidden iframe (bypasses any browser popup block):
+    let frame = document.getElementById("subidha-catalog-print-frame") as HTMLIFrameElement;
+    if (!frame) {
+      frame = document.createElement("iframe");
+      frame.id = "subidha-catalog-print-frame";
+      frame.style.position = "fixed";
+      frame.style.right = "0";
+      frame.style.bottom = "0";
+      frame.style.width = "0";
+      frame.style.height = "0";
+      frame.style.border = "none";
+      document.body.appendChild(frame);
+    }
+    const frameDoc = frame.contentWindow?.document;
+    if (frameDoc) {
+      frameDoc.open();
+      frameDoc.write(fullHtml);
+      frameDoc.close();
+      setTimeout(() => {
+        frame.contentWindow?.focus();
+        frame.contentWindow?.print();
+      }, 250);
+    }
+  };
+
+  // Download complete standalone HTML print sheet
+  const handleDownloadHtml = (layoutOverride?: "matrix" | "cards") => {
+    const layout = layoutOverride || printLayout;
+    const fullHtml = generateFullPrintDocumentHtml(layout);
+    const blob = new Blob([fullHtml], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.download = `subidha-price-list-${layout}-${activeItems.length}-products.html`;
+    a.href = url;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setStatusNotification(`Downloaded offline printable HTML file (${activeItems.length} products)!`);
+    setTimeout(() => setStatusNotification(null), 4000);
+  };
+
+  // Listen for Ctrl+P while modal is open
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "p") {
+        e.preventDefault();
+        handlePrint();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isOpen, printLayout, activeItems]);
 
   // Helper to find server quote item
   const findServerItem = (id: number): PriceListQuoteItem | undefined => {
@@ -791,83 +1068,10 @@ export default function ProductCatalogShareModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-2 sm:p-4 overflow-y-auto print-modal-overlay">
-      {/* BULLETPROOF MULTI-PAGE PRINT STYLES */}
       <style>{`
         @media print {
-          /* 1. Unclamp document roots for infinite multi-page pagination */
-          html, body {
-            overflow: visible !important;
-            height: auto !important;
-            min-height: auto !important;
-            background: white !important;
-            color: black !important;
-          }
-
-          /* 2. Hide all regular app and modal chrome */
-          body * {
-            visibility: hidden;
-          }
-
-          /* 3. Unclamp modal parents so content is never restricted to 1 viewport height */
-          .print-modal-overlay,
-          .print-modal-card,
-          .print-modal-body {
-            position: static !important;
-            overflow: visible !important;
-            max-height: none !important;
-            height: auto !important;
-            width: 100% !important;
-            padding: 0 !important;
-            margin: 0 !important;
-            border: none !important;
-            box-shadow: none !important;
-            background: white !important;
-            transform: none !important;
-          }
-
-          .no-print,
-          .screen-only {
+          .no-print {
             display: none !important;
-          }
-
-          /* 4. Display the catalog print sheet clearly across all pages */
-          .catalog-print-sheet,
-          .catalog-print-sheet * {
-            visibility: visible !important;
-          }
-
-          .catalog-print-sheet {
-            display: block !important;
-            position: absolute !important;
-            left: 0 !important;
-            top: 0 !important;
-            width: 100% !important;
-            margin: 0 !important;
-            padding: 8mm 10mm !important;
-            background: white !important;
-            color: black !important;
-          }
-
-          /* 5. Clean, repeating table headers across every page */
-          table {
-            width: 100% !important;
-            page-break-inside: auto !important;
-            border-collapse: collapse !important;
-          }
-
-          thead {
-            display: table-header-group !important; /* Repeats table header on every printed page! */
-          }
-
-          tr {
-            page-break-inside: avoid !important;
-            break-inside: avoid !important;
-          }
-
-          .print-card-item {
-            page-break-inside: avoid !important;
-            break-inside: avoid !important;
-            margin-bottom: 12px !important;
           }
         }
       `}</style>
@@ -1314,7 +1518,7 @@ export default function ProductCatalogShareModal({
                   </button>
                   <button
                     type="button"
-                    onClick={handlePrint}
+                    onClick={() => handlePrint("matrix")}
                     className="inline-flex items-center gap-1.5 h-8 rounded-lg bg-primary text-primary-foreground px-3 text-xs font-semibold hover:opacity-90 shadow-2xs transition cursor-pointer"
                   >
                     <Printer className="h-3.5 w-3.5" />
@@ -1676,7 +1880,16 @@ export default function ProductCatalogShareModal({
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={handlePrint}
+                    onClick={() => handleDownloadHtml()}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-background hover:bg-muted text-foreground px-3 py-2 text-xs font-semibold shadow-2xs transition cursor-pointer"
+                    title="Download standalone HTML file for offline viewing or printing"
+                  >
+                    <Download className="h-4 w-4 text-primary" />
+                    Download HTML Sheet
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handlePrint()}
                     className="inline-flex items-center gap-2 rounded-xl bg-primary text-primary-foreground px-4 py-2 text-xs font-semibold hover:opacity-90 shadow-sm transition cursor-pointer"
                   >
                     <Printer className="h-4 w-4" />
@@ -1812,11 +2025,11 @@ export default function ProductCatalogShareModal({
           <div
             id={printContainerId}
             className={`catalog-print-sheet bg-white text-black p-6 rounded-2xl border border-border shadow-sm space-y-5 ${
-              activeTab === "print" ? "block" : "hidden print:block"
+              activeTab === "print" ? "block" : "hidden"
             }`}
           >
             {/* Header for Print Sheet */}
-            <div className="border-b-2 border-black pb-4 flex flex-wrap items-center justify-between gap-4">
+            <div id="print-sheet-header" className="border-b-2 border-black pb-4 flex flex-wrap items-center justify-between gap-4">
               <div>
                 <h1 className="text-xl font-black tracking-tight text-black uppercase">
                   Subidha Furniture & Appliances
@@ -1847,238 +2060,245 @@ export default function ProductCatalogShareModal({
               </div>
             </div>
 
-            {/* Print Layout: Matrix or Cards */}
-            {printLayout === "matrix" ? (
-              <div className="overflow-visible">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead className="bg-gray-100 border-b-2 border-gray-400 text-[10px] font-bold text-black uppercase tracking-wider">
-                    <tr>
-                      <th className="px-2 py-2 w-14">QR Code</th>
-                      <th className="px-2 py-2">Product & Variant Details</th>
-                      <th className="px-2 py-2">Specifications</th>
-                      <th className="px-2 py-2 text-center w-16">Stock</th>
-                      {schemes.direct_sale && <th className="px-2 py-2 text-right">Direct Sale</th>}
-                      {schemes.rent &&
-                        selectedRentTenures.map((t) => (
-                          <th key={t} className="px-2 py-2 text-right">
-                            Rent {t}m
-                          </th>
-                        ))}
-                      {schemes.lease &&
-                        selectedLeaseTenures.map((t) => (
-                          <th key={t} className="px-2 py-2 text-right">
-                            Lease {t}m
-                          </th>
-                        ))}
-                      {schemes.sfemi &&
-                        selectedSfemiTenures.map((t) => (
-                          <th key={t} className="px-2 py-2 text-right font-black">
-                            {t === 15 ? "SFEMI 15m (Promo)" : `SFEMI ${t}m`}
-                          </th>
-                        ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-300">
-                    {activeItems.map((item) => {
-                      const sItem = findServerItem(item.id);
-                      const price = item.basePrice;
+            {/* Matrix Table Section (Always present in DOM so SVGs and table can be printed) */}
+            <div
+              id="print-matrix-section"
+              className="overflow-visible"
+              style={{ display: printLayout === "matrix" ? "block" : "none" }}
+            >
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-gray-100 border-b-2 border-gray-400 text-[10px] font-bold text-black uppercase tracking-wider">
+                  <tr>
+                    <th className="px-2 py-2 w-14">QR Code</th>
+                    <th className="px-2 py-2">Product & Variant Details</th>
+                    <th className="px-2 py-2">Specifications</th>
+                    <th className="px-2 py-2 text-center w-16">Stock</th>
+                    {schemes.direct_sale && <th className="px-2 py-2 text-right">Direct Sale</th>}
+                    {schemes.rent &&
+                      selectedRentTenures.map((t) => (
+                        <th key={t} className="px-2 py-2 text-right">
+                          Rent {t}m
+                        </th>
+                      ))}
+                    {schemes.lease &&
+                      selectedLeaseTenures.map((t) => (
+                        <th key={t} className="px-2 py-2 text-right">
+                          Lease {t}m
+                        </th>
+                      ))}
+                    {schemes.sfemi &&
+                      selectedSfemiTenures.map((t) => (
+                        <th key={t} className="px-2 py-2 text-right font-black">
+                          {t === 15 ? "SFEMI 15m (Promo)" : `SFEMI ${t}m`}
+                        </th>
+                      ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-300">
+                  {activeItems.map((item) => {
+                    const sItem = findServerItem(item.id);
+                    const price = item.basePrice;
 
-                      return (
-                        <tr key={item.id} className="break-inside-avoid">
-                          <td className="px-2 py-2 align-middle">
-                            <div className="flex flex-col items-center p-0.5 rounded bg-white border border-gray-300 w-12">
-                              <QRCode
-                                value={item.publicUrl}
-                                size={40}
-                                level="M"
-                                style={{ height: "auto", maxWidth: "100%", width: "100%" }}
-                              />
-                              <span className="text-[6px] text-gray-600 font-bold mt-0.5">Scan</span>
-                            </div>
-                          </td>
-                          <td className="px-2 py-2 align-middle">
-                            <div className="font-bold text-black text-xs leading-snug">{item.fullName}</div>
-                            <div className="font-mono text-[9px] text-gray-600">
-                              SKU: {item.sku} {item.brand ? `· ${item.brand}` : ""}
-                            </div>
-                            <div className="text-[9px] text-gray-500">{item.category}</div>
-                          </td>
-                          <td className="px-2 py-2 align-middle">
-                            <div className="text-[10px] text-gray-800">
-                              {item.specs.length > 0 ? item.specs.join(" · ") : "Standard model"}
-                            </div>
-                          </td>
-                          <td className="px-2 py-2 text-center align-middle whitespace-nowrap">
-                            {item.currentStock > 0 ? (
-                              <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold text-green-800 bg-green-50 border border-green-300">
-                                {item.currentStock} Ready
-                              </span>
-                            ) : (
-                              <span className="text-[9px] text-gray-500">Order</span>
-                            )}
-                          </td>
-                          {schemes.direct_sale && (
-                            <td className="px-2 py-2 text-right font-bold text-black align-middle whitespace-nowrap">
-                              {item.hasPrice ? formatCurrency(price) : "Contact"}
-                            </td>
-                          )}
-                          {schemes.rent &&
-                            selectedRentTenures.map((t) => {
-                              if (!item.hasPrice) {
-                                return <td key={t} className="px-2 py-2 text-right text-gray-400 align-middle">-</td>;
-                              }
-                              const sRent = sItem?.quotes?.rent?.tenures?.[String(t)];
-                              const m = sRent ? Number(sRent.monthly_amount) : Math.round((price * item.rentYieldPercent * 12) / t / 100);
-                              return (
-                                <td key={t} className="px-2 py-2 text-right align-middle whitespace-nowrap">
-                                  <div className="font-bold text-black">₹{m.toLocaleString("en-IN")}/mo</div>
-                                </td>
-                              );
-                            })}
-                          {schemes.lease &&
-                            selectedLeaseTenures.map((t) => {
-                              if (!item.hasPrice) {
-                                return <td key={t} className="px-2 py-2 text-right text-gray-400 align-middle">-</td>;
-                              }
-                              const sLease = sItem?.quotes?.lease?.tenures?.[String(t)];
-                              const m = sLease ? Number(sLease.monthly_amount) : Math.round((price * item.leaseYieldPercent * 12) / t / 100);
-                              return (
-                                <td key={t} className="px-2 py-2 text-right align-middle whitespace-nowrap">
-                                  <div className="font-bold text-black">₹{m.toLocaleString("en-IN")}/mo</div>
-                                </td>
-                              );
-                            })}
-                          {schemes.sfemi &&
-                            selectedSfemiTenures.map((t) => {
-                              if (!item.hasPrice) {
-                                return <td key={t} className="px-2 py-2 text-right text-gray-400 align-middle">-</td>;
-                              }
-                              const sSfemi = sItem?.quotes?.sfemi?.tenures?.[String(t)];
-                              const m = sSfemi ? Number(sSfemi.monthly_amount) : Math.round(price / t);
-                              return (
-                                <td key={t} className="px-2 py-2 text-right align-middle whitespace-nowrap font-black">
-                                  <div className={t === 15 ? "text-black underline font-black" : "text-black font-bold"}>
-                                    ₹{m.toLocaleString("en-IN")}/mo
-                                  </div>
-                                </td>
-                              );
-                            })}
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {activeItems.map((item) => (
-                  <div
-                    key={item.id}
-                    className="print-card-item rounded-xl border border-gray-300 p-3 bg-white flex flex-col justify-between gap-2.5 break-inside-avoid shadow-2xs"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="flex flex-col items-center justify-center p-1.5 rounded-lg bg-white border border-gray-300 shrink-0">
-                        <QRCode
-                          value={item.publicUrl}
-                          size={70}
-                          level="M"
-                          style={{ height: "auto", maxWidth: "100%", width: "100%" }}
-                        />
-                        <span className="text-[8px] text-gray-600 font-bold mt-1 text-center">
-                          Scan to View
-                        </span>
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <div className="font-bold text-xs text-black">{item.fullName}</div>
-                        <p className="font-mono text-[10px] text-gray-600 mt-0.5">
-                          Code: <strong>{item.code}</strong> {item.brand ? `· Brand: ${item.brand}` : ""}
-                        </p>
-                        <p className="text-[10px] text-gray-500">{item.category}</p>
-
-                        {item.specs.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {item.specs.map((s, idx) => (
-                              <span
-                                key={idx}
-                                className="text-[9px] font-medium bg-gray-100 px-1 py-0.2 rounded border border-gray-300 text-black"
-                              >
-                                {s}
-                              </span>
-                            ))}
+                    return (
+                      <tr key={item.id} className="break-inside-avoid">
+                        <td className="px-2 py-2 align-middle">
+                          <div className="flex flex-col items-center p-0.5 rounded bg-white border border-gray-300 w-12">
+                            <QRCode
+                              value={item.publicUrl}
+                              size={40}
+                              level="M"
+                              style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+                            />
+                            <span className="text-[6px] text-gray-600 font-bold mt-0.5">Scan</span>
                           </div>
+                        </td>
+                        <td className="px-2 py-2 align-middle">
+                          <div className="font-bold text-black text-xs leading-snug">{item.fullName}</div>
+                          <div className="font-mono text-[9px] text-gray-600">
+                            SKU: {item.sku} {item.brand ? `· ${item.brand}` : ""}
+                          </div>
+                          <div className="text-[9px] text-gray-500">{item.category}</div>
+                        </td>
+                        <td className="px-2 py-2 align-middle">
+                          <div className="text-[10px] text-gray-800">
+                            {item.specs.length > 0 ? item.specs.join(" · ") : "Standard model"}
+                          </div>
+                        </td>
+                        <td className="px-2 py-2 text-center align-middle whitespace-nowrap">
+                          {item.currentStock > 0 ? (
+                            <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold text-green-800 bg-green-50 border border-green-300">
+                              {item.currentStock} Ready
+                            </span>
+                          ) : (
+                            <span className="text-[9px] text-gray-500">Order</span>
+                          )}
+                        </td>
+                        {schemes.direct_sale && (
+                          <td className="px-2 py-2 text-right font-bold text-black align-middle whitespace-nowrap">
+                            {item.hasPrice ? formatCurrency(price) : "Contact"}
+                          </td>
                         )}
-                      </div>
+                        {schemes.rent &&
+                          selectedRentTenures.map((t) => {
+                            if (!item.hasPrice) {
+                              return <td key={t} className="px-2 py-2 text-right text-gray-400 align-middle">-</td>;
+                            }
+                            const sRent = sItem?.quotes?.rent?.tenures?.[String(t)];
+                            const m = sRent ? Number(sRent.monthly_amount) : Math.round((price * item.rentYieldPercent * 12) / t / 100);
+                            return (
+                              <td key={t} className="px-2 py-2 text-right align-middle whitespace-nowrap">
+                                <div className="font-bold text-black">₹{m.toLocaleString("en-IN")}/mo</div>
+                              </td>
+                            );
+                          })}
+                        {schemes.lease &&
+                          selectedLeaseTenures.map((t) => {
+                            if (!item.hasPrice) {
+                              return <td key={t} className="px-2 py-2 text-right text-gray-400 align-middle">-</td>;
+                            }
+                            const sLease = sItem?.quotes?.lease?.tenures?.[String(t)];
+                            const m = sLease ? Number(sLease.monthly_amount) : Math.round((price * item.leaseYieldPercent * 12) / t / 100);
+                            return (
+                              <td key={t} className="px-2 py-2 text-right align-middle whitespace-nowrap">
+                                <div className="font-bold text-black">₹{m.toLocaleString("en-IN")}/mo</div>
+                              </td>
+                            );
+                          })}
+                        {schemes.sfemi &&
+                          selectedSfemiTenures.map((t) => {
+                            if (!item.hasPrice) {
+                              return <td key={t} className="px-2 py-2 text-right text-gray-400 align-middle">-</td>;
+                            }
+                            const sSfemi = sItem?.quotes?.sfemi?.tenures?.[String(t)];
+                            const m = sSfemi ? Number(sSfemi.monthly_amount) : Math.round(price / t);
+                            return (
+                              <td key={t} className="px-2 py-2 text-right align-middle whitespace-nowrap font-black">
+                                <div className={t === 15 ? "text-black underline font-black" : "text-black font-bold"}>
+                                  ₹{m.toLocaleString("en-IN")}/mo
+                                </div>
+                              </td>
+                            );
+                          })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Cards Grid Section (Always present in DOM so SVGs and cards can be printed) */}
+            <div
+              id="print-cards-section"
+              className="grid grid-cols-1 md:grid-cols-2 gap-3"
+              style={{ display: printLayout === "cards" ? "grid" : "none" }}
+            >
+              {activeItems.map((item) => (
+                <div
+                  key={item.id}
+                  className="print-card-item rounded-xl border border-gray-300 p-3 bg-white flex flex-col justify-between gap-2.5 break-inside-avoid shadow-2xs"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="flex flex-col items-center justify-center p-1.5 rounded-lg bg-white border border-gray-300 shrink-0">
+                      <QRCode
+                        value={item.publicUrl}
+                        size={70}
+                        level="M"
+                        style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+                      />
+                      <span className="text-[8px] text-gray-600 font-bold mt-1 text-center">
+                        Scan to View
+                      </span>
                     </div>
 
-                    {/* Pricing Grid */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 pt-2 border-t border-gray-300 text-xs">
-                      {schemes.direct_sale && (
-                        <div className="p-1.5 rounded bg-gray-50 border border-gray-300">
-                          <span className="block text-[9px] font-bold text-gray-600 uppercase">
-                            Direct Sale
-                          </span>
-                          <span className="text-xs font-bold text-black">
-                            {item.hasPrice ? formatCurrency(item.basePrice) : "On Request"}
-                          </span>
-                        </div>
-                      )}
+                    <div className="min-w-0 flex-1">
+                      <div className="font-bold text-xs text-black">{item.fullName}</div>
+                      <p className="font-mono text-[10px] text-gray-600 mt-0.5">
+                        Code: <strong>{item.code}</strong> {item.brand ? `· Brand: ${item.brand}` : ""}
+                      </p>
+                      <p className="text-[10px] text-gray-500">{item.category}</p>
 
-                      {schemes.rent && (
-                        <div className="p-1.5 rounded bg-sky-50 border border-sky-300">
-                          <span className="block text-[9px] font-bold text-sky-800 uppercase">
-                            Rent
-                          </span>
-                          {selectedRentTenures.map((t) => {
-                            const m = Math.round((item.basePrice * item.rentYieldPercent * 12) / t / 100);
-                            return (
-                              <div key={t} className="text-[10px] font-bold text-black">
-                                {t}m: ₹{m.toLocaleString("en-IN")}/mo
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-
-                      {schemes.lease && (
-                        <div className="p-1.5 rounded bg-indigo-50 border border-indigo-300">
-                          <span className="block text-[9px] font-bold text-indigo-800 uppercase">
-                            Lease
-                          </span>
-                          {selectedLeaseTenures.map((t) => {
-                            const m = Math.round((item.basePrice * item.leaseYieldPercent * 12) / t / 100);
-                            return (
-                              <div key={t} className="text-[10px] font-bold text-black">
-                                {t}m: ₹{m.toLocaleString("en-IN")}/mo
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-
-                      {schemes.sfemi && (
-                        <div className="p-1.5 rounded bg-emerald-50 border border-emerald-300">
-                          <span className="block text-[9px] font-bold text-emerald-800 uppercase">
-                            SFEMI
-                          </span>
-                          {selectedSfemiTenures.map((t) => {
-                            const m = Math.round(item.basePrice / t);
-                            return (
-                              <div key={t} className="text-[10px] font-black text-black">
-                                {t === 15 ? "⭐ 15m Promo: " : `${t}m: `}₹{m.toLocaleString("en-IN")}/mo
-                              </div>
-                            );
-                          })}
+                      {item.specs.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {item.specs.map((s, idx) => (
+                            <span
+                              key={idx}
+                              className="text-[9px] font-medium bg-gray-100 px-1 py-0.2 rounded border border-gray-300 text-black"
+                            >
+                              {s}
+                            </span>
+                          ))}
                         </div>
                       )}
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
+
+                  {/* Pricing Grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 pt-2 border-t border-gray-300 text-xs">
+                    {schemes.direct_sale && (
+                      <div className="p-1.5 rounded bg-gray-50 border border-gray-300">
+                        <span className="block text-[9px] font-bold text-gray-600 uppercase">
+                          Direct Sale
+                        </span>
+                        <span className="text-xs font-bold text-black">
+                          {item.hasPrice ? formatCurrency(item.basePrice) : "On Request"}
+                        </span>
+                      </div>
+                    )}
+
+                    {schemes.rent && (
+                      <div className="p-1.5 rounded bg-sky-50 border border-sky-300">
+                        <span className="block text-[9px] font-bold text-sky-800 uppercase">
+                          Rent
+                        </span>
+                        {selectedRentTenures.map((t) => {
+                          const m = Math.round((item.basePrice * item.rentYieldPercent * 12) / t / 100);
+                          return (
+                            <div key={t} className="text-[10px] font-bold text-black">
+                              {t}m: ₹{m.toLocaleString("en-IN")}/mo
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {schemes.lease && (
+                      <div className="p-1.5 rounded bg-indigo-50 border border-indigo-300">
+                        <span className="block text-[9px] font-bold text-indigo-800 uppercase">
+                          Lease
+                        </span>
+                        {selectedLeaseTenures.map((t) => {
+                          const m = Math.round((item.basePrice * item.leaseYieldPercent * 12) / t / 100);
+                          return (
+                            <div key={t} className="text-[10px] font-bold text-black">
+                              {t}m: ₹{m.toLocaleString("en-IN")}/mo
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {schemes.sfemi && (
+                      <div className="p-1.5 rounded bg-emerald-50 border border-emerald-300">
+                        <span className="block text-[9px] font-bold text-emerald-800 uppercase">
+                          SFEMI
+                        </span>
+                        {selectedSfemiTenures.map((t) => {
+                          const m = Math.round(item.basePrice / t);
+                          return (
+                            <div key={t} className="text-[10px] font-black text-black">
+                              {t === 15 ? "⭐ 15m Promo: " : `${t}m: `}₹{m.toLocaleString("en-IN")}/mo
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
 
             {/* Print Footer */}
-            <div className="pt-3 border-t-2 border-black text-[9px] text-gray-700 leading-normal flex items-start justify-between gap-4">
+            <div id="print-sheet-footer" className="pt-3 border-t-2 border-black text-[9px] text-gray-700 leading-normal flex items-start justify-between gap-4">
               <div>
                 <p>
                   <strong>Terms & Notes:</strong> Indicative pricing based on current showroom catalog. Rent & Lease agreements require identity & address verification (KYC). Security deposit is 100% refundable upon product return in good order. SFEMI Advance EMI operates under approved transparent promotional benefits (Remaining Future EMIs Waived for Beneficiaries under the 15-Month Promotion).
@@ -2116,7 +2336,16 @@ export default function ProductCatalogShareModal({
             </button>
             <button
               type="button"
-              onClick={handlePrint}
+              onClick={() => handleDownloadHtml()}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-background hover:bg-muted text-foreground px-3 py-2 text-xs font-medium transition cursor-pointer"
+              title="Save complete price list as standalone offline HTML file"
+            >
+              <Download className="h-3.5 w-3.5 text-primary" />
+              Download HTML
+            </button>
+            <button
+              type="button"
+              onClick={() => handlePrint()}
               className="inline-flex items-center gap-1.5 rounded-xl border border-primary/30 bg-primary/10 text-primary px-4 py-2 text-xs font-semibold hover:bg-primary/20 transition cursor-pointer"
             >
               <Printer className="h-4 w-4" />
