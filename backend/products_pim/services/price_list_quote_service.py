@@ -80,6 +80,9 @@ def generate_price_list_quote(
     customer_phone: str = "",
     currency_symbol: str = "₹",
     public_origin: str = "https://subidhafurnitureasansol.com",
+    category_id: int | None = None,
+    exclude_unpriced: bool = False,
+    in_stock_only: bool = False,
 ) -> dict[str, Any]:
     """
     Generate authoritative multi-scheme, multi-tenure price list quote for products.
@@ -158,8 +161,23 @@ def generate_price_list_quote(
     else:
         all_products = initial_products
 
+    # Category Filter (if requested)
+    if category_id:
+        all_products = [
+            p for p in all_products
+            if p.category_id == category_id or getattr(p.parent, "category_id", None) == category_id
+        ]
+
+    # Exclude unpriced filter (if requested, hide base_price <= 0)
+    if exclude_unpriced:
+        all_products = [p for p in all_products if (p.base_price or Decimal("0.00")) > Decimal("0.00")]
+
     # Pre-fetch stock map for all products
     stock_map = get_pim_stock_map(all_products)
+
+    # In-stock only filter (if requested)
+    if in_stock_only:
+        all_products = [p for p in all_products if stock_map.get(p.id, 0) > 0]
 
     items: list[dict[str, Any]] = []
     origin = public_origin.rstrip("/")
@@ -252,8 +270,13 @@ def generate_price_list_quote(
             "name": p.name,
             "full_name": f"{p.parent.name} — {p.name}" if is_child and p.parent else p.name,
             "category": cat_label,
+            "category_id": p.category_id,
+            "category_name": p.category.name if p.category else "",
+            "subcategory_id": p.subcategory_id,
+            "subcategory_name": p.subcategory.name if p.subcategory else "",
             "brand": p.brand or "",
             "base_price": str(price),
+            "has_price": price > ZERO,
             "current_stock_qty": stock_qty,
             "specs": specs,
             "public_url": public_url,
@@ -369,6 +392,46 @@ def generate_price_list_quote(
     ])
     whatsapp_message = "\n".join(whatsapp_lines)
 
+    # Generate a compact, URL-safe summary message that never exceeds browser limits
+    summary_lines: list[str] = [
+        "✨ *SUBIDHA FURNITURE & APPLIANCES — PRICE LIST*",
+    ]
+    if customer_name.strip():
+        summary_lines.append(f"👤 *Prepared for:* {customer_name.strip()}")
+    summary_lines.extend([
+        "📍 Asansol, West Bengal · 📞 +91 7602283000",
+        f"🌐 {origin}",
+        "------------------------------------------",
+        f"Hello! Here is the pricing overview for your selected {len(items)} product(s):",
+        "",
+    ])
+    sample_items = items[:3]
+    for idx, s in enumerate(sample_items, 1):
+        s_price = Decimal(s["base_price"])
+        q = s["quotes"]
+        summary_lines.append(f"{idx}. 📌 *{s['full_name']}* (Code: `{s['sku']}`)")
+        if q["direct_sale"]["available"]:
+            summary_lines.append(f"   💰 Direct Sale: {currency_symbol}{s_price:,.2f}")
+        if q["rent"]["available"] and q["rent"]["tenures"]:
+            t_first = sorted(q["rent"]["tenures"].keys(), key=int)[0]
+            summary_lines.append(f"   🏠 Rent ({t_first}m): {currency_symbol}{Decimal(q['rent']['tenures'][t_first]['monthly_amount']):,.2f}/mo")
+        if q["sfemi"]["available"] and "15" in q["sfemi"]["tenures"]:
+            q15 = q["sfemi"]["tenures"]["15"]
+            summary_lines.append(f"   ⭐ SFEMI 15m Promo: {currency_symbol}{Decimal(q15['monthly_amount']):,.2f}/mo (Future EMIs Waived!)")
+        summary_lines.append("")
+
+    if len(items) > 3:
+        summary_lines.append(f"*(+ {len(items) - 3} more products in your complete quotation)*")
+        summary_lines.append("📋 *Full itemized price list copied to clipboard! Paste below to view all.*")
+        summary_lines.append("")
+
+    summary_lines.extend([
+        f"🔗 *Browse Online Catalog:* {origin}/products",
+        "------------------------------------------",
+        "✅ Transparent terms · Doorstep delivery · Quick approval",
+    ])
+    whatsapp_summary_message = "\n".join(summary_lines)
+
     return {
         "customer_name": customer_name,
         "customer_phone": customer_phone,
@@ -381,4 +444,5 @@ def generate_price_list_quote(
         "variant_count": len([i for i in items if i["is_child"]]),
         "items": items,
         "whatsapp_message": whatsapp_message,
+        "whatsapp_summary_message": whatsapp_summary_message,
     }

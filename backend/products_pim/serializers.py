@@ -946,9 +946,26 @@ class PriceListQuoteRequestSerializer(serializers.Serializer):
         default="https://subidhafurnitureasansol.com",
         help_text="Public site origin used for generating scannable QR URLs.",
     )
+    category_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        min_value=1,
+        help_text="Optional category ID filter.",
+    )
+    exclude_unpriced = serializers.BooleanField(
+        default=False,
+        required=False,
+        help_text="Whether to exclude products without a price (base_price <= 0).",
+    )
+    in_stock_only = serializers.BooleanField(
+        default=False,
+        required=False,
+        help_text="Whether to only include in-stock products.",
+    )
 
     def validate_product_ids(self, value):
-        if len(value) > 500:
-            raise serializers.ValidationError("Select no more than 500 products at a time.")
+        if len(value) > 1000:
+            raise serializers.ValidationError("Select no more than 1,000 products at a time.")
         return list(dict.fromkeys(value))
+
 

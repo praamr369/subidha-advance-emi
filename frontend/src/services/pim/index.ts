@@ -256,6 +256,9 @@ export interface PriceListQuoteRequest {
   customer_name?: string;
   customer_phone?: string;
   public_origin?: string;
+  category_id?: number | null;
+  exclude_unpriced?: boolean;
+  in_stock_only?: boolean;
 }
 
 export interface PriceListQuoteRentTenure {
@@ -296,8 +299,13 @@ export interface PriceListQuoteItem {
   name: string;
   full_name: string;
   category: string;
+  category_id?: number | null;
+  category_name?: string;
+  subcategory_id?: number | null;
+  subcategory_name?: string;
   brand: string;
   base_price: string;
+  has_price?: boolean;
   current_stock_qty: number;
   specs: string[];
   public_url: string;
@@ -342,6 +350,7 @@ export interface PriceListQuoteResponse {
   variant_count: number;
   items: PriceListQuoteItem[];
   whatsapp_message: string;
+  whatsapp_summary_message?: string;
 }
 
 

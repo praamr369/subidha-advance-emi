@@ -887,10 +887,10 @@ function PimPanel({
                   }
                 }}
                 className="inline-flex items-center gap-1.5 rounded-xl border border-sky-300 bg-sky-50 dark:bg-sky-950/40 dark:border-sky-800 text-sky-800 dark:text-sky-300 px-3 py-2 text-sm hover:bg-sky-100 dark:hover:bg-sky-900/50 font-medium shadow-2xs"
-                title="Share multi-scheme catalog (Rent, Lease, Direct Sale, SFEMI) with price variations & QR codes"
+                title="Share or print multi-scheme catalog (Rent, Lease, Direct Sale, SFEMI) with price variations & QR codes"
               >
                 <Share2 className="h-4 w-4 text-sky-600 dark:text-sky-400" />
-                Share Catalog ({selectedPimIds.size})
+                Share / Print ({selectedPimIds.size})
               </button>
               <button
                 type="button"
@@ -956,10 +956,10 @@ function PimPanel({
             }}
             disabled={roots.length === 0}
             className="inline-flex items-center gap-1.5 rounded-xl border border-sky-200 bg-sky-50/60 dark:bg-sky-950/30 dark:border-sky-800 text-sky-800 dark:text-sky-300 px-3 py-2 text-sm hover:bg-sky-100 dark:hover:bg-sky-900/40 font-medium shadow-2xs disabled:opacity-50"
-            title="Share full page catalog & price list across all schemes with QR codes"
+            title="Share or print full page catalog & price list across all schemes with QR codes"
           >
             <Share2 className="h-4 w-4 text-sky-600 dark:text-sky-400" />
-            Share Page Catalog ({roots.length})
+            Share / Print Page ({roots.length})
           </button>
           <button
             type="button"

@@ -160,3 +160,73 @@ class PriceListQuoteApiTests(APITestCase):
         self.assertIn("Remaining Future EMIs Waived", msg)
         self.assertNotIn("Lucky Plan", msg)
         self.assertNotIn("Lucky Draw", msg)
+
+        # Check that whatsapp_summary_message is present and concise
+        summary_msg = data.get("whatsapp_summary_message", "")
+        self.assertTrue(bool(summary_msg))
+        self.assertIn("Ramesh Sen", summary_msg)
+        self.assertIn("SOFA-ROYAL", summary_msg)
+        self.assertLess(len(summary_msg), 1500)
+
+    def test_exclude_unpriced_filter(self):
+        # Create unpriced product (base_price = 0)
+        unpriced = PimProduct.objects.create(
+            code="UNPRICED-ITEM",
+            name="Draft Sofa Unpriced",
+            category=self.category,
+            base_price=Decimal("0.00"),
+            is_active=True,
+            is_published=True,
+        )
+
+        # 1. With exclude_unpriced=True
+        res = self.client.post(
+            URL,
+            {"product_ids": [self.sofa_base.id, unpriced.id], "include_variants": False, "exclude_unpriced": True},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        data = res.json()
+        item_codes = [i["code"] for i in data["items"]]
+        self.assertIn("SOFA-ROYAL", item_codes)
+        self.assertNotIn("UNPRICED-ITEM", item_codes)
+
+        # 2. With exclude_unpriced=False
+        res2 = self.client.post(
+            URL,
+            {"product_ids": [self.sofa_base.id, unpriced.id], "include_variants": False, "exclude_unpriced": False},
+            format="json",
+        )
+        self.assertEqual(res2.status_code, status.HTTP_200_OK)
+        data2 = res2.json()
+        item_codes2 = [i["code"] for i in data2["items"]]
+        self.assertIn("UNPRICED-ITEM", item_codes2)
+        unpriced_item = next(i for i in data2["items"] if i["code"] == "UNPRICED-ITEM")
+        self.assertFalse(unpriced_item["has_price"])
+
+    def test_category_filter(self):
+        other_cat = ProductCategory.objects.create(name="Office", slug="office-quote")
+        chair = PimProduct.objects.create(
+            code="OFFICE-CHAIR-01",
+            name="Ergonomic Mesh Chair",
+            category=other_cat,
+            base_price=Decimal("8000.00"),
+            is_active=True,
+            is_published=True,
+        )
+
+        res = self.client.post(
+            URL,
+            {
+                "product_ids": [self.sofa_base.id, chair.id],
+                "include_variants": False,
+                "category_id": other_cat.id,
+            },
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        data = res.json()
+        item_codes = [i["code"] for i in data["items"]]
+        self.assertIn("OFFICE-CHAIR-01", item_codes)
+        self.assertNotIn("SOFA-ROYAL", item_codes)
+
