@@ -877,3 +877,78 @@ class ProductMediaItemSerializer(serializers.ModelSerializer):
 
     def get_ios_file_url(self, obj):
         return self._absolute(obj.ios_file)
+
+
+class PriceListQuoteRequestSerializer(serializers.Serializer):
+    """Request payload serializer for generating multi-scheme, multi-tenure price list quotes."""
+
+    product_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1),
+        allow_empty=False,
+        help_text="List of PIM product IDs to generate quotes for.",
+    )
+    include_variants = serializers.BooleanField(
+        default=True,
+        required=False,
+        help_text="Whether to include child variant SKUs under selected base blueprints.",
+    )
+    schemes = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        default=list,
+        help_text="Price categories/schemes to include (e.g. DIRECT_SALE, RENT, LEASE, SFEMI).",
+    )
+    rent_tenures = serializers.ListField(
+        child=serializers.IntegerField(min_value=3, max_value=60),
+        required=False,
+        default=lambda: [6, 9, 12, 24],
+        help_text="Rent tenures in months (e.g. [6, 9, 12, 24]).",
+    )
+    lease_tenures = serializers.ListField(
+        child=serializers.IntegerField(min_value=6, max_value=60),
+        required=False,
+        default=lambda: [12, 24, 36],
+        help_text="Lease tenures in months (e.g. [12, 24, 36]).",
+    )
+    sfemi_tenures = serializers.ListField(
+        child=serializers.IntegerField(min_value=12, max_value=15),
+        required=False,
+        default=lambda: [12, 15],
+        help_text="SFEMI tenures in months (specifically [12, 15]).",
+    )
+    deposit_percent = serializers.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        required=False,
+        allow_null=True,
+        min_value=0,
+        max_value=100,
+        help_text="Optional security deposit percent override (e.g. 20.00). Defaults to automatic price band.",
+    )
+    customer_name = serializers.CharField(
+        max_length=200,
+        required=False,
+        allow_blank=True,
+        default="",
+        help_text="Customer name for personalized quotation.",
+    )
+    customer_phone = serializers.CharField(
+        max_length=30,
+        required=False,
+        allow_blank=True,
+        default="",
+        help_text="Customer phone number for WhatsApp sharing.",
+    )
+    public_origin = serializers.CharField(
+        max_length=255,
+        required=False,
+        allow_blank=True,
+        default="https://subidhafurnitureasansol.com",
+        help_text="Public site origin used for generating scannable QR URLs.",
+    )
+
+    def validate_product_ids(self, value):
+        if len(value) > 500:
+            raise serializers.ValidationError("Select no more than 500 products at a time.")
+        return list(dict.fromkeys(value))
+

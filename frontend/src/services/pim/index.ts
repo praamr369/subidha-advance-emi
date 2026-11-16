@@ -245,6 +245,106 @@ export interface VariantAuditEntry {
   created_at: string;
 }
 
+export interface PriceListQuoteRequest {
+  product_ids: number[];
+  include_variants?: boolean;
+  schemes?: string[];
+  rent_tenures?: number[];
+  lease_tenures?: number[];
+  sfemi_tenures?: number[];
+  deposit_percent?: number | null;
+  customer_name?: string;
+  customer_phone?: string;
+  public_origin?: string;
+}
+
+export interface PriceListQuoteRentTenure {
+  tenure_months: number;
+  monthly_amount: string;
+  deposit_percent: string;
+  deposit_amount: string;
+  upfront_amount: string;
+  total_rent: string;
+}
+
+export interface PriceListQuoteLeaseTenure {
+  tenure_months: number;
+  monthly_amount: string;
+  deposit_percent: string;
+  deposit_amount: string;
+  upfront_amount: string;
+  total_lease: string;
+}
+
+export interface PriceListQuoteSfemiTenure {
+  tenure_months: number;
+  monthly_amount: string;
+  total_contract_amount: string;
+  is_special_promotion: boolean;
+  plan_label: string;
+  promotional_benefit: string;
+}
+
+export interface PriceListQuoteItem {
+  id: number;
+  is_child: boolean;
+  parent_id: number | null;
+  parent_code: string | null;
+  parent_name: string | null;
+  code: string;
+  sku: string;
+  name: string;
+  full_name: string;
+  category: string;
+  brand: string;
+  base_price: string;
+  current_stock_qty: number;
+  specs: string[];
+  public_url: string;
+  quotes: {
+    direct_sale: {
+      available: boolean;
+      price: string;
+      label: string;
+      description: string;
+    };
+    rent: {
+      available: boolean;
+      annual_yield_percent: string;
+      deposit_percent: string;
+      deposit_amount: string;
+      tenures: Record<string, PriceListQuoteRentTenure>;
+    };
+    lease: {
+      available: boolean;
+      annual_yield_percent: string;
+      deposit_percent: string;
+      deposit_amount: string;
+      tenures: Record<string, PriceListQuoteLeaseTenure>;
+    };
+    sfemi: {
+      available: boolean;
+      tenures: Record<string, PriceListQuoteSfemiTenure>;
+      promotional_terms: string;
+    };
+  };
+}
+
+export interface PriceListQuoteResponse {
+  customer_name: string;
+  customer_phone: string;
+  requested_schemes: string[];
+  rent_tenures: number[];
+  lease_tenures: number[];
+  sfemi_tenures: number[];
+  item_count: number;
+  base_count: number;
+  variant_count: number;
+  items: PriceListQuoteItem[];
+  whatsapp_message: string;
+}
+
+
 const BASE = "/api/v1/pim";
 
 // DRF global pagination wraps lists in {count, results}. Unwrap safely.
@@ -769,4 +869,11 @@ export const pimService = {
     request<VariantAuditEntry[]>(
       `/api/v1/admin/audit-logs/timeline/PimProduct/${encodeURIComponent(productIdOrCode)}/${includeVariants ? "?include_variants=true" : ""}`
     ),
+
+  // --- Price List Quote Engine (Direct Sale, Multi-Tenure Rent/Lease, SFEMI 15m Promotion) ---
+  getPriceListQuote: (payload: PriceListQuoteRequest): Promise<PriceListQuoteResponse> =>
+    request<PriceListQuoteResponse>(`${BASE}/products/price-list-quote/`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
 };

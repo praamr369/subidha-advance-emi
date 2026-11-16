@@ -39,6 +39,7 @@ from .serializers import (
     ProductVariantCreateSerializer,
     VariantAttributeValueSerializer,
     ProductMediaItemSerializer,
+    PriceListQuoteRequestSerializer,
 )
 
 
@@ -536,6 +537,22 @@ class PimProductViewSet(viewsets.ModelViewSet):
             "affected_products": changed,
             "variants_activated": activated_variants,
         })
+
+    @action(detail=False, methods=["post"], url_path="price-list-quote")
+    def price_list_quote(self, request):
+        """Generate tailored multi-scheme, multi-tenure price list quote for products.
+
+        Computes exact pricing across Direct Sale, Rent (6m, 9m, 12m, 24m),
+        Lease (12m, 24m, 36m), and SFEMI (12m, and 15m Special Promotion),
+        including public QR codes and ready-to-send customer WhatsApp text.
+        """
+        from products_pim.services.price_list_quote_service import generate_price_list_quote
+
+        serializer = PriceListQuoteRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        quote = generate_price_list_quote(**serializer.validated_data)
+        return Response(quote, status=status.HTTP_200_OK)
+
 
 
     @action(detail=True, methods=["get", "patch"], url_path="variants_publish_control")
