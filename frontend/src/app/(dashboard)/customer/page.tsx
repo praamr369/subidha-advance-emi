@@ -27,6 +27,8 @@ import {
   Truck,
   Users,
 } from "lucide-react";
+import DashboardWidgetBoard from "@/components/dashboard/DashboardWidgetBoard";
+import ActionButton from "@/components/ui/ActionButton";
 import UpiPayDialog from "@/components/payments/UpiPayDialog";
 import { listPublicProducts, type PublicProduct } from "@/services/public";
 import { resolveApiMediaUrl } from "@/lib/media";
@@ -805,6 +807,78 @@ export default function CustomerDashboardPage() {
               </div>
             </div>
           ) : null}
+          {/* ── 11. Custom Quick Lanes Board ── */}
+          <div className="space-y-2">
+            <details className="group rounded-2xl border border-border bg-card p-4 shadow-xs [&_summary::-webkit-details-marker]:hidden">
+              <summary className="flex cursor-pointer items-center justify-between font-bold text-xs text-muted-foreground uppercase tracking-wider select-none">
+                <span>Custom Lane Preferences</span>
+                <span className="text-primary text-xs font-semibold group-open:rotate-180 transition-transform">▼</span>
+              </summary>
+              <div className="mt-3 pt-3 border-t border-border">
+                <DashboardWidgetBoard
+                  storageKey="subidha:dashboard-widgets:customer:v1"
+                  version={1}
+                  title="Customer lane widgets"
+                  description="Simple customer lane controls for subscription, payment, and support routes."
+                  presets={[
+                    {
+                      id: "subscription-first",
+                      label: "Subscription first",
+                      description: "Prioritize subscription and payment visibility.",
+                      order: ["subs", "payments", "support"],
+                      pinned: ["subs", "payments"],
+                    },
+                    {
+                      id: "support-first",
+                      label: "Support first",
+                      description: "Prioritize support escalation while preserving subscription context.",
+                      order: ["support", "subs", "payments"],
+                      pinned: ["support"],
+                    },
+                  ]}
+                  widgets={[
+                    {
+                      id: "subs",
+                      title: "My subscriptions",
+                      subtitle: "Contract and beneficiary posture overview.",
+                      group: "core",
+                      fixed: true,
+                      content: (
+                        <ActionButton href={ROUTES.customer.subscriptions} variant="outline" className="justify-between">
+                          Open subscriptions
+                          <ArrowRight className="h-4 w-4" />
+                        </ActionButton>
+                      ),
+                    },
+                    {
+                      id: "payments",
+                      title: "My payments",
+                      subtitle: "Payment register and receipt lookup.",
+                      group: "quick-actions",
+                      content: (
+                        <ActionButton href={ROUTES.customer.payments} variant="outline" className="justify-between">
+                          Open payments
+                          <ArrowRight className="h-4 w-4" />
+                        </ActionButton>
+                      ),
+                    },
+                    {
+                      id: "support",
+                      title: "Support requests",
+                      subtitle: "Escalate customer-side issues safely.",
+                      group: "operational",
+                      content: (
+                        <ActionButton href={ROUTES.customer.support} variant="outline" className="justify-between">
+                          Open support
+                          <ArrowRight className="h-4 w-4" />
+                        </ActionButton>
+                      ),
+                    },
+                  ]}
+                />
+              </div>
+            </details>
+          </div>
         </>
       ) : null}
 
