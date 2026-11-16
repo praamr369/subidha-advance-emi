@@ -169,12 +169,14 @@ export default function ProductCatalogShareModal({
     address: string;
     email: string;
     website: string;
+    logoUrl: string;
   }>({
     name: "Subidha Furniture",
     phone: "+91 94764 90946",
     address: "South Dhadka Sukantapally, Near Rupkatha Cinema Hall, Dakhin Dhadka, Asansol, Paschim Barddhaman, West Bengal 713302, India",
     email: "subidhafurnitureofficial@gmail.com",
     website: "subidhafurnitureasansol.com",
+    logoUrl: "/brand/logo.png",
   });
 
   useEffect(() => {
@@ -188,6 +190,7 @@ export default function ProductCatalogShareModal({
           address: settings.print_address?.replace(/\r?\n+/g, ", ").trim() || prev.address,
           email: settings.print_email?.trim() || prev.email,
           website: settings.print_website?.trim() || prev.website,
+          logoUrl: settings.business_logo_url?.trim() || prev.logoUrl,
         }));
       })
       .catch(() => {
@@ -206,9 +209,19 @@ export default function ProductCatalogShareModal({
         address: serverQuote.business_address || prev.address,
         email: serverQuote.business_email || prev.email,
         website: prev.website,
+        logoUrl: serverQuote.business_logo_url || prev.logoUrl,
       }));
     }
   }, [serverQuote]);
+
+  const resolvedLogoUrl = useMemo(() => {
+    if (!businessInfo.logoUrl) return `${origin}/brand/logo.png`;
+    return businessInfo.logoUrl.startsWith("http")
+      ? businessInfo.logoUrl
+      : `${origin}${businessInfo.logoUrl.startsWith("/") ? "" : "/"}${businessInfo.logoUrl}`;
+  }, [businessInfo.logoUrl, origin]);
+
+  const webappCatalogUrl = `${origin}/products`;
 
   // Combine products based on scope and extra loaded
   const effectiveSourceProducts = useMemo<PimProduct[]>(() => {
@@ -843,6 +856,7 @@ export default function ProductCatalogShareModal({
 <html lang="en">
 <head>
   <meta charset="utf-8" />
+  <base href="${origin}/" />
   <title>${businessInfo.name} - Official Showroom Price List (${activeItems.length} Products)</title>
   <style>
     @page {
@@ -1015,9 +1029,51 @@ export default function ProductCatalogShareModal({
     .w-12 { width: 48px !important; }
     .w-14 { width: 56px !important; }
     .w-16 { width: 64px !important; }
+    .h-14 { height: 56px !important; }
+    .h-16 { height: 64px !important; }
+    .w-\[115px\] { width: 115px !important; }
+    .max-w-\[200px\] { max-width: 200px !important; }
+    .max-w-\[220px\] { max-width: 220px !important; }
     .min-w-0 { min-width: 0 !important; }
     .flex-1 { flex: 1 1 0% !important; }
     .shrink-0 { flex-shrink: 0 !important; }
+    img {
+      max-width: 100%;
+      height: auto;
+      object-fit: contain;
+      display: block;
+    }
+    a {
+      color: #1d4ed8 !important;
+      text-decoration: underline !important;
+    }
+    .bg-zinc-900 { background-color: #18181b !important; color: #ffffff !important; }
+    .bg-zinc-50 { background-color: #fafafa !important; }
+    .text-blue-700 { color: #1d4ed8 !important; }
+    .text-blue-900 { color: #1e3a8a !important; }
+    .text-sky-950 { color: #082f49 !important; }
+    .text-sky-900 { color: #0c4a6e !important; }
+    .text-indigo-950 { color: #1e1b4b !important; }
+    .text-indigo-900 { color: #312e81 !important; }
+    .text-amber-950 { color: #451a03 !important; }
+    .text-amber-900 { color: #78350f !important; }
+    .border-amber-300 { border-color: #fcd34d !important; }
+    .border-gray-200 { border-color: #e5e7eb !important; }
+    .border-sky-200 { border-color: #bae6fd !important; }
+    .border-indigo-200 { border-color: #c7d2fe !important; }
+    .border-t { border-top-width: 1px !important; }
+    .border-b-2 { border-bottom-width: 2px !important; }
+    .border-2 { border-width: 2px !important; }
+    .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+    .grid-cols-4, .md\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+    .space-y-3 > * + * { margin-top: 12px !important; }
+    .gap-x-3 { column-gap: 12px !important; }
+    .gap-y-0\\.5 { row-gap: 2px !important; }
+    .break-all { word-break: break-all !important; }
+    .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .inline-flex { display: inline-flex !important; }
+    .overflow-hidden { overflow: hidden !important; }
+    .shadow-2xs { box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important; }
     button, input, textarea, [role="button"], .no-print {
       display: none !important;
     }
@@ -2079,35 +2135,153 @@ export default function ProductCatalogShareModal({
               activeTab === "print" ? "block" : "hidden"
             }`}
           >
-            {/* Header for Print Sheet */}
-            <div id="print-sheet-header" className="border-b-2 border-black pb-4 flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <h1 className="text-xl font-black tracking-tight text-black uppercase">
-                  {businessInfo.name}
-                </h1>
-                <p className="text-xs text-gray-700 font-semibold mt-0.5">
-                  Official Showroom Price List · Direct Sale · Rent · Lease · SFEMI Advance EMI
-                </p>
-                <p className="text-[11px] text-gray-600 mt-1">
-                  Showroom: {businessInfo.address} · Phone: {businessInfo.phone} · Web: {businessInfo.website}
-                </p>
-                {customerName.trim() && (
-                  <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-gray-100 text-xs font-bold text-black border border-gray-300">
-                    👤 Prepared for: <span className="underline">{customerName.trim()}</span>{" "}
-                    {customerPhone.trim() ? `(${customerPhone.trim()})` : ""}
+            {/* Header for Print Sheet: Complete Advertising, Marketing & Handover Brand Header */}
+            <div id="print-sheet-header" className="border-b-2 border-black pb-3 space-y-3">
+              {/* Top Branding Row */}
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                {/* Brand Identity & Logo */}
+                <div className="flex items-center gap-3">
+                  <div className="relative shrink-0 w-16 h-16 rounded-xl border border-gray-300 bg-white p-1 flex items-center justify-center overflow-hidden shadow-2xs">
+                    <img
+                      src={resolvedLogoUrl}
+                      alt={`${businessInfo.name} Brand Logo`}
+                      className="w-full h-full object-contain"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).src = `${origin}/brand/logo.png`;
+                      }}
+                    />
                   </div>
-                )}
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h1 className="text-xl font-black tracking-tight text-black uppercase">
+                        {businessInfo.name}
+                      </h1>
+                      <span className="px-2 py-0.5 rounded bg-black text-white text-[9px] font-black tracking-wider uppercase">
+                        Official Catalog Handover
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-800 font-bold mt-0.5">
+                      Premium Furniture &amp; Home Appliances · Direct Sale · Smart Rent · Corporate Lease · SFEMI Advance EMI
+                    </p>
+                    <p className="text-[11px] text-gray-600 mt-0.5">
+                      📍 <strong>Showroom:</strong> {businessInfo.address}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10.5px] text-gray-700 mt-0.5">
+                      <span>📞 <strong>Phone:</strong> {businessInfo.phone}</span>
+                      <span>✉️ <strong>Email:</strong> {businessInfo.email}</span>
+                      <span>
+                        🌐 <strong>Web:</strong>{" "}
+                        <a
+                          href={webappCatalogUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-700 font-bold underline hover:text-blue-900"
+                        >
+                          {businessInfo.website}
+                        </a>
+                      </span>
+                    </div>
+
+                    {customerName.trim() && (
+                      <div className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-amber-50 text-xs font-bold text-black border border-amber-300">
+                        👤 Prepared for: <span className="underline">{customerName.trim()}</span>{" "}
+                        {customerPhone.trim() ? `(${customerPhone.trim()})` : ""}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Right Side: Webapp QR Code & Metadata Card */}
+                <div className="flex items-center gap-3 shrink-0 ml-auto">
+                  {/* Webapp Online QR Code Box */}
+                  <div className="flex flex-col items-center justify-center p-2 rounded-xl bg-zinc-50 border-2 border-black/80 text-center w-[115px] shadow-2xs">
+                    <div className="w-16 h-16 bg-white p-1 rounded-md border border-gray-300 flex items-center justify-center">
+                      <QRCode
+                        value={webappCatalogUrl}
+                        size={60}
+                        level="M"
+                        style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+                      />
+                    </div>
+                    <span className="text-[8px] font-black uppercase text-black mt-1 tracking-tight">
+                      Webapp Catalog QR
+                    </span>
+                    <a
+                      href={webappCatalogUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[8px] text-blue-700 font-bold hover:underline truncate max-w-full block"
+                      title="Open Online Webapp"
+                    >
+                      Open Webapp ↗
+                    </a>
+                  </div>
+
+                  <div className="text-right text-xs">
+                    <span className="inline-block px-3 py-1 rounded bg-black text-white font-bold tracking-wider text-[11px]">
+                      OFFICIAL PRICE LIST
+                    </span>
+                    <p className="text-[11px] text-gray-600 mt-1 font-medium">
+                      Date: {new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                    </p>
+                    <p className="text-[10px] text-gray-500 mt-0.5 font-mono">
+                      {activeItems.length} Products Selected
+                    </p>
+                  </div>
+                </div>
               </div>
-              <div className="text-right text-xs">
-                <span className="inline-block px-3 py-1 rounded bg-black text-white font-bold tracking-wider text-[11px]">
-                  OFFICIAL PRICE LIST
-                </span>
-                <p className="text-[11px] text-gray-600 mt-1 font-medium">
-                  Date: {new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
-                </p>
-                <p className="text-[10px] text-gray-500 mt-0.5 font-mono">
-                  {activeItems.length} Products & Variations
-                </p>
+
+              {/* Full Advertising Marketing Highlights Banner */}
+              <div className="pt-2.5 border-t border-gray-200">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-left">
+                  {/* Direct Sale */}
+                  <div className="p-2 rounded-lg bg-gray-50 border border-gray-200">
+                    <div className="font-black text-[10px] text-black uppercase">
+                      🛋️ Direct Sale (MRP)
+                    </div>
+                    <p className="text-[9px] text-gray-600 mt-0.5 leading-snug">
+                      100% Genuine brand quality, manufacturer warranty, instant delivery &amp; best showroom pricing.
+                    </p>
+                  </div>
+
+                  {/* Smart Rent */}
+                  <div className="p-2 rounded-lg bg-sky-50/80 border border-sky-200">
+                    <div className="font-black text-[10px] text-sky-950 uppercase">
+                      🏠 Smart Rent Plans
+                    </div>
+                    <p className="text-[9px] text-sky-900 mt-0.5 leading-snug">
+                      Tenures: 3, 6, 9, 12, 24 Months. Zero long-term commitment, free maintenance &amp; easy relocation.
+                    </p>
+                  </div>
+
+                  {/* Commercial Lease */}
+                  <div className="p-2 rounded-lg bg-indigo-50/80 border border-indigo-200">
+                    <div className="font-black text-[10px] text-indigo-950 uppercase">
+                      🏢 Commercial Lease
+                    </div>
+                    <p className="text-[9px] text-indigo-900 mt-0.5 leading-snug">
+                      12, 18, 24, 36, 48 Months. Complete home &amp; office furnishing with tax-efficient operating expense.
+                    </p>
+                  </div>
+
+                  {/* SFEMI Promotion */}
+                  <div className="p-2 rounded-lg bg-amber-50/80 border border-amber-300">
+                    <div className="font-black text-[10px] text-amber-950 uppercase">
+                      ⭐ SFEMI 15m Promo
+                    </div>
+                    <p className="text-[9px] text-amber-900 mt-0.5 leading-snug">
+                      Transparent advance EMI. Under the 15-Month Promotion, remaining future EMIs are waived for beneficiaries!
+                    </p>
+                  </div>
+                </div>
+
+                {/* Trust & Guarantee Strip */}
+                <div className="mt-2 py-1 px-2.5 rounded-md bg-zinc-900 text-white flex flex-wrap items-center justify-between text-[9px] font-medium gap-2">
+                  <span>🚚 <strong>Showroom Setup &amp; Delivery:</strong> Prompt delivery in Asansol &amp; Raniganj region</span>
+                  <span>🛡️ <strong>100% Refundable</strong> Security Deposit</span>
+                  <span>⚡ <strong>Paperless Verification:</strong> Fast Digital KYC</span>
+                  <span>📞 <strong>WhatsApp Orders:</strong> {businessInfo.phone}</span>
+                </div>
               </div>
             </div>
 
@@ -2153,14 +2327,21 @@ export default function ProductCatalogShareModal({
                     return (
                       <tr key={item.id} className="break-inside-avoid">
                         <td className="px-2 py-2 align-middle">
-                          <div className="flex flex-col items-center p-0.5 rounded bg-white border border-gray-300 w-12">
+                          <div className="flex flex-col items-center p-0.5 rounded bg-white border border-gray-300 w-12 shrink-0">
                             <QRCode
                               value={item.publicUrl}
                               size={40}
                               level="M"
                               style={{ height: "auto", maxWidth: "100%", width: "100%" }}
                             />
-                            <span className="text-[6px] text-gray-600 font-bold mt-0.5">Scan</span>
+                            <a
+                              href={item.publicUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[6.5px] text-blue-700 font-bold mt-0.5 hover:underline"
+                            >
+                              Scan / Open
+                            </a>
                           </div>
                         </td>
                         <td className="px-2 py-2 align-middle">
@@ -2169,6 +2350,21 @@ export default function ProductCatalogShareModal({
                             SKU: {item.sku} {item.brand ? `· ${item.brand}` : ""}
                           </div>
                           <div className="text-[9px] text-gray-500">{item.category}</div>
+                          <div className="mt-1">
+                            <a
+                              href={item.publicUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-[9px] font-bold text-blue-700 hover:text-blue-900 hover:underline"
+                              title="Click to view product online"
+                            >
+                              <span>🔗 View Online:</span>
+                              <span className="font-mono text-[8.5px] truncate max-w-[200px]">
+                                {item.publicUrl.replace(/^https?:\/\//, "")}
+                              </span>
+                              <span className="text-[8px]">↗</span>
+                            </a>
+                          </div>
                         </td>
                         <td className="px-2 py-2 align-middle">
                           <div className="text-[10px] text-gray-800">
@@ -2252,13 +2448,21 @@ export default function ProductCatalogShareModal({
                     <div className="flex flex-col items-center justify-center p-1.5 rounded-lg bg-white border border-gray-300 shrink-0">
                       <QRCode
                         value={item.publicUrl}
-                        size={70}
+                        size={65}
                         level="M"
                         style={{ height: "auto", maxWidth: "100%", width: "100%" }}
                       />
-                      <span className="text-[8px] text-gray-600 font-bold mt-1 text-center">
+                      <span className="text-[7.5px] text-gray-600 font-bold mt-1 text-center">
                         Scan to View
                       </span>
+                      <a
+                        href={item.publicUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[7.5px] text-blue-700 font-bold hover:underline mt-0.5 text-center"
+                      >
+                        Open Online ↗
+                      </a>
                     </div>
 
                     <div className="min-w-0 flex-1">
@@ -2267,6 +2471,20 @@ export default function ProductCatalogShareModal({
                         Code: <strong>{item.code}</strong> {item.brand ? `· Brand: ${item.brand}` : ""}
                       </p>
                       <p className="text-[10px] text-gray-500">{item.category}</p>
+
+                      <div className="mt-1">
+                        <a
+                          href={item.publicUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-[9px] font-bold text-blue-700 hover:text-blue-900 hover:underline break-all"
+                        >
+                          <span>🔗 Webapp Link:</span>
+                          <span className="font-mono text-[8.5px]">
+                            {item.publicUrl.replace(/^https?:\/\//, "")}
+                          </span>
+                        </a>
+                      </div>
 
                       {item.specs.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-1">
@@ -2355,7 +2573,15 @@ export default function ProductCatalogShareModal({
                   <strong>Terms & Notes:</strong> Indicative pricing based on current showroom catalog. Rent & Lease agreements require identity & address verification (KYC). Security deposit is 100% refundable upon product return in good order. SFEMI Advance EMI operates under approved transparent promotional benefits (Remaining Future EMIs Waived for Beneficiaries under the 15-Month Promotion).
                 </p>
                 <p className="mt-0.5">
-                  {businessInfo.name} · Showroom: {businessInfo.address} · 📞 {businessInfo.phone} · 🌐 {businessInfo.website}
+                  {businessInfo.name} · Showroom: {businessInfo.address} · 📞 {businessInfo.phone} · 🌐{" "}
+                  <a
+                    href={webappCatalogUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-700 font-bold underline hover:text-blue-900"
+                  >
+                    {businessInfo.website}
+                  </a>
                 </p>
               </div>
               <div className="shrink-0 text-right font-mono text-[9px] text-gray-500">

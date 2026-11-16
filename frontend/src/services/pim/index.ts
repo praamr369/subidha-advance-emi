@@ -345,6 +345,7 @@ export interface PriceListQuoteResponse {
   business_phone?: string;
   business_address?: string;
   business_email?: string;
+  business_logo_url?: string;
   requested_schemes: string[];
   rent_tenures: number[];
   lease_tenures: number[];

@@ -309,6 +309,7 @@ def generate_price_list_quote(
     b_phone = "+91 94764 90946"
     b_address = "South Dhadka Sukantapally, Near Rupkatha Cinema Hall, Dakhin Dhadka, Asansol, Paschim Barddhaman, West Bengal 713302, India"
     b_email = "subidhafurnitureofficial@gmail.com"
+    b_logo_url = "/brand/logo.png"
 
     try:
         from business_setup.models import BusinessProfile, DocumentPrintSettings
@@ -324,6 +325,8 @@ def generate_price_list_quote(
                 b_address = ", ".join([line.strip() for line in print_settings.print_address.splitlines() if line.strip()])
             if print_settings.print_email:
                 b_email = print_settings.print_email.strip()
+            if print_settings.business_logo:
+                b_logo_url = getattr(print_settings.business_logo, "url", "") or b_logo_url
         elif profile:
             if profile.trade_name:
                 b_name = profile.trade_name.strip()
@@ -331,6 +334,8 @@ def generate_price_list_quote(
                 b_phone = profile.primary_phone.strip()
             if profile.primary_email:
                 b_email = profile.primary_email.strip()
+            if profile.logo_url:
+                b_logo_url = profile.logo_url.strip()
             addr_parts = [
                 profile.address_line_1,
                 profile.address_line_2,
@@ -481,6 +486,7 @@ def generate_price_list_quote(
         "business_phone": b_phone,
         "business_address": b_address,
         "business_email": b_email,
+        "business_logo_url": b_logo_url,
         "requested_schemes": sorted(normalized_schemes),
         "rent_tenures": selected_rent_tenures,
         "lease_tenures": selected_lease_tenures,
