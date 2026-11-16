@@ -5,13 +5,14 @@ import { formatRupee } from "@/lib/utils/currency";
 import Link from "next/link";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { Download, RefreshCw, Search, SlidersHorizontal, X, Layers, ExternalLink, ChevronRight, ChevronDown, GitBranch, CheckCircle2, AlertCircle, Star, Package2, CircleHelp, QrCode, Boxes, Sparkles, Eye, EyeOff, Puzzle, Factory, Wrench, Box } from "lucide-react";
+import { Download, RefreshCw, Search, SlidersHorizontal, X, Layers, ExternalLink, ChevronRight, ChevronDown, GitBranch, CheckCircle2, AlertCircle, Star, Package2, CircleHelp, QrCode, Boxes, Sparkles, Eye, EyeOff, Puzzle, Factory, Wrench, Box, Share2 } from "lucide-react";
 import PimHelpGuideTab from "@/components/admin/help/PimHelpGuideTab";
 import PimPurchaseStockPanel from "@/components/admin/pim/PimPurchaseStockPanel";
 import { pimService, type PimProduct, type PimCategory, type PimTreeSummary } from "@/services/pim";
 import QRLabelPrintModal, { type QRLabelItem } from "@/components/inventory/QRLabelPrintModal";
 import PimQuickEditModal from "@/components/admin/pim/PimQuickEditModal";
 import PimVariantPublishControlModal from "@/components/admin/pim/PimVariantPublishControlModal";
+import ProductCatalogShareModal from "@/components/admin/products/ProductCatalogShareModal";
 
 import ProductQuickActions from "@/components/admin/products/ProductQuickActions";
 import { useWorkflowLauncher } from "@/components/workflows/WorkflowProvider";
@@ -263,6 +264,7 @@ function PimProductRow({
   togglingId,
   onTogglePublish,
   onPrintQR,
+  onShareCatalog,
   onQuickEdit,
   onOpenPublishControl,
 }: {
@@ -276,6 +278,7 @@ function PimProductRow({
   togglingId?: number | null;
   onTogglePublish?: (p: PimProduct) => void;
   onPrintQR?: (p: PimProduct) => void;
+  onShareCatalog?: (p: PimProduct) => void;
   onQuickEdit?: (p: PimProduct) => void;
   onOpenPublishControl?: (p: PimProduct) => void;
 }) {
@@ -444,6 +447,14 @@ function PimProductRow({
           </button>
           <button
             type="button"
+            onClick={() => onShareCatalog?.(p)}
+            className="inline-flex items-center gap-1 text-sky-700 hover:text-sky-900 dark:text-sky-300 dark:hover:text-white text-xs hover:underline font-medium"
+            title="Share product profile, child variants, price list across Rent, Lease, Direct Sale & SFEMI with QR codes"
+          >
+            <Share2 className="h-3 w-3 text-sky-600 dark:text-sky-400" /> Share Catalog
+          </button>
+          <button
+            type="button"
             onClick={() => onQuickEdit?.(p)}
             className="inline-flex items-center gap-1 text-primary text-xs hover:underline font-semibold cursor-pointer text-left"
             title="Quick edit this product, attributes and variants in a pop up window"
@@ -600,6 +611,8 @@ function PimPanel({
   const [qrModalItems, setQrModalItems] = useState<QRLabelItem[] | null>(null);
   const [quickEditPimProduct, setQuickEditPimProduct] = useState<PimProduct | null>(null);
   const [publishControlProduct, setPublishControlProduct] = useState<PimProduct | null>(null);
+  const [shareCatalogProducts, setShareCatalogProducts] = useState<PimProduct[] | null>(null);
+  const [showShareCatalogModal, setShowShareCatalogModal] = useState<boolean>(false);
   const tableTopRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -867,6 +880,20 @@ function PimPanel({
               </button>
               <button
                 type="button"
+                onClick={() => {
+                  if (selectedProducts.length > 0) {
+                    setShareCatalogProducts(selectedProducts);
+                    setShowShareCatalogModal(true);
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-sky-300 bg-sky-50 dark:bg-sky-950/40 dark:border-sky-800 text-sky-800 dark:text-sky-300 px-3 py-2 text-sm hover:bg-sky-100 dark:hover:bg-sky-900/50 font-medium shadow-2xs"
+                title="Share multi-scheme catalog (Rent, Lease, Direct Sale, SFEMI) with price variations & QR codes"
+              >
+                <Share2 className="h-4 w-4 text-sky-600 dark:text-sky-400" />
+                Share Catalog ({selectedPimIds.size})
+              </button>
+              <button
+                type="button"
                 onClick={() => void handleBulkPublish(true)}
                 disabled={bulkPublishing}
                 className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 text-white px-3 py-2 text-sm hover:bg-emerald-700 disabled:opacity-50"
@@ -917,6 +944,22 @@ function PimPanel({
           >
             <QrCode className="h-4 w-4" />
             Print Page QRs ({roots.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const list = roots.map((n) => n.product);
+              if (list.length > 0) {
+                setShareCatalogProducts(list);
+                setShowShareCatalogModal(true);
+              }
+            }}
+            disabled={roots.length === 0}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-sky-200 bg-sky-50/60 dark:bg-sky-950/30 dark:border-sky-800 text-sky-800 dark:text-sky-300 px-3 py-2 text-sm hover:bg-sky-100 dark:hover:bg-sky-900/40 font-medium shadow-2xs disabled:opacity-50"
+            title="Share full page catalog & price list across all schemes with QR codes"
+          >
+            <Share2 className="h-4 w-4 text-sky-600 dark:text-sky-400" />
+            Share Page Catalog ({roots.length})
           </button>
           <button
             type="button"
@@ -1125,6 +1168,10 @@ function PimPanel({
                         setQrModalItems(null);
                         setQrModalStockMode((prod.current_stock_qty ?? 0) > 0);
                       }}
+                      onShareCatalog={(prod) => {
+                        setShareCatalogProducts([prod]);
+                        setShowShareCatalogModal(true);
+                      }}
                       onQuickEdit={(prod) => setQuickEditPimProduct(prod)}
                       onOpenPublishControl={(prod) => setPublishControlProduct(prod)}
                     />
@@ -1145,6 +1192,10 @@ function PimPanel({
                           setQrModalItem(pimProductToQRLabel(prod));
                           setQrModalItems(null);
                           setQrModalStockMode((prod.current_stock_qty ?? 0) > 0);
+                        }}
+                        onShareCatalog={(prod) => {
+                          setShareCatalogProducts([prod]);
+                          setShowShareCatalogModal(true);
                         }}
                         onQuickEdit={(prod) => setQuickEditPimProduct(prod)}
                         onOpenPublishControl={(prod) => setPublishControlProduct(prod)}
@@ -1171,6 +1222,10 @@ function PimPanel({
                     setQrModalItem(pimProductToQRLabel(prod));
                     setQrModalItems(null);
                     setQrModalStockMode((prod.current_stock_qty ?? 0) > 0);
+                  }}
+                  onShareCatalog={(prod) => {
+                    setShareCatalogProducts([prod]);
+                    setShowShareCatalogModal(true);
                   }}
                   onQuickEdit={(prod) => setQuickEditPimProduct(prod)}
                   onOpenPublishControl={(prod) => setPublishControlProduct(prod)}
@@ -1242,6 +1297,18 @@ function PimPanel({
             const found = pimProducts.find((p) => p.id === prodId);
             setQuickEditPimProduct(found || ({ id: prodId } as PimProduct));
           }}
+        />
+      )}
+
+      {showShareCatalogModal && (
+        <ProductCatalogShareModal
+          isOpen={showShareCatalogModal}
+          onClose={() => {
+            setShowShareCatalogModal(false);
+            setShareCatalogProducts(null);
+          }}
+          selectedProducts={shareCatalogProducts || []}
+          allPimProducts={pimProducts}
         />
       )}
 

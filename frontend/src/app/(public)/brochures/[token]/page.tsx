@@ -14,7 +14,7 @@ import {
 const PLANS: Array<{ value: BrochureEnquiryPlan; label: string }> = [
   { value: "RENT", label: "Rent" },
   { value: "LEASE", label: "Lease" },
-  { value: "LUCKY_EMI", label: "Lucky EMI" },
+  { value: "LUCKY_EMI", label: "SFEMI Advance EMI" },
   { value: "DIRECT_SALE", label: "Direct sale" },
   { value: "NOT_SURE", label: "Not sure yet" },
 ];

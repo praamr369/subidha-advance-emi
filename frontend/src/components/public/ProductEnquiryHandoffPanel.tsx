@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowRight, BadgeCheck, ClipboardCheck, PackageCheck, ReceiptText, ShieldCheck, type LucideIcon } from "lucide-react";
+import { ArrowRight, BadgeCheck, ClipboardCheck, MessageCircle, PackageCheck, ReceiptText, ShieldCheck, type LucideIcon } from "lucide-react";
 
 import { formatCurrency } from "@/lib/format";
 import { ROUTES } from "@/lib/routes";
@@ -181,12 +181,26 @@ export default function ProductEnquiryHandoffPanel({ product, dict }: ProductEnq
                   )}
                 </span>
               </div>
-              <Link
-                href={buildProductEnquiryHref(product, option.value, product.product_code, product.stock_status, option.tenureValue)}
-                className="mt-2 flex items-center gap-1 self-end text-xs font-semibold text-primary hover:underline focus-visible:outline-none"
-              >
-                Proceed with {option.title.split(' ')[0]} <ArrowRight className="h-3 w-3" />
-              </Link>
+              <div className="mt-2 flex items-center justify-between gap-2 pt-2 border-t border-border/50">
+                <a
+                  href={`https://wa.me/917602283000?text=${encodeURIComponent(
+                    `Hello Subidha Furniture, I am interested in ${option.title} for ${product.name} (Code: ${product.product_code})${
+                      option.showTenure && option.tenureValue ? ` for ${option.tenureValue} months tenure` : ""
+                    }. Please share availability and details.`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:underline"
+                >
+                  <MessageCircle className="h-3.5 w-3.5 text-[#25D366]" /> Chat on WhatsApp
+                </a>
+                <Link
+                  href={buildProductEnquiryHref(product, option.value, product.product_code, product.stock_status, option.tenureValue)}
+                  className="flex items-center gap-1 text-xs font-semibold text-primary hover:underline focus-visible:outline-none"
+                >
+                  Proceed with {option.title.split(' ')[0]} <ArrowRight className="h-3 w-3" />
+                </Link>
+              </div>
             </div>
           ))}
         </div>
