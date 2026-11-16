@@ -56,8 +56,9 @@ export const documentCopyLabels: DocumentCopyLabel[] = [
 ];
 
 const fallbackAddressLines = [
-  "Subidha Furniture, Asansol",
-  "West Bengal, India",
+  "South Dhadka Sukantapally, Near Rupkatha Cinema Hall",
+  "Dakhin Dhadka, Asansol, Paschim Barddhaman",
+  "West Bengal 713302, India",
 ];
 
 function splitTerms(value?: string | null): string[] {

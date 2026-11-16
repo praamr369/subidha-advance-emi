@@ -183,7 +183,7 @@ export default function ProductEnquiryHandoffPanel({ product, dict }: ProductEnq
               </div>
               <div className="mt-2 flex items-center justify-between gap-2 pt-2 border-t border-border/50">
                 <a
-                  href={`https://wa.me/917602283000?text=${encodeURIComponent(
+                  href={`https://wa.me/919476490946?text=${encodeURIComponent(
                     `Hello Subidha Furniture, I am interested in ${option.title} for ${product.name} (Code: ${product.product_code})${
                       option.showTenure && option.tenureValue ? ` for ${option.tenureValue} months tenure` : ""
                     }. Please share availability and details.`

@@ -341,6 +341,10 @@ export interface PriceListQuoteItem {
 export interface PriceListQuoteResponse {
   customer_name: string;
   customer_phone: string;
+  business_name?: string;
+  business_phone?: string;
+  business_address?: string;
+  business_email?: string;
   requested_schemes: string[];
   rent_tenures: number[];
   lease_tenures: number[];

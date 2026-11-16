@@ -40,6 +40,7 @@ import {
   type PriceListQuoteResponse,
   type PriceListQuoteItem,
 } from "@/services/pim";
+import { getDocumentPrintSettings } from "@/services/business-setup";
 import { formatCurrency } from "@/lib/format";
 
 export interface ProductCatalogShareModalProps {
@@ -160,6 +161,54 @@ export default function ProductCatalogShareModal({
     typeof window !== "undefined" && window.location.origin
       ? window.location.origin
       : "https://subidhafurnitureasansol.com";
+
+  // Authentic business identity resolved from Business Setup Profile / Document Print Settings
+  const [businessInfo, setBusinessInfo] = useState<{
+    name: string;
+    phone: string;
+    address: string;
+    email: string;
+    website: string;
+  }>({
+    name: "Subidha Furniture",
+    phone: "+91 94764 90946",
+    address: "South Dhadka Sukantapally, Near Rupkatha Cinema Hall, Dakhin Dhadka, Asansol, Paschim Barddhaman, West Bengal 713302, India",
+    email: "subidhafurnitureofficial@gmail.com",
+    website: "subidhafurnitureasansol.com",
+  });
+
+  useEffect(() => {
+    let active = true;
+    getDocumentPrintSettings()
+      .then((settings) => {
+        if (!active || !settings) return;
+        setBusinessInfo((prev) => ({
+          name: settings.business_name?.trim() || prev.name,
+          phone: settings.print_phone?.trim() || prev.phone,
+          address: settings.print_address?.replace(/\r?\n+/g, ", ").trim() || prev.address,
+          email: settings.print_email?.trim() || prev.email,
+          website: settings.print_website?.trim() || prev.website,
+        }));
+      })
+      .catch(() => {
+        // Fallback to authentic defaults
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (serverQuote?.business_name || serverQuote?.business_phone || serverQuote?.business_address) {
+      setBusinessInfo((prev) => ({
+        name: serverQuote.business_name || prev.name,
+        phone: serverQuote.business_phone || prev.phone,
+        address: serverQuote.business_address || prev.address,
+        email: serverQuote.business_email || prev.email,
+        website: prev.website,
+      }));
+    }
+  }, [serverQuote]);
 
   // Combine products based on scope and extra loaded
   const effectiveSourceProducts = useMemo<PimProduct[]>(() => {
@@ -576,13 +625,13 @@ export default function ProductCatalogShareModal({
 
     if (activeItems.length === 0) return "No products selected.";
 
-    const lines: string[] = ["✨ *SUBIDHA FURNITURE & APPLIANCES — PRICE LIST*"];
+    const lines: string[] = [`✨ *${businessInfo.name.toUpperCase()} — PRICE LIST*`];
     if (customerName.trim()) {
       lines.push(`👤 *Prepared for:* ${customerName.trim()}`);
     }
     lines.push(
-      "📍 Asansol, West Bengal · 📞 +91 7602283000",
-      `🌐 ${origin}`,
+      `📍 ${businessInfo.address}`,
+      `📞 ${businessInfo.phone} · 🌐 ${businessInfo.website || origin}`,
       "------------------------------------------",
       `Hello! Here is the custom price list for your selected ${activeItems.length} product(s):`,
       ""
@@ -679,6 +728,7 @@ export default function ProductCatalogShareModal({
     selectedLeaseTenures,
     selectedSfemiTenures,
     origin,
+    businessInfo,
   ]);
 
   // URL-safe summary message that NEVER triggers ERR_CONNECTION_CLOSED
@@ -687,13 +737,13 @@ export default function ProductCatalogShareModal({
       return serverQuote.whatsapp_summary_message;
     }
 
-    const lines: string[] = ["✨ *SUBIDHA FURNITURE & APPLIANCES — PRICE LIST*"];
+    const lines: string[] = [`✨ *${businessInfo.name.toUpperCase()} — PRICE LIST*`];
     if (customerName.trim()) {
       lines.push(`👤 *Prepared for:* ${customerName.trim()}`);
     }
     lines.push(
-      "📍 Asansol, West Bengal · 📞 +91 7602283000",
-      `🌐 ${origin}`,
+      `📍 ${businessInfo.address}`,
+      `📞 ${businessInfo.phone} · 🌐 ${businessInfo.website || origin}`,
       "------------------------------------------",
       `Hello! Here is the pricing overview for your selected ${activeItems.length} product(s):`,
       ""
@@ -740,6 +790,7 @@ export default function ProductCatalogShareModal({
     selectedRentTenures,
     selectedSfemiTenures,
     origin,
+    businessInfo,
   ]);
 
   // Copy helper
@@ -792,7 +843,7 @@ export default function ProductCatalogShareModal({
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Subidha Furniture &amp; Appliances - Official Showroom Price List (${activeItems.length} Products)</title>
+  <title>${businessInfo.name} - Official Showroom Price List (${activeItems.length} Products)</title>
   <style>
     @page {
       size: A4 portrait;
@@ -2032,13 +2083,13 @@ export default function ProductCatalogShareModal({
             <div id="print-sheet-header" className="border-b-2 border-black pb-4 flex flex-wrap items-center justify-between gap-4">
               <div>
                 <h1 className="text-xl font-black tracking-tight text-black uppercase">
-                  Subidha Furniture & Appliances
+                  {businessInfo.name}
                 </h1>
                 <p className="text-xs text-gray-700 font-semibold mt-0.5">
                   Official Showroom Price List · Direct Sale · Rent · Lease · SFEMI Advance EMI
                 </p>
                 <p className="text-[11px] text-gray-600 mt-1">
-                  Showroom: G.T. Road, Asansol, West Bengal · Phone: +91 7602283000 · Web: subidhafurnitureasansol.com
+                  Showroom: {businessInfo.address} · Phone: {businessInfo.phone} · Web: {businessInfo.website}
                 </p>
                 {customerName.trim() && (
                   <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-gray-100 text-xs font-bold text-black border border-gray-300">
@@ -2304,7 +2355,7 @@ export default function ProductCatalogShareModal({
                   <strong>Terms & Notes:</strong> Indicative pricing based on current showroom catalog. Rent & Lease agreements require identity & address verification (KYC). Security deposit is 100% refundable upon product return in good order. SFEMI Advance EMI operates under approved transparent promotional benefits (Remaining Future EMIs Waived for Beneficiaries under the 15-Month Promotion).
                 </p>
                 <p className="mt-0.5">
-                  Subidha Furniture & Appliances · Showroom: G.T. Road, Asansol, West Bengal · 📞 +91 7602283000 · 🌐 subidhafurnitureasansol.com
+                  {businessInfo.name} · Showroom: {businessInfo.address} · 📞 {businessInfo.phone} · 🌐 {businessInfo.website}
                 </p>
               </div>
               <div className="shrink-0 text-right font-mono text-[9px] text-gray-500">

@@ -304,15 +304,57 @@ def generate_price_list_quote(
             },
         })
 
+    # Resolve authentic business profile & document print settings
+    b_name = "Subidha Furniture"
+    b_phone = "+91 94764 90946"
+    b_address = "South Dhadka Sukantapally, Near Rupkatha Cinema Hall, Dakhin Dhadka, Asansol, Paschim Barddhaman, West Bengal 713302, India"
+    b_email = "subidhafurnitureofficial@gmail.com"
+
+    try:
+        from business_setup.models import BusinessProfile, DocumentPrintSettings
+        print_settings = DocumentPrintSettings.objects.filter(is_active=True).first()
+        profile = BusinessProfile.objects.first()
+
+        if print_settings:
+            if print_settings.business_name:
+                b_name = print_settings.business_name.strip()
+            if print_settings.print_phone:
+                b_phone = print_settings.print_phone.strip()
+            if print_settings.print_address:
+                b_address = ", ".join([line.strip() for line in print_settings.print_address.splitlines() if line.strip()])
+            if print_settings.print_email:
+                b_email = print_settings.print_email.strip()
+        elif profile:
+            if profile.trade_name:
+                b_name = profile.trade_name.strip()
+            if profile.primary_phone:
+                b_phone = profile.primary_phone.strip()
+            if profile.primary_email:
+                b_email = profile.primary_email.strip()
+            addr_parts = [
+                profile.address_line_1,
+                profile.address_line_2,
+                profile.landmark,
+                profile.city,
+                profile.district,
+                f"{profile.state} {profile.postal_code}".strip() if profile.postal_code else profile.state,
+                profile.country,
+            ]
+            valid_parts = [p.strip() for p in addr_parts if p and p.strip()]
+            if valid_parts:
+                b_address = ", ".join(valid_parts)
+    except Exception:
+        pass
+
     # Generate customer-tailored WhatsApp Message
     whatsapp_lines: list[str] = [
-        "✨ *SUBIDHA FURNITURE & APPLIANCES — OFFICIAL PRICE LIST*",
+        f"✨ *{b_name.upper()} — OFFICIAL PRICE LIST*",
     ]
     if customer_name.strip():
         whatsapp_lines.append(f"👤 *Prepared for:* {customer_name.strip()}")
     whatsapp_lines.extend([
-        "📍 Asansol, West Bengal · 📞 +91 7602283000",
-        f"🌐 {origin}",
+        f"📍 {b_address}",
+        f"📞 {b_phone} · 🌐 {origin}",
         "------------------------------------------",
         "Hello! Here is the custom price list with tenure breakdowns for your selected products:",
         "",
@@ -394,13 +436,13 @@ def generate_price_list_quote(
 
     # Generate a compact, URL-safe summary message that never exceeds browser limits
     summary_lines: list[str] = [
-        "✨ *SUBIDHA FURNITURE & APPLIANCES — PRICE LIST*",
+        f"✨ *{b_name.upper()} — PRICE LIST*",
     ]
     if customer_name.strip():
         summary_lines.append(f"👤 *Prepared for:* {customer_name.strip()}")
     summary_lines.extend([
-        "📍 Asansol, West Bengal · 📞 +91 7602283000",
-        f"🌐 {origin}",
+        f"📍 {b_address}",
+        f"📞 {b_phone} · 🌐 {origin}",
         "------------------------------------------",
         f"Hello! Here is the pricing overview for your selected {len(items)} product(s):",
         "",
@@ -435,6 +477,10 @@ def generate_price_list_quote(
     return {
         "customer_name": customer_name,
         "customer_phone": customer_phone,
+        "business_name": b_name,
+        "business_phone": b_phone,
+        "business_address": b_address,
+        "business_email": b_email,
         "requested_schemes": sorted(normalized_schemes),
         "rent_tenures": selected_rent_tenures,
         "lease_tenures": selected_lease_tenures,
