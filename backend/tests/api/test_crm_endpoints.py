@@ -246,6 +246,9 @@ class CrmApiTests(APITestCase):
         self.assertIn("public_visits", funnel_data)
         self.assertIn("unique_visitors", funnel_data)
         self.assertIn("registered_visitors", funnel_data)
+        self.assertIn("traffic_sources", funnel_data)
+        self.assertIn("lead_sources", funnel_data)
+        self.assertIn("is_ga_active", funnel_data)
         self.assertGreaterEqual(funnel_data["public_visits"], 1)
 
         products_res = self.client.get("/api/v1/admin/crm/analytics/products/")
@@ -258,3 +261,24 @@ class CrmApiTests(APITestCase):
         self.assertIn("likes_count", prod_entry)
         self.assertIn("sentiment", prod_entry)
         self.assertEqual(prod_entry["likes_count"], 1)
+
+    def test_public_lead_submission_captures_utm_attribution(self):
+        payload = {
+            "name": "Campaign Visitor",
+            "phone": "9800112233",
+            "email": "visitor@example.com",
+            "city": "Asansol",
+            "utm_source": "GOOGLE_ADS",
+            "utm_medium": "cpc",
+            "utm_campaign": "diwali_furniture_sale",
+            "referrer": "https://google.com/search",
+        }
+        res = self.client.post("/api/v1/public/leads/", payload, format="json")
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+
+        from crm.models import PublicLead
+        lead = PublicLead.objects.filter(phone="9800112233").first()
+        self.assertIsNotNone(lead)
+        self.assertEqual(lead.source, "GOOGLE_ADS")
+        self.assertIn("Source: GOOGLE_ADS", lead.notes)
+        self.assertIn("Campaign: diwali_furniture_sale", lead.notes)

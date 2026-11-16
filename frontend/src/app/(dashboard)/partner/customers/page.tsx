@@ -191,14 +191,14 @@ export default function PartnerCustomersPage() {
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             placeholder="Search name or phone..."
-            className="h-12 w-full rounded-2xl border border-border bg-background pl-10 pr-4 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+            className="h-12 w-full rounded-2xl border border-border bg-background pl-10 pr-4 text-base sm:text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 touch-manipulation"
           />
         </div>
         <div className="flex gap-2">
           <select
             value={kycInput}
             onChange={(e) => setKycInput(e.target.value as KycFilter)}
-            className="h-10 flex-1 rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+            className="h-11 flex-1 rounded-xl border border-border bg-background px-3 text-base sm:text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 touch-manipulation"
           >
             <option value="">All KYC Status</option>
             <option value="NOT_PROVIDED">Not Provided</option>
@@ -209,7 +209,7 @@ export default function PartnerCustomersPage() {
           </select>
           <button
             type="submit"
-            className="h-10 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground active:scale-95"
+            className="h-11 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground active:scale-95 touch-manipulation"
           >
             Apply
           </button>
@@ -217,7 +217,7 @@ export default function PartnerCustomersPage() {
             <button
               type="button"
               onClick={handleReset}
-              className="h-10 rounded-xl border border-border bg-card px-4 text-sm font-bold text-foreground active:scale-95"
+              className="h-11 rounded-xl border border-border bg-card px-4 text-sm font-bold text-foreground active:scale-95 touch-manipulation"
             >
               Clear
             </button>
@@ -241,7 +241,7 @@ export default function PartnerCustomersPage() {
             <Link
               key={row.id}
               href={`/partner/customers/${row.id}`}
-              className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm transition active:scale-95"
+              className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 min-h-[72px] shadow-sm transition active:scale-[0.98] touch-manipulation"
             >
               <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-primary/10 text-lg font-bold text-primary">
                 {(row.name || "?").charAt(0).toUpperCase()}
@@ -251,7 +251,7 @@ export default function PartnerCustomersPage() {
                 <div className="mt-0.5 text-xs font-medium text-muted-foreground">{row.phone || "—"}</div>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <StatusBadge status={row.kyc_status || "NOT_PROVIDED"} />
-                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                  <span className="text-xs font-medium text-muted-foreground">
                     Added {formatDate(row.created_at)}
                   </span>
                 </div>

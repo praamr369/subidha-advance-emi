@@ -177,23 +177,27 @@ function securityCspHeaders(): Array<{ key: string; value: string }> {
       // ignore a malformed env value; 'self' still applies.
     }
   }
-  if (process.env.NEXT_PUBLIC_GA_ID) {
-    connectSrc.add("https://*.google-analytics.com");
-    connectSrc.add("https://*.analytics.google.com");
-    connectSrc.add("https://*.googletagmanager.com");
-  }
+  // Always permit Google Analytics, Tag Manager & Meta (Facebook) Pixel telemetry in connect-src
+  // so dynamic database-driven tracking IDs can communicate without needing static .env rebuilds.
+  connectSrc.add("https://*.google-analytics.com");
+  connectSrc.add("https://*.analytics.google.com");
+  connectSrc.add("https://*.googletagmanager.com");
+  connectSrc.add("https://stats.g.doubleclick.net");
+  connectSrc.add("https://connect.facebook.net");
+  connectSrc.add("https://www.facebook.com");
+
   const csp = [
     "default-src 'self'",
     "base-uri 'self'",
     "object-src 'none'",
     "frame-ancestors 'self'",
     "form-action 'self'",
-    "img-src 'self' data: blob: https:",
-    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://www.googletagmanager.com",
+    "img-src 'self' data: blob: https: https://*.google-analytics.com https://*.googletagmanager.com https://www.facebook.com",
+    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://www.googletagmanager.com https://*.googletagmanager.com https://*.google-analytics.com https://connect.facebook.net",
     "style-src 'self' 'unsafe-inline'",
     "font-src 'self' data:",
     `connect-src ${Array.from(connectSrc).join(" ")}`,
-    "frame-src 'self' blob: data:",
+    "frame-src 'self' blob: data: https://www.google.com https://maps.google.com",
     "worker-src 'self' blob:",
   ].join("; ");
   return [{ key: "Content-Security-Policy", value: csp }];
@@ -268,10 +272,12 @@ const nextConfig: NextConfig = {
         headers: [
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "X-XSS-Protection", value: "1; mode=block" },
+          { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains; preload" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           {
             key: "Permissions-Policy",
-            value: "camera=(self), microphone=(), geolocation=(self)",
+            value: "camera=(self), microphone=(), geolocation=(self), payment=(self), usb=()",
           },
           ...securityCspHeaders(),
         ],

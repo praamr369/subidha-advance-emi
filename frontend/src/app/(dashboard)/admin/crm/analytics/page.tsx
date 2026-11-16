@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import QRCode from "react-qr-code";
 
 import { accountingErrorMessage } from "@/components/accounting/shared";
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
@@ -115,7 +116,7 @@ export default function CRMAnalyticsPage() {
     timeline: null,
     byType: null,
   });
-  const [activeTab, setActiveTab] = useState<"analytics" | "pipeline">("analytics");
+  const [activeTab, setActiveTab] = useState<"analytics" | "pipeline" | "campaigns">("analytics");
   const [pipelineLeads, setPipelineLeads] = useState<KanbanLead[]>([]);
   const [pipelineLoading, setPipelineLoading] = useState(false);
   const [days, setDays] = useState(30);
@@ -209,6 +210,16 @@ export default function CRMAnalyticsPage() {
           }`}
         >
           🎯 Kanban Pipeline
+        </button>
+        <button
+          onClick={() => setActiveTab("campaigns")}
+          className={`px-4 py-3 font-medium text-sm transition-colors ${
+            activeTab === "campaigns"
+              ? "text-primary border-b-2 border-primary"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          🚀 Campaign & Ad Tools
         </button>
       </div>
 
@@ -385,6 +396,102 @@ export default function CRMAnalyticsPage() {
           <div className="my-8 pt-6 border-t border-border">
             <h2 className="text-lg font-semibold">Historical Trends (Last {days} Days)</h2>
             <p className="text-sm text-muted-foreground mt-1">Detailed analytics showing how leads progress through your sales funnel</p>
+          </div>
+
+          {/* Connected Web Analytics & Campaign Attribution */}
+          <div className="mb-6 rounded-xl border border-border bg-card p-5 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
+              <div>
+                <h3 className="text-base font-semibold text-foreground flex flex-wrap items-center gap-2">
+                  <span>🌐</span> Connected Marketing & Traffic Analytics
+                  {funnel.is_ga_active ? (
+                    <span className="inline-flex items-center rounded-full bg-emerald-100 dark:bg-emerald-950/60 px-2.5 py-0.5 text-xs font-semibold text-emerald-800 dark:text-emerald-300">
+                      GA4 Active ({funnel.google_analytics_id})
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center rounded-full bg-amber-100 dark:bg-amber-950/60 px-2.5 py-0.5 text-xs font-semibold text-amber-800 dark:text-amber-300">
+                      GA4 Not Configured
+                    </span>
+                  )}
+                  {funnel.is_meta_active ? (
+                    <span className="inline-flex items-center rounded-full bg-blue-100 dark:bg-blue-950/60 px-2.5 py-0.5 text-xs font-semibold text-blue-800 dark:text-blue-300">
+                      Meta Pixel Active ({funnel.meta_pixel_id})
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+                      Meta Pixel Inactive
+                    </span>
+                  )}
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Real-time connection between public website visitors, Google Analytics campaigns, and CRM sales conversions.
+                </p>
+              </div>
+              <Link
+                href="/admin/settings/business-setup/profile"
+                className="rounded-lg border border-input bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition"
+              >
+                Configure Web & SEO Settings →
+              </Link>
+            </div>
+
+            <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {/* Traffic Acquisition Referrers */}
+              <div className="rounded-lg border border-border bg-muted/20 p-3">
+                <div className="text-xs font-semibold text-foreground uppercase tracking-wider mb-2">
+                  Top Web Traffic Referrers
+                </div>
+                {funnel.traffic_sources && funnel.traffic_sources.length > 0 ? (
+                  <ul className="space-y-1.5 text-xs">
+                    {funnel.traffic_sources.map((ts, idx) => (
+                      <li key={idx} className="flex justify-between items-center text-muted-foreground">
+                        <span className="truncate max-w-[200px]" title={ts.source}>{ts.source || "Direct / Internal"}</span>
+                        <span className="font-semibold text-foreground">{ts.visits} visits</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Direct visits / Organic search traffic active.</p>
+                )}
+              </div>
+
+              {/* Lead Attribution Channels */}
+              <div className="rounded-lg border border-border bg-muted/20 p-3">
+                <div className="text-xs font-semibold text-foreground uppercase tracking-wider mb-2">
+                  Lead Acquisition Sources
+                </div>
+                {funnel.lead_sources && funnel.lead_sources.length > 0 ? (
+                  <ul className="space-y-1.5 text-xs">
+                    {funnel.lead_sources.map((ls, idx) => (
+                      <li key={idx} className="flex justify-between items-center text-muted-foreground">
+                        <span className="font-mono text-[11px] text-foreground">{ls.source}</span>
+                        <span className="font-semibold text-foreground">{ls.leads} leads</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Website enquiries recorded directly in CRM.</p>
+                )}
+              </div>
+
+              {/* Visitor to Lead Conversion Card */}
+              <div className="rounded-lg border border-border bg-muted/20 p-3 flex flex-col justify-between">
+                <div>
+                  <div className="text-xs font-semibold text-foreground uppercase tracking-wider mb-1">
+                    Visitor → Lead Conversion
+                  </div>
+                  <div className="text-2xl font-bold text-primary mt-1">
+                    {funnel.visitor_to_lead_pct ?? 0}%
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Ratio of public unique visitors who submitted an inquiry or requested a quote.
+                  </p>
+                </div>
+                <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium mt-2 pt-2 border-t border-border">
+                  ✓ High purchase intent tracked
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Conversion Funnel */}
@@ -752,6 +859,149 @@ export default function CRMAnalyticsPage() {
           )}
         </div>
       )}
+
+      {activeTab === "campaigns" && (
+        <div className="mt-4">
+          <CampaignLinkGenerator />
+        </div>
+      )}
     </ERPPageShell>
+  );
+}
+
+function CampaignLinkGenerator() {
+  const [targetPath, setTargetPath] = useState("/");
+  const [channel, setChannel] = useState("whatsapp");
+  const [campaignName, setCampaignName] = useState("festival_offer");
+  const [copied, setCopied] = useState(false);
+
+  const channelPresets: Record<string, { source: string; medium: string; label: string; icon: string }> = {
+    whatsapp: { source: "whatsapp", medium: "broadcast", label: "WhatsApp Broadcast / Status", icon: "💬" },
+    facebook: { source: "facebook", medium: "cpc", label: "Meta / Facebook Ad Campaign", icon: "📘" },
+    instagram: { source: "instagram", medium: "social_story", label: "Instagram Story / Bio Link", icon: "📸" },
+    google: { source: "google", medium: "cpc", label: "Google Search / Local Ads", icon: "🔍" },
+    offline_qr: { source: "offline_print", medium: "qr_code", label: "Newspaper / Flyer Print QR", icon: "📰" },
+    showroom_qr: { source: "showroom_standee", medium: "in_store_qr", label: "Showroom Display Standee QR", icon: "🏬" },
+  };
+
+  const origin = typeof window !== "undefined" ? window.location.origin : "https://subidha.com";
+  const cleanSource = channelPresets[channel]?.source || "campaign";
+  const cleanMedium = channelPresets[channel]?.medium || "referral";
+  const cleanCampaign = (campaignName || "promo").trim().toLowerCase().replace(/[^a-z0-9_-]/g, "_");
+
+  const generatedUrl = `${origin}${targetPath.startsWith("/") ? targetPath : `/${targetPath}`}?utm_source=${cleanSource}&utm_medium=${cleanMedium}&utm_campaign=${cleanCampaign}`;
+
+  const handleCopy = () => {
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      void navigator.clipboard.writeText(generatedUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <ERPSectionShell
+        title="Marketing & Advertising Campaign Link Generator"
+        description="Generate trackable campaign links and printable QR codes with UTM parameters that directly attribute leads and visitor traffic into your CRM funnel."
+      >
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Controls */}
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Destination Page
+              </label>
+              <select
+                value={targetPath}
+                onChange={(e) => setTargetPath(e.target.value)}
+                className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="/">Home Page (/)</option>
+                <option value="/lucky-plan">SFEMI Plans (/lucky-plan)</option>
+                <option value="/products">Product Catalog (/products)</option>
+                <option value="/rent">Furniture Rental (/rent)</option>
+                <option value="/lease">Furniture Leasing (/lease)</option>
+                <option value="/apply">Customer Application Form (/apply)</option>
+                <option value="/contact">Contact & Showroom Location (/contact)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Marketing Channel Preset
+              </label>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {Object.entries(channelPresets).map(([key, val]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setChannel(key)}
+                    className={`flex items-center gap-2 rounded-xl border p-2.5 text-left text-xs font-medium transition ${
+                      channel === key
+                        ? "border-primary bg-primary/10 text-primary font-bold shadow-xs"
+                        : "border-border bg-card text-muted-foreground hover:bg-muted/50"
+                    }`}
+                  >
+                    <span>{val.icon}</span>
+                    <span className="truncate">{val.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Campaign Name / Identifier
+              </label>
+              <input
+                type="text"
+                value={campaignName}
+                onChange={(e) => setCampaignName(e.target.value)}
+                placeholder="e.g. diwali_dhamaka_2026 or asansol_sofa_offer"
+                className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm font-mono"
+              />
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Keep it short, lowercase, without spaces. Helps categorize sales in your CRM funnel.
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-input bg-muted/30 p-3 space-y-2">
+              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Generated Trackable URL
+              </div>
+              <div className="break-all font-mono text-xs text-foreground bg-background p-2.5 rounded-lg border border-input select-all">
+                {generatedUrl}
+              </div>
+              <button
+                type="button"
+                onClick={handleCopy}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition"
+              >
+                {copied ? "✓ Copied to Clipboard!" : "📋 Copy Trackable Link"}
+              </button>
+            </div>
+          </div>
+
+          {/* QR Code & Preview */}
+          <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-muted/10 p-6 text-center">
+            <div className="rounded-2xl bg-white p-5 shadow-sm border border-border">
+              <QRCode value={generatedUrl} size={180} />
+            </div>
+            <div className="mt-4 max-w-sm">
+              <div className="text-sm font-bold text-foreground">
+                Instant Campaign QR Code
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Scan with any smartphone camera to test. You can right-click the QR image to copy or save for printing on banners, flyers, or showroom display boards.
+              </p>
+              <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/60 dark:border-emerald-900/40 dark:bg-emerald-950/20 p-2.5 text-left text-[11px] text-emerald-800 dark:text-emerald-300">
+                <strong>✓ CRM Attribution Active:</strong> Anyone scanning this QR or clicking the link will be automatically recognized by the CRM attribution engine with source <code className="font-mono font-bold">{cleanSource}</code> and campaign <code className="font-mono font-bold">{cleanCampaign}</code>.
+              </div>
+            </div>
+          </div>
+        </div>
+      </ERPSectionShell>
+    </div>
   );
 }

@@ -53,38 +53,38 @@ export default function CustomerShellRouter({ children }: { children: ReactNode 
     <RoleGuard allowedRoles={["CUSTOMER"]}>
       <div className="relative overflow-x-clip bg-background min-h-screen max-w-150 mx-auto border-x border-border shadow-sm flex flex-col">
         {/* Mobile Top Header */}
-        <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-background/80 px-4 backdrop-blur-xl">
+        <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-background/90 px-4 backdrop-blur-xl">
           <div className="flex items-center gap-2.5">
-            <WorkspaceBrandMark size={28} variant="onLight" className="rounded-lg shadow-xs" />
+            <WorkspaceBrandMark size={32} variant="onLight" className="rounded-lg shadow-xs" />
             <div>
               <div className="text-xs font-bold leading-none tracking-tight text-foreground">
                 {brandConfig.companyName}
               </div>
-              <div className="mt-0.5 inline-block rounded bg-primary/10 px-1.5 py-0.2 text-[9px] font-bold uppercase tracking-widest text-primary">
+              <div className="mt-1 inline-block rounded bg-primary/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">
                 {displayName}
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
             <Link
               href="/customer/notifications"
-              className="inline-flex size-9 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              className="inline-flex size-10 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-muted hover:text-foreground active:scale-95"
               title="Notifications"
             >
-              <Bell className="size-4" />
+              <Bell className="size-5" />
             </Link>
             <button
               onClick={logout}
               disabled={isLoggingOut}
-              className="inline-flex size-9 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-50"
+              className="inline-flex size-10 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-muted hover:text-foreground active:scale-95 disabled:opacity-50"
               title="Log out"
             >
-              <LogOut className="size-4" />
+              <LogOut className="size-5" />
             </button>
           </div>
         </header>
 
-        <main className="flex-1 pb-20">
+        <main className="flex-1 pb-24">
           {children}
         </main>
 

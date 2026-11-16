@@ -185,14 +185,14 @@ export default function PartnerSubscriptionsPage() {
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             placeholder="Search customer, phone, product..."
-            className="h-12 w-full rounded-2xl border border-border bg-background pl-10 pr-4 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+            className="h-12 w-full rounded-2xl border border-border bg-background pl-10 pr-4 text-base sm:text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 touch-manipulation"
           />
         </div>
         <div className="flex gap-2">
           <select
             value={statusInput}
             onChange={(e) => setStatusInput(e.target.value as FilterStatus)}
-            className="h-10 flex-1 rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+            className="h-11 flex-1 rounded-xl border border-border bg-background px-3 text-base sm:text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 touch-manipulation"
           >
             <option value="">All Statuses</option>
             <option value="ACTIVE">Active</option>
@@ -202,7 +202,7 @@ export default function PartnerSubscriptionsPage() {
           </select>
           <button
             type="submit"
-            className="h-10 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground active:scale-95"
+            className="h-11 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground active:scale-95 touch-manipulation"
           >
             Apply
           </button>
@@ -210,7 +210,7 @@ export default function PartnerSubscriptionsPage() {
             <button
               type="button"
               onClick={handleReset}
-              className="h-10 rounded-xl border border-border bg-card px-4 text-sm font-bold text-foreground active:scale-95"
+              className="h-11 rounded-xl border border-border bg-card px-4 text-sm font-bold text-foreground active:scale-95 touch-manipulation"
             >
               Clear
             </button>
@@ -234,10 +234,11 @@ export default function PartnerSubscriptionsPage() {
             <Link
               key={row.id}
               href={`/partner/subscriptions/${row.id}`}
-              className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm transition active:scale-95"
+              className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 min-h-[72px] shadow-sm transition active:scale-[0.98] touch-manipulation"
             >
-              <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-xs font-bold text-primary">
-                #{row.lucky_number ?? "—"}
+              <div className="flex flex-col items-center justify-center min-w-[54px] px-2 py-1.5 shrink-0 rounded-xl bg-primary/10 text-primary">
+                <span className="text-[10px] font-bold uppercase tracking-wider opacity-75">SFEMI</span>
+                <span className="text-xs font-black">#{row.lucky_number ?? "—"}</span>
               </div>
               <div className="min-w-0 flex-1">
                 <div className="font-bold text-foreground text-sm truncate">{row.subscription_number || `SUB-${row.id}`}</div>
@@ -245,7 +246,7 @@ export default function PartnerSubscriptionsPage() {
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <StatusBadge status={row.status || "PENDING"} />
                   {getOutstandingAmount(row) > 0 ? (
-                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                    <span className="text-xs font-bold text-amber-600 dark:text-amber-400">
                       Due {formatMoney(getOutstandingAmount(row))}
                     </span>
                   ) : null}

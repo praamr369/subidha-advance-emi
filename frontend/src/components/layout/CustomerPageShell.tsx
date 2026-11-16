@@ -33,17 +33,17 @@ export default function CustomerPageShell({
         {backHref ? (
           <Link
             href={backHref}
-            className="mb-2 flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+            className="mb-1.5 inline-flex min-h-[38px] items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-bold text-muted-foreground transition-colors hover:text-foreground active:bg-muted/60 touch-manipulation -ml-1"
           >
-            <ArrowLeft className="size-3.5" />
+            <ArrowLeft className="size-4" />
             {backLabel ?? "Back"}
           </Link>
         ) : null}
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h1 className="text-lg font-bold text-foreground leading-tight truncate">{title}</h1>
+            <h1 className="text-xl font-bold tracking-tight text-foreground leading-tight truncate">{title}</h1>
             {subtitle ? (
-              <p className="mt-0.5 text-xs text-muted-foreground leading-relaxed">{subtitle}</p>
+              <p className="mt-0.5 text-xs font-medium text-muted-foreground leading-relaxed">{subtitle}</p>
             ) : null}
           </div>
           {actions ? <div className="shrink-0 flex items-center gap-2">{actions}</div> : null}
@@ -75,9 +75,9 @@ export function CPageStat({
   }[tone];
 
   return (
-    <div className="flex-1 min-w-0 rounded-2xl border border-border bg-card p-3 shadow-sm">
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground truncate">{label}</p>
-      <p className={cn("mt-1 text-base font-bold truncate", valueColor)}>{value}</p>
+    <div className="flex-1 min-w-0 rounded-2xl border border-border bg-card p-3.5 shadow-xs">
+      <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground truncate">{label}</p>
+      <p className={cn("mt-1 text-lg font-black truncate tracking-tight", valueColor)}>{value}</p>
     </div>
   );
 }
@@ -103,7 +103,7 @@ export function CPageSection({
     <div className={cn("mt-4", className)}>
       {title ? (
         <div className="mb-2 flex items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-foreground">{title}</h2>
+          <h2 className="text-sm font-bold text-foreground">{title}</h2>
           {action ? <div className="text-xs">{action}</div> : null}
         </div>
       ) : null}
@@ -130,15 +130,15 @@ export function CPageTabs<T extends string>({
           type="button"
           onClick={() => onChange(t.value)}
           className={cn(
-            "shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition",
+            "shrink-0 rounded-full px-4 py-2 min-h-[38px] text-xs font-bold transition active:scale-95 touch-manipulation",
             active === t.value
-              ? "bg-primary text-primary-foreground"
+              ? "bg-primary text-primary-foreground shadow-xs"
               : "bg-muted text-muted-foreground hover:text-foreground"
           )}
         >
           {t.label}
           {t.count !== undefined ? (
-            <span className="ml-1 opacity-70">({t.count})</span>
+            <span className="ml-1 opacity-75">({t.count})</span>
           ) : null}
         </button>
       ))}

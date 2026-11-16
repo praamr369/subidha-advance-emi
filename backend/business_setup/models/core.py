@@ -429,6 +429,12 @@ class PublicBusinessProfile(BusinessSetupTimeStampedModel):
         default="",
         help_text="Google Analytics 4 Measurement ID (e.g. G-XXXXXXXXXX). Dynamically activates visitor tracking on the public site.",
     )
+    meta_pixel_id = models.CharField(
+        max_length=50,
+        blank=True,
+        default="",
+        help_text="Meta (Facebook) Pixel ID (e.g. 123456789012345). Dynamically activates Facebook & Instagram ad conversion tracking.",
+    )
     google_search_console_id = models.CharField(
         max_length=255,
         blank=True,
@@ -488,6 +494,7 @@ class PublicBusinessProfile(BusinessSetupTimeStampedModel):
         self.business_hours = (self.business_hours or "").strip()
         self.public_logo_url = (self.public_logo_url or "").strip()
         self.google_analytics_id = (self.google_analytics_id or "").strip()
+        self.meta_pixel_id = (self.meta_pixel_id or "").strip()
         self.google_search_console_id = (self.google_search_console_id or "").strip()
         self.seo_local_area = (self.seo_local_area or "").strip()
         self.meta_title = (self.meta_title or "").strip()

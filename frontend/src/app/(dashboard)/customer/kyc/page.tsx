@@ -46,7 +46,7 @@ export default function KYCPage() {
   const [uploaded, setUploaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const inputCls = "w-full rounded-2xl border border-border bg-card px-4 py-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/30 transition";
+  const inputCls = "w-full min-h-[48px] rounded-2xl border border-border bg-card px-4 py-3 text-base sm:text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/30 transition touch-manipulation";
 
   // The backend serves the document list, not a pre-shaped status object:
   // { count, kyc_status, results: [...] }. There is no /kyc-status/ endpoint

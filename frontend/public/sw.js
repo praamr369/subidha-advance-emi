@@ -7,7 +7,14 @@ const API_CACHE_NAME = "subidha-core-api-v4";
 
 const STATIC_ASSETS = [
   "/brand/logo.png",
+  "/brand/icon-192.png",
+  "/brand/icon-512.png",
+  "/brand/icon-maskable-192.png",
+  "/brand/icon-maskable-512.png",
+  "/apple-touch-icon.png",
   "/favicon.ico",
+  "/favicon-32x32.png",
+  "/favicon-16x16.png",
   "/manifest.webmanifest",
 ];
 

@@ -86,6 +86,35 @@ def get_funnel_analytics(days: int = 30) -> dict:
         approved_direct_sale__isnull=False
     ).count()
 
+    # Top traffic sources from web visitors
+    traffic_sources_qs = (
+        WebappVisitorEvent.objects.filter(created_at__range=[start_date, end_date])
+        .exclude(referrer="")
+        .values("referrer")
+        .annotate(count=Count("id"))
+        .order_by("-count")[:5]
+    )
+    traffic_sources = [
+        {"source": row["referrer"], "visits": row["count"]} for row in traffic_sources_qs
+    ]
+
+    # Top lead acquisition sources
+    lead_sources_qs = (
+        PublicLead.objects.filter(created_at__range=[start_date, end_date])
+        .values("source")
+        .annotate(count=Count("id"))
+        .order_by("-count")[:5]
+    )
+    lead_sources = [
+        {"source": row["source"], "leads": row["count"]} for row in lead_sources_qs
+    ]
+
+    # Google Analytics & Meta Pixel connection status
+    from business_setup.models import PublicBusinessProfile
+    pbp = PublicBusinessProfile.objects.filter(is_active=True).first()
+    ga_id = (pbp.google_analytics_id or "").strip() if pbp else ""
+    meta_pixel_id = (pbp.meta_pixel_id or "").strip() if pbp else ""
+
     # Calculate percentages
     def pct(numerator, denominator):
         return round((numerator / denominator * 100), 1) if denominator > 0 else 0
@@ -116,6 +145,12 @@ def get_funnel_analytics(days: int = 30) -> dict:
             'direct_sales_created': direct_sales_created,
             'total_conversions': subscriptions_created + direct_sales_created,
             'conversion_rate_lead_to_sale': pct(subscriptions_created + direct_sales_created, leads_total),
+            'traffic_sources': traffic_sources,
+            'lead_sources': lead_sources,
+            'google_analytics_id': ga_id or None,
+            'is_ga_active': bool(ga_id),
+            'meta_pixel_id': meta_pixel_id or None,
+            'is_meta_active': bool(meta_pixel_id),
         },
         'date_range': {
             'start': start_date.isoformat(),

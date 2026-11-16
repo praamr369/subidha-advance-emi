@@ -63,13 +63,13 @@ type Props = {
 export default function PartnerMobileBottomNav({ pathname, onOpenMenu }: Props) {
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-40 flex h-16 items-stretch border-t border-border bg-[var(--sidebar-surface,hsl(var(--card)))] shadow-[0_-1px_0_0_rgba(0,0,0,0.06),0_-8px_24px_-12px_rgba(0,0,0,0.12)] md:hidden"
+      className="fixed bottom-0 inset-x-0 z-40 flex h-16 max-w-150 mx-auto items-stretch border-t border-border bg-card/95 backdrop-blur-md shadow-[0_-1px_0_0_rgba(0,0,0,0.06),0_-8px_24px_-12px_rgba(0,0,0,0.12)] pb-[env(safe-area-inset-bottom,0px)]"
       aria-label="Partner navigation"
     >
       {TABS.map((tab) => {
         const isActive = tab.match ? tab.match(pathname) : false;
         const commonCls = cn(
-          "flex flex-1 flex-col items-center justify-center gap-1 text-[10px] font-semibold tracking-wide transition-colors",
+          "flex flex-1 flex-col items-center justify-center gap-1 text-[11px] font-bold tracking-wide transition-colors min-h-[48px] py-1 touch-manipulation",
           isActive
             ? "text-primary"
             : "text-muted-foreground active:text-foreground"

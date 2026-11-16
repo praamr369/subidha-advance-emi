@@ -448,7 +448,7 @@ export default function VendorDashboardPage() {
                     <select
                       value={categoryFilter}
                       onChange={e => setCategoryFilter(e.target.value)}
-                      className="rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground"
+                      className="min-h-[40px] rounded-xl border border-border bg-card px-3 py-1.5 text-base sm:text-xs font-medium text-foreground outline-none touch-manipulation"
                     >
                       <option value="">All categories</option>
                       {categories.map(c => <option key={c} value={c}>{c}</option>)}
@@ -458,7 +458,7 @@ export default function VendorDashboardPage() {
                     <select
                       value={locationFilter}
                       onChange={e => setLocationFilter(e.target.value)}
-                      className="rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-foreground"
+                      className="min-h-[40px] rounded-xl border border-border bg-card px-3 py-1.5 text-base sm:text-xs font-medium text-foreground outline-none touch-manipulation"
                     >
                       <option value="">All locations</option>
                       {locations.map(l => <option key={l} value={l}>{l}</option>)}
@@ -468,7 +468,7 @@ export default function VendorDashboardPage() {
                     <button
                       type="button"
                       onClick={() => { setCategoryFilter(""); setLocationFilter(""); }}
-                      className="rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+                      className="min-h-[40px] rounded-xl border border-border bg-card px-3 py-1.5 text-xs font-bold text-muted-foreground hover:text-foreground active:scale-95 touch-manipulation"
                     >
                       Clear
                     </button>
@@ -519,41 +519,73 @@ export default function VendorDashboardPage() {
                   No purchase orders yet. POs from admin will appear here.
                 </div>
               ) : (
-                <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-border bg-muted/40">
-                        <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">PO Number</th>
-                        <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Date</th>
-                        <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Items</th>
-                        <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Status</th>
-                        <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {purchaseOrders.slice(0, 8).map((po, i) => (
-                        <tr key={po.id} className={`border-b border-border last:border-0 transition hover:bg-muted/30 ${i % 2 === 1 ? "bg-muted/10" : ""}`}>
-                          <td className="px-4 py-3 font-mono text-xs font-semibold text-foreground">{po.po_no ?? `PO-${po.id}`}</td>
-                          <td className="px-4 py-3 text-xs text-muted-foreground">{po.po_date ?? "—"}</td>
-                          <td className="px-4 py-3 text-xs text-muted-foreground">{Array.isArray(po.lines) ? po.lines.length : "—"}</td>
-                          <td className="px-4 py-3"><StatusPill status={po.status} /></td>
-                          <td className="px-4 py-3 text-right">
-                            <Link href={ROUTES.vendor.orders} className="text-xs font-semibold text-primary hover:underline">
-                              View
-                            </Link>
-                          </td>
+                <>
+                  {/* Mobile PO Cards */}
+                  <div className="space-y-3 sm:hidden">
+                    {purchaseOrders.slice(0, 8).map((po) => (
+                      <div key={po.id} className="rounded-2xl border border-border bg-card p-4 shadow-sm space-y-2.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-mono text-xs font-bold text-foreground">{po.po_no ?? `PO-${po.id}`}</span>
+                          <StatusPill status={po.status} />
+                        </div>
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>Date: {po.po_date ?? "—"}</span>
+                          <span>{Array.isArray(po.lines) ? `${po.lines.length} items` : "—"}</span>
+                        </div>
+                        <Link
+                          href={ROUTES.vendor.orders}
+                          className="flex min-h-[42px] items-center justify-center rounded-xl border border-border bg-background px-3 py-1.5 text-xs font-bold text-primary hover:bg-muted active:scale-95 touch-manipulation"
+                        >
+                          View Order Details
+                        </Link>
+                      </div>
+                    ))}
+                    {purchaseOrders.length > 8 ? (
+                      <div className="pt-1 text-center">
+                        <Link href={ROUTES.vendor.orders} className="text-xs font-bold text-primary hover:underline">
+                          View all {purchaseOrders.length} purchase orders →
+                        </Link>
+                      </div>
+                    ) : null}
+                  </div>
+
+                  {/* Desktop PO Table */}
+                  <div className="hidden sm:block overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-border bg-muted/40">
+                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">PO Number</th>
+                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Date</th>
+                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Items</th>
+                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Status</th>
+                          <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Action</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {purchaseOrders.length > 8 ? (
-                    <div className="border-t border-border px-4 py-2 text-center">
-                      <Link href={ROUTES.vendor.orders} className="text-xs font-semibold text-primary hover:underline">
-                        View all {purchaseOrders.length} purchase orders →
-                      </Link>
-                    </div>
-                  ) : null}
-                </div>
+                      </thead>
+                      <tbody>
+                        {purchaseOrders.slice(0, 8).map((po, i) => (
+                          <tr key={po.id} className={`border-b border-border last:border-0 transition hover:bg-muted/30 ${i % 2 === 1 ? "bg-muted/10" : ""}`}>
+                            <td className="px-4 py-3 font-mono text-xs font-semibold text-foreground">{po.po_no ?? `PO-${po.id}`}</td>
+                            <td className="px-4 py-3 text-xs text-muted-foreground">{po.po_date ?? "—"}</td>
+                            <td className="px-4 py-3 text-xs text-muted-foreground">{Array.isArray(po.lines) ? po.lines.length : "—"}</td>
+                            <td className="px-4 py-3"><StatusPill status={po.status} /></td>
+                            <td className="px-4 py-3 text-right">
+                              <Link href={ROUTES.vendor.orders} className="text-xs font-semibold text-primary hover:underline">
+                                View
+                              </Link>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {purchaseOrders.length > 8 ? (
+                      <div className="border-t border-border px-4 py-2 text-center">
+                        <Link href={ROUTES.vendor.orders} className="text-xs font-semibold text-primary hover:underline">
+                          View all {purchaseOrders.length} purchase orders →
+                        </Link>
+                      </div>
+                    ) : null}
+                  </div>
+                </>
               )}
             </section>
 
@@ -574,7 +606,7 @@ export default function VendorDashboardPage() {
                   <Link
                     key={href}
                     href={href}
-                    className="group flex items-start gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm transition hover:shadow-md hover:border-ring"
+                    className="group flex min-h-[72px] items-start gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm transition hover:shadow-md hover:border-ring active:scale-[0.98] touch-manipulation"
                   >
                     <div className={`mt-0.5 shrink-0 rounded-xl p-2 ${bg}`}>{icon}</div>
                     <div>

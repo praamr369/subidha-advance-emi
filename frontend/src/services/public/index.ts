@@ -111,6 +111,13 @@ export type PublicLeadPayload = {
   interested_product?: string;
   preferred_emi_amount?: string | number;
   notes?: string;
+  source?: string;
+  utm_source?: string;
+  utm_medium?: string;
+  utm_campaign?: string;
+  referrer?: string;
+  session_id?: string;
+  hp_field?: string;
 };
 
 export type PublicLeadResponse = {
@@ -252,6 +259,7 @@ export type PublicBusinessProfile = {
   business_hours?: string;
   public_logo_url?: string;
   google_analytics_id?: string;
+  meta_pixel_id?: string;
   google_search_console_id?: string;
   seo_local_area?: string;
   meta_title?: string;
@@ -630,17 +638,59 @@ export async function getPublicProductDetail(
 export async function submitPublicLead(
   payload: PublicLeadPayload
 ): Promise<PublicLeadResponse> {
-  return fetchPublic<PublicLeadResponse>(
+  let enrichedPayload: PublicLeadPayload = { ...payload };
+
+  // Attach stored UTM attribution and session tracking if available
+  if (typeof window !== "undefined") {
+    try {
+      const raw = sessionStorage.getItem("subidha_utm_attribution");
+      if (raw) {
+        const attribution = JSON.parse(raw) as Record<string, string>;
+        enrichedPayload = {
+          utm_source: attribution.utm_source,
+          utm_medium: attribution.utm_medium,
+          utm_campaign: attribution.utm_campaign,
+          referrer: attribution.referrer,
+          ...enrichedPayload,
+        };
+      }
+      const visId = localStorage.getItem("subidha_visitor_id");
+      if (visId && !enrichedPayload.session_id) {
+        enrichedPayload.session_id = visId;
+      }
+    } catch {
+      // Ignore storage errors in restricted browser environments
+    }
+  }
+
+  const response = await fetchPublic<PublicLeadResponse>(
     "/public/leads/",
     {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(enrichedPayload),
     },
     "Unable to submit your enquiry right now."
   );
+
+  // Trigger Google Analytics lead conversion event
+  if (typeof window !== "undefined") {
+    try {
+      if (typeof window.gtag === "function") {
+        window.gtag("event", "generate_lead", {
+          event_category: "crm_lead",
+          event_label: payload.interested_product || "General Enquiry",
+          value: payload.preferred_emi_amount ? Number(payload.preferred_emi_amount) : undefined,
+        });
+      }
+    } catch {
+      // Ignore analytics dispatch errors
+    }
+  }
+
+  return response;
 }
 
 export async function getPublicBusinessProfile(): Promise<PublicBusinessProfile | null> {

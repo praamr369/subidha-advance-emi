@@ -170,7 +170,7 @@ export default function PartnerCollectionsPage() {
         <div className="flex items-center gap-2">
           <Link
             href="/partner/collections/create"
-            className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm transition active:scale-95"
+            className="inline-flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm transition active:scale-95 touch-manipulation"
           >
             <Plus className="size-5" />
           </Link>
@@ -178,7 +178,7 @@ export default function PartnerCollectionsPage() {
             type="button"
             onClick={() => void loadPage()}
             disabled={refreshing}
-            className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground shadow-sm transition hover:bg-muted disabled:opacity-50"
+            className="inline-flex size-11 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground shadow-sm transition hover:bg-muted active:scale-95 disabled:opacity-50 touch-manipulation"
           >
             <RefreshCw className={`size-4 ${refreshing ? "animate-spin" : ""}`} />
           </button>
@@ -211,12 +211,12 @@ export default function PartnerCollectionsPage() {
           <>
             {followUpQueue.length > 0 && (
               <div className="space-y-3">
-                <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">Needs Action</h2>
+                <h2 className="text-xs font-bold text-foreground uppercase tracking-wider">Needs Action</h2>
                 {followUpQueue.map((row) => (
                   <Link
                     key={row.id}
                     href={`/partner/collections/${row.id}`}
-                    className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/20 p-4 shadow-sm transition active:scale-95"
+                    className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/20 p-4 min-h-[72px] shadow-sm transition active:scale-[0.98] touch-manipulation"
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
@@ -227,7 +227,7 @@ export default function PartnerCollectionsPage() {
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         <StatusBadge status={row.status} />
                         {row.review_note && (
-                          <span className="text-[10px] uppercase tracking-wider text-amber-600 dark:text-amber-400 font-semibold truncate">
+                          <span className="text-xs font-bold text-amber-700 dark:text-amber-400 truncate">
                             {row.review_note}
                           </span>
                         )}
@@ -241,12 +241,12 @@ export default function PartnerCollectionsPage() {
 
             {requests.length > 0 && (
               <div className="space-y-3">
-                <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">Recent Requests</h2>
+                <h2 className="text-xs font-bold text-foreground uppercase tracking-wider">Recent Requests</h2>
                 {requests.map((row) => (
                   <Link
                     key={row.id}
                     href={`/partner/collections/${row.id}`}
-                    className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm transition active:scale-95"
+                    className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 min-h-[72px] shadow-sm transition active:scale-[0.98] touch-manipulation"
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
@@ -256,7 +256,7 @@ export default function PartnerCollectionsPage() {
                       <div className="mt-0.5 text-xs font-medium text-muted-foreground">{row.subscription_code} · {row.method}</div>
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         <StatusBadge status={row.status} />
-                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                        <span className="text-xs font-medium text-muted-foreground">
                           {formatDate(row.payment_date)}
                         </span>
                       </div>
@@ -269,12 +269,12 @@ export default function PartnerCollectionsPage() {
 
             {verifiedPayments.length > 0 && (
               <div className="space-y-3">
-                <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">Verified Payments</h2>
+                <h2 className="text-xs font-bold text-foreground uppercase tracking-wider">Verified Payments</h2>
                 {verifiedPayments.map((row) => (
                   <Link
                     key={row.id}
                     href={row.subscription_id ? `/partner/payments?subscription=${row.subscription_id}` : "/partner/payments"}
-                    className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm transition active:scale-95"
+                    className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 min-h-[72px] shadow-sm transition active:scale-[0.98] touch-manipulation"
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
@@ -284,7 +284,7 @@ export default function PartnerCollectionsPage() {
                       <div className="mt-0.5 text-xs font-medium text-muted-foreground">{row.subscription_code} · {row.method}</div>
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         <StatusBadge status="VERIFIED" />
-                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                        <span className="text-xs font-medium text-muted-foreground">
                           {formatDate(row.payment_date)}
                         </span>
                       </div>

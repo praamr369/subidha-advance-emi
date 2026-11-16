@@ -1,8 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { luckyPlanService, LuckyIDTracker } from '@/services/lucky-plan'
+import { luckyPlanService, type LuckyIDTracker } from '@/services/lucky-plan'
 import Link from 'next/link'
+import CustomerPageShell, { CPageCard, CPageSection } from '@/components/layout/CustomerPageShell'
+import ERPLoadingState from '@/components/erp/ERPLoadingState'
+import ERPErrorState from '@/components/erp/ERPErrorState'
+import { Star, Clock, Gift, ShieldCheck, Sparkles, ArrowRight } from 'lucide-react'
 
 export default function LuckyIDTrackerPage() {
   const [tracker, setTracker] = useState<LuckyIDTracker | null>(null)
@@ -25,31 +29,8 @@ export default function LuckyIDTrackerPage() {
     fetchTracker()
   }, [])
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
-    )
-  }
-
-  if (error || !tracker) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-red-50 to-red-100 p-6 md:p-12">
-        <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-lg p-8">
-          <div className="text-center">
-            <h1 className="text-3xl font-bold text-red-600 mb-4">Error</h1>
-            <p className="text-gray-600 mb-6">{error || 'Failed to load SFEMI ID information'}</p>
-            <Link href="/customer" className="text-primary hover:underline">
-              Back to Dashboard
-            </Link>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
   const calculateDaysUntilDraw = () => {
+    if (!tracker?.next_draw_date) return 0
     const drawDate = new Date(tracker.next_draw_date)
     const today = new Date()
     const days = Math.ceil((drawDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
@@ -59,146 +40,160 @@ export default function LuckyIDTrackerPage() {
   const daysUntil = calculateDaysUntilDraw()
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-100 p-6 md:p-12">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Your SFEMI ID</h1>
-          <p className="text-gray-600">Track your SFEMI IDs across all promotional benefit cycles</p>
-        </div>
+    <CustomerPageShell
+      title="My SFEMI ID"
+      subtitle="Track your promotional benefit identity and draw cycle"
+      backHref="/customer"
+      backLabel="Dashboard"
+    >
+      {loading ? <ERPLoadingState label="Loading SFEMI ID details..." /> : null}
 
-        {/* Current Lucky ID - Large Card */}
-        <div className="bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg shadow-2xl p-8 md:p-12 mb-8 text-white">
-          <p className="text-purple-100 text-sm mb-2 uppercase tracking-wide">Current SFEMI ID</p>
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <p className="text-6xl font-bold font-mono mb-2">{tracker.current_lucky_id}</p>
-              <p className="text-purple-100">Batch: {tracker.batch_name}</p>
-            </div>
-            <div className="text-right">
-              <svg className="w-20 h-20 text-purple-200 mb-2" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-              </svg>
-              <p className="text-sm font-semibold">Allocated on {new Date(tracker.allocated_at).toLocaleDateString('en-IN')}</p>
-            </div>
-          </div>
+      {!loading && error ? (
+        <ERPErrorState
+          title="Could not load SFEMI ID"
+          description={error}
+          onRetry={() => {
+            setError(null)
+            setLoading(true)
+            luckyPlanService.getLuckyIDTracker().then(setTracker).catch((e) => setError(e.message)).finally(() => setLoading(false))
+          }}
+        />
+      ) : null}
 
-          {/* Countdown */}
-          <div className="bg-white bg-opacity-20 rounded-lg p-4">
-            <p className="text-sm text-purple-100 mb-1">Next Promotional Benefit Countdown</p>
-            <div className="flex items-baseline gap-2">
-              <p className="text-4xl font-bold">{daysUntil}</p>
-              <p className="text-lg text-purple-100">days remaining</p>
+      {!loading && !error && tracker ? (
+        <div className="space-y-4">
+          {/* Current SFEMI ID Hero Card */}
+          <div className="overflow-hidden rounded-2xl border-2 border-primary/30 bg-gradient-to-br from-primary/10 via-purple-50/50 to-card dark:from-primary/20 dark:via-purple-950/30 dark:to-card p-4 shadow-sm">
+            <div className="flex items-center justify-between gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/20 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-primary">
+                <Star className="size-3.5 fill-primary" /> Active SFEMI ID
+              </span>
+              <span className="text-xs font-semibold text-muted-foreground">
+                Batch: {tracker.batch_name}
+              </span>
             </div>
-          </div>
-        </div>
 
-        {/* Draw odds — static info, not a running probability */}
-        {tracker.win_probability !== undefined && (
-          <div className="bg-white rounded-lg shadow-lg p-8 mb-8">
-            <h3 className="text-2xl font-bold text-gray-900 mb-2">Benefit Odds</h3>
-            <p className="text-sm text-gray-500 mb-6">
-              One SFEMI ID is selected per batch. Odds are fixed by the number of eligible participants at the time of benefit selection — they do not change as the date approaches.
-            </p>
-            <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-6 py-4">
-              <div>
-                <p className="text-sm text-gray-600">Your share of eligible entries</p>
-                <p className="text-xs text-gray-400 mt-1">1 benefit recipient per batch · based on eligible paid IDs only</p>
+            <div className="mt-3 text-center py-2">
+              <p className="text-4xl font-black font-mono tracking-tight text-foreground">
+                {tracker.current_lucky_id}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Allocated on {new Date(tracker.allocated_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+              </p>
+            </div>
+
+            {/* Countdown Banner */}
+            <div className="mt-3 flex items-center justify-between rounded-xl bg-card border border-border/80 px-4 py-3 shadow-xs">
+              <div className="flex items-center gap-2">
+                <Clock className="size-4 text-primary" />
+                <span className="text-xs font-bold text-foreground">Next Benefit Cycle</span>
               </div>
               <div className="text-right">
-                <p className="text-3xl font-bold text-purple-600">{(tracker.win_probability * 100).toFixed(2)}%</p>
-                <p className="text-xs text-gray-500 mt-1">as of last eligibility check</p>
+                <span className="text-lg font-black text-primary">{daysUntil}</span>
+                <span className="text-xs text-muted-foreground ml-1">days left</span>
               </div>
             </div>
           </div>
-        )}
 
-        {/* Previous Lucky IDs */}
-        {tracker.previous_lucky_ids && tracker.previous_lucky_ids.length > 0 && (
-          <div className="bg-white rounded-lg shadow-lg p-8">
-            <h3 className="text-2xl font-bold text-gray-900 mb-6">SFEMI ID History</h3>
-            <div className="space-y-4">
-              {tracker.previous_lucky_ids.map((id, idx) => (
-                <div key={idx} className="border-l-4 border-purple-500 pl-4 py-2 hover:bg-gray-50 rounded transition">
-                  <div className="flex items-center justify-between">
+          {/* Benefit Odds */}
+          {tracker.win_probability !== undefined && (
+            <div className="rounded-2xl border border-border bg-card p-4 shadow-xs">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-foreground">Benefit Odds</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    1 recipient per batch · fixed by active eligible participants
+                  </p>
+                </div>
+                <div className="text-right">
+                  <div className="text-xl font-black text-primary">
+                    {(tracker.win_probability * 100).toFixed(2)}%
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">odds</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* SFEMI ID History */}
+          {tracker.previous_lucky_ids && tracker.previous_lucky_ids.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-sm font-bold text-foreground">SFEMI ID History</h3>
+              <div className="space-y-2">
+                {tracker.previous_lucky_ids.map((id, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-card p-3.5 shadow-xs"
+                  >
                     <div>
-                      <p className="font-mono font-bold text-gray-900 text-lg">{id.lucky_id}</p>
-                      <p className="text-sm text-gray-600">{id.batch_name}</p>
-                      <p className="text-xs text-gray-500">
-                        {new Date(id.allocated_at).toLocaleDateString('en-IN')}
-                      </p>
+                      <div className="font-mono font-bold text-base text-foreground">{id.lucky_id}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {id.batch_name} · {new Date(id.allocated_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      </div>
                     </div>
-                    <div className="text-right">
+                    <div>
                       {id.draw_result === 'WON' ? (
-                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-green-100 text-green-800">
-                          🎉 Benefit Recipient
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
+                          Benefit Recipient
                         </span>
                       ) : id.draw_result === 'DRAWN' ? (
-                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-yellow-100 text-yellow-800">
-                          ✓ Selected
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+                          Selected
                         </span>
                       ) : (
-                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-gray-100 text-gray-800">
-                          - Not Selected
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">
+                          Not Selected
                         </span>
                       )}
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* How It Works */}
+          <div className="rounded-2xl border border-border bg-card p-4 shadow-xs space-y-3">
+            <h3 className="text-sm font-bold text-foreground flex items-center gap-1.5">
+              <Sparkles className="size-4 text-primary" /> How SFEMI Benefit Works
+            </h3>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="rounded-xl border border-border/70 p-2.5 bg-muted/20">
+                <div className="font-bold text-primary mb-1">1. Keep Paid</div>
+                <div className="text-muted-foreground">Pay monthly EMIs on time to keep your SFEMI ID active.</div>
+              </div>
+              <div className="rounded-xl border border-border/70 p-2.5 bg-muted/20">
+                <div className="font-bold text-primary mb-1">2. Monthly Cycle</div>
+                <div className="text-muted-foreground">Eligible IDs enter the monthly promotional benefit cycle.</div>
+              </div>
+              <div className="rounded-xl border border-border/70 p-2.5 bg-muted/20">
+                <div className="font-bold text-primary mb-1">3. Benefit Awarded</div>
+                <div className="text-muted-foreground">Selected recipient gets remaining future EMIs fully waived.</div>
+              </div>
+              <div className="rounded-xl border border-border/70 p-2.5 bg-muted/20">
+                <div className="font-bold text-primary mb-1">4. Delivery</div>
+                <div className="text-muted-foreground">Product delivery proceeds as per your contract schedule.</div>
+              </div>
             </div>
           </div>
-        )}
 
-        {/* How It Works */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-8 mt-8">
-          <h3 className="text-xl font-bold text-gray-900 mb-4">How SFEMI ID Works</h3>
-          <div className="grid md:grid-cols-4 gap-4">
-            <div className="text-center">
-              <div className="w-12 h-12 rounded-full bg-blue-600 text-white flex items-center justify-center mx-auto mb-2 font-bold text-lg">1</div>
-              <p className="text-sm font-semibold text-gray-900 mb-1">Make Payment</p>
-              <p className="text-xs text-gray-600">Each subscription holds a unique SFEMI ID</p>
-            </div>
-            <div className="text-center">
-              <div className="w-12 h-12 rounded-full bg-blue-600 text-white flex items-center justify-center mx-auto mb-2 font-bold text-lg">2</div>
-              <p className="text-sm font-semibold text-gray-900 mb-1">Enter Benefit Event</p>
-              <p className="text-xs text-gray-600">Your ID enters monthly promotional benefit selection</p>
-            </div>
-            <div className="text-center">
-              <div className="w-12 h-12 rounded-full bg-blue-600 text-white flex items-center justify-center mx-auto mb-2 font-bold text-lg">3</div>
-              <p className="text-sm font-semibold text-gray-900 mb-1">Benefit Awarded</p>
-              <p className="text-xs text-gray-600">Recipients get remaining future EMIs waived</p>
-            </div>
-            <div className="text-center">
-              <div className="w-12 h-12 rounded-full bg-blue-600 text-white flex items-center justify-center mx-auto mb-2 font-bold text-lg">4</div>
-              <p className="text-sm font-semibold text-gray-900 mb-1">Get Settled</p>
-              <p className="text-xs text-gray-600">Waiver credited within 7 days</p>
-            </div>
+          {/* Action Links */}
+          <div className="grid grid-cols-2 gap-2.5 pt-1">
+            <Link
+              href="/customer/lucky-plan/eligibility"
+              className="flex min-h-12 items-center justify-center rounded-xl bg-card border border-border px-3 text-xs font-bold text-foreground shadow-xs transition hover:bg-muted active:scale-[0.98]"
+            >
+              Check Eligibility
+            </Link>
+            <Link
+              href="/customer/lucky-draws"
+              className="flex min-h-12 items-center justify-center rounded-xl bg-primary px-3 text-xs font-bold text-primary-foreground shadow-xs transition hover:bg-primary/90 active:scale-[0.98]"
+            >
+              Benefit Results
+            </Link>
           </div>
         </div>
-
-        {/* Navigation */}
-        <div className="flex gap-4 mt-8">
-          <Link
-            href="/customer/lucky-plan/eligibility"
-            className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-900 font-semibold py-3 rounded-lg transition text-center"
-          >
-            Check Eligibility
-          </Link>
-          <Link
-            href="/customer/lucky-plan/results"
-            className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 rounded-lg transition text-center"
-          >
-            View Benefit Results
-          </Link>
-          <Link
-            href="/customer/lucky-plan/history"
-            className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 rounded-lg transition text-center"
-          >
-            View Waivers
-          </Link>
-        </div>
-      </div>
-    </div>
+      ) : null}
+    </CustomerPageShell>
   )
 }

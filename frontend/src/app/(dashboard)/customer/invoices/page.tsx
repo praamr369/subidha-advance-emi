@@ -62,7 +62,7 @@ export default function CustomerInvoicesPage() {
       actions={
         <Link
           href="/customer/receipts"
-          className="rounded-xl border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted"
+          className="min-h-[38px] px-3.5 py-1.5 text-xs font-bold inline-flex items-center rounded-xl border border-border bg-background text-foreground hover:bg-muted active:scale-95 touch-manipulation"
         >
           Receipts
         </Link>
@@ -163,15 +163,15 @@ export default function CustomerInvoicesPage() {
 
                 <div className="mt-3 grid grid-cols-3 gap-2 border-t border-border/60 pt-3">
                   <div>
-                    <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Total</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Total</p>
                     <p className="mt-0.5 text-sm font-bold text-foreground">{formatRupee(row.grand_total)}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Received</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Received</p>
                     <p className="mt-0.5 text-sm font-semibold text-emerald-700">{formatRupee(row.received_total)}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Balance</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Balance</p>
                     <p className={`mt-0.5 text-sm font-semibold ${Number(row.balance_total ?? 0) > 0 ? "text-amber-700" : "text-foreground"}`}>
                       {formatRupee(row.balance_total)}
                     </p>
@@ -182,7 +182,7 @@ export default function CustomerInvoicesPage() {
                   {row.product_id ? (
                     <Link
                       href={`/customer/catalog/${row.product_id}`}
-                      className="flex-1 min-w-[130px] flex items-center justify-center gap-1.5 rounded-xl border border-primary/30 bg-primary/5 py-2 text-xs font-bold text-primary hover:bg-primary/10 transition active:scale-95"
+                      className="flex-1 min-w-[130px] min-h-[42px] flex items-center justify-center gap-1.5 rounded-xl border border-primary/30 bg-primary/5 py-2 text-xs font-bold text-primary hover:bg-primary/10 transition active:scale-95 touch-manipulation"
                     >
                       <Camera className="size-3.5" />
                       <span>Product Gallery</span>
@@ -192,7 +192,7 @@ export default function CustomerInvoicesPage() {
                   <button
                     onClick={() => void handleDownload(row.id)}
                     disabled={downloadingId === row.id}
-                    className="flex-1 min-w-[130px] flex items-center justify-center gap-2 rounded-xl border border-border bg-background py-2 text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-50 transition"
+                    className="flex-1 min-w-[130px] min-h-[42px] flex items-center justify-center gap-2 rounded-xl border border-border bg-background py-2 text-xs font-bold text-foreground hover:bg-muted disabled:opacity-50 transition active:scale-95 touch-manipulation"
                   >
                     <Download className="size-3.5" />
                     {downloadingId === row.id ? "Downloading..." : "Download PDF"}

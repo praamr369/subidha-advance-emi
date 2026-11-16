@@ -46,7 +46,7 @@ export default function StaffShell({ children }: { children: ReactNode }) {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${
+                  className={`inline-flex min-h-[44px] items-center rounded-xl border px-3.5 py-2 text-sm font-bold transition touch-manipulation active:scale-95 ${
                     isActive(pathname, item.href)
                       ? "border-foreground bg-foreground text-background"
                       : "border-border bg-background text-foreground hover:bg-muted"
@@ -59,7 +59,7 @@ export default function StaffShell({ children }: { children: ReactNode }) {
                 type="button"
                 onClick={logout}
                 disabled={isLoggingOut}
-                className="flex items-center gap-1.5 rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold text-destructive transition hover:bg-destructive hover:text-destructive-foreground disabled:opacity-50"
+                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-border bg-background px-3.5 py-2 text-sm font-bold text-destructive transition hover:bg-destructive hover:text-destructive-foreground active:scale-95 touch-manipulation disabled:opacity-50"
               >
                 <LogOut className="h-4 w-4" />
                 {isLoggingOut ? "Logging out..." : "Logout"}

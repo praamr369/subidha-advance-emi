@@ -112,8 +112,10 @@ def create_public_lead(
     product: Product | None = None,
     intent: str | None = None,
     create_procurement_enquiry: bool = False,
+    source: str = "PUBLIC_SITE",
 ):
     resolved_intent = _normalize_intent(intent)
+    resolved_source = _normalize_source(source, default="PUBLIC_SITE")[:40]
     lead = PublicLead.objects.create(
         name=(name or "").strip(),
         phone=(phone or "").strip(),
@@ -124,7 +126,7 @@ def create_public_lead(
         preferred_emi_amount=_normalize_decimal(preferred_emi_amount),
         notes=_normalize_notes(notes),
         status=PublicLeadStatus.NEW,
-        source="PUBLIC_SITE",
+        source=resolved_source,
         intent=resolved_intent,
         follow_up_required=False,
         follow_up_on=None,

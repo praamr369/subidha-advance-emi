@@ -58,6 +58,11 @@ class PublicLeadSerializer(serializers.Serializer):
     intent = serializers.ChoiceField(choices=PublicLeadIntent.choices, required=False, default="GENERAL")
     create_procurement_enquiry = serializers.BooleanField(required=False, default=False)
     session_id = serializers.CharField(max_length=64, required=False, allow_blank=True, default="")
+    source = serializers.CharField(max_length=50, required=False, allow_blank=True, default="")
+    utm_source = serializers.CharField(max_length=50, required=False, allow_blank=True, default="")
+    utm_medium = serializers.CharField(max_length=50, required=False, allow_blank=True, default="")
+    utm_campaign = serializers.CharField(max_length=100, required=False, allow_blank=True, default="")
+    referrer = serializers.CharField(max_length=255, required=False, allow_blank=True, default="")
     hp_field = serializers.CharField(required=False, allow_blank=True, default="")
 
 
@@ -608,6 +613,29 @@ class PublicLeadView(APIView):
         product = None
         product_id = validated.pop("product_id", None)
 
+        utm_source = validated.pop("utm_source", "").strip()[:50]
+        utm_medium = validated.pop("utm_medium", "").strip()[:50]
+        utm_campaign = validated.pop("utm_campaign", "").strip()[:100]
+        referrer = validated.pop("referrer", "").strip()[:255]
+        custom_source = validated.pop("source", "").strip()[:50]
+
+        source_val = utm_source or custom_source or "PUBLIC_SITE"
+
+        # If campaign tags exist, document in lead notes for sales context
+        attribution_items = []
+        if utm_source:
+            attribution_items.append(f"Source: {utm_source}")
+        if utm_medium:
+            attribution_items.append(f"Medium: {utm_medium}")
+        if utm_campaign:
+            attribution_items.append(f"Campaign: {utm_campaign}")
+        if referrer:
+            attribution_items.append(f"Referrer: {referrer}")
+        if attribution_items:
+            existing_notes = validated.get("notes", "")
+            attr_block = "[Attribution: " + " | ".join(attribution_items) + "]"
+            validated["notes"] = f"{existing_notes}\n{attr_block}".strip()
+
         if product_id is not None:
             try:
                 product = Product.objects.get(id=product_id, is_active=True)
@@ -621,6 +649,7 @@ class PublicLeadView(APIView):
                 product=product,
                 intent=intent_val,
                 create_procurement_enquiry=create_pe,
+                source=source_val,
                 **validated,
             )
             if session_id:
@@ -758,6 +787,20 @@ class PublicVisitorTrackSerializer(serializers.Serializer):
     hp_field = serializers.CharField(required=False, allow_blank=True, default="")
 
 
+KNOWN_BOT_TOKENS = (
+    "bot", "crawler", "spider", "slurp", "headlesschrome",
+    "googlebot", "bingbot", "yandex", "baiduspider", "duckduckbot",
+    "facebookexternalhit", "whatsapp", "curl", "python-requests", "wget"
+)
+
+
+def _is_automated_bot(user_agent: str) -> bool:
+    if not user_agent:
+        return False
+    ua = user_agent.lower()
+    return any(token in ua for token in KNOWN_BOT_TOKENS)
+
+
 class PublicVisitorTrackView(APIView):
     authentication_classes = []
     permission_classes = [AllowAny]
@@ -770,6 +813,10 @@ class PublicVisitorTrackView(APIView):
 
         if data.get("hp_field"):
             return Response({"status": "ok"}, status=status.HTTP_200_OK)
+
+        ua = request.META.get("HTTP_USER_AGENT", "")[:500]
+        if _is_automated_bot(ua):
+            return Response({"status": "ignored_bot"}, status=status.HTTP_200_OK)
 
         from crm.models import WebappVisitorEvent
         from customers.models import Customer

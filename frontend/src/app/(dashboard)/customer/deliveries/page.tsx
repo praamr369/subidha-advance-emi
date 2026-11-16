@@ -125,7 +125,7 @@ export default function CustomerDeliveriesPage() {
       actions={
         <Link
           href="/customer/deliveries/handover"
-          className="rounded-xl border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted"
+          className="min-h-[38px] px-3.5 py-1.5 text-xs font-bold inline-flex items-center rounded-xl border border-border bg-background text-foreground hover:bg-muted active:scale-95 touch-manipulation"
         >
           Handover
         </Link>

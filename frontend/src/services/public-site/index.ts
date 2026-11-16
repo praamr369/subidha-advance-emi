@@ -18,6 +18,7 @@ export type PublicBusinessProfile = {
   public_logo_url?: string;
   is_active?: boolean;
   google_analytics_id?: string;
+  meta_pixel_id?: string;
   google_search_console_id?: string;
   seo_local_area?: string;
   meta_title?: string;

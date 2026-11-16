@@ -1,49 +1,43 @@
 "use client";
 
 import Link from "next/link";
-import type { NotificationSummaryResponse } from "@/services/notifications";
-import { getCustomerNotificationSummary } from "@/services/notifications";
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Image from "next/image";
 import {
   ArrowRight,
+  BadgeCheck,
+  CheckCircle2,
+  ChevronRight,
+  Clock,
+  CreditCard,
+  FileText,
+  Gift,
+  HelpCircle,
   Package,
+  Receipt,
   RefreshCw,
+  RotateCcw,
+  ShieldCheck,
+  ShoppingBag,
   Smartphone,
   Sparkles,
+  Star,
   Tag,
+  Truck,
+  Users,
 } from "lucide-react";
 import UpiPayDialog from "@/components/payments/UpiPayDialog";
 import { listPublicProducts, type PublicProduct } from "@/services/public";
 import { resolveApiMediaUrl } from "@/lib/media";
-
-import DashboardTimeWindowSelector from "@/components/dashboard/DashboardTimeWindowSelector";
-import DashboardSurfaceExportActions from "@/components/dashboard/DashboardSurfaceExportActions";
-import DashboardWidgetBoard from "@/components/dashboard/DashboardWidgetBoard";
-import ERPEmptyState from "@/components/erp/ERPEmptyState";
-import ERPErrorState from "@/components/erp/ERPErrorState";
-import ERPLoadingState from "@/components/erp/ERPLoadingState";
-import ERPPageHeader from "@/components/erp/ERPPageHeader";
-import ERPSectionShell from "@/components/erp/ERPSectionShell";
-import ActionButton from "@/components/ui/ActionButton";
-import { brandConfig } from "@/config/brand";
-import { MetricStrip } from "@/components/ui/operations";
-import { SelfServicePageShell } from "@/components/layout/page-shells";
-import { WorkspaceSection } from "@/components/ui/workspace";
-import CustomerProductSummaryCard from "@/domains/subscriptions/components/CustomerProductSummaryCard";
-import {
-  buildSettlementPosture,
-  buildWinnerPosture,
-  formatDate,
-  money,
-} from "@/lib/dashboard-summary";
+import StatusBadge from "@/components/ui/status-badge";
 import { ROUTES } from "@/lib/routes";
 import {
   getCustomerDashboard,
   getCustomerDirectSaleSummary,
   listCustomerDirectSales,
   type CustomerDirectSaleListItem,
+  type CustomerSubscription,
 } from "@/services/customer";
 import { listCustomerDeliveries, type DeliveryReportSummary } from "@/services/deliveries";
 import { listCustomerSupportTickets } from "@/services/support";
@@ -55,64 +49,46 @@ import {
   listDashboardWinners,
   normalizeDashboardSummary,
 } from "@/services/dashboards";
-import type { DashboardWindowPreset } from "@/services/dashboard-types";
-import ProductPostureCard, { normalizeProductPosture } from "@/components/customers/ProductPostureCard";
+import {
+  getCustomerNotificationSummary,
+  type NotificationSummaryResponse,
+} from "@/services/notifications";
 
-type LegacyDashboardResponse = Awaited<ReturnType<typeof getCustomerDashboard>>;
-type LegacyDashboardData = NonNullable<LegacyDashboardResponse>;
-type CustomerSubscription = LegacyDashboardData["subscriptions"][number];
-type CanonicalDashboardPayload = Awaited<ReturnType<typeof getDashboardSummaryV2>>;
-type DashboardDuePayload = Awaited<ReturnType<typeof listDashboardOverdue>>;
-type DashboardPaymentsPayload = Awaited<
-  ReturnType<typeof listDashboardRecentPayments>
->;
-type DashboardWinnersPayload = Awaited<ReturnType<typeof listDashboardWinners>>;
-type DirectSaleSummaryPayload = Awaited<ReturnType<typeof getCustomerDirectSaleSummary>>;
-
-function toErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message.trim()) {
-    return error.message;
-  }
-  return "Failed to load customer workspace.";
+function money(value: string | number | null | undefined): string {
+  const n = Number(value ?? 0);
+  if (!Number.isFinite(n)) return "₹0";
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  }).format(n);
 }
 
-function statusPriority(subscription: CustomerSubscription): number {
-  switch ((subscription.status || "").toUpperCase()) {
-    case "ACTIVE":
-      return 0;
-    case "WON":
-      return 1;
-    case "COMPLETED":
-      return 2;
-    default:
-      return 3;
-  }
+function formatDate(value?: string | null): string {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return value;
+  return d.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 }
 
-type QuickLink = {
-  title: string;
-  description: string;
-  href: string;
-};
+function planLabel(planType?: string): string {
+  const pt = (planType || "").toUpperCase();
+  if (pt === "EMI") return "Advance EMI";
+  if (pt === "RENT") return "Rent";
+  if (pt === "LEASE") return "Lease";
+  return pt || "Advance EMI";
+}
 
-function QuickLinkCard({ title, description, href }: QuickLink) {
-  return (
-    <Link
-      href={href}
-      className="group workspace-section-shell surface-panel-elevated rounded-[1.6rem] p-5 transition hover:-translate-y-0.5 hover:shadow-[0_26px_60px_-36px_rgba(15,23,42,0.52)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-    >
-      <span className="pointer-events-none absolute inset-x-8 top-0 h-px bg-linear-to-r from-transparent via-(--surface-border-strong)/75 to-transparent" />
-      <div className="flex items-start justify-between gap-4">
-        <div className="space-y-2">
-          <h3 className="text-base font-semibold text-foreground">{title}</h3>
-          <p className="text-sm leading-6 text-muted-foreground">{description}</p>
-        </div>
-        <span className="rounded-2xl border border-[color-mix(in_oklab,var(--surface-border-strong)_76%,white_24%)] bg-(--surface-card-elevated) p-2 text-slate-500 shadow-[inset_0_1px_0_rgba(255,255,255,0.76)] transition group-hover:text-slate-900">
-          <ArrowRight className="h-4 w-4" />
-        </span>
-      </div>
-    </Link>
-  );
+function planBadgeClass(planType?: string): string {
+  const pt = (planType || "").toUpperCase();
+  if (pt === "EMI") return "bg-purple-100 text-purple-800 dark:bg-purple-950/40 dark:text-purple-300";
+  if (pt === "RENT") return "bg-sky-100 text-sky-800 dark:bg-sky-950/40 dark:text-sky-300";
+  if (pt === "LEASE") return "bg-indigo-100 text-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300";
+  return "bg-muted text-muted-foreground";
 }
 
 export default function CustomerDashboardPage() {
@@ -126,105 +102,86 @@ export default function CustomerDashboardPage() {
     emi_id?: number | string | null;
     subscription_id?: number | string | null;
   } | null>(null);
-  const [windowPreset, setWindowPreset] =
-    useState<DashboardWindowPreset>("DEFAULT");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const dashboardQuery = useMemo(
-    () =>
-      windowPreset === "CUSTOM"
-        ? {
-            window: windowPreset,
-            start_date: startDate || undefined,
-            end_date: endDate || undefined,
-          }
-        : { window: windowPreset },
-    [endDate, startDate, windowPreset]
-  );
 
   const coreQuery = useQuery({
     queryKey: ["customer", "dashboard", "core"],
     queryFn: getCustomerDashboard,
   });
-  // EMI + rent/lease + direct sale in one shape — same helper as the admin page.
-  const productPosture = useMemo(
-    () => normalizeProductPosture(coreQuery.data?.product_posture),
-    [coreQuery.data?.product_posture]
-  );
+
   const canonicalQuery = useQuery({
-    queryKey: ["customer", "dashboard", "summary", dashboardQuery],
-    queryFn: () => getDashboardSummaryV2(dashboardQuery),
+    queryKey: ["customer", "dashboard", "summary"],
+    queryFn: () => getDashboardSummaryV2({}),
     enabled: coreQuery.isSuccess,
   });
+
   const overdueQuery = useQuery({
-    queryKey: ["customer", "dashboard", "overdue", dashboardQuery],
-    queryFn: () => listDashboardOverdue({ ...dashboardQuery, limit: 6 }),
+    queryKey: ["customer", "dashboard", "overdue"],
+    queryFn: () => listDashboardOverdue({ limit: 6 }),
     enabled: coreQuery.isSuccess,
   });
+
   const upcomingQuery = useQuery({
-    queryKey: ["customer", "dashboard", "upcoming", dashboardQuery],
-    queryFn: () => listDashboardUpcoming({ ...dashboardQuery, limit: 6 }),
+    queryKey: ["customer", "dashboard", "upcoming"],
+    queryFn: () => listDashboardUpcoming({ limit: 6 }),
     enabled: coreQuery.isSuccess,
   });
+
   const recentPaymentsQuery = useQuery({
-    queryKey: ["customer", "dashboard", "recent-payments", dashboardQuery],
-    queryFn: () => listDashboardRecentPayments({ ...dashboardQuery, limit: 6 }),
+    queryKey: ["customer", "dashboard", "recent-payments"],
+    queryFn: () => listDashboardRecentPayments({ limit: 6 }),
     enabled: coreQuery.isSuccess,
   });
+
   const winnersQuery = useQuery({
-    queryKey: ["customer", "dashboard", "winners", dashboardQuery],
-    queryFn: () => listDashboardWinners({ ...dashboardQuery, limit: 4 }),
+    queryKey: ["customer", "dashboard", "winners"],
+    queryFn: () => listDashboardWinners({ limit: 4 }),
     enabled: coreQuery.isSuccess,
   });
+
   const directSaleSummaryQuery = useQuery({
     queryKey: ["customer", "dashboard", "direct-sale-summary"],
     queryFn: getCustomerDirectSaleSummary,
     enabled: coreQuery.isSuccess,
   });
+
   const directSalesQuery = useQuery({
     queryKey: ["customer", "dashboard", "direct-sales", 1, 5],
     queryFn: () => listCustomerDirectSales({ page: 1, pageSize: 5 }),
     enabled: coreQuery.isSuccess,
   });
+
   const notificationSummaryQuery = useQuery({
     queryKey: ["customer", "dashboard", "notification-summary"],
     queryFn: getCustomerNotificationSummary,
     enabled: coreQuery.isSuccess,
   });
+
   const deliveriesQuery = useQuery({
     queryKey: ["customer", "dashboard", "deliveries"],
     queryFn: () => listCustomerDeliveries(),
     enabled: coreQuery.isSuccess,
   });
+
   const supportQuery = useQuery({
     queryKey: ["customer", "dashboard", "support", "open"],
     queryFn: () => listCustomerSupportTickets("open"),
     enabled: coreQuery.isSuccess,
   });
+
   const productsQuery = useQuery({
     queryKey: ["publicProducts", "dashboard"],
     queryFn: () => listPublicProducts(),
     staleTime: 5 * 60 * 1000,
   });
 
-  const legacy: LegacyDashboardResponse | null = coreQuery.data ?? null;
-  const canonical: CanonicalDashboardPayload | null = canonicalQuery.data ?? null;
-  const overdue: DashboardDuePayload | null = overdueQuery.data ?? null;
-  const upcoming: DashboardDuePayload | null = upcomingQuery.data ?? null;
-  const recentPayments: DashboardPaymentsPayload | null =
-    recentPaymentsQuery.data ?? null;
-  const winnerItems: DashboardWinnersPayload | null =
-    winnersQuery.data ?? null;
-  const directSaleSummary: DirectSaleSummaryPayload | null =
-    directSaleSummaryQuery.data ?? null;
-  const latestDirectSales: CustomerDirectSaleListItem[] =
-    directSalesQuery.data?.results ?? [];
-  const notificationSummary: NotificationSummaryResponse | null =
-    notificationSummaryQuery.data ?? null;
-  const deliverySummary: DeliveryReportSummary | null =
-    deliveriesQuery.data?.summary ?? null;
-  const supportOpenCount: number | null = supportQuery.data?.count ?? null;
-  const publicProducts: PublicProduct[] = productsQuery.data?.products ?? [];
+  const legacy = coreQuery.data ?? null;
+  const canonical = canonicalQuery.data ?? null;
+  const summary =
+    canonical?.summary ??
+    (legacy?.summary
+      ? normalizeDashboardSummary(legacy.summary as unknown as Record<string, unknown>)
+      : undefined);
+
   const loading = coreQuery.isPending;
   const refreshing = [
     coreQuery,
@@ -238,9 +195,10 @@ export default function CustomerDashboardPage() {
     notificationSummaryQuery,
     deliveriesQuery,
     supportQuery,
-  ].some((query) => query.isFetching && !query.isPending);
+  ].some((q) => q.isFetching && !q.isPending);
+
   const error = coreQuery.error
-    ? toErrorMessage(coreQuery.error)
+    ? (coreQuery.error instanceof Error ? coreQuery.error.message : "Failed to load customer workspace.")
     : null;
 
   function refreshDashboard() {
@@ -257,621 +215,385 @@ export default function CustomerDashboardPage() {
     void supportQuery.refetch();
   }
 
-  const summary =
-    canonical?.summary ??
-    (legacy?.summary
-      ? normalizeDashboardSummary(
-          legacy.summary as unknown as Record<string, unknown>
-        )
-      : undefined);
-  const winnerSurface = canonical?.winner_surface;
-  const settlementPosture = summary ? buildSettlementPosture(summary) : null;
-  const winnerPosture = buildWinnerPosture(winnerSurface, summary);
-  const dueRows = [...(overdue?.results ?? []), ...(upcoming?.results ?? [])].slice(
-    0,
-    6
+  const dueRows = useMemo(
+    () => [...(overdueQuery.data?.results ?? []), ...(upcomingQuery.data?.results ?? [])].slice(0, 6),
+    [overdueQuery.data, upcomingQuery.data]
   );
   const paymentRows = useMemo(
-    () => recentPayments?.results ?? [],
-    [recentPayments?.results]
+    () => recentPaymentsQuery.data?.results ?? [],
+    [recentPaymentsQuery.data]
   );
-  const winnerRows = winnerItems?.results ?? [];
-  const lastPayment = useMemo(() => paymentRows[0] ?? null, [paymentRows]);
+  const lastPayment = paymentRows[0] ?? null;
 
-  const atAGlanceMetrics = useMemo(() => {
-    if (!summary) return [];
-    const d = deliverySummary;
-    const inFlight =
-      d === null
-        ? null
-        : d.pending +
-          d.scheduled +
-          d.in_transit +
-          d.dispatched +
-          d.out_for_delivery;
-    const items: Array<{
-      label: string;
-      value: ReactNode;
-      helper?: ReactNode;
-      href?: string;
-    }> = [
-      {
-        label: "Active contracts",
-        value: String(summary.active_subscriptions ?? 0),
-        helper: `${summary.completed_subscriptions ?? 0} completed`,
-        href: ROUTES.customer.subscriptions,
-      },
-      {
-        label: "Next payment",
-        value:
-          summary.next_due_date && summary.next_due_amount
-            ? money(summary.next_due_amount)
-            : "None due",
-        helper: summary.next_due_date
-          ? `Due ${formatDate(summary.next_due_date)}`
-          : "No upcoming EMI on file",
-        href: ROUTES.customer.subscriptions,
-      },
-      {
-        label: "Last payment",
-        value: lastPayment ? money(lastPayment.amount) : "—",
-        helper: lastPayment
-          ? `${formatDate(lastPayment.payment_date || lastPayment.created_at)}${
-              lastPayment.is_reversed ? " · Reversed" : ""
-            }`
-          : "No payments in this date range",
-        href: lastPayment
-          ? `${ROUTES.customer.payments}/${lastPayment.payment_id}`
-          : ROUTES.customer.payments,
-      },
-    ];
+  const directSaleSummary = directSaleSummaryQuery.data ?? null;
+  const latestDirectSales: CustomerDirectSaleListItem[] = directSalesQuery.data?.results ?? [];
+  const notificationSummary: NotificationSummaryResponse | null = notificationSummaryQuery.data ?? null;
+  const deliverySummary: DeliveryReportSummary | null = deliveriesQuery.data?.summary ?? null;
+  const inFlightDeliveries = deliverySummary
+    ? deliverySummary.pending +
+      deliverySummary.scheduled +
+      deliverySummary.in_transit +
+      deliverySummary.dispatched +
+      deliverySummary.out_for_delivery
+    : 0;
 
-    if (d !== null) {
-      items.push({
-        label: "Deliveries",
-        value: d.total > 0 ? `${d.delivered} delivered` : "—",
-        helper:
-          inFlight !== null && inFlight > 0
-            ? `${inFlight} in progress`
-            : d.total === 0
-              ? "No shipment records yet"
-              : "No active shipments",
-        href: ROUTES.customer.deliveries,
-      });
-    }
+  const publicProducts: PublicProduct[] = productsQuery.data?.products ?? [];
 
-    if (supportOpenCount !== null) {
-      items.push({
-        label: "Open support",
-        value: String(supportOpenCount),
-        helper:
-          supportOpenCount === 0
-            ? "No open requests"
-            : "Waiting on the shop team",
-        href: ROUTES.customer.support,
-      });
-    }
+  const activeSubs: CustomerSubscription[] = useMemo(() => {
+    return (legacy?.subscriptions ?? []).slice(0, 3);
+  }, [legacy?.subscriptions]);
 
-    const winnerCount = Number(summary.winner_subscriptions ?? 0);
-    if (winnerCount > 0) {
-      items.push({
-        label: "SFEMI Benefits",
-        value: `${winnerCount} benefit contract${winnerCount === 1 ? "" : "s"}`,
-        helper: "Open a subscription for benefit detail",
-        href: ROUTES.customer.subscriptions,
-      });
-    }
-
-    return items;
-  }, [deliverySummary, lastPayment, summary, supportOpenCount]);
-  const spotlightSubscriptions =
-    legacy?.subscriptions
-      ?.slice()
-      .sort((left, right) => {
-        const priorityDelta = statusPriority(left) - statusPriority(right);
-        if (priorityDelta !== 0) return priorityDelta;
-
-        const leftOutstanding = Number(
-          left.financial_summary?.remaining_amount ??
-            left.financial_summary?.outstanding_amount ??
-            left.outstanding_amount ??
-            0
-        );
-        const rightOutstanding = Number(
-          right.financial_summary?.remaining_amount ??
-            right.financial_summary?.outstanding_amount ??
-            right.outstanding_amount ??
-            0
-        );
-
-        return rightOutstanding - leftOutstanding;
-      })
-      .slice(0, 3) ?? [];
-
-  const quickLinks: QuickLink[] = [
-    {
-      title: "My Contracts",
-      description: "View all Advance EMI, Rent, and Lease contracts grouped by type with status.",
-      href: "/customer/contracts",
-    },
-    {
-      title: "My Subscriptions",
-      description: "Open contract detail, beneficiary posture, and product status by subscription.",
-      href: ROUTES.customer.subscriptions,
-    },
-    {
-      title: "My Payments",
-      description: "Review recorded payment rows and the current settled total.",
-      href: ROUTES.customer.payments,
-    },
-    {
-      title: "Direct Sales",
-      description: "View direct-sale invoices, dues, and receipt downloads linked to your profile.",
-      href: ROUTES.customer.directSales,
-    },
-    {
-      title: "Finance Summary",
-      description: "Track invoices, receipts, outstanding balance, and payment method split.",
-      href: "/customer/finance",
-    },
-    {
-      title: "Account Statement",
-      description: "View statement totals across invoices, receipts, and recorded payments.",
-      href: "/customer/account-statement",
-    },
-    {
-      title: "Support",
-      description: "Raise a support request if a payment or contract detail needs follow-up.",
-      href: ROUTES.customer.support,
-    },
-  ];
+  const hasNextDue = Boolean(summary?.next_due_amount && Number(summary.next_due_amount) > 0);
 
   return (
-    <>
-      <SelfServicePageShell
-      glance={
-        <>
-          <ERPPageHeader
-            eyebrow={`${brandConfig.companyName} · Your account`}
-            title="Customer Workspace"
-            description="See what is due, what you paid last, and where deliveries or support stand—using the same live records the shop uses for your contracts."
-            helperNote="Amounts and statuses come from your subscriptions and payments. They update when the shop records activity."
-            helperTone="info"
-            actions={
-              <ActionButton
-                variant="outline"
-                onClick={refreshDashboard}
-                aria-label={refreshing ? "Refreshing dashboard" : "Refresh dashboard"}
-                leftIcon={<RefreshCw className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />}
-              >
-                {refreshing ? "Refreshing..." : "Refresh"}
-              </ActionButton>
-            }
-          />
-
-          <DashboardTimeWindowSelector
-            value={windowPreset}
-            startDate={startDate}
-            endDate={endDate}
-            loading={loading || refreshing}
-            onWindowChange={setWindowPreset}
-            onStartDateChange={setStartDate}
-            onEndDateChange={setEndDate}
-          />
-
-          {!loading && !error && legacy && summary ? (
-            <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">At a glance</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Tap a tile to open subscriptions, payments, deliveries, or support.
-              </p>
-              <div className="mt-4">
-                <MetricStrip items={atAGlanceMetrics} />
-              </div>
-            </section>
-          ) : null}
-        </>
-      }
-      actions={
-        <ERPSectionShell
-          title="Workspace quick lanes"
-          description="Open common customer workflows quickly while keeping contract, payment, and support routes separate."
+    <div className="w-full px-3.5 py-4 space-y-4 max-w-full">
+      {/* ── 1. Top Customer Profile Header ── */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary font-bold text-base shadow-xs">
+            {((legacy?.customer?.name || "C").charAt(0) || "C").toUpperCase()}
+          </div>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-lg font-bold text-foreground truncate">
+              {legacy?.customer?.name || "Customer Workspace"}
+            </h1>
+            <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+              <StatusBadge status={legacy?.customer?.kyc_status || "PENDING"} />
+              {legacy?.customer?.phone ? (
+                <span className="text-xs font-medium text-muted-foreground">{legacy.customer.phone}</span>
+              ) : null}
+            </div>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={refreshDashboard}
+          disabled={loading || refreshing}
+          className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-foreground shadow-xs transition hover:bg-muted active:scale-95 disabled:opacity-60"
+          title="Refresh dashboard"
         >
-          <DashboardWidgetBoard
-            storageKey="subidha:dashboard-widgets:customer:v1"
-            version={1}
-            title="Customer lane widgets"
-            description="Simple customer lane controls for subscription, payment, and support routes."
-            presets={[
-              {
-                id: "subscription-first",
-                label: "Subscription first",
-                description: "Prioritize subscription and payment visibility.",
-                order: ["subs", "payments", "support"],
-                pinned: ["subs", "payments"],
-              },
-              {
-                id: "support-first",
-                label: "Support first",
-                description: "Prioritize support escalation while preserving subscription context.",
-                order: ["support", "subs", "payments"],
-                pinned: ["support"],
-              },
-            ]}
-            widgets={[
-              {
-                id: "subs",
-                title: "My subscriptions",
-                subtitle: "Contract and beneficiary posture overview.",
-                group: "core",
-                fixed: true,
-                content: (
-                  <ActionButton href={ROUTES.customer.subscriptions} variant="outline" className="justify-between">
-                    Open subscriptions
-                    <ArrowRight className="h-4 w-4" />
-                  </ActionButton>
-                ),
-              },
-              {
-                id: "payments",
-                title: "My payments",
-                subtitle: "Payment register and receipt lookup.",
-                group: "quick-actions",
-                content: (
-                  <ActionButton href={ROUTES.customer.payments} variant="outline" className="justify-between">
-                    Open payments
-                    <ArrowRight className="h-4 w-4" />
-                  </ActionButton>
-                ),
-              },
-              {
-                id: "support",
-                title: "Support requests",
-                subtitle: "Escalate customer-side issues safely.",
-                group: "operational",
-                content: (
-                  <ActionButton href={ROUTES.customer.support} variant="outline" className="justify-between">
-                    Open support
-                    <ArrowRight className="h-4 w-4" />
-                  </ActionButton>
-                ),
-              },
-            ]}
-          />
-        </ERPSectionShell>
-      }
-      records={
-        <>
-      <div aria-live="polite">
-        {loading ? <ERPLoadingState label="Loading customer workspace..." /> : null}
-
-        {!loading && error ? (
-          <ERPErrorState
-            title="Unable to load customer workspace"
-            description={error}
-            onRetry={() => void coreQuery.refetch()}
-          />
-        ) : null}
+          <RefreshCw className={`size-4.5 ${refreshing ? "animate-spin" : ""}`} />
+        </button>
       </div>
 
-      {!loading && !error && legacy && summary ? (
+      {/* ── Loading / Error State ── */}
+      {loading ? (
+        <div className="space-y-3">
+          <div className="h-28 animate-pulse rounded-2xl border border-border bg-muted/50" />
+          <div className="grid grid-cols-2 gap-2.5">
+            <div className="h-20 animate-pulse rounded-2xl border border-border bg-muted/40" />
+            <div className="h-20 animate-pulse rounded-2xl border border-border bg-muted/40" />
+          </div>
+        </div>
+      ) : error ? (
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
+          <div className="font-bold">Unable to load dashboard</div>
+          <p className="mt-1 text-xs opacity-90">{error}</p>
+          <button
+            type="button"
+            onClick={refreshDashboard}
+            className="mt-3 inline-flex rounded-xl bg-red-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-xs"
+          >
+            Retry
+          </button>
+        </div>
+      ) : null}
+
+      {!loading && !error && summary ? (
         <>
-          <section className="relative overflow-hidden rounded-4xl border border-slate-200/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(248,250,252,0.94),rgba(239,246,255,0.92))] p-6 shadow-[0_28px_90px_-54px_rgba(15,23,42,0.5)]">
-            <div className="pointer-events-none absolute right-0 top-0 h-40 w-40 rounded-full bg-sky-200/25 blur-3xl" />
-            <div className="pointer-events-none absolute left-0 top-0 h-28 w-28 rounded-full bg-amber-200/20 blur-3xl" />
-
-            <div className="relative flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-              <div className="max-w-3xl">
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/85 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-600 shadow-sm">
-                  <Sparkles className="h-3.5 w-3.5" />
-                  Financial alignment
-                </div>
-                <h2 className="mt-4 text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
-                  {legacy.customer.name || "Customer"}
-                </h2>
-                <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600 sm:text-base">
-                  Paid, remaining, overdue, and SFEMI promotional benefit figures are
-                  calculated from your live contracts and payments so what you
-                  see here matches your subscription and receipt records.
-                </p>
-              </div>
-
-              <dl className="grid gap-3 sm:grid-cols-2 lg:w-90">
-                <div className="rounded-2xl border border-white/80 bg-white/85 p-4 shadow-sm">
-                  <dt className="text-xs font-medium text-slate-500">KYC status</dt>
-                  <dd className="mt-1 text-sm font-semibold text-slate-950">
-                    {legacy.customer.kyc_status || "PENDING"}
-                  </dd>
-                </div>
-                <div className="rounded-2xl border border-white/80 bg-white/85 p-4 shadow-sm">
-                  <dt className="text-xs font-medium text-slate-500">Phone</dt>
-                  <dd className="mt-1 text-sm font-semibold text-slate-950">
-                    {legacy.customer.phone || "—"}
-                  </dd>
-                </div>
-                <div className="rounded-2xl border border-white/80 bg-white/85 p-4 shadow-sm">
-                  <dt className="text-xs font-medium text-slate-500">Contracts</dt>
-                  <dd className="mt-1 text-sm font-semibold text-slate-950">
-                    {summary.subscription_count ?? legacy.subscriptions.length}
-                  </dd>
-                </div>
-                <div className="rounded-2xl border border-white/80 bg-white/85 p-4 shadow-sm">
-                  <dt className="text-xs font-medium text-slate-500">Beneficiary history</dt>
-                  <dd className="mt-1 text-sm font-semibold text-slate-950">
-                    {summary.winner_subscriptions ?? 0} subscription
-                    {(summary.winner_subscriptions ?? 0) === 1 ? "" : "s"}
-                  </dd>
-                </div>
-              </dl>
-            </div>
-          </section>
-
-          <WorkspaceSection
-            title="Direct sale dues"
-            description="Outstanding dues from direct-sale invoices linked to your customer profile."
-            action={
-              <ActionButton href={ROUTES.customer.directSales} variant="secondary" className="h-9 px-3 text-xs">
-                View Direct Sales
-              </ActionButton>
-            }
-          >
-            <dl className="grid gap-3 md:grid-cols-3">
-              <div className="rounded-2xl border border-border bg-card/80 p-4">
-                <dt className="text-xs font-medium text-muted-foreground">Outstanding</dt>
-                <dd className="mt-1 text-sm font-semibold text-foreground">
-                  {money(directSaleSummary?.total_outstanding_direct_sale_dues ?? "0.00")}
-                </dd>
-                <dd className="mt-1 text-xs text-muted-foreground">Grand total minus received.</dd>
-              </div>
-              <div className="rounded-2xl border border-border bg-card/80 p-4">
-                <dt className="text-xs font-medium text-muted-foreground">Total paid</dt>
-                <dd className="mt-1 text-sm font-semibold text-foreground">
-                  {money(directSaleSummary?.total_paid_direct_sale_amount ?? "0.00")}
-                </dd>
-              </div>
-              <div className="rounded-2xl border border-border bg-card/80 p-4">
-                <dt className="text-xs font-medium text-muted-foreground">Latest invoice</dt>
-                <dd className="mt-1 text-sm font-semibold text-foreground">
-                  {String(
-                    (directSaleSummary?.latest_direct_sale_invoice?.invoice_number as string | undefined) ||
-                      (directSaleSummary?.latest_direct_sale_invoice?.document_number as string | undefined) ||
-                      "—"
-                  )}
-                </dd>
-              </div>
-            </dl>
-          </WorkspaceSection>
-
-          <WorkspaceSection
-            title="Latest direct-sale invoices"
-            description="Recent invoices linked to your customer profile (walk-in snapshot-only sales are excluded)."
-            action={
-              <ActionButton href={ROUTES.customer.directSales} variant="secondary" className="h-9 px-3 text-xs">
-                All direct sales
-              </ActionButton>
-            }
-          >
-            {latestDirectSales.length === 0 ? (
-              <ERPEmptyState
-                title="No direct-sale invoices"
-                description="When a direct sale is linked to your account, it will appear here with balance context."
-              />
-            ) : (
-              <div className="space-y-2">
-                {latestDirectSales.map((inv) => (
-                  <Link
-                    key={inv.id}
-                    href={`${ROUTES.customer.directSales}/${inv.id}`}
-                    className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-border bg-card px-4 py-3 text-sm transition hover:bg-muted/40"
-                  >
-                    <div>
-                      <div className="font-semibold text-foreground">
-                        {inv.invoice_number || inv.document_number || `Sale #${inv.id}`}
-                      </div>
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        {inv.sale_date ? formatDate(inv.sale_date) : "—"} · Due {money(inv.outstanding_amount)}
-                      </div>
-                    </div>
-                    <div className="text-right text-xs text-muted-foreground">
-                      <div>Total {money(inv.grand_total)}</div>
-                      <div>Paid {money(inv.paid_amount)}</div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </WorkspaceSection>
-
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-            <section
-              className={`rounded-[1.8rem] border p-6 shadow-[0_20px_60px_-42px_rgba(15,23,42,0.52)] ${settlementPosture?.tone}`}
-            >
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                    Settlement posture
-                  </p>
-                  <h3 className="mt-3 text-xl font-semibold text-slate-950">
-                    {settlementPosture?.title}
-                  </h3>
-                </div>
-                <span
-                  className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${settlementPosture?.badgeClass}`}
-                >
-                  {settlementPosture?.badgeLabel}
+          {/* ── 2. Next EMI Due - Hero Action Banner ── */}
+          {hasNextDue ? (
+            <div className="overflow-hidden rounded-2xl border-2 border-emerald-500/30 bg-gradient-to-br from-emerald-50/90 via-teal-50/40 to-background dark:from-emerald-950/40 dark:via-teal-950/20 dark:to-card p-4 shadow-sm">
+              <div className="flex items-center justify-between gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
+                  <Clock className="size-3.5" /> Next EMI Due
+                </span>
+                <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+                  Due {formatDate(summary.next_due_date)}
                 </span>
               </div>
 
-              <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-700">
-                {settlementPosture?.description}
-              </p>
-
-              {productPosture ? (
-                <div className="mt-5 rounded-[1.3rem] border border-white/80 bg-white/80 p-4">
-                  <ProductPostureCard posture={productPosture} title="Your contracts & payments" />
-                </div>
-              ) : null}
-
-              <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                <div className="rounded-[1.3rem] border border-white/80 bg-white/80 p-4">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                    Next payment due
+              <div className="mt-2.5 flex items-baseline justify-between gap-2">
+                <div>
+                  <div className="text-3xl font-black tracking-tight text-foreground">
+                    {money(summary.next_due_amount)}
                   </div>
-                  <div className="mt-2 text-sm font-semibold text-slate-950">
-                    {summary.next_due_date
-                      ? `${money(summary.next_due_amount)} on ${formatDate(
-                          summary.next_due_date
-                        )}`
-                      : "No pending EMI"}
-                  </div>
-                  <div className="mt-1 text-xs text-slate-500">
-                    {summary.next_due_subscription_number || "No contract pending"}
-                  </div>
-                  {summary.next_due_amount && Number(summary.next_due_amount) > 0 ? (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setSelectedDuePayItem({
-                          subscription_number: summary.next_due_subscription_number || undefined,
-                          pending_amount: summary.next_due_amount,
-                          due_date: summary.next_due_date || undefined,
-                        })
-                      }
-                      className="mt-2.5 flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 active:scale-[0.99]"
-                    >
-                      <Smartphone className="h-3.5 w-3.5" />
-                      <span>Pay Now</span>
-                    </button>
-                  ) : null}
-                </div>
-                <div className="rounded-[1.3rem] border border-white/80 bg-white/80 p-4">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                    Active contracts
-                  </div>
-                  <div className="mt-2 text-sm font-semibold text-slate-950">
-                    {summary.active_subscriptions}
-                  </div>
-                  <div className="mt-1 text-xs text-slate-500">
-                    {summary.completed_subscriptions ?? 0} completed
-                  </div>
-                </div>
-                <div className="rounded-[1.3rem] border border-white/80 bg-white/80 p-4">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                    Payment adjustments
-                  </div>
-                  <div className="mt-2 text-sm font-semibold text-slate-950">
-                    {summary.has_payment_adjustments ? "Recorded" : "None"}
-                  </div>
-                  <div className="mt-1 text-xs text-slate-500">
-                    Settled totals already reflect any reversal history.
+                  <div className="mt-0.5 text-xs font-medium text-muted-foreground truncate">
+                    {summary.next_due_subscription_number || "Active Contract"}
                   </div>
                 </div>
               </div>
-            </section>
 
-            <WorkspaceSection
-              title={winnerPosture.title}
-              description={winnerPosture.description}
-              className="h-full rounded-[1.8rem]"
-              action={
-                <DashboardSurfaceExportActions
-                  query={dashboardQuery}
-                  actions={[{ surface: "winners", label: "Export CSV" }]}
-                />
-              }
+              <button
+                type="button"
+                onClick={() =>
+                  setSelectedDuePayItem({
+                    subscription_number: summary.next_due_subscription_number || undefined,
+                    pending_amount: summary.next_due_amount,
+                    due_date: summary.next_due_date || undefined,
+                  })
+                }
+                className="mt-3.5 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 active:scale-[0.98]"
+              >
+                <Smartphone className="size-4.5" />
+                <span>Pay Now via UPI / Autopay</span>
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 rounded-2xl border border-emerald-200/80 bg-emerald-50/60 dark:border-emerald-900/40 dark:bg-emerald-950/20 p-4 shadow-xs">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                <CheckCircle2 className="size-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-sm font-bold text-emerald-900 dark:text-emerald-200">
+                  All Payments Up to Date!
+                </div>
+                <div className="text-xs text-emerald-700/80 dark:text-emerald-400">
+                  No pending EMIs due at this time.
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── 3. At-a-Glance KPI Grid (2x2) ── */}
+          <div className="grid grid-cols-2 gap-2.5">
+            <Link
+              href={ROUTES.customer.subscriptions}
+              className="flex flex-col justify-between rounded-2xl border border-border bg-card p-3.5 shadow-xs transition hover:bg-muted/40 active:scale-[0.98]"
             >
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-[1.2rem] border border-white/80 bg-white/80 px-4 py-3 text-sm">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Waived by benefit
-                  </div>
-                  <div className="mt-1 font-semibold text-slate-950">
-                    {money(winnerSurface?.total_waived_amount ?? summary.total_waived_amount)}
-                  </div>
-                  <div className="mt-1 text-xs text-slate-500">
-                    {winnerSurface?.waived_emis ?? summary.waived_emis ?? 0} EMI rows marked waived
-                  </div>
-                </div>
-                <div className="rounded-[1.2rem] border border-white/80 bg-white/80 px-4 py-3 text-sm">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Contracts in view
-                  </div>
-                  <div className="mt-1 font-semibold text-slate-950">
-                    {summary.subscription_count ?? legacy.subscriptions.length}
-                  </div>
-                  <div className="mt-1 text-xs text-slate-500">
-                    {summary.winner_subscriptions ?? 0} with beneficiary history
-                  </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Contracts</span>
+                <Package className="size-4 text-primary" />
+              </div>
+              <div className="mt-2">
+                <div className="text-2xl font-black text-foreground">{summary.active_subscriptions ?? 0}</div>
+                <div className="mt-0.5 text-xs font-medium text-muted-foreground">
+                  {summary.completed_subscriptions ?? 0} completed
                 </div>
               </div>
-              {winnerRows.length > 0 ? (
-                <div className="mt-4 grid gap-2">
-                  {winnerRows.map((row) => (
-                    <div
-                      key={row.subscription_id}
-                      className="rounded-[1.2rem] border border-white/80 bg-white/80 px-4 py-3 text-sm text-slate-700"
-                    >
-                      <div className="font-semibold text-slate-950">
-                        {row.subscription_number}
-                      </div>
-                      <div className="mt-1 text-xs text-slate-500">
-                        {row.customer_name || "Unknown customer"}
-                        {row.waived_amount ? ` • Waived ${money(row.waived_amount)}` : ""}
-                      </div>
-                    </div>
-                  ))}
+            </Link>
+
+            <Link
+              href={ROUTES.customer.payments}
+              className="flex flex-col justify-between rounded-2xl border border-border bg-card p-3.5 shadow-xs transition hover:bg-muted/40 active:scale-[0.98]"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Last Paid</span>
+                <CreditCard className="size-4 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <div className="mt-2">
+                <div className="text-2xl font-black text-foreground">
+                  {lastPayment ? money(lastPayment.amount) : "—"}
                 </div>
-              ) : null}
-            </WorkspaceSection>
+                <div className="mt-0.5 text-xs font-medium text-muted-foreground truncate">
+                  {lastPayment ? formatDate(lastPayment.payment_date || lastPayment.created_at) : "No payments yet"}
+                </div>
+              </div>
+            </Link>
+
+            <Link
+              href={ROUTES.customer.deliveries}
+              className="flex flex-col justify-between rounded-2xl border border-border bg-card p-3.5 shadow-xs transition hover:bg-muted/40 active:scale-[0.98]"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Deliveries</span>
+                <Truck className="size-4 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div className="mt-2">
+                <div className="text-2xl font-black text-foreground">
+                  {deliverySummary ? deliverySummary.delivered : 0}
+                </div>
+                <div className="mt-0.5 text-xs font-medium text-muted-foreground truncate">
+                  {inFlightDeliveries > 0 ? `${inFlightDeliveries} in progress` : "All delivered"}
+                </div>
+              </div>
+            </Link>
+
+            <Link
+              href="/customer/lucky-plan/lucky-id"
+              className="flex flex-col justify-between rounded-2xl border border-border bg-card p-3.5 shadow-xs transition hover:bg-muted/40 active:scale-[0.98]"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">SFEMI Benefit</span>
+                <Star className="size-4 text-amber-500" />
+              </div>
+              <div className="mt-2">
+                <div className="text-2xl font-black text-foreground">
+                  {summary.winner_subscriptions ?? 0}
+                </div>
+                <div className="mt-0.5 text-xs font-medium text-muted-foreground truncate">
+                  {Number(summary.total_waived_amount ?? 0) > 0
+                    ? `${money(summary.total_waived_amount)} waived`
+                    : "Active benefits"}
+                </div>
+              </div>
+            </Link>
           </div>
 
-          <div className="grid gap-4 xl:grid-cols-2">
-            <WorkspaceSection
-              title="Due collection queue"
-              description="Upcoming and overdue instalments from your contracts for the selected date range."
-              action={
-                <>
-                  <ActionButton
-                    href={ROUTES.customer.subscriptions}
-                    variant="secondary"
-                    className="h-9 px-3 text-xs"
-                  >
-                    Open subscriptions
-                  </ActionButton>
-                  <DashboardSurfaceExportActions
-                    query={dashboardQuery}
-                    actions={[
-                      { surface: "upcoming", label: "Export upcoming" },
-                      { surface: "overdue", label: "Export overdue" },
-                    ]}
-                  />
-                </>
-              }
-            >
-              {dueRows.length > 0 ? (
-                <div className="grid gap-3">
-                  {dueRows.map((item) => (
+          {/* ── 4. Quick Access Lanes (Large Touch Targets) ── */}
+          <div className="space-y-2">
+            <h2 className="text-sm font-bold text-foreground">Quick Access</h2>
+            <div className="grid grid-cols-2 gap-2.5">
+              <Link
+                href={ROUTES.customer.subscriptions}
+                className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3.5 shadow-xs transition hover:bg-muted/50 active:scale-[0.98]"
+              >
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300">
+                  <Package className="size-5" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-sm font-bold text-foreground leading-tight">My Contracts</div>
+                  <div className="text-[11px] font-medium text-muted-foreground">EMI, Rent &amp; Lease</div>
+                </div>
+              </Link>
+
+              <Link
+                href="/customer/emis"
+                className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3.5 shadow-xs transition hover:bg-muted/50 active:scale-[0.98]"
+              >
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                  <CreditCard className="size-5" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-sm font-bold text-foreground leading-tight">EMI Schedule</div>
+                  <div className="text-[11px] font-medium text-muted-foreground">View &amp; Pay EMIs</div>
+                </div>
+              </Link>
+
+              <Link
+                href={ROUTES.customer.payments}
+                className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3.5 shadow-xs transition hover:bg-muted/50 active:scale-[0.98]"
+              >
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">
+                  <Receipt className="size-5" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-sm font-bold text-foreground leading-tight">Payments</div>
+                  <div className="text-[11px] font-medium text-muted-foreground">History &amp; Receipts</div>
+                </div>
+              </Link>
+
+              <Link
+                href="/customer/lucky-plan/lucky-id"
+                className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3.5 shadow-xs transition hover:bg-muted/50 active:scale-[0.98]"
+              >
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                  <Star className="size-5" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-sm font-bold text-foreground leading-tight">My SFEMI ID</div>
+                  <div className="text-[11px] font-medium text-muted-foreground">Benefit status &amp; ID</div>
+                </div>
+              </Link>
+
+              <Link
+                href={ROUTES.customer.deliveries}
+                className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3.5 shadow-xs transition hover:bg-muted/50 active:scale-[0.98]"
+              >
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-teal-100 text-teal-700 dark:bg-teal-950/40 dark:text-teal-300">
+                  <Truck className="size-5" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-sm font-bold text-foreground leading-tight">Deliveries</div>
+                  <div className="text-[11px] font-medium text-muted-foreground">Track shipments</div>
+                </div>
+              </Link>
+
+              <Link
+                href="/customer/invoices"
+                className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3.5 shadow-xs transition hover:bg-muted/50 active:scale-[0.98]"
+              >
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                  <FileText className="size-5" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-sm font-bold text-foreground leading-tight">Invoices</div>
+                  <div className="text-[11px] font-medium text-muted-foreground">Download PDFs</div>
+                </div>
+              </Link>
+
+              <Link
+                href={ROUTES.customer.support}
+                className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3.5 shadow-xs transition hover:bg-muted/50 active:scale-[0.98]"
+              >
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
+                  <HelpCircle className="size-5" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-sm font-bold text-foreground leading-tight">Support</div>
+                  <div className="text-[11px] font-medium text-muted-foreground">Tickets &amp; Help</div>
+                </div>
+              </Link>
+
+              <Link
+                href="/customer/catalog"
+                className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3.5 shadow-xs transition hover:bg-muted/50 active:scale-[0.98]"
+              >
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
+                  <ShoppingBag className="size-5" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-sm font-bold text-foreground leading-tight">Catalog</div>
+                  <div className="text-[11px] font-medium text-muted-foreground">Explore Products</div>
+                </div>
+              </Link>
+            </div>
+          </div>
+
+          {/* ── 5. Due Collection Queue (Upcoming & Overdue) ── */}
+          {dueRows.length > 0 ? (
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-bold text-foreground">
+                  Instalments Due ({dueRows.length})
+                </h2>
+                <Link href="/customer/emis" className="text-xs font-bold text-primary hover:underline">
+                  View all →
+                </Link>
+              </div>
+
+              <div className="space-y-2">
+                {dueRows.map((item) => {
+                  const isOverdue = Boolean(item.is_overdue);
+                  return (
                     <div
                       key={`${item.subscription_id ?? item.id}-${item.emi_id ?? "na"}`}
-                      className="rounded-2xl border border-white/75 bg-white/75 p-4"
+                      className={`rounded-2xl border p-3.5 shadow-xs transition ${
+                        isOverdue
+                          ? "border-red-200 bg-red-50/60 dark:border-red-900/40 dark:bg-red-950/20"
+                          : "border-border bg-card"
+                      }`}
                     >
-                      <div className="text-sm font-semibold text-foreground">
-                        {item.subscription_number || `SUB-${String(item.subscription_id ?? item.id)}`}
-                      </div>
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        {item.product_name || "Linked product"} · Batch {item.batch_code || "—"} · SFEMI ID{" "}
-                        {item.lucky_number != null ? `#${String(item.lucky_number).padStart(2, "0")}` : "—"}
-                      </div>
-                      <div className="mt-2 text-sm text-muted-foreground">
-                        Due {formatDate(item.due_date)} · Pending {money(item.pending_amount)}
-                        {item.is_overdue && item.overdue_days
-                          ? ` · ${item.overdue_days} day(s) overdue`
-                          : ""}
-                      </div>
-                      <div className="mt-3 flex items-center justify-between gap-2 border-t border-slate-100 pt-2.5">
-                        <div className="text-xs font-semibold text-foreground">
-                          Pending: {money(item.pending_amount)}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="text-sm font-bold text-foreground truncate">
+                              {item.product_name || "Contract Item"}
+                            </span>
+                            {isOverdue ? (
+                              <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-red-700 dark:bg-red-900/40 dark:text-red-300">
+                                Overdue {item.overdue_days ? `${item.overdue_days}d` : ""}
+                              </span>
+                            ) : (
+                              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                                Due Soon
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            {item.subscription_number || `SUB-${item.subscription_id ?? item.id}`} · Due {formatDate(item.due_date)}
+                          </div>
                         </div>
+
+                        <div className="text-right shrink-0">
+                          <div className="text-base font-black text-foreground">
+                            {money(item.pending_amount)}
+                          </div>
+                          <div className="text-[11px] text-muted-foreground">Pending</div>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 border-t border-border/60 pt-2.5">
                         <button
                           type="button"
                           onClick={() =>
@@ -884,280 +606,225 @@ export default function CustomerDashboardPage() {
                               subscription_id: item.subscription_id,
                             })
                           }
-                          className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 active:scale-[0.99]"
+                          className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-xs font-bold text-white shadow-xs transition hover:bg-emerald-700 active:scale-[0.98]"
                         >
-                          <Smartphone className="h-3.5 w-3.5" />
-                          <span>Pay via UPI / Autopay</span>
+                          <Smartphone className="size-4" />
+                          <span>Pay {money(item.pending_amount)} via UPI</span>
                         </button>
                       </div>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <ERPEmptyState
-                  title="No due contracts in this window"
-                  description="The selected drilldown window is not currently returning any next-due or overdue rows."
-                />
-              )}
-            </WorkspaceSection>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
 
-            <WorkspaceSection
-              title="Recent payments"
-              description="Recently recorded payments for the selected date range (same source as the payment history page)."
-              action={
-                <>
-                  <ActionButton
-                    href={ROUTES.customer.payments}
-                    variant="secondary"
-                    className="h-9 px-3 text-xs"
+          {/* ── 6. Active Subscriptions Overview ── */}
+          {activeSubs.length > 0 ? (
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-bold text-foreground">My Subscriptions</h2>
+                <Link href={ROUTES.customer.subscriptions} className="text-xs font-bold text-primary hover:underline">
+                  All ({summary.subscription_count ?? activeSubs.length}) →
+                </Link>
+              </div>
+
+              <div className="space-y-2.5">
+                {activeSubs.map((sub) => (
+                  <Link
+                    key={sub.id}
+                    href={`${ROUTES.customer.subscriptions}/${sub.id}`}
+                    className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3.5 shadow-xs transition hover:bg-muted/40 active:scale-[0.98]"
                   >
-                    Open payments
-                  </ActionButton>
-                  <DashboardSurfaceExportActions
-                    query={dashboardQuery}
-                    actions={[
-                      {
-                        surface: "recent-payments",
-                        label: "Export CSV",
-                      },
-                    ]}
-                  />
-                </>
-              }
-            >
-              {paymentRows.length > 0 ? (
-                <div className="grid gap-3">
-                  {paymentRows.map((item) => (
-                    <div
-                      key={item.payment_id}
-                      className="rounded-2xl border border-white/75 bg-white/75 p-4"
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                          <div className="text-sm font-semibold text-foreground">
-                            {item.subscription_number || `Payment #${item.payment_id}`}
-                          </div>
-                          <div className="mt-1 text-xs text-muted-foreground">
-                            {item.method || "—"}
-                            {item.reference_no ? ` · Ref ${item.reference_no}` : ""}
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-sm font-semibold text-foreground">
-                            {money(item.amount)}
-                          </div>
-                          <div className="mt-1 text-xs text-muted-foreground">
-                            {formatDate(item.payment_date)}
-                          </div>
-                        </div>
+                    <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+                      <Package className="size-6 text-primary/70" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-sm font-bold text-foreground truncate">
+                          {sub.product_name || `Contract #${sub.id}`}
+                        </span>
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${planBadgeClass(sub.plan_type)}`}>
+                          {planLabel(sub.plan_type)}
+                        </span>
+                      </div>
+                      <div className="mt-0.5 text-xs text-muted-foreground">
+                        {sub.subscription_number || `SUB-${sub.id}`}
+                      </div>
+                      <div className="mt-1 flex items-center gap-2 text-xs">
+                        <span className="font-bold text-foreground">{money(sub.monthly_amount)}/mo</span>
+                        {sub.outstanding_amount ? (
+                          <span className="text-muted-foreground">· Rem: {money(sub.outstanding_amount)}</span>
+                        ) : null}
                       </div>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <ERPEmptyState
-                  title="No recent payments in this window"
-                  description="No recorded payment rows are visible for the selected drilldown window."
-                />
-              )}
-            </WorkspaceSection>
-          </div>
-
-          <section className="space-y-4">
-            <div>
-              <h2 className="text-lg font-semibold text-foreground">
-                Subscription overview
-              </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Priority contracts are surfaced here with their linked product,
-                current remaining amount, and beneficiary posture.
-              </p>
-            </div>
-
-            {spotlightSubscriptions.length > 0 ? (
-              <div className="grid gap-4 xl:grid-cols-3">
-                {spotlightSubscriptions.map((subscription) => (
-                  <CustomerProductSummaryCard
-                    key={subscription.id}
-                    subscription={subscription}
-                    href={`${ROUTES.customer.subscriptions}/${subscription.id}`}
-                    compact
-                  />
+                    <ChevronRight className="size-5 shrink-0 text-muted-foreground/50" />
+                  </Link>
                 ))}
               </div>
-            ) : (
-              <ERPEmptyState
-                title="No subscriptions yet"
-                description="Once your contracts are active, they will appear here with product and settlement context."
-              />
-            )}
-          </section>
-
-          <section className="space-y-4">
-            <div>
-              <h2 className="text-lg font-semibold text-foreground">Go next</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Open the next customer workflow without leaving this financial overview.
-              </p>
             </div>
+          ) : null}
 
-            <div className="grid gap-4 md:grid-cols-3">
-              {quickLinks.map((item) => (
-                <QuickLinkCard key={item.href} {...item} />
-              ))}
-            </div>
-          </section>
-        </>
-      ) : null}
-
-      {!loading && !error && !legacy ? (
-        <ERPEmptyState
-          title="No customer workspace data"
-          description="Customer dashboard data is not currently available."
-        />
-      ) : null}
-
-      {/* ── Products for future planning — loads independently of main dashboard ── */}
-      {publicProducts.length > 0 ? (
-        <section className="space-y-4">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-semibold text-foreground">Browse products</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Admin-approved catalog — available for EMI, rent, lease, or direct purchase. Start a subscription request anytime.
-              </p>
-            </div>
-            <Link href={ROUTES.customer.subscriptions} className="shrink-0 rounded-xl border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted">
-              My subscriptions →
-            </Link>
-          </div>
-          {/* Category filter */}
-          {(() => {
-            const cats = Array.from(new Set(publicProducts.map(p => p.category).filter(Boolean))) as string[];
-            return cats.length > 1 ? (
-              <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={() => setProductCategoryFilter("")}
-                  className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${!productCategoryFilter ? "border-primary/40 bg-primary/10 text-primary" : "border-border text-muted-foreground hover:text-foreground"}`}>
-                  All
-                </button>
-                {cats.slice(0, 8).map(cat => (
-                  <button key={cat} type="button" onClick={() => setProductCategoryFilter(productCategoryFilter === cat ? "" : cat)}
-                    className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${productCategoryFilter === cat ? "border-primary/40 bg-primary/10 text-primary" : "border-border text-muted-foreground hover:text-foreground"}`}>
-                    {cat}
-                  </button>
-                ))}
+          {/* ── 7. Direct Sale Dues (if any) ── */}
+          {directSaleSummary && Number(directSaleSummary.total_outstanding_direct_sale_dues ?? 0) > 0 ? (
+            <div className="rounded-2xl border border-amber-200/80 bg-amber-50/50 dark:border-amber-900/40 dark:bg-amber-950/20 p-4 shadow-xs">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300">
+                  Direct Sale Balance Due
+                </span>
+                <Link href={ROUTES.customer.directSales} className="text-xs font-bold text-amber-700 hover:underline">
+                  View Sales →
+                </Link>
               </div>
-            ) : null;
-          })()}
-          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
-            {publicProducts
-              .filter(p => !productCategoryFilter || p.category === productCategoryFilter)
-              .slice(0, 8)
-              .map(product => {
-                const imgUrl = resolveApiMediaUrl(product.image ?? null);
-                return (
-                  <div key={product.id} className="group overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition hover:shadow-md">
-                    {imgUrl ? (
-                      <div className="relative h-36 overflow-hidden bg-muted">
-                        <Image src={imgUrl} alt={product.name} fill className="object-cover transition group-hover:scale-105" sizes="(max-width: 768px) 50vw, 25vw" />
+              <div className="mt-1 text-2xl font-black text-foreground">
+                {money(directSaleSummary.total_outstanding_direct_sale_dues)}
+              </div>
+              <div className="mt-0.5 text-xs text-muted-foreground">
+                Total paid: {money(directSaleSummary.total_paid_direct_sale_amount)}
+              </div>
+            </div>
+          ) : null}
+
+          {/* ── 8. Recent Payments ── */}
+          {paymentRows.length > 0 ? (
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-bold text-foreground">Recent Payments</h2>
+                <Link href={ROUTES.customer.payments} className="text-xs font-bold text-primary hover:underline">
+                  See all →
+                </Link>
+              </div>
+
+              <div className="space-y-2">
+                {paymentRows.slice(0, 4).map((p) => (
+                  <div
+                    key={p.payment_id}
+                    className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-card p-3.5 shadow-xs"
+                  >
+                    <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                      <BadgeCheck className="size-5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-bold text-foreground truncate">
+                        {p.subscription_number || `Payment #${p.payment_id}`}
                       </div>
-                    ) : (
-                      <div className="flex h-36 items-center justify-center bg-muted/40">
-                        <Package className="h-10 w-10 text-muted-foreground/40" />
+                      <div className="mt-0.5 text-xs text-muted-foreground">
+                        {p.method || "Online"} {p.reference_no ? `· Ref ${p.reference_no}` : ""}
                       </div>
-                    )}
-                    <div className="p-3">
-                      <div className="truncate text-sm font-semibold text-foreground">{product.name}</div>
-                      <div className="mt-0.5 font-mono text-[10px] text-muted-foreground">{product.product_code}</div>
-                      {product.category ? (
-                        <div className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">
-                          <Tag className="h-3 w-3" /> {product.category}
-                        </div>
-                      ) : null}
-                      <div className="mt-2 text-sm font-bold text-foreground">
-                        ₹{Number(product.base_price).toLocaleString("en-IN")}
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="text-sm font-bold text-emerald-700 dark:text-emerald-300">
+                        {money(p.amount)}
                       </div>
-                      <Link
-                        href={`/customer/catalog/${product.id}`}
-                        className="mt-2 flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
-                      >
-                        View product details <ArrowRight className="h-3 w-3" />
-                      </Link>
+                      <div className="text-[11px] text-muted-foreground">
+                        {formatDate(p.payment_date || p.created_at)}
+                      </div>
                     </div>
                   </div>
-                );
-              })}
-          </div>
-          {publicProducts.filter(p => !productCategoryFilter || p.category === productCategoryFilter).length > 8 ? (
-            <p className="text-xs text-muted-foreground">
-              Showing 8 of {publicProducts.filter(p => !productCategoryFilter || p.category === productCategoryFilter).length} products. Contact support to start a new subscription.
-            </p>
-          ) : null}
-        </section>
-      ) : null}
-        </>
-      }
-      support={
-        !loading && !error && legacy && summary ? (
-          <WorkspaceSection
-            title="Notifications"
-            description="Operational updates for your account (payments, documents, and subscription events)."
-            action={
-              <ActionButton href={ROUTES.customer.notifications} variant="secondary" className="h-9 px-3 text-xs">
-                Notification center
-              </ActionButton>
-            }
-          >
-            <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-              <span>
-                <span className="font-semibold text-foreground">
-                  {notificationSummary?.unread_count ?? 0}
-                </span>{" "}
-                unread
-              </span>
-              <span>
-                <span className="font-semibold text-foreground">
-                  {notificationSummary?.high_priority_count ?? 0}
-                </span>{" "}
-                high priority
-              </span>
-            </div>
-            {(notificationSummary?.latest?.length ?? 0) > 0 ? (
-              <ul className="mt-4 space-y-2 text-sm">
-                {(notificationSummary?.latest ?? []).slice(0, 5).map((n) => (
-                  <li key={n.id} className="rounded-xl border border-border px-3 py-2">
-                    <div className="font-medium text-foreground">{n.title}</div>
-                    <div className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{n.body}</div>
-                    <div className="mt-1 text-[11px] text-muted-foreground">
-                      {formatDate(n.created_at)}
-                      {n.is_read ? "" : " · Unread"}
-                    </div>
-                  </li>
                 ))}
-              </ul>
-            ) : (
-              <p className="mt-4 text-sm text-muted-foreground">No recent notifications.</p>
-            )}
-          </WorkspaceSection>
-        ) : null
-      }
-    />
-    {selectedDuePayItem ? (
-      <UpiPayDialog
-        isOpen={Boolean(selectedDuePayItem)}
-        onClose={() => setSelectedDuePayItem(null)}
-        amount={selectedDuePayItem.pending_amount || selectedDuePayItem.amount || 0}
-        subscriptionNumber={selectedDuePayItem.subscription_number || undefined}
-        productName={selectedDuePayItem.product_name || undefined}
-        dueDate={selectedDuePayItem.due_date ? formatDate(selectedDuePayItem.due_date) : undefined}
-        sourceType="EMI"
-        sourceId={selectedDuePayItem.emi_id || undefined}
-        onPaymentReported={() => {
-          void canonicalQuery.refetch();
-          void overdueQuery.refetch();
-        }}
-      />
-    ) : null}
-  </>
+              </div>
+            </div>
+          ) : null}
+
+          {/* ── 9. Browse Products Catalog Preview ── */}
+          {publicProducts.length > 0 ? (
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-sm font-bold text-foreground">Explore Catalog</h2>
+                  <p className="text-[11px] text-muted-foreground">Available for EMI, Rent, Lease, or Direct Purchase</p>
+                </div>
+                <Link href="/customer/catalog" className="text-xs font-bold text-primary hover:underline">
+                  View catalog →
+                </Link>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2.5">
+                {publicProducts.slice(0, 4).map((product) => {
+                  const imgUrl = resolveApiMediaUrl(product.image ?? null);
+                  return (
+                    <Link
+                      key={product.id}
+                      href={`/customer/catalog/${product.id}`}
+                      className="group overflow-hidden rounded-2xl border border-border bg-card shadow-xs transition hover:shadow-md active:scale-[0.98]"
+                    >
+                      {imgUrl ? (
+                        <div className="relative h-28 w-full overflow-hidden bg-muted">
+                          <Image
+                            src={imgUrl}
+                            alt={product.name}
+                            fill
+                            className="object-cover transition group-hover:scale-105"
+                            sizes="50vw"
+                          />
+                        </div>
+                      ) : (
+                        <div className="flex h-28 items-center justify-center bg-muted/40">
+                          <Package className="size-8 text-muted-foreground/30" />
+                        </div>
+                      )}
+                      <div className="p-3">
+                        <div className="truncate text-xs font-bold text-foreground">{product.name}</div>
+                        <div className="mt-1 text-sm font-black text-foreground">
+                          {money(product.base_price)}
+                        </div>
+                        <div className="mt-1.5 flex items-center gap-1 text-[11px] font-bold text-primary">
+                          <span>Details</span>
+                          <ArrowRight className="size-3" />
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+
+          {/* ── 10. Recent Notifications ── */}
+          {notificationSummary && (notificationSummary.latest?.length ?? 0) > 0 ? (
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-bold text-foreground">Recent Updates</h2>
+                <Link href="/customer/notifications" className="text-xs font-bold text-primary hover:underline">
+                  All ({notificationSummary.unread_count ?? 0} unread) →
+                </Link>
+              </div>
+
+              <div className="space-y-2">
+                {(notificationSummary.latest ?? []).slice(0, 3).map((n) => (
+                  <div key={n.id} className="rounded-2xl border border-border bg-card p-3.5 shadow-xs">
+                    <div className="text-xs font-bold text-foreground">{n.title}</div>
+                    <div className="mt-1 line-clamp-2 text-xs text-muted-foreground leading-relaxed">
+                      {n.body}
+                    </div>
+                    <div className="mt-1.5 text-[10px] font-medium text-muted-foreground">
+                      {formatDate(n.created_at)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </>
+      ) : null}
+
+      {/* ── UPI / Autopay Dialog ── */}
+      {selectedDuePayItem ? (
+        <UpiPayDialog
+          isOpen={Boolean(selectedDuePayItem)}
+          onClose={() => setSelectedDuePayItem(null)}
+          amount={selectedDuePayItem.pending_amount || selectedDuePayItem.amount || 0}
+          subscriptionNumber={selectedDuePayItem.subscription_number || undefined}
+          productName={selectedDuePayItem.product_name || undefined}
+          dueDate={selectedDuePayItem.due_date ? formatDate(selectedDuePayItem.due_date) : undefined}
+          sourceType="EMI"
+          sourceId={selectedDuePayItem.emi_id || undefined}
+          onPaymentReported={() => {
+            void canonicalQuery.refetch();
+            void overdueQuery.refetch();
+          }}
+        />
+      ) : null}
+    </div>
   );
 }

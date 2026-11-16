@@ -81,14 +81,14 @@ function KpiCard({ icon, label, value, sub, href, tone = "default" }: KpiCardPro
   }[tone];
 
   const inner = (
-    <div className={`flex items-start gap-3.5 rounded-2xl border p-4 ${toneClass} transition active:scale-[0.98]`}>
-      <div className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${iconClass}`}>
+    <div className={`flex items-start gap-3 rounded-2xl border p-3.5 ${toneClass} shadow-xs transition active:scale-[0.98]`}>
+      <div className={`flex size-11 shrink-0 items-center justify-center rounded-xl ${iconClass}`}>
         {icon}
       </div>
-      <div className="min-w-0">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
-        <p className={`mt-0.5 text-xl font-bold ${valueClass}`}>{value}</p>
-        {sub ? <p className="mt-0.5 truncate text-xs text-muted-foreground">{sub}</p> : null}
+      <div className="min-w-0 flex-1">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground truncate">{label}</p>
+        <p className={`mt-0.5 text-2xl font-black tracking-tight ${valueClass}`}>{value}</p>
+        {sub ? <p className="mt-0.5 text-xs font-medium text-muted-foreground truncate">{sub}</p> : null}
       </div>
     </div>
   );
@@ -107,20 +107,20 @@ function QuickLink({ href, icon, label, desc, accent }: QuickLinkProps) {
   return (
     <Link
       href={href}
-      className={`flex min-h-16 items-center gap-3.5 rounded-2xl border px-4 py-3.5 transition active:scale-[0.98] ${
+      className={`flex min-h-14 items-center gap-3.5 rounded-2xl border px-4 py-3 shadow-xs transition active:scale-[0.98] ${
         accent
-          ? "border-primary/60 bg-primary text-primary-foreground hover:bg-primary/90"
-          : "border-border bg-card text-foreground hover:bg-muted"
+          ? "border-primary/40 bg-primary text-primary-foreground hover:bg-primary/90"
+          : "border-border bg-card text-foreground hover:bg-muted/60"
       }`}
     >
-      <div className={`flex size-9 shrink-0 items-center justify-center rounded-xl ${accent ? "bg-white/20" : "bg-muted"}`}>
+      <div className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${accent ? "bg-white/20 text-white" : "bg-primary/10 text-primary"}`}>
         {icon}
       </div>
-      <div className="min-w-0">
-        <div className="text-sm font-bold">{label}</div>
-        {desc ? <div className={`text-xs ${accent ? "text-primary-foreground/80" : "text-muted-foreground"}`}>{desc}</div> : null}
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-bold leading-tight">{label}</div>
+        {desc ? <div className={`mt-0.5 text-xs font-medium ${accent ? "text-primary-foreground/90" : "text-muted-foreground"}`}>{desc}</div> : null}
       </div>
-      <ArrowRight className="ml-auto size-4 shrink-0 opacity-60" />
+      <ArrowRight className="size-4 shrink-0 opacity-70" />
     </Link>
   );
 }
@@ -192,25 +192,21 @@ export default function PartnerDashboardPage() {
   }
 
   return (
-    <div className="w-full px-3 py-4 sm:px-4 sm:py-5 lg:px-6 lg:py-6 xl:px-8">
-
+    <div className="w-full px-3.5 py-4 sm:px-5 sm:py-5 max-w-full">
       {/* ── Header ── */}
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <WorkspaceBrandMark size={36} variant="onLight" className="rounded-xl shadow-xs" />
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">{brandConfig.companyName} · Partner Portal</p>
-            <h1 className="text-2xl font-bold text-foreground">Workspace Home</h1>
-          </div>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-foreground">Partner Home</h1>
+          <p className="text-xs font-medium text-muted-foreground">Collections, customers, and earnings overview</p>
         </div>
         <button
           type="button"
           onClick={refetchAll}
           disabled={loading || refreshing}
-          className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-card px-4 text-sm font-semibold text-foreground shadow-sm transition hover:bg-muted disabled:opacity-60"
+          className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl border border-border bg-card text-foreground shadow-xs transition hover:bg-muted active:scale-95 disabled:opacity-60"
+          title="Refresh dashboard"
         >
-          <RefreshCw className={`size-4 ${refreshing ? "animate-spin" : ""}`} />
-          {refreshing ? "Refreshing…" : "Refresh"}
+          <RefreshCw className={`size-4.5 ${refreshing ? "animate-spin" : ""}`} />
         </button>
       </div>
 
@@ -352,11 +348,11 @@ export default function PartnerDashboardPage() {
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="text-sm font-bold text-foreground">{item.customer_name || "Customer"}</span>
                         {overdue ? (
-                          <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold uppercase text-red-700 dark:bg-red-900/40 dark:text-red-300">
+                          <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-red-700 dark:bg-red-900/40 dark:text-red-300">
                             Overdue {item.overdue_days ? `${item.overdue_days}d` : ""}
                           </span>
                         ) : (
-                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                          <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
                             Due soon
                           </span>
                         )}
@@ -364,14 +360,14 @@ export default function PartnerDashboardPage() {
                       <div className="mt-0.5 text-xs text-muted-foreground">
                         {item.subscription_number || `SUB-${subId}`} · Due {fmtDate(item.due_date)}
                       </div>
-                      <div className="mt-1 text-sm font-semibold text-foreground">{money(item.pending_amount)}</div>
+                      <div className="mt-1 text-base font-bold text-foreground">{money(item.pending_amount)}</div>
                     </div>
                     <Link
                       href={`/partner/collections/create?subscription=${subId}`}
-                      className="inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground transition hover:bg-primary/90 active:scale-[0.98]"
+                      className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-primary px-4.5 text-sm font-bold text-primary-foreground shadow-xs transition hover:bg-primary/90 active:scale-[0.98]"
                     >
                       Collect
-                      <ArrowRight className="size-3.5" />
+                      <ArrowRight className="size-4" />
                     </Link>
                   </div>
                 </div>
@@ -401,16 +397,16 @@ export default function PartnerDashboardPage() {
               };
               const s = String(item.status || "SUBMITTED");
               return (
-                <div key={String(item.id)} className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4">
+                <div key={String(item.id)} className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 shadow-xs">
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm font-semibold text-foreground">{item.customer_name || "Customer"}</div>
-                    <div className="text-xs text-muted-foreground">{item.subscription_number || "—"} · {money(item.amount)}</div>
+                    <div className="text-sm font-bold text-foreground">{item.customer_name || "Customer"}</div>
+                    <div className="mt-0.5 text-xs text-muted-foreground">{item.subscription_number || "—"} · <span className="font-semibold text-foreground">{money(item.amount)}</span></div>
                   </div>
                   <div className="flex flex-col items-end gap-1">
-                    <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${statusColors[s] ?? "bg-muted text-muted-foreground"}`}>
+                    <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide ${statusColors[s] ?? "bg-muted text-muted-foreground"}`}>
                       {s === "UNDER_REVIEW" ? "Under Review" : s.charAt(0) + s.slice(1).toLowerCase()}
                     </span>
-                    <span className="text-[10px] text-muted-foreground">{fmtDate(item.payment_date)}</span>
+                    <span className="text-xs text-muted-foreground">{fmtDate(item.payment_date)}</span>
                   </div>
                 </div>
               );

@@ -224,14 +224,78 @@ export default function CustomerLuckyDrawsPage() {
                 description="Promotional benefit events occur monthly for active SFEMI subscriptions."
               />
             ) : (
-              <DataTableShell>
-                <MobileSafeTable>
-                  <DataTable<CustomerLuckyDraw>
-                    columns={drawsColumns}
-                    rows={rows}
-                  />
-                </MobileSafeTable>
-              </DataTableShell>
+              <>
+                {/* Mobile Card View */}
+                <div className="space-y-2.5 md:hidden">
+                  {rows.map((row) => {
+                    const isWon = (row.status === "COMPLETED" && row.winner_status === "VERIFIED");
+                    return (
+                      <div
+                        key={row.id}
+                        className={`rounded-2xl border p-4 shadow-xs transition ${
+                          isWon
+                            ? "border-emerald-200 bg-emerald-50/50 dark:border-emerald-900/40 dark:bg-emerald-950/20"
+                            : "border-border bg-card"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="text-sm font-bold text-foreground">
+                              {row.batch_code ? `Batch ${row.batch_code}` : `Benefit Event #${row.id}`}
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-0.5">
+                              Date: {formatDate(row.draw_date)}
+                            </div>
+                          </div>
+                          <ERPStatusBadge status={drawStatus(row)} />
+                        </div>
+
+                        <div className="mt-3 grid grid-cols-2 gap-2 border-t border-border/60 pt-2.5 text-xs">
+                          <div>
+                            <span className="text-muted-foreground">SFEMI ID</span>
+                            <div className="font-mono font-bold text-foreground mt-0.5">{row.lucky_number ?? "—"}</div>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">EMIs Waived</span>
+                            <div className="font-bold text-foreground mt-0.5">{row.waived_emi_count ?? 0}</div>
+                          </div>
+                          {Number(row.waived_amount ?? 0) > 0 ? (
+                            <div className="col-span-2 rounded-xl bg-emerald-100/70 dark:bg-emerald-950/40 p-2 text-emerald-800 dark:text-emerald-300 font-bold">
+                              Future EMIs Waived: {formatRupee(row.waived_amount)}
+                            </div>
+                          ) : null}
+                        </div>
+
+                        {isWon ? (
+                          <div className="mt-3">
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadCertificate(row.id)}
+                              disabled={downloadingId === row.id}
+                              className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white shadow-xs transition hover:bg-emerald-700 active:scale-[0.98] disabled:opacity-50"
+                            >
+                              <Download className="size-3.5" />
+                              {downloadingId === row.id ? "Downloading..." : "Download Benefit Certificate"}
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Desktop Table View */}
+                <div className="hidden md:block">
+                  <DataTableShell>
+                    <MobileSafeTable>
+                      <DataTable<CustomerLuckyDraw>
+                        columns={drawsColumns}
+                        rows={rows}
+                      />
+                    </MobileSafeTable>
+                  </DataTableShell>
+                </div>
+              </>
             )}
           </div>
         </ERPSectionShell>

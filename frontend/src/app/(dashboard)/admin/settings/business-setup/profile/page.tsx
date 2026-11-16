@@ -105,6 +105,7 @@ type UnifiedProfile = {
 
   // Web Analytics & Local SEO (Public / Brand - No .env Required)
   google_analytics_id: string;
+  meta_pixel_id: string;
   google_search_console_id: string;
   seo_local_area: string;
   meta_title: string;
@@ -132,7 +133,7 @@ const initialForm: UnifiedProfile = {
   website_url: "", whatsapp_link: "", facebook_url: "", instagram_url: "", youtube_url: "", justdial_url: "",
   address_line_1: "", address_line_2: "", landmark: "", city: "", district: "", state: "", postal_code: "", country: "India",
   address_text: "", map_url: "", business_hours: "",
-  google_analytics_id: "", google_search_console_id: "", seo_local_area: "", meta_title: "", meta_description: "", meta_keywords: "",
+  google_analytics_id: "", meta_pixel_id: "", google_search_console_id: "", seo_local_area: "", meta_title: "", meta_description: "", meta_keywords: "",
   default_currency_code: "INR", timezone_name: "Asia/Kolkata",
   is_active: true,
   is_legacy_migration: false,
@@ -418,6 +419,7 @@ export default function UnifiedBusinessProfilePage() {
 
         // Web Analytics & Local SEO
         google_analytics_id: pub?.google_analytics_id || "",
+        meta_pixel_id: pub?.meta_pixel_id || "",
         google_search_console_id: pub?.google_search_console_id || "",
         seo_local_area: pub?.seo_local_area || "",
         meta_title: pub?.meta_title || "",
@@ -507,6 +509,7 @@ export default function UnifiedBusinessProfilePage() {
         business_hours: form.business_hours,
         public_logo_url: form.public_logo_url,
         google_analytics_id: form.google_analytics_id,
+        meta_pixel_id: form.meta_pixel_id,
         google_search_console_id: form.google_search_console_id,
         seo_local_area: form.seo_local_area,
         meta_title: form.meta_title,
@@ -713,6 +716,15 @@ export default function UnifiedBusinessProfilePage() {
                   disabled={loading || saving}
                   placeholder="G-XXXXXXXXXX"
                   hint="Your GA4 Measurement ID (starts with G-). Automatically activates Google Analytics visitor tracking, realtime stats, and bot/crawler filters on all public pages."
+                />
+                <InputField
+                  label="Meta (Facebook) Pixel ID"
+                  name="meta_pixel_id"
+                  value={form.meta_pixel_id as string | undefined}
+                  onChange={handleChange}
+                  disabled={loading || saving}
+                  placeholder="e.g. 123456789012345"
+                  hint="Your Meta / Facebook Pixel ID. Enables Facebook and Instagram ad campaign conversion tracking for leads, product views, and registrations."
                 />
                 <InputField
                   label="Google Search Console Verification Token"

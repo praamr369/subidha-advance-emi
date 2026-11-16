@@ -11,15 +11,21 @@ type WorkspaceBrandMarkProps = {
   /** Edge length in CSS pixels */
   size?: number;
   variant?: "onSidebar" | "onLight";
+  logoSrc?: string;
 };
 
 /**
- * Compact logo tile for dashboard chrome: uses `/brand/logo.png` when available,
+ * Compact logo tile for dashboard chrome: uses `logoSrc` or `/brand/logo.png` when available,
  * otherwise a professional “SF” monogram aligned with Subidha Furniture styling.
  */
-export function WorkspaceBrandMark({ className, size = 32, variant = "onLight" }: WorkspaceBrandMarkProps) {
+export function WorkspaceBrandMark({
+  className,
+  size = 32,
+  variant = "onLight",
+  logoSrc,
+}: WorkspaceBrandMarkProps) {
   const [logoFailed, setLogoFailed] = useState(false);
-  const src = brandConfig.publicLogoSrc;
+  const src = logoSrc || brandConfig.publicLogoSrc;
   const showLogo = Boolean(src) && !logoFailed;
   const dim = `${size}px`;
   const tooltip = `${brandConfig.companyName} — ${brandConfig.systemProductName}`;

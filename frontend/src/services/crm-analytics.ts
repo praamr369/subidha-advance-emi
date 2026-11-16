@@ -23,6 +23,12 @@ export interface FunnelAnalytics {
     direct_sales_created: number;
     total_conversions: number;
     conversion_rate_lead_to_sale: number;
+    traffic_sources?: Array<{ source: string; visits: number }>;
+    lead_sources?: Array<{ source: string; leads: number }>;
+    google_analytics_id?: string | null;
+    is_ga_active?: boolean;
+    meta_pixel_id?: string | null;
+    is_meta_active?: boolean;
   };
   date_range: {
     start: string;
