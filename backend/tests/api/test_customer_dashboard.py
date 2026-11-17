@@ -302,3 +302,132 @@ class CustomerDashboardApiTests(APITestCase):
         self.assertEqual(dashboard_response.data["summary"]["total_paid_amount"], "400.00")
         self.assertEqual(dashboard_response.data["summary"]["remaining_amount"], "600.00")
         self.assertTrue(dashboard_response.data["summary"]["has_payment_adjustments"])
+
+    def test_customer_overdue_and_dashboard_scoping_and_rent_demand(self):
+        from billing.models import DirectSale
+        from payments.models import RentLeaseBillingDemand, RentLeaseDemandType, RentLeaseDemandStatus
+        from contracts.models import ContractItem
+        from subscriptions.enums import PlanType
+        from tests.helpers import ensure_document_numbering_profile_for_date
+        from accounting.services.document_sequence_service import DocumentType
+
+        other_user = create_customer_user(
+            username="other_customer_user",
+            phone="7999999999",
+            email="other@example.com",
+        )
+        other_customer = create_customer_profile(
+            user=other_user,
+            name="Other Customer",
+            phone="7999999999",
+        )
+
+        ds_series = ensure_document_numbering_profile_for_date(
+            DocumentType.DIRECT_SALE, self.today, performed_by=self.admin
+        )
+
+        # Other customer's overdue direct sale
+        DirectSale.objects.create(
+            sale_no="SALE/TEST/00099",
+            sale_date=self.today - timedelta(days=10),
+            financial_year=ds_series.financial_year,
+            doc_series=ds_series,
+            customer=other_customer,
+            status="DELIVERED",
+            grand_total=Decimal("8000.00"),
+            received_total=Decimal("0.00"),
+            balance_total=Decimal("8000.00"),
+        )
+
+        from subscriptions.models import Subscription, SubscriptionStatus
+
+        # Self customer's rent contract with a bundle of 2 items
+        self.product.is_rent_enabled = True
+        self.product.save(update_fields=["is_rent_enabled"])
+
+        rent_sub = Subscription.objects.create(
+            subscription_number="RENT-2026-TEST",
+            customer=self.customer,
+            product=self.product,
+            plan_type=PlanType.RENT,
+            status=SubscriptionStatus.ACTIVE,
+            start_date=self.today - timedelta(days=20),
+            monthly_amount=Decimal("1500.00"),
+            total_amount=Decimal("18000.00"),
+            tenure_months=12,
+        )
+        product_item_2 = create_product(
+            name="Add-on Mattress",
+            product_code="ADDON-MAT-01",
+            base_price=Decimal("5000.00"),
+        )
+        product_item_2.is_rent_enabled = True
+        product_item_2.save(update_fields=["is_rent_enabled"])
+        ContractItem.objects.create(
+            subscription=rent_sub,
+            product=self.product,
+            quantity=1,
+            unit_base_price=Decimal("13000.00"),
+            total_base_price=Decimal("13000.00"),
+            monthly_yield_percent=Decimal("5.00"),
+            monthly_amount=Decimal("1000.00"),
+            security_deposit_percent=Decimal("20.00"),
+            security_deposit_amount=Decimal("2000.00"),
+        )
+        ContractItem.objects.create(
+            subscription=rent_sub,
+            product=product_item_2,
+            quantity=1,
+            unit_base_price=Decimal("5000.00"),
+            total_base_price=Decimal("5000.00"),
+            monthly_yield_percent=Decimal("5.00"),
+            monthly_amount=Decimal("500.00"),
+            security_deposit_percent=Decimal("20.00"),
+            security_deposit_amount=Decimal("1000.00"),
+        )
+
+        # Rent monthly demand that is overdue
+        RentLeaseBillingDemand.objects.create(
+            subscription=rent_sub,
+            demand_type=RentLeaseDemandType.RENT_MONTHLY,
+            status=RentLeaseDemandStatus.PENDING,
+            billing_period_start=self.today - timedelta(days=20),
+            billing_period_end=self.today + timedelta(days=10),
+            due_date=self.today - timedelta(days=5),
+            amount=Decimal("1500.00"),
+            collected_amount=Decimal("0.00"),
+            reference_key=f"RLD-TEST-{rent_sub.id}-1",
+        )
+
+        self.client.force_authenticate(user=self.customer_user)
+
+        # 1. Check overdue surface
+        overdue_res = self.client.get("/api/v1/dashboards/surfaces/overdue/")
+        self.assertEqual(overdue_res.status_code, status.HTTP_200_OK)
+        overdue_items = overdue_res.data.get("results", [])
+
+        # Check NO data leak of other customer's direct sale
+        direct_sale_numbers = [item.get("subscription_number") for item in overdue_items]
+        self.assertNotIn("SALE/TEST/00099", direct_sale_numbers)
+
+        # Check rent demand is present in overdue items
+        rent_demand_items = [item for item in overdue_items if item.get("source_type") == "RENT_DEMAND"]
+        self.assertTrue(len(rent_demand_items) >= 1)
+        self.assertEqual(rent_demand_items[0]["pending_amount"], "1500.00")
+        self.assertTrue(rent_demand_items[0]["is_overdue"])
+
+        # 2. Check customer dashboard
+        dash_res = self.client.get("/api/v1/customer/dashboard/")
+        self.assertEqual(dash_res.status_code, status.HTTP_200_OK)
+        summary = dash_res.data["summary"]
+        self.assertTrue(summary["pending_emis"] >= 1)
+        self.assertTrue(summary["overdue_emis"] >= 1)
+        self.assertEqual(summary["next_due_amount"], "1500.00")
+
+        # 3. Check customer subscriptions list shows bundle properties
+        subs = dash_res.data.get("subscriptions", [])
+        rent_sub_res = next((s for s in subs if s["id"] == rent_sub.id), None)
+        self.assertIsNotNone(rent_sub_res)
+        self.assertTrue(rent_sub_res["is_bundle"])
+        self.assertEqual(rent_sub_res["bundle_items_count"], 2)
+        self.assertEqual(rent_sub_res["emi_count"], 12)

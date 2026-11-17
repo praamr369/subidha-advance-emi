@@ -103,6 +103,8 @@ export type CustomerSubscription = {
   product_code?: string | null;
   product_image?: string | null;
   product_base_price?: number | string;
+  is_bundle?: boolean;
+  bundle_items_count?: number;
   batch_code?: string | null;
   lucky_number?: number | null;
   emi_count?: number;
@@ -558,6 +560,14 @@ export function normalizeCustomerSubscription(item: unknown): CustomerSubscripti
     product_name: toStringOrUndefined(row.product_name),
     product_code: toStringOrUndefined(row.product_code) ?? null,
     product_image: resolveApiMediaUrl(toStringOrUndefined(row.product_image) ?? null),
+    is_bundle: Boolean(
+      row.is_bundle ||
+      (Array.isArray(row.contract_items) && row.contract_items.length > 1)
+    ),
+    bundle_items_count:
+      row.bundle_items_count !== null && row.bundle_items_count !== undefined
+        ? toNumber(row.bundle_items_count)
+        : (Array.isArray(row.contract_items) && row.contract_items.length > 1 ? row.contract_items.length : undefined),
     batch_code: toStringOrUndefined(row.batch_code) ?? null,
     lucky_number:
       row.lucky_number === null || row.lucky_number === undefined

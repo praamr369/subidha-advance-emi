@@ -86,6 +86,7 @@ export function normalizeDashboardSummary(
       row.next_due_lucky_number === null || row.next_due_lucky_number === undefined
         ? null
         : toNumber(row.next_due_lucky_number),
+    next_due_source_type: toStringOrNull(row.next_due_source_type),
     has_payment_adjustments: toBoolean(row.has_payment_adjustments, false),
   };
 }

@@ -1600,7 +1600,7 @@ class CustomerDirectSaleListSerializer(serializers.ModelSerializer):
         return request.build_absolute_uri(f"/customer/direct-sales/{obj.id}")
 
     def get_invoice_pdf_url(self, obj):
-        invoice = getattr(obj, "_customer_invoice", None)
+        invoice = getattr(obj, "_customer_invoice", None) or obj.billing_invoices.order_by("-id").first()
         if invoice is None:
             return None
         request = self.context.get("request")
@@ -1678,28 +1678,59 @@ class CustomerDirectSaleDetailSerializer(serializers.ModelSerializer):
         return "PENDING"
 
     def get_customer_snapshot(self, obj):
+        customer = getattr(obj, "customer", None)
         return {
-            "name": (obj.customer_name_snapshot or "").strip(),
-            "phone": (obj.customer_phone_snapshot or "").strip(),
-            "email": (obj.customer_snapshot_email or "").strip(),
-            "billing_address_line1": (obj.customer_snapshot_billing_address_line1 or "").strip(),
+            "name": (obj.customer_name_snapshot or "").strip() or getattr(customer, "name", ""),
+            "phone": (obj.customer_phone_snapshot or "").strip() or getattr(customer, "phone", ""),
+            "email": (obj.customer_snapshot_email or "").strip() or getattr(getattr(customer, "user", None), "email", ""),
+            "billing_address_line1": (obj.customer_snapshot_billing_address_line1 or "").strip() or getattr(customer, "address", ""),
             "billing_address_line2": (obj.customer_snapshot_billing_address_line2 or "").strip(),
-            "city": (obj.customer_snapshot_city or "").strip(),
+            "city": (obj.customer_snapshot_city or "").strip() or getattr(customer, "city", ""),
             "district": (obj.customer_snapshot_district or "").strip(),
-            "state": (obj.customer_snapshot_state or "").strip(),
-            "pincode": (obj.customer_snapshot_pincode or "").strip(),
+            "state": (obj.customer_snapshot_state or "").strip() or getattr(customer, "state", ""),
+            "pincode": (obj.customer_snapshot_pincode or "").strip() or getattr(customer, "pincode", ""),
+            "address": (obj.customer_snapshot_billing_address_line1 or "").strip() or getattr(customer, "address", ""),
         }
 
     def get_delivery_snapshot(self, obj):
         if not obj.delivery_required:
             return None
+        customer = getattr(obj, "customer", None)
+        addr1 = (
+            (obj.delivery_snapshot_address_line1 or "").strip()
+            or (obj.customer_snapshot_billing_address_line1 or "").strip()
+            or (getattr(customer, "address", "") or "").strip()
+        )
+        addr2 = (
+            (obj.delivery_snapshot_address_line2 or "").strip()
+            or (obj.customer_snapshot_billing_address_line2 or "").strip()
+        )
+        city = (
+            (obj.delivery_snapshot_city or "").strip()
+            or (obj.customer_snapshot_city or "").strip()
+            or (getattr(customer, "city", "") or "").strip()
+        )
+        district = (
+            (obj.delivery_snapshot_district or "").strip()
+            or (obj.customer_snapshot_district or "").strip()
+        )
+        state = (
+            (obj.delivery_snapshot_state or "").strip()
+            or (obj.customer_snapshot_state or "").strip()
+            or (getattr(customer, "state", "") or "").strip()
+        )
+        pincode = (
+            (obj.delivery_snapshot_pincode or "").strip()
+            or (obj.customer_snapshot_pincode or "").strip()
+            or (getattr(customer, "pincode", "") or "").strip()
+        )
         return {
-            "address_line1": (obj.delivery_snapshot_address_line1 or "").strip(),
-            "address_line2": (obj.delivery_snapshot_address_line2 or "").strip(),
-            "city": (obj.delivery_snapshot_city or "").strip(),
-            "district": (obj.delivery_snapshot_district or "").strip(),
-            "state": (obj.delivery_snapshot_state or "").strip(),
-            "pincode": (obj.delivery_snapshot_pincode or "").strip(),
+            "address_line1": addr1,
+            "address_line2": addr2,
+            "city": city,
+            "district": district,
+            "state": state,
+            "pincode": pincode,
             "delivery_reference": (obj.delivery_reference or "").strip(),
         }
 
@@ -1714,7 +1745,7 @@ class CustomerDirectSaleDetailSerializer(serializers.ModelSerializer):
         return serializer.data
 
     def get_invoice_pdf_url(self, obj):
-        invoice = getattr(obj, "_customer_invoice", None)
+        invoice = getattr(obj, "_customer_invoice", None) or obj.billing_invoices.order_by("-id").first()
         if invoice is None:
             return None
         request = self.context.get("request")

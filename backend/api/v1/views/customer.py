@@ -359,12 +359,97 @@ class CustomerDeliveryListView(APIView):
                 queryset = queryset.none()
 
         serializer = CustomerSubscriptionDeliveryReadSerializer(queryset[:100], many=True)
+        results = list(serializer.data)
+        summary = build_delivery_report_summary(queryset)
+
+        if not subscription_filter:
+            from billing.models import DirectSale
+            ds_qs = (
+                DirectSale.objects.filter(customer=customer, delivery_required=True)
+                .prefetch_related("lines__product")
+                .order_by("-sale_date", "-id")
+            )
+            for ds in ds_qs:
+                ds_status = (
+                    "DELIVERED"
+                    if ds.status in ("DELIVERED", "INVOICED")
+                    else ("CANCELLED" if "CANCELLED" in ds.status else "PENDING")
+                )
+                summary["total"] = (summary.get("total") or 0) + 1
+                if ds_status == "DELIVERED":
+                    summary["delivered"] = (summary.get("delivered") or 0) + 1
+                elif ds_status == "PENDING":
+                    summary["pending"] = (summary.get("pending") or 0) + 1
+                elif ds_status == "CANCELLED":
+                    summary["cancelled"] = (summary.get("cancelled") or 0) + 1
+
+                if status_filter and status_filter != ds_status:
+                    continue
+
+                addr_parts = [
+                    ds.delivery_snapshot_address_line1 or customer.address or "",
+                    ds.delivery_snapshot_address_line2 or "",
+                    ds.delivery_snapshot_city or customer.city or "",
+                    ds.delivery_snapshot_state or customer.state or "",
+                    ds.delivery_snapshot_pincode or customer.pincode or "",
+                ]
+                full_address = ", ".join(p for p in addr_parts if p)
+
+                first_line = ds.lines.first()
+                prod_name = (
+                    first_line.product.name
+                    if (first_line and first_line.product)
+                    else (first_line.description if first_line else "Direct Sale Products")
+                )
+                if ds.lines.count() > 1:
+                    prod_name += f" (+{ds.lines.count() - 1} more items)"
+
+                results.append({
+                    "id": 100000 + ds.id,
+                    "subscription": None,
+                    "subscription_id": None,
+                    "subscription_number": ds.sale_no,
+                    "customer_id": customer.id,
+                    "customer_name": ds.customer_name_snapshot or customer.name,
+                    "customer_phone": ds.customer_phone_snapshot or customer.phone,
+                    "product_id": first_line.product_id if (first_line and first_line.product_id) else None,
+                    "product_name": prod_name,
+                    "product_code": first_line.product.sku if (first_line and first_line.product) else "",
+                    "batch_id": None,
+                    "batch_code": None,
+                    "lucky_id": None,
+                    "lucky_number": None,
+                    "status": ds_status,
+                    "delivery_reference": ds.delivery_reference or ds.sale_no,
+                    "scheduled_date": ds.sale_date.isoformat() if ds.sale_date else None,
+                    "dispatched_at": None,
+                    "out_for_delivery_at": None,
+                    "delivered_at": ds.delivered_at.isoformat() if ds.delivered_at else (ds.created_at.isoformat() if ds_status == "DELIVERED" else None),
+                    "failed_at": None,
+                    "cancelled_at": None,
+                    "return_requested_at": None,
+                    "returned_at": None,
+                    "receiver_name": ds.customer_name_snapshot or customer.name,
+                    "receiver_phone": ds.customer_phone_snapshot or customer.phone,
+                    "delivery_address_snapshot": full_address,
+                    "notes": f"Direct Sale #{ds.sale_no}",
+                    "failure_reason": "",
+                    "created_at": ds.created_at.isoformat(),
+                    "updated_at": ds.updated_at.isoformat(),
+                    "fulfillment_status": ds_status,
+                    "is_terminal": ds_status in ("DELIVERED", "CANCELLED"),
+                    "is_active_delivery": ds_status not in ("DELIVERED", "CANCELLED"),
+                    "inventory_stock_status": "FULFILLED" if ds_status == "DELIVERED" else "PENDING",
+                    "inventory_available_qty": None,
+                    "is_direct_sale": True,
+                    "direct_sale_id": ds.id,
+                })
 
         return Response(
             {
-                "count": queryset.count(),
-                "summary": build_delivery_report_summary(queryset),
-                "results": serializer.data,
+                "count": len(results),
+                "summary": summary,
+                "results": results,
             }
         )
 
@@ -376,6 +461,81 @@ class CustomerDeliveryDetailView(APIView):
         customer, error_response = _get_customer_or_404_response(request)
         if error_response is not None:
             return error_response
+
+        if pk >= 100000:
+            from billing.models import DirectSale
+            ds = (
+                DirectSale.objects.filter(customer=customer, id=pk - 100000)
+                .prefetch_related("lines__product")
+                .first()
+            )
+            if ds is None:
+                return Response(
+                    {"error": "delivery not found"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            ds_status = (
+                "DELIVERED"
+                if ds.status in ("DELIVERED", "INVOICED")
+                else ("CANCELLED" if "CANCELLED" in ds.status else "PENDING")
+            )
+            addr_parts = [
+                ds.delivery_snapshot_address_line1 or customer.address or "",
+                ds.delivery_snapshot_address_line2 or "",
+                ds.delivery_snapshot_city or customer.city or "",
+                ds.delivery_snapshot_state or customer.state or "",
+                ds.delivery_snapshot_pincode or customer.pincode or "",
+            ]
+            full_address = ", ".join(p for p in addr_parts if p)
+            first_line = ds.lines.first()
+            prod_name = (
+                first_line.product.name
+                if (first_line and first_line.product)
+                else (first_line.description if first_line else "Direct Sale Products")
+            )
+            if ds.lines.count() > 1:
+                prod_name += f" (+{ds.lines.count() - 1} more items)"
+
+            return Response({
+                "id": pk,
+                "subscription": None,
+                "subscription_id": None,
+                "subscription_number": ds.sale_no,
+                "customer_id": customer.id,
+                "customer_name": ds.customer_name_snapshot or customer.name,
+                "customer_phone": ds.customer_phone_snapshot or customer.phone,
+                "product_id": first_line.product_id if (first_line and first_line.product_id) else None,
+                "product_name": prod_name,
+                "product_code": first_line.product.sku if (first_line and first_line.product) else "",
+                "batch_id": None,
+                "batch_code": None,
+                "lucky_id": None,
+                "lucky_number": None,
+                "status": ds_status,
+                "delivery_reference": ds.delivery_reference or ds.sale_no,
+                "scheduled_date": ds.sale_date.isoformat() if ds.sale_date else None,
+                "dispatched_at": None,
+                "out_for_delivery_at": None,
+                "delivered_at": ds.delivered_at.isoformat() if ds.delivered_at else (ds.created_at.isoformat() if ds_status == "DELIVERED" else None),
+                "failed_at": None,
+                "cancelled_at": None,
+                "return_requested_at": None,
+                "returned_at": None,
+                "receiver_name": ds.customer_name_snapshot or customer.name,
+                "receiver_phone": ds.customer_phone_snapshot or customer.phone,
+                "delivery_address_snapshot": full_address,
+                "notes": f"Direct Sale #{ds.sale_no}",
+                "failure_reason": "",
+                "created_at": ds.created_at.isoformat(),
+                "updated_at": ds.updated_at.isoformat(),
+                "fulfillment_status": ds_status,
+                "is_terminal": ds_status in ("DELIVERED", "CANCELLED"),
+                "is_active_delivery": ds_status not in ("DELIVERED", "CANCELLED"),
+                "inventory_stock_status": "FULFILLED" if ds_status == "DELIVERED" else "PENDING",
+                "inventory_available_qty": None,
+                "is_direct_sale": True,
+                "direct_sale_id": ds.id,
+            })
 
         delivery = _customer_delivery_queryset(customer).filter(pk=pk).first()
         if delivery is None:
@@ -394,6 +554,21 @@ class CustomerDeliveryPdfView(APIView):
         customer, error_response = _get_customer_or_404_response(request)
         if error_response is not None:
             return error_response
+
+        if pk >= 100000:
+            from billing.models import DirectSale, BillingInvoice
+            from contracts.services.document_pdf_service import render_invoice_pdf
+            ds = DirectSale.objects.filter(customer=customer, id=pk - 100000).first()
+            if ds is None:
+                return Response({"detail": "Delivery not found."}, status=status.HTTP_404_NOT_FOUND)
+            inv = BillingInvoice.objects.filter(direct_sale=ds).order_by("-id").first()
+            if inv:
+                pdf_bytes = render_invoice_pdf(invoice=inv)
+                response = HttpResponse(pdf_bytes, content_type="application/pdf")
+                response["Content-Disposition"] = f'attachment; filename="delivery-invoice-{ds.sale_no}.pdf"'
+                return response
+            return Response({"detail": "Delivery invoice not ready."}, status=status.HTTP_400_BAD_REQUEST)
+
         delivery = _customer_delivery_queryset(customer).filter(pk=pk).first()
         if delivery is None:
             return Response({"detail": "Delivery not found."}, status=status.HTTP_404_NOT_FOUND)

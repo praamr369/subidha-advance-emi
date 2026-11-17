@@ -54,6 +54,7 @@ function planLabel(planType: string) {
 function ContractCard({ sub }: { sub: CustomerSubscription }) {
   const [openingPdf, setOpeningPdf] = useState(false);
   const pt = (sub.plan_type ?? "").toUpperCase();
+  const isRentLease = pt === "RENT" || pt === "LEASE";
   const isWinner =
     (sub.status || "").toUpperCase() === "WON" ||
     (sub.winner_month !== null && sub.winner_month !== undefined);
@@ -61,9 +62,15 @@ function ContractCard({ sub }: { sub: CustomerSubscription }) {
     pt === "RENT" ||
     pt === "LEASE" ||
     Number(sub.security_deposit_amount || 0) > 0;
-  const emiTotalCount = sub.emi_count ?? sub.tenure_months ?? null;
+  const emiTotalCount =
+    sub.emi_count && Number(sub.emi_count) > 0
+      ? Number(sub.emi_count)
+      : (sub.tenure_months ? Number(sub.tenure_months) : null);
   const paidCount = sub.paid_emi_count ?? 0;
-  const pendingCount = sub.pending_emi_count ?? (emiTotalCount ? Math.max(emiTotalCount - paidCount, 0) : null);
+  const pendingCount =
+    sub.pending_emi_count !== undefined && sub.pending_emi_count !== null
+      ? Number(sub.pending_emi_count)
+      : (emiTotalCount !== null ? Math.max(emiTotalCount - paidCount, 0) : null);
   const securityDepositTotal = Number(sub.security_deposit_amount ?? 0);
   const securityDepositPaid = Number(sub.security_deposit_paid ?? 0);
   const securityDepositRemaining = Math.max(
@@ -79,6 +86,11 @@ function ContractCard({ sub }: { sub: CustomerSubscription }) {
             <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${planBadgeClass(sub.plan_type ?? "")}`}>
               {planLabel(sub.plan_type ?? "")}
             </span>
+            {sub.is_bundle || (sub.contract_items && sub.contract_items.length > 1) ? (
+              <span className="rounded-full bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300 px-2 py-0.5 text-[10px] font-bold">
+                📦 Bundle ({sub.contract_items?.length || sub.bundle_items_count || 2} items)
+              </span>
+            ) : null}
             {sub.has_customer_signature ? (
               <span className="rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-[10px] font-bold">
                 ✓ Signed
@@ -119,6 +131,27 @@ function ContractCard({ sub }: { sub: CustomerSubscription }) {
           {sub.subscription_number ? (
             <div className="font-mono text-xs text-muted-foreground mt-0.5">{sub.subscription_number}</div>
           ) : null}
+
+          {sub.contract_items && sub.contract_items.length > 1 ? (
+            <div className="mt-2.5 rounded-xl border border-border/70 bg-muted/30 p-2 text-xs">
+              <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">
+                <span>Bundle Contents ({sub.contract_items.length} items)</span>
+                <span className="text-primary font-semibold">Multi-Product Package</span>
+              </div>
+              <div className="divide-y divide-border/50">
+                {sub.contract_items.map((item, idx) => (
+                  <div key={item.id || idx} className="py-1 flex items-center justify-between gap-1 text-[11px]">
+                    <span className="font-medium text-foreground truncate">
+                      {idx + 1}. {(item.product_name || "").replace(/\s*\([^)]+:[^)]+\)\s*$/i, "").trim()} × {item.quantity}
+                    </span>
+                    {item.monthly_amount ? (
+                      <span className="font-semibold text-primary shrink-0">{formatRupee(item.monthly_amount)}/mo</span>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
         <ERPStatusBadge status={sub.status ?? "—"} />
       </div>
@@ -137,7 +170,7 @@ function ContractCard({ sub }: { sub: CustomerSubscription }) {
           <div className="font-semibold mt-0.5">{sub.tenure_months ? `${sub.tenure_months} Months` : "—"}</div>
         </div>
         <div>
-          <span className="text-muted-foreground">EMI Progress</span>
+          <span className="text-muted-foreground">{isRentLease ? "Rent Progress" : "EMI Progress"}</span>
           <div className="font-semibold mt-0.5">
             {paidCount} of {emiTotalCount ?? "—"} Paid
             {pendingCount !== null && pendingCount > 0 ? (

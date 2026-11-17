@@ -4,6 +4,7 @@ from datetime import date
 from decimal import Decimal
 
 from django.db.models import Prefetch
+from django.utils import timezone
 
 from subscriptions.models import (
     Emi,
@@ -18,7 +19,7 @@ from subscriptions.models import (
     SubscriptionDocument,
     q2,
 )
-from subscriptions.enums import PRE_ACTIVATION_SUBSCRIPTION_STATUSES
+from subscriptions.enums import PlanType, PRE_ACTIVATION_SUBSCRIPTION_STATUSES
 from deliveries.services.delivery_service import get_subscription_delivery_prefetch
 from contracts.services.subscription_status_service import (
     resolve_expected_subscription_status,
@@ -429,7 +430,7 @@ def _pending_emi_sort_key(row: dict) -> tuple[date, int, int]:
     )
 
 
-def build_customer_dashboard_summary(subscriptions) -> dict[str, object]:
+def build_customer_dashboard_summary(subscriptions, customer=None) -> dict[str, object]:
     subscription_rows = list(subscriptions)
 
     total_paid_amount = MONEY_ZERO
@@ -452,6 +453,7 @@ def build_customer_dashboard_summary(subscriptions) -> dict[str, object]:
 
     next_due_subscription = None
     next_due_emi = None
+    next_due_direct_sale = None
 
     for subscription in subscription_rows:
         snapshot = attach_subscription_financial_snapshot(subscription)
@@ -483,7 +485,9 @@ def build_customer_dashboard_summary(subscriptions) -> dict[str, object]:
             has_payment_adjustments = True
 
         if subscription.status not in PRE_ACTIVATION_SUBSCRIPTION_STATUSES:
+            has_emis = False
             for emi_row in snapshot.get("emis") or []:
+                has_emis = True
                 if emi_row.get("derived_status") != EmiStatus.PENDING:
                     continue
 
@@ -501,6 +505,100 @@ def build_customer_dashboard_summary(subscriptions) -> dict[str, object]:
                 ):
                     next_due_emi = emi_row
                     next_due_subscription = subscription
+
+            # Rent / Lease plans track dues via RentLeaseBillingDemand
+            if not has_emis and getattr(subscription, "plan_type", None) in (PlanType.RENT, PlanType.LEASE):
+                today = timezone.localdate()
+                demands = _related_rows(subscription, "rent_lease_demands", ("due_date", "id"))
+                for demand in demands:
+                    if demand.status in ("CANCELLED", "WAIVED", "PAID"):
+                        continue
+                    unpaid_balance = q2(max(_decimal(demand.amount) - _decimal(demand.collected_amount), MONEY_ZERO))
+                    if unpaid_balance <= MONEY_ZERO:
+                        continue
+
+                    is_overdue = bool(demand.due_date and demand.due_date < today)
+                    if is_overdue:
+                        overdue_emis += 1
+                        total_overdue_amount = q2(total_overdue_amount + unpaid_balance)
+                    else:
+                        upcoming_emis += 1
+                        total_upcoming_amount = q2(total_upcoming_amount + unpaid_balance)
+
+                    pending_emis += 1
+
+                    demand_row = {
+                        "id": demand.id,
+                        "due_date": demand.due_date.isoformat() if demand.due_date else None,
+                        "balance_amount": unpaid_balance,
+                        "month_no": 0 if demand.demand_type == "SECURITY_DEPOSIT" else 1,
+                        "is_overdue": is_overdue,
+                        "demand_type": demand.demand_type,
+                    }
+                    if next_due_emi is None or _pending_emi_sort_key(demand_row) < _pending_emi_sort_key(
+                        next_due_emi
+                    ):
+                        next_due_emi = demand_row
+                        next_due_subscription = subscription
+
+    target_customer = customer or (
+        subscription_rows[0].customer
+        if subscription_rows and getattr(subscription_rows[0], "customer_id", None)
+        else None
+    )
+
+    if target_customer is not None:
+        from billing.models import DirectSale
+        cancelled_sale_statuses = [
+            "CANCELLED",
+            "CANCELLED_PRE_INVOICE",
+            "CANCELLED_AFTER_DELIVERY",
+            "REVERSED_POST_INVOICE",
+            "RETURNED",
+            "ARCHIVED",
+            "EXCHANGED_CLOSED",
+        ]
+        direct_sales = (
+            DirectSale.objects.filter(customer=target_customer, balance_total__gt=0)
+            .exclude(status__in=cancelled_sale_statuses)
+            .prefetch_related("lines__product")
+        )
+        today = timezone.localdate()
+        for ds in direct_sales:
+            balance = q2(_decimal(ds.balance_total))
+            if balance <= MONEY_ZERO:
+                continue
+            total_pending_amount = q2(total_pending_amount + balance)
+            total_remaining_amount = q2(total_remaining_amount + balance)
+            pending_emis += 1
+
+            is_overdue = bool(ds.sale_date and ds.sale_date < today)
+            if is_overdue:
+                overdue_emis += 1
+                total_overdue_amount = q2(total_overdue_amount + balance)
+            else:
+                upcoming_emis += 1
+                total_upcoming_amount = q2(total_upcoming_amount + balance)
+
+            line_items = [l.description for l in ds.lines.all()[:2] if l.description]
+            line_desc = ", ".join(line_items) if line_items else "Direct Sale Items"
+            ds_row = {
+                "id": f"ds-{ds.id}",
+                "due_date": ds.sale_date.isoformat() if ds.sale_date else None,
+                "balance_amount": balance,
+                "month_no": 1,
+                "is_overdue": is_overdue,
+                "is_direct_sale": True,
+                "direct_sale_id": ds.id,
+                "sale_no": ds.sale_no,
+                "product_name": line_desc,
+            }
+            if next_due_emi is None or _pending_emi_sort_key(ds_row) < _pending_emi_sort_key(
+                next_due_emi
+            ):
+                next_due_emi = ds_row
+                next_due_subscription = None
+                next_due_direct_sale = ds
 
     next_due_amount = _money(
         _decimal(next_due_emi.get("balance_amount")) if next_due_emi else MONEY_ZERO
@@ -526,14 +624,27 @@ def build_customer_dashboard_summary(subscriptions) -> dict[str, object]:
         "next_due_amount": next_due_amount if next_due_emi else None,
         "next_due_date": next_due_emi.get("due_date") if next_due_emi else None,
         "next_due_is_overdue": bool(next_due_emi.get("is_overdue")) if next_due_emi else False,
-        "next_due_subscription_id": getattr(next_due_subscription, "id", None),
+        "next_due_subscription_id": (
+            getattr(next_due_subscription, "id", None)
+            if next_due_subscription is not None
+            else getattr(next_due_direct_sale, "id", None) if next_due_direct_sale else None
+        ),
         "next_due_subscription_number": (
-            f"SUB-{next_due_subscription.id}" if next_due_subscription else None
+            f"SUB-{next_due_subscription.id}"
+            if next_due_subscription
+            else (next_due_direct_sale.sale_no if next_due_direct_sale else None)
         ),
         "next_due_product_name": (
             getattr(next_due_subscription.product, "name", None)
             if next_due_subscription is not None
-            else None
+            else (
+                next_due_emi.get("product_name")
+                if next_due_direct_sale
+                else None
+            )
+        ),
+        "next_due_source_type": (
+            "DIRECT_SALE" if next_due_direct_sale else "SUBSCRIPTION"
         ),
         "next_due_lucky_number": (
             getattr(next_due_subscription.lucky_id, "lucky_number", None)

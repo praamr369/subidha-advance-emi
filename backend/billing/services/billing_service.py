@@ -481,6 +481,8 @@ def _build_direct_sale_snapshots(
 ):
     customer_address = (getattr(customer, "address", "") or "").strip() if customer is not None else ""
     customer_city = (getattr(customer, "city", "") or "").strip() if customer is not None else ""
+    customer_state = (getattr(customer, "state", "") or "").strip() if customer is not None else ""
+    customer_pincode = (getattr(customer, "pincode", "") or "").strip() if customer is not None else ""
     customer_email = (getattr(getattr(customer, "user", None), "email", "") or "").strip()
     return {
         "customer_name_snapshot": (
@@ -498,20 +500,20 @@ def _build_direct_sale_snapshots(
         "customer_snapshot_billing_address_line2": (customer_snapshot_billing_address_line2 or "").strip(),
         "customer_snapshot_city": (customer_snapshot_city or "").strip() or customer_city,
         "customer_snapshot_district": (customer_snapshot_district or "").strip(),
-        "customer_snapshot_state": (customer_snapshot_state or "").strip(),
-        "customer_snapshot_pincode": (customer_snapshot_pincode or "").strip(),
+        "customer_snapshot_state": (customer_snapshot_state or "").strip() or customer_state,
+        "customer_snapshot_pincode": (customer_snapshot_pincode or "").strip() or customer_pincode,
         "customer_gstin": (
             (customer_gstin or "").strip().upper()
             or (getattr(getattr(customer, "user", None), "gstin", "") or "").strip().upper()
             or None
         ),
         "customer_snapshot_place_of_supply": (customer_snapshot_place_of_supply or "").strip(),
-        "delivery_snapshot_address_line1": (delivery_snapshot_address_line1 or "").strip(),
+        "delivery_snapshot_address_line1": (delivery_snapshot_address_line1 or "").strip() or customer_address,
         "delivery_snapshot_address_line2": (delivery_snapshot_address_line2 or "").strip(),
-        "delivery_snapshot_city": (delivery_snapshot_city or "").strip(),
+        "delivery_snapshot_city": (delivery_snapshot_city or "").strip() or customer_city,
         "delivery_snapshot_district": (delivery_snapshot_district or "").strip(),
-        "delivery_snapshot_state": (delivery_snapshot_state or "").strip(),
-        "delivery_snapshot_pincode": (delivery_snapshot_pincode or "").strip(),
+        "delivery_snapshot_state": (delivery_snapshot_state or "").strip() or customer_state,
+        "delivery_snapshot_pincode": (delivery_snapshot_pincode or "").strip() or customer_pincode,
     }
 
 

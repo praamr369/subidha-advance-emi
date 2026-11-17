@@ -186,6 +186,7 @@ class PartnerDashboardView(APIView):
                     ],
                     "next_due_product_name": dashboard.summary["next_due_product_name"],
                     "next_due_lucky_number": dashboard.summary["next_due_lucky_number"],
+                    "next_due_source_type": dashboard.summary.get("next_due_source_type", "SUBSCRIPTION"),
                     "has_payment_adjustments": dashboard.summary["has_payment_adjustments"],
                     "total_commission": metrics["total_commission"],
                     "pending_commission": metrics["pending_commission"],

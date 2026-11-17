@@ -1,3 +1,4 @@
+from datetime import date
 from decimal import Decimal
 
 from django.db.models import Sum
@@ -15,6 +16,7 @@ from contracts.services.contract_number_service import (
 from subscriptions.services.subscription_financial_service import (
     attach_subscription_financial_snapshot,
     build_subscription_financial_snapshot,
+    _related_rows,
 )
 
 
@@ -121,6 +123,8 @@ class BaseSubscriptionSerializer(serializers.ModelSerializer):
     customer_signature_signed_at = serializers.SerializerMethodField()
     customer_signature_url = serializers.SerializerMethodField()
     signing_path = serializers.SerializerMethodField()
+    is_bundle = serializers.SerializerMethodField()
+    bundle_items_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Subscription
@@ -140,6 +144,8 @@ class BaseSubscriptionSerializer(serializers.ModelSerializer):
             "product_code",
             "product_image",
             "product_base_price",
+            "is_bundle",
+            "bundle_items_count",
             "contract_items",
             "batch",
             "batch_id",
@@ -232,17 +238,17 @@ class BaseSubscriptionSerializer(serializers.ModelSerializer):
     def get_contract_items(self, obj):
         if obj.plan_type not in (PlanType.RENT, PlanType.LEASE):
             return []
-        items = list(obj.contract_items.select_related("product").all())
+        items = _related_rows(obj, "contract_items", ("id",)) if hasattr(obj, "_prefetched_objects_cache") and "contract_items" in obj._prefetched_objects_cache else list(obj.contract_items.select_related("product").all())
         if items:
             return [
                 {
                     "id": it.id,
                     "product": it.product_id,
                     "product_id": it.product_id,
-                    "product_name": it.product.name,
-                    "product_code": it.product.product_code,
-                    "sku": getattr(it.product, "sku", ""),
-                    "category": getattr(it.product, "category", ""),
+                    "product_name": it.product.name if it.product else (it.product_snapshot or {}).get("name", ""),
+                    "product_code": it.product.product_code if it.product else (it.product_snapshot or {}).get("product_code", ""),
+                    "sku": getattr(it.product, "sku", "") if it.product else "",
+                    "category": getattr(it.product, "category", "") if it.product else "",
                     "quantity": it.quantity,
                     "unit_base_price": str(it.unit_base_price),
                     "total_base_price": str(it.total_base_price),
@@ -259,6 +265,14 @@ class BaseSubscriptionSerializer(serializers.ModelSerializer):
             if isinstance(snap_items, list) and snap_items:
                 return snap_items
         return []
+
+    def get_is_bundle(self, obj) -> bool:
+        items = self.get_contract_items(obj)
+        return len(items) > 1
+
+    def get_bundle_items_count(self, obj) -> int:
+        items = self.get_contract_items(obj)
+        return len(items)
 
     def get_product_image(self, obj):
         return serialize_media_url(
@@ -336,14 +350,22 @@ class BaseSubscriptionSerializer(serializers.ModelSerializer):
         }
 
     def get_emi_count(self, obj):
+        if obj.plan_type in (PlanType.RENT, PlanType.LEASE):
+            return obj.tenure_months or 0
         return len(self._get_emis(obj))
 
     def get_paid_emi_count(self, obj):
+        if obj.plan_type in (PlanType.RENT, PlanType.LEASE):
+            demands = _related_rows(obj, "rent_lease_demands", ("due_date", "id")) if hasattr(obj, "_prefetched_objects_cache") and "rent_lease_demands" in obj._prefetched_objects_cache else list(obj.rent_lease_demands.all())
+            return sum(1 for d in demands if d.demand_type in ("RENT_MONTHLY", "LEASE_MONTHLY") and d.status == "PAID")
         if self._use_canonical_financial_summary():
             return int(self._snapshot(obj)["emi_count_paid"])
         return sum(1 for emi in self._get_emis(obj) if emi.status == "PAID")
 
     def get_pending_emi_count(self, obj):
+        if obj.plan_type in (PlanType.RENT, PlanType.LEASE):
+            demands = _related_rows(obj, "rent_lease_demands", ("due_date", "id")) if hasattr(obj, "_prefetched_objects_cache") and "rent_lease_demands" in obj._prefetched_objects_cache else list(obj.rent_lease_demands.all())
+            return sum(1 for d in demands if d.demand_type in ("RENT_MONTHLY", "LEASE_MONTHLY") and d.status in ("PENDING", "OVERDUE", "PARTIAL"))
         if self._use_canonical_financial_summary():
             return int(self._snapshot(obj)["emi_count_pending"])
         return sum(1 for emi in self._get_emis(obj) if emi.status == "PENDING")
@@ -384,6 +406,13 @@ class BaseSubscriptionSerializer(serializers.ModelSerializer):
         return getattr(payment, "payment_date", None)
 
     def get_next_due_date(self, obj):
+        if obj.plan_type in (PlanType.RENT, PlanType.LEASE):
+            demands = _related_rows(obj, "rent_lease_demands", ("due_date", "id")) if hasattr(obj, "_prefetched_objects_cache") and "rent_lease_demands" in obj._prefetched_objects_cache else list(obj.rent_lease_demands.all())
+            pending_demands = sorted(
+                [d for d in demands if d.status in ("PENDING", "OVERDUE", "PARTIAL") and d.amount > d.collected_amount],
+                key=lambda d: (d.due_date or date.max, d.id or 0),
+            )
+            return pending_demands[0].due_date.isoformat() if pending_demands and pending_demands[0].due_date else None
         emis = sorted(
             [emi for emi in self._get_emis(obj) if emi.status == "PENDING"],
             key=lambda emi: (

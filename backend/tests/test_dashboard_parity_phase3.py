@@ -24,6 +24,8 @@ from tests.helpers import (
 class DashboardParityPhase3Tests(APITestCase):
     def setUp(self):
         super().setUp()
+        from django.core.cache import cache
+        cache.clear()
         today = timezone.localdate()
         self.admin = create_admin_user(username="dash_phase3_admin", phone="9363300001")
         ensure_test_accounting_posting_prerequisites(today, performed_by=self.admin)

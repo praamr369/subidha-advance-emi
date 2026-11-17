@@ -205,10 +205,30 @@ export default function CustomerDirectSaleDetailPage() {
 
           <WorkspaceSection title="Customer snapshot" description="Snapshot values from billing document context.">
             <div className="grid gap-3 md:grid-cols-2">
-              <div>Name: {stringify(customerSnapshot.name)}</div>
-              <div>Phone: {stringify(customerSnapshot.phone)}</div>
-              <div>Email: {stringify(customerSnapshot.email)}</div>
-              <div>City: {stringify(customerSnapshot.city)}</div>
+              <div>
+                <span className="text-muted-foreground">Name: </span>
+                <span className="font-medium text-foreground">{stringify(customerSnapshot.name)}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Phone: </span>
+                <span className="font-medium text-foreground">{stringify(customerSnapshot.phone)}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Email: </span>
+                <span className="font-medium text-foreground">{stringify(customerSnapshot.email)}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">City: </span>
+                <span className="font-medium text-foreground">{stringify(customerSnapshot.city)}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Address: </span>
+                <span className="font-medium text-foreground">{stringify(customerSnapshot.billing_address_line1 || customerSnapshot.address)}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Pincode: </span>
+                <span className="font-medium text-foreground">{stringify(customerSnapshot.pincode)}</span>
+              </div>
             </div>
           </WorkspaceSection>
 
@@ -353,11 +373,32 @@ export default function CustomerDirectSaleDetailPage() {
           {row.delivery_required ? (
             <WorkspaceSection title="Delivery snapshot" description="Stored delivery snapshot from sale confirmation.">
               <div className="grid gap-3 md:grid-cols-2">
-                <div>Address line 1: {stringify(deliverySnapshot.address_line1)}</div>
-                <div>Address line 2: {stringify(deliverySnapshot.address_line2)}</div>
-                <div>City: {stringify(deliverySnapshot.city)}</div>
-                <div>State: {stringify(deliverySnapshot.state)}</div>
-                <div>Pincode: {stringify(deliverySnapshot.pincode)}</div>
+                <div>
+                  <span className="text-muted-foreground">Address line 1: </span>
+                  <span className="font-medium text-foreground">{stringify(deliverySnapshot.address_line1 || customerSnapshot.billing_address_line1 || customerSnapshot.address)}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Address line 2: </span>
+                  <span className="font-medium text-foreground">{stringify(deliverySnapshot.address_line2 || customerSnapshot.billing_address_line2)}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">City: </span>
+                  <span className="font-medium text-foreground">{stringify(deliverySnapshot.city || customerSnapshot.city)}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">State: </span>
+                  <span className="font-medium text-foreground">{stringify(deliverySnapshot.state || customerSnapshot.state)}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Pincode: </span>
+                  <span className="font-medium text-foreground">{stringify(deliverySnapshot.pincode || customerSnapshot.pincode)}</span>
+                </div>
+                {deliverySnapshot.delivery_reference ? (
+                  <div>
+                    <span className="text-muted-foreground">Reference: </span>
+                    <span className="font-mono font-medium text-foreground">{stringify(deliverySnapshot.delivery_reference)}</span>
+                  </div>
+                ) : null}
               </div>
             </WorkspaceSection>
           ) : null}

@@ -22,6 +22,7 @@ export type CanonicalDashboardSummary = {
   next_due_subscription_number?: string | null;
   next_due_product_name?: string | null;
   next_due_lucky_number?: number | null;
+  next_due_source_type?: string | null;
   has_payment_adjustments?: boolean;
 };
 

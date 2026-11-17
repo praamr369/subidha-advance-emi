@@ -14,6 +14,7 @@ import UpiPayDialog from "@/components/payments/UpiPayDialog";
 
 type ScheduleRow = {
   emi_id?: number;
+  subscription_id?: number;
   schedule_id?: string;
   subscription_number?: string | null;
   plan_type?: string;
@@ -136,8 +137,8 @@ export default function CustomerPaymentSchedulePage() {
           subscriptionNumber={selectedSchedulePayRow.subscription_number || undefined}
           productName={selectedSchedulePayRow.product_name}
           dueDate={selectedSchedulePayRow.due_date}
-          sourceType="EMI"
-          sourceId={selectedSchedulePayRow.emi_id}
+          sourceType={selectedSchedulePayRow.emi_id ? "EMI" : "SUBSCRIPTION"}
+          sourceId={selectedSchedulePayRow.emi_id || selectedSchedulePayRow.subscription_id}
           onPaymentReported={() => {
             void load();
           }}

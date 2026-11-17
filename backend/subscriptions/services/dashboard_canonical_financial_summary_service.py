@@ -21,7 +21,7 @@ from subscriptions.models import (
     Payment,
     SubscriptionStatus,
 )
-from subscriptions.enums import PRE_ACTIVATION_SUBSCRIPTION_STATUSES
+from subscriptions.enums import PlanType, PRE_ACTIVATION_SUBSCRIPTION_STATUSES
 from subscriptions.services.dashboard_scopes import (
     AdminScope,
     CashierScope,
@@ -35,6 +35,7 @@ from core.services.operational_visibility import get_payment_collection_totals
 from subscriptions.services.subscription_financial_service import (
     build_customer_dashboard_summary,
     build_reconciliation_attention_payload,
+    _related_rows,
 )
 
 
@@ -249,6 +250,30 @@ def _build_due_subscription_rows(
             for row in snapshot.get("emis") or []
             if row.get("derived_status") == EmiStatus.PENDING
         ]
+
+        # Rent / Lease plans track dues via RentLeaseBillingDemand
+        if not pending_rows and getattr(subscription, "plan_type", None) in (PlanType.RENT, PlanType.LEASE):
+            demands = _related_rows(subscription, "rent_lease_demands", ("due_date", "id"))
+            for demand in demands:
+                if demand.status in ("CANCELLED", "WAIVED", "PAID"):
+                    continue
+                unpaid = Decimal(str(demand.amount or 0)) - Decimal(str(demand.collected_amount or 0))
+                if unpaid <= Decimal("0.00"):
+                    continue
+                is_demand_overdue = bool(demand.due_date and demand.due_date < reference_date)
+                source_type = "SECURITY_DEPOSIT" if demand.demand_type == "SECURITY_DEPOSIT" else ("RENT_DEMAND" if subscription.plan_type == PlanType.RENT else "LEASE_DEMAND")
+                pending_rows.append({
+                    "id": demand.id,
+                    "demand_id": demand.id,
+                    "due_date": demand.due_date.isoformat() if demand.due_date else None,
+                    "balance_amount": unpaid,
+                    "month_no": 0 if demand.demand_type == "SECURITY_DEPOSIT" else 1,
+                    "derived_status": EmiStatus.PENDING,
+                    "demand_type": demand.demand_type,
+                    "source_type": source_type,
+                    "is_overdue": is_demand_overdue,
+                })
+
         if not pending_rows:
             continue
 
@@ -278,15 +303,27 @@ def _build_due_subscription_rows(
 
         next_due = min(filtered_pending_rows, key=_pending_emi_sort_key)
         is_overdue = _is_pending_row_overdue(next_due, reference_date=reference_date)
+
+        # Resolve bundle product title if multiple contract items
+        contract_items_list = _related_rows(subscription, "contract_items", ("id",)) if getattr(subscription, "plan_type", None) in (PlanType.RENT, PlanType.LEASE) else []
+        prod_name = getattr(subscription.product, "name", "")
+        if len(contract_items_list) > 1:
+            prod_name = f"{prod_name} (+{len(contract_items_list) - 1} items)" if prod_name else f"Bundle ({len(contract_items_list)} items)"
+        elif not prod_name and len(contract_items_list) == 1:
+            ci = contract_items_list[0]
+            prod_name = getattr(ci.product, "name", "") or (ci.product_snapshot or {}).get("name", "Product")
+
+        source_type = next_due.get("source_type", "SUBSCRIPTION_EMI")
+
         rows.append(
             {
-                "id": subscription.id,
+                "id": f"sub-{subscription.id}-demand-{next_due.get('demand_id')}" if next_due.get("demand_id") else subscription.id,
                 "subscription_id": subscription.id,
-                "subscription_number": f"SUB-{subscription.id}",
+                "subscription_number": getattr(subscription, "subscription_number", None) or f"SUB-{subscription.id}",
                 "customer_id": getattr(subscription.customer, "id", None),
                 "customer_name": getattr(subscription.customer, "name", ""),
                 "customer_phone": getattr(subscription.customer, "phone", ""),
-                "product_name": getattr(subscription.product, "name", ""),
+                "product_name": prod_name,
                 "batch_code": getattr(subscription.batch, "batch_code", None),
                 "lucky_number": getattr(subscription.lucky_id, "lucky_number", None),
                 "due_date": next_due.get("due_date"),
@@ -299,7 +336,10 @@ def _build_due_subscription_rows(
                 if is_overdue
                 else 0,
                 "is_overdue": is_overdue,
-                "emi_id": next_due.get("id"),
+                "emi_id": next_due.get("id") if not next_due.get("demand_id") else None,
+                "demand_id": next_due.get("demand_id"),
+                "demand_type": next_due.get("demand_type"),
+                "source_type": source_type,
                 "month_no": next_due.get("month_no"),
             }
         )
@@ -480,7 +520,8 @@ def get_dashboard_summary(
     effective_window = window_params or resolve_dashboard_window()
     queryset = scope.get_subscription_queryset(actor_user).order_by("-created_at", "-id")
     subscriptions = list(queryset)
-    summary = build_customer_dashboard_summary(subscriptions)
+    target_customer = getattr(actor_user, "customer_profile", None) if isinstance(scope, CustomerScope) else None
+    summary = build_customer_dashboard_summary(subscriptions, customer=target_customer)
     due_subscriptions = _build_due_subscription_rows(
         subscriptions,
         window_params=effective_window,

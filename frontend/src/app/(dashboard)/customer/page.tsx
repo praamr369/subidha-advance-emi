@@ -103,6 +103,7 @@ export default function CustomerDashboardPage() {
     product_name?: string | null;
     emi_id?: number | string | null;
     subscription_id?: number | string | null;
+    sourceType?: "EMI" | "SUBSCRIPTION" | "DIRECT_SALE";
   } | null>(null);
 
   const coreQuery = useQuery({
@@ -303,12 +304,12 @@ export default function CustomerDashboardPage() {
 
       {!loading && !error && summary ? (
         <>
-          {/* ── 2. Next EMI Due - Hero Action Banner ── */}
+          {/* ── 2. Next EMI / Installment Due - Hero Action Banner ── */}
           {hasNextDue ? (
             <div className="overflow-hidden rounded-2xl border-2 border-emerald-500/30 bg-gradient-to-br from-emerald-50/90 via-teal-50/40 to-background dark:from-emerald-950/40 dark:via-teal-950/20 dark:to-card p-4 shadow-sm">
               <div className="flex items-center justify-between gap-2">
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
-                  <Clock className="size-3.5" /> Next EMI Due
+                  <Clock className="size-3.5" /> Next Due
                 </span>
                 <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">
                   Due {formatDate(summary.next_due_date)}
@@ -320,7 +321,7 @@ export default function CustomerDashboardPage() {
                   <div className="text-3xl font-black tracking-tight text-foreground">
                     {money(summary.next_due_amount)}
                   </div>
-                  <div className="mt-0.5 text-xs font-medium text-muted-foreground truncate">
+                  <div className="mt-0.5 text-xs font-medium text-muted-foreground truncate font-mono">
                     {summary.next_due_subscription_number || "Active Contract"}
                   </div>
                 </div>
@@ -333,6 +334,15 @@ export default function CustomerDashboardPage() {
                     subscription_number: summary.next_due_subscription_number || undefined,
                     pending_amount: summary.next_due_amount,
                     due_date: summary.next_due_date || undefined,
+                    subscription_id: summary.next_due_subscription_id || undefined,
+                    sourceType:
+                      summary.next_due_source_type === "DIRECT_SALE" ||
+                      summary.next_due_subscription_number?.startsWith("SALE")
+                        ? "DIRECT_SALE"
+                        : summary.next_due_subscription_id
+                        ? "SUBSCRIPTION"
+                        : "EMI",
+                    product_name: summary.next_due_product_name || undefined,
                   })
                 }
                 className="mt-3.5 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 active:scale-[0.98]"
@@ -351,7 +361,7 @@ export default function CustomerDashboardPage() {
                   All Payments Up to Date!
                 </div>
                 <div className="text-xs text-emerald-700/80 dark:text-emerald-400">
-                  No pending EMIs due at this time.
+                  No pending installments due at this time.
                 </div>
               </div>
             </div>
@@ -557,6 +567,45 @@ export default function CustomerDashboardPage() {
               <div className="space-y-2">
                 {dueRows.map((item) => {
                   const isOverdue = Boolean(item.is_overdue);
+                  const isDirectSale = item.source_type === "DIRECT_SALE";
+                  const isSecurityDeposit = item.source_type === "SECURITY_DEPOSIT";
+                  const isRentDemand = item.source_type === "RENT_DEMAND";
+                  const isLeaseDemand = item.source_type === "LEASE_DEMAND";
+
+                  let sourceBadge = null;
+                  if (isDirectSale) {
+                    sourceBadge = (
+                      <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">
+                        Direct Sale
+                      </span>
+                    );
+                  } else if (isSecurityDeposit) {
+                    sourceBadge = (
+                      <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-purple-800 dark:bg-purple-900/40 dark:text-purple-300">
+                        Security Deposit
+                      </span>
+                    );
+                  } else if (isRentDemand) {
+                    sourceBadge = (
+                      <span className="rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300">
+                        Rent Due
+                      </span>
+                    );
+                  } else if (isLeaseDemand) {
+                    sourceBadge = (
+                      <span className="rounded-full bg-teal-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-teal-800 dark:bg-teal-900/40 dark:text-teal-300">
+                        Lease Due
+                      </span>
+                    );
+                  }
+
+                  const targetSourceType: "EMI" | "SUBSCRIPTION" | "DIRECT_SALE" = isDirectSale
+                    ? "DIRECT_SALE"
+                    : (item.emi_id ? "EMI" : "SUBSCRIPTION");
+                  const targetSourceId = isDirectSale
+                    ? (item.subscription_id || item.id)
+                    : (item.emi_id || item.subscription_id || item.id);
+
                   return (
                     <div
                       key={`${item.subscription_id ?? item.id}-${item.emi_id ?? "na"}`}
@@ -572,6 +621,7 @@ export default function CustomerDashboardPage() {
                             <span className="text-sm font-bold text-foreground truncate">
                               {item.product_name || "Contract Item"}
                             </span>
+                            {sourceBadge}
                             {isOverdue ? (
                               <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-red-700 dark:bg-red-900/40 dark:text-red-300">
                                 Overdue {item.overdue_days ? `${item.overdue_days}d` : ""}
@@ -605,7 +655,8 @@ export default function CustomerDashboardPage() {
                               pending_amount: item.pending_amount,
                               due_date: item.due_date,
                               emi_id: item.emi_id,
-                              subscription_id: item.subscription_id,
+                              subscription_id: targetSourceId,
+                              sourceType: targetSourceType,
                             })
                           }
                           className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-xs font-bold text-white shadow-xs transition hover:bg-emerald-700 active:scale-[0.98]"
@@ -649,8 +700,13 @@ export default function CustomerDashboardPage() {
                         <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${planBadgeClass(sub.plan_type)}`}>
                           {planLabel(sub.plan_type)}
                         </span>
+                        {sub.is_bundle || (sub.contract_items && sub.contract_items.length > 1) ? (
+                          <span className="rounded-full bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300 px-2 py-0.5 text-[10px] font-bold">
+                            📦 Bundle ({sub.contract_items?.length || sub.bundle_items_count || 2})
+                          </span>
+                        ) : null}
                       </div>
-                      <div className="mt-0.5 text-xs text-muted-foreground">
+                      <div className="mt-0.5 text-xs text-muted-foreground font-mono">
                         {sub.subscription_number || `SUB-${sub.id}`}
                       </div>
                       <div className="mt-1 flex items-center gap-2 text-xs">
@@ -659,6 +715,19 @@ export default function CustomerDashboardPage() {
                           <span className="text-muted-foreground">· Rem: {money(sub.outstanding_amount)}</span>
                         ) : null}
                       </div>
+                      {sub.contract_items && sub.contract_items.length > 1 ? (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {sub.contract_items.map((item, idx) => (
+                            <span
+                              key={item.id || idx}
+                              className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
+                            >
+                              <span>{(item.product_name || "").replace(/\s*\([^)]+:[^)]+\)\s*$/i, "").trim()}</span>
+                              {item.quantity > 1 ? <span className="font-bold text-foreground">×{item.quantity}</span> : null}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
                     <ChevronRight className="size-5 shrink-0 text-muted-foreground/50" />
                   </Link>
@@ -891,8 +960,12 @@ export default function CustomerDashboardPage() {
           subscriptionNumber={selectedDuePayItem.subscription_number || undefined}
           productName={selectedDuePayItem.product_name || undefined}
           dueDate={selectedDuePayItem.due_date ? formatDate(selectedDuePayItem.due_date) : undefined}
-          sourceType="EMI"
-          sourceId={selectedDuePayItem.emi_id || undefined}
+          sourceType={selectedDuePayItem.sourceType || (selectedDuePayItem.emi_id ? "EMI" : "SUBSCRIPTION")}
+          sourceId={
+            selectedDuePayItem.sourceType === "DIRECT_SALE"
+              ? (selectedDuePayItem.subscription_id || undefined)
+              : (selectedDuePayItem.emi_id || selectedDuePayItem.subscription_id || undefined)
+          }
           onPaymentReported={() => {
             void canonicalQuery.refetch();
             void overdueQuery.refetch();

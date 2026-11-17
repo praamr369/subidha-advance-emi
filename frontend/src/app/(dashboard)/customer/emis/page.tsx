@@ -23,6 +23,7 @@ import {
 interface EmiRecord extends CustomerEmi {
   subscription_number?: string;
   product_name?: string;
+  source_type?: "EMI" | "SUBSCRIPTION";
 }
 
 function formatDate(value: string | null | undefined): string {
@@ -165,13 +166,34 @@ export default function CustomerEmisPage() {
       const emis: EmiRecord[] = [];
 
       subscriptions.results?.forEach((sub) => {
-        sub.emis?.forEach((emi) => {
-          emis.push({
-            ...emi,
-            subscription_number: sub.subscription_number,
-            product_name: sub.product_name,
+        if (sub.emis && sub.emis.length > 0) {
+          sub.emis.forEach((emi) => {
+            emis.push({
+              ...emi,
+              subscription_number: sub.subscription_number,
+              product_name: sub.product_name,
+              source_type: "EMI",
+            });
           });
-        });
+        } else if (sub.rent_lease_demands && sub.rent_lease_demands.length > 0) {
+          sub.rent_lease_demands.forEach((demand, idx) => {
+            emis.push({
+              id: demand.id,
+              subscription: sub.id,
+              sequence_no: idx + 1,
+              month_no: idx + 1,
+              due_date: demand.due_date || undefined,
+              amount: demand.amount,
+              paid_amount: demand.paid_amount,
+              status: demand.status,
+              subscription_number: sub.subscription_number,
+              product_name: demand.demand_type === "SECURITY_DEPOSIT"
+                ? `${sub.product_name || "Contract"} (Security Deposit)`
+                : (sub.product_name || "Rent Installment"),
+              source_type: "SUBSCRIPTION",
+            });
+          });
+        }
       });
 
       setAllEmis(emis.sort((a, b) => {
@@ -419,8 +441,8 @@ export default function CustomerEmisPage() {
             subscriptionNumber={selectedPayEmi.subscription_number}
             productName={selectedPayEmi.product_name}
             dueDate={formatDate(selectedPayEmi.due_date)}
-            sourceType="EMI"
-            sourceId={selectedPayEmi.id}
+            sourceType={selectedPayEmi.source_type === "SUBSCRIPTION" ? "SUBSCRIPTION" : "EMI"}
+            sourceId={selectedPayEmi.source_type === "SUBSCRIPTION" ? (selectedPayEmi.subscription || selectedPayEmi.id) : selectedPayEmi.id}
             onPaymentReported={() => {
               void loadData();
             }}

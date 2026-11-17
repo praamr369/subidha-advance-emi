@@ -344,6 +344,30 @@ def render_invoice_pdf(*, invoice) -> bytes:
     line(f"Paid Amount: INR {invoice.received_total:.2f}", size=10)
     line(f"Outstanding: INR {invoice.balance_total:.2f}", size=10)
 
+    rule()
+    check_page_break(110)
+    line("AUTHORIZATION & VERIFICATION", size=11, lead=15)
+    sig_y = cy
+    c.setFont("Helvetica-Bold", 9)
+    c.drawString(mx, sig_y, "For SUBIDHA FURNITURE & APPLIANCES")
+    c.drawString(width / 2 + 10 * mm, sig_y, "CUSTOMER ACCEPTANCE")
+
+    c.setFont("Helvetica", 8)
+    sig_y -= 14
+    c.drawString(mx, sig_y, "Authorized Signatory: Digitally Verified")
+    c.drawString(width / 2 + 10 * mm, sig_y, f"Customer: {customer_name[:35]}")
+
+    sig_y -= 12
+    c.drawString(mx, sig_y, f"Verification Reference: {document_no}")
+    c.drawString(width / 2 + 10 * mm, sig_y, "Signature / Confirmation: On Database Record")
+
+    sig_y -= 12
+    c.drawString(mx, sig_y, f"System Verified on: {generated_label}")
+    c.drawString(width / 2 + 10 * mm, sig_y, f"Phone: {_mask_phone(customer_phone)}")
+
+    cy = sig_y - 15
+    rule()
+
     c.showPage()
     c.save()
     data = buf.getvalue()
@@ -503,6 +527,30 @@ def render_receipt_pdf(*, receipt) -> bytes:
                     size=9, lead=12,
                 )
                 cy -= 4
+
+    rule()
+    check_page_break(110)
+    line("PAYMENT CONFIRMATION & AUTHENTICATION", size=11, lead=15)
+    sig_y = cy
+    c.setFont("Helvetica-Bold", 9)
+    c.drawString(mx, sig_y, "For SUBIDHA FURNITURE & APPLIANCES")
+    c.drawString(width / 2 + 10 * mm, sig_y, "COLLECTION ACKNOWLEDGEMENT")
+
+    c.setFont("Helvetica", 8)
+    sig_y -= 14
+    c.drawString(mx, sig_y, f"Received with thanks by: {collected_by or 'Finance Counter'}")
+    c.drawString(width / 2 + 10 * mm, sig_y, f"Received from: {customer_name[:35]}")
+
+    sig_y -= 12
+    c.drawString(mx, sig_y, f"Transaction Ref: {receipt.source_reference or receipt_no}")
+    c.drawString(width / 2 + 10 * mm, sig_y, f"Mode: {payment_method}")
+
+    sig_y -= 12
+    c.drawString(mx, sig_y, f"Digitally Authenticated: {generated_label}")
+    c.drawString(width / 2 + 10 * mm, sig_y, "Status: Authenticated Financial Entry")
+
+    cy = sig_y - 15
+    rule()
 
     c.showPage()
     c.save()

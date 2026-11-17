@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from math import ceil
 from typing import Any
+from django.db.models import Q
 
 from subscriptions.models import Payment
 from subscriptions.services.dashboard_canonical_financial_summary_service import (
@@ -218,6 +219,8 @@ def _scoped_payment_queryset(scope: DashboardScope, actor_user):
 
 def _build_due_direct_sale_rows(
     *,
+    scope: DashboardScope,
+    actor_user,
     window_params: DashboardWindowParams,
     only_state: str | None = None,
 ) -> list[dict[str, object]]:
@@ -233,11 +236,28 @@ def _build_due_direct_sale_rows(
         "ARCHIVED",
         "EXCHANGED_CLOSED",
     ]
-    qs = DirectSale.objects.exclude(status__in=cancelled_sale_statuses).filter(balance_total__gt=0)
+    qs = (
+        DirectSale.objects.exclude(status__in=cancelled_sale_statuses)
+        .filter(balance_total__gt=0)
+        .select_related("customer")
+        .prefetch_related("lines__product")
+    )
+
+    if isinstance(scope, CustomerScope):
+        customer = getattr(actor_user, "customer_profile", None)
+        if not customer:
+            return []
+        qs = qs.filter(customer=customer)
+    elif isinstance(scope, CashierScope):
+        from branch_control.services.branch_service import scope_queryset_to_user_branches
+        qs = scope_queryset_to_user_branches(qs, user=actor_user, field_name="branch_id")
+    elif isinstance(scope, PartnerScope):
+        return []
     
     for sale in qs:
-        if window_params.start_date and sale.sale_date < window_params.start_date:
-            continue
+        if only_state != "OVERDUE":
+            if window_params.start_date and sale.sale_date < window_params.start_date:
+                continue
         if window_params.end_date and sale.sale_date > window_params.end_date:
             continue
         
@@ -248,6 +268,11 @@ def _build_due_direct_sale_rows(
         if only_state == "UPCOMING" and is_overdue:
             continue
             
+        line_items = [l.description for l in sale.lines.all()[:2] if l.description]
+        prod_name = ", ".join(line_items) if line_items else "Direct Sale"
+        if sale.lines.count() > 2:
+            prod_name += f" (+{sale.lines.count() - 2} more)"
+
         rows.append({
             "id": f"ds-{sale.id}",
             "subscription_id": None,
@@ -257,7 +282,7 @@ def _build_due_direct_sale_rows(
             "customer_id": sale.customer_id,
             "customer_name": sale.customer.name if sale.customer_id else "",
             "customer_phone": sale.customer.phone if sale.customer_id else "",
-            "product_name": "Direct Sale", 
+            "product_name": prod_name, 
             "batch_code": None,
             "lucky_number": None,
             "due_date": sale.sale_date.isoformat() if sale.sale_date else None,
@@ -273,6 +298,8 @@ def _build_due_direct_sale_rows(
 
 def _build_due_legacy_rows(
     *,
+    scope: DashboardScope,
+    actor_user,
     window_params: DashboardWindowParams,
     only_state: str | None = None,
 ) -> list[dict[str, object]]:
@@ -280,6 +307,17 @@ def _build_due_legacy_rows(
     reference_date = window_params.reference_date
 
     qs = CustomerOpeningOutstanding.objects.filter(is_settled=False)
+
+    if isinstance(scope, CustomerScope):
+        customer = getattr(actor_user, "customer_profile", None)
+        if not customer:
+            return []
+        filter_q = Q(customer_id=customer.id)
+        if getattr(customer, "phone", None):
+            filter_q |= Q(phone=customer.phone)
+        qs = qs.filter(filter_q)
+    elif isinstance(scope, PartnerScope):
+        return []
 
     for legacy in qs:
         if window_params.start_date and legacy.entry_date < window_params.start_date:
@@ -317,7 +355,6 @@ def _build_due_legacy_rows(
     return rows
 
 def list_upcoming_items(
-
     *,
     scope: DashboardScope,
     actor_user,
@@ -328,11 +365,17 @@ def list_upcoming_items(
     effective_window = window_params or resolve_dashboard_window()
     subscriptions = list(scope.get_subscription_queryset(actor_user).order_by("-created_at", "-id"))
     build_customer_dashboard_summary(subscriptions)
-    rows = _build_due_subscription_rows(
+    emi_rows = _build_due_subscription_rows(
         subscriptions,
         window_params=effective_window,
         only_state="UPCOMING",
     )
+    for r in emi_rows:
+        if "source_type" not in r:
+            r["source_type"] = "SUBSCRIPTION_EMI"
+    ds_rows = _build_due_direct_sale_rows(scope=scope, actor_user=actor_user, window_params=effective_window, only_state="UPCOMING")
+    legacy_rows = _build_due_legacy_rows(scope=scope, actor_user=actor_user, window_params=effective_window, only_state="UPCOMING")
+    rows = emi_rows + ds_rows + legacy_rows
     rows = _apply_row_ordering(rows, surface_code=SURFACE_UPCOMING, ordering=ordering)
     return rows if limit is None else rows[:limit]
 
@@ -355,10 +398,11 @@ def list_overdue_items(
         only_state="OVERDUE",
     )
     for r in emi_rows:
-        r["source_type"] = "SUBSCRIPTION_EMI"
+        if "source_type" not in r:
+            r["source_type"] = "SUBSCRIPTION_EMI"
         
-    ds_rows = _build_due_direct_sale_rows(window_params=effective_window, only_state="OVERDUE")
-    legacy_rows = _build_due_legacy_rows(window_params=effective_window, only_state="OVERDUE")
+    ds_rows = _build_due_direct_sale_rows(scope=scope, actor_user=actor_user, window_params=effective_window, only_state="OVERDUE")
+    legacy_rows = _build_due_legacy_rows(scope=scope, actor_user=actor_user, window_params=effective_window, only_state="OVERDUE")
     
     rows = emi_rows + ds_rows + legacy_rows
     rows = _apply_row_ordering(rows, surface_code=SURFACE_OVERDUE, ordering=ordering)
@@ -388,6 +432,37 @@ def list_recent_payments(
             window_params=effective_window,
         )
     rows = [_serialize_payment(payment) for payment in queryset]
+
+    if isinstance(scope, CustomerScope):
+        customer = getattr(actor_user, "customer_profile", None)
+        if customer:
+            from billing.models import ReceiptDocument, BillingDocumentStatus
+            receipts = (
+                ReceiptDocument.objects.filter(
+                    customer=customer,
+                    status=BillingDocumentStatus.POSTED,
+                )
+                .exclude(payment__isnull=False)
+                .select_related("direct_sale", "customer", "finance_account")
+            )
+            for r in receipts:
+                ref = r.receipt_no or r.source_reference or f"RCP-{r.id}"
+                rows.append({
+                    "payment_id": r.id,
+                    "amount": f"{r.amount:.2f}",
+                    "payment_date": r.receipt_date.isoformat() if r.receipt_date else None,
+                    "created_at": r.created_at.isoformat() if r.created_at else None,
+                    "method": getattr(r.finance_account, "name", "Cash / Bank / UPI"),
+                    "reference_no": ref,
+                    "customer_name": customer.name,
+                    "customer_phone": customer.phone,
+                    "subscription_id": None,
+                    "subscription_number": r.direct_sale.sale_no if r.direct_sale else None,
+                    "batch_code": None,
+                    "lucky_number": None,
+                    "is_reversed": False,
+                })
+
     rows = _apply_row_ordering(
         rows,
         surface_code=SURFACE_RECENT_PAYMENTS,
