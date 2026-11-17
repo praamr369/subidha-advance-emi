@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useState } from "react";
+import { Fragment, useEffect, useId, useMemo, useState } from "react";
 import QRCode from "react-qr-code";
 import {
   AlertCircle,
@@ -79,6 +79,73 @@ export interface ResolvedCatalogItem {
   leaseMonthly: number;
   leaseDeposit: number;
   sfemiMonthly: number;
+}
+
+export interface CategorySubcategoryGroup {
+  id: string;
+  categoryName: string;
+  subcategoryName: string;
+  displayCategory: string;
+  displaySubcategory: string;
+  fullLabel: string;
+  icon: string;
+  items: ResolvedCatalogItem[];
+  itemCount: number;
+  minPrice: number;
+  maxPrice: number;
+  hasPricedItems: boolean;
+  minRentMonthly: number;
+  minLeaseMonthly: number;
+  minSfemiMonthly: number;
+}
+
+export interface MainCategoryGroup {
+  categoryName: string;
+  icon: string;
+  totalItems: number;
+  subcategories: CategorySubcategoryGroup[];
+}
+
+function parseCategoryHierarchy(item: ResolvedCatalogItem): {
+  mainCategory: string;
+  subcategory: string;
+} {
+  let main = item.categoryName?.trim() || "";
+  let sub = item.subcategoryName?.trim() || "";
+
+  if ((!main || !sub) && item.category) {
+    const parts = item.category.split("/").map((p) => p.trim()).filter(Boolean);
+    if (parts.length >= 2) {
+      main = main || parts[0];
+      sub = sub || parts.slice(1).join(" / ");
+    } else if (parts.length === 1) {
+      if (!main) main = parts[0];
+      if (!sub) sub = "General";
+    }
+  }
+
+  if (!main) main = "General Catalog";
+  if (!sub) sub = "All Models";
+
+  return { mainCategory: main, subcategory: sub };
+}
+
+function getCategoryIcon(catName: string, subcatName: string = ""): string {
+  const text = `${catName} ${subcatName}`.toLowerCase();
+  if (text.includes("bed") || text.includes("mattress") || text.includes("cot")) return "🛏️";
+  if (text.includes("sofa") || text.includes("couch") || text.includes("recliner") || text.includes("living")) return "🛋️";
+  if (text.includes("chair") || text.includes("stool") || text.includes("seating")) return "🪑";
+  if (text.includes("table") || text.includes("desk") || text.includes("dining")) return "🍽️";
+  if (text.includes("alna") || text.includes("wardrobe") || text.includes("cupboard") || text.includes("closet") || text.includes("storage")) return "🚪";
+  if (text.includes("ac") || text.includes("conditioner") || text.includes("cooler") || text.includes("cooling")) return "❄️";
+  if (text.includes("tv") || text.includes("television") || text.includes("audio") || text.includes("video")) return "📺";
+  if (text.includes("fridge") || text.includes("refrigerator")) return "🧊";
+  if (text.includes("wash") || text.includes("laundry")) return "🧺";
+  if (text.includes("appliance") || text.includes("electronic") || text.includes("home appliance")) return "⚡";
+  if (text.includes("kitchen") || text.includes("cook")) return "🍳";
+  if (text.includes("office")) return "💼";
+  if (text.includes("furniture")) return "🛋️";
+  return "📦";
 }
 
 function resolveItemSpecs(p: PimProduct): string[] {
@@ -479,6 +546,115 @@ export default function ProductCatalogShareModal({
     searchFilter,
   ]);
 
+  // Structured Category Hierarchy: Main Category -> Subcategories -> Items
+  const categoryHierarchy = useMemo<MainCategoryGroup[]>(() => {
+    const mainMap = new Map<string, Map<string, ResolvedCatalogItem[]>>();
+
+    for (const item of activeItems) {
+      const { mainCategory, subcategory } = parseCategoryHierarchy(item);
+      if (!mainMap.has(mainCategory)) {
+        mainMap.set(mainCategory, new Map<string, ResolvedCatalogItem[]>());
+      }
+      const subMap = mainMap.get(mainCategory)!;
+      if (!subMap.has(subcategory)) {
+        subMap.set(subcategory, []);
+      }
+      subMap.get(subcategory)!.push(item);
+    }
+
+    const result: MainCategoryGroup[] = [];
+
+    // Sort main categories
+    const sortedMainKeys = Array.from(mainMap.keys()).sort((a, b) => {
+      const order = ["Furniture", "Home Appliances", "Electronics", "Office Furniture", "Living Room", "Bedroom"];
+      const idxA = order.indexOf(a);
+      const idxB = order.indexOf(b);
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+      return a.localeCompare(b);
+    });
+
+    for (const mainCat of sortedMainKeys) {
+      const subMap = mainMap.get(mainCat)!;
+      const sortedSubKeys = Array.from(subMap.keys()).sort((a, b) => a.localeCompare(b));
+      const subcatGroups: CategorySubcategoryGroup[] = [];
+      let totalMainItems = 0;
+
+      for (const subCat of sortedSubKeys) {
+        const itemsInSub = subMap.get(subCat)!;
+        totalMainItems += itemsInSub.length;
+
+        const pricedItems = itemsInSub.filter((i) => i.hasPrice);
+        const prices = pricedItems.map((i) => i.basePrice);
+        const minPrice = prices.length ? Math.min(...prices) : 0;
+        const maxPrice = prices.length ? Math.max(...prices) : 0;
+
+        const rentMonthlyPrices = pricedItems.map((i) => i.rentMonthly).filter((m) => m > 0);
+        const minRent = rentMonthlyPrices.length ? Math.min(...rentMonthlyPrices) : 0;
+
+        const leaseMonthlyPrices = pricedItems.map((i) => i.leaseMonthly).filter((m) => m > 0);
+        const minLease = leaseMonthlyPrices.length ? Math.min(...leaseMonthlyPrices) : 0;
+
+        const sfemiMonthlyPrices = pricedItems.map((i) => i.sfemiMonthly).filter((m) => m > 0);
+        const minSfemi = sfemiMonthlyPrices.length ? Math.min(...sfemiMonthlyPrices) : 0;
+
+        const slug = `cat-${mainCat.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${subCat.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+
+        subcatGroups.push({
+          id: slug,
+          categoryName: mainCat,
+          subcategoryName: subCat,
+          displayCategory: mainCat,
+          displaySubcategory: subCat,
+          fullLabel: `${mainCat} / ${subCat}`,
+          icon: getCategoryIcon(mainCat, subCat),
+          items: itemsInSub,
+          itemCount: itemsInSub.length,
+          minPrice,
+          maxPrice,
+          hasPricedItems: pricedItems.length > 0,
+          minRentMonthly: minRent,
+          minLeaseMonthly: minLease,
+          minSfemiMonthly: minSfemi,
+        });
+      }
+
+      result.push({
+        categoryName: mainCat,
+        icon: getCategoryIcon(mainCat),
+        totalItems: totalMainItems,
+        subcategories: subcatGroups,
+      });
+    }
+
+    return result;
+  }, [activeItems]);
+
+  const flatSubcategoryGroups = useMemo<CategorySubcategoryGroup[]>(() => {
+    return categoryHierarchy.flatMap((main) => main.subcategories);
+  }, [categoryHierarchy]);
+
+  const selectGroupItems = (groupItems: ResolvedCatalogItem[]) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const item of groupItems) {
+        next.add(item.id);
+      }
+      return next;
+    });
+  };
+
+  const deselectGroupItems = (groupItems: ResolvedCatalogItem[]) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const item of groupItems) {
+        next.delete(item.id);
+      }
+      return next;
+    });
+  };
+
   // Initialize selectedIds with priced items (or all items if excludeUnpriced is off)
   useEffect(() => {
     const validIds = new Set<number>();
@@ -542,6 +718,21 @@ export default function ProductCatalogShareModal({
   const totalBaseCount = resolvedItems.filter((i) => !i.isChild).length;
   const totalVariantCount = resolvedItems.filter((i) => i.isChild).length;
   const pricedCount = resolvedItems.filter((i) => i.hasPrice).length;
+
+  const totalInteractiveCols =
+    4 +
+    (schemes.direct_sale ? 1 : 0) +
+    (schemes.rent ? selectedRentTenures.length : 0) +
+    (schemes.lease ? selectedLeaseTenures.length : 0) +
+    (schemes.sfemi ? selectedSfemiTenures.length : 0) +
+    1;
+
+  const totalPrintCols =
+    4 +
+    (schemes.direct_sale ? 1 : 0) +
+    (schemes.rent ? selectedRentTenures.length : 0) +
+    (schemes.lease ? selectedLeaseTenures.length : 0) +
+    (schemes.sfemi ? selectedSfemiTenures.length : 0);
 
   // Selection actions
   const selectAllPriced = () => {
@@ -650,6 +841,15 @@ export default function ProductCatalogShareModal({
       ""
     );
 
+    if (categoryHierarchy.length > 0) {
+      lines.push("📂 *CATALOG CATEGORIES & INDEX:*");
+      for (const main of categoryHierarchy) {
+        const subList = main.subcategories.map((s) => `${s.displaySubcategory} (${s.itemCount})`).join(", ");
+        lines.push(`• ${main.icon} *${main.categoryName}:* ${subList}`);
+      }
+      lines.push("------------------------------------------", "");
+    }
+
     const roots = activeItems.filter((i) => !i.isChild);
     const orphans = activeItems.filter((i) => i.isChild && !roots.some((r) => r.id === i.parentId));
 
@@ -742,6 +942,7 @@ export default function ProductCatalogShareModal({
     selectedSfemiTenures,
     origin,
     businessInfo,
+    categoryHierarchy,
   ]);
 
   // URL-safe summary message that NEVER triggers ERR_CONNECTION_CLOSED
@@ -761,6 +962,15 @@ export default function ProductCatalogShareModal({
       `Hello! Here is the pricing overview for your selected ${activeItems.length} product(s):`,
       ""
     );
+
+    if (categoryHierarchy.length > 0) {
+      lines.push("📂 *CATEGORIES INCLUDED:*");
+      for (const main of categoryHierarchy) {
+        const subList = main.subcategories.map((s) => `${s.displaySubcategory} (${s.itemCount})`).join(", ");
+        lines.push(`• ${main.icon} *${main.categoryName}* [${main.totalItems}]: ${subList}`);
+      }
+      lines.push("------------------------------------------", "");
+    }
 
     const sample = activeItems.slice(0, 3);
     sample.forEach((item, i) => {
@@ -804,6 +1014,7 @@ export default function ProductCatalogShareModal({
     selectedSfemiTenures,
     origin,
     businessInfo,
+    categoryHierarchy,
   ]);
 
   // Copy helper
@@ -845,10 +1056,12 @@ export default function ProductCatalogShareModal({
   // Generate standalone, self-contained HTML document for pixel-perfect multi-page A4 printing
   const generateFullPrintDocumentHtml = (layout: "matrix" | "cards"): string => {
     const headerEl = document.getElementById("print-sheet-header");
+    const indexEl = document.getElementById("catalog-context-index");
     const footerEl = document.getElementById("print-sheet-footer");
     const bodyEl = document.getElementById(layout === "matrix" ? "print-matrix-section" : "print-cards-section");
 
     const headerHtml = headerEl ? headerEl.innerHTML : "";
+    const indexHtml = indexEl ? indexEl.outerHTML : "";
     const bodyHtml = bodyEl ? bodyEl.innerHTML : "";
     const footerHtml = footerEl ? footerEl.innerHTML : "";
 
@@ -862,6 +1075,9 @@ export default function ProductCatalogShareModal({
     @page {
       size: A4 portrait;
       margin: 8mm 8mm 10mm 8mm;
+    }
+    html {
+      scroll-behavior: smooth;
     }
     *, *::before, *::after {
       box-sizing: border-box;
@@ -893,6 +1109,11 @@ export default function ProductCatalogShareModal({
       align-items: flex-start;
       gap: 16px;
     }
+    .index-box {
+      margin-bottom: 12px;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
     .footer-box {
       border-top: 2px solid #000000;
       padding-top: 10px;
@@ -902,6 +1123,22 @@ export default function ProductCatalogShareModal({
       align-items: flex-start;
       font-size: 8.5px;
       color: #374151;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    /* Category Section Banner Styling */
+    .category-section-banner {
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+      page-break-after: avoid !important;
+      break-after: avoid !important;
+      margin-top: 10px !important;
+      margin-bottom: 6px !important;
+    }
+    tr.category-section-banner td {
+      background-color: #18181b !important;
+      color: #ffffff !important;
+    }
       page-break-inside: avoid;
       break-inside: avoid;
     }
@@ -1082,6 +1319,7 @@ export default function ProductCatalogShareModal({
 <body>
   <div class="print-wrapper">
     <div class="header-box">${headerHtml}</div>
+    ${indexHtml ? `<div class="index-box">${indexHtml}</div>` : ""}
     <div class="body-box">${bodyHtml}</div>
     <div class="footer-box">${footerHtml}</div>
   </div>
@@ -1683,15 +1921,63 @@ export default function ProductCatalogShareModal({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {activeItems.map((item) => {
-                      const sItem = findServerItem(item.id);
-                      const price = item.basePrice;
+                    {flatSubcategoryGroups.length === 0 ? (
+                      <tr>
+                        <td colSpan={totalInteractiveCols} className="px-3 py-8 text-center text-muted-foreground text-xs">
+                          No products match the selected criteria.
+                        </td>
+                      </tr>
+                    ) : (
+                      flatSubcategoryGroups.map((group) => (
+                        <Fragment key={`interactive-${group.id}`}>
+                          <tr className="bg-muted/70 border-y border-border">
+                            <td colSpan={totalInteractiveCols} className="px-3 py-1.5">
+                              <div className="flex items-center justify-between flex-wrap gap-2">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-sm">{group.icon}</span>
+                                  <span className="font-bold text-xs uppercase text-foreground">
+                                    {group.categoryName} › {group.subcategoryName}
+                                  </span>
+                                  <span className="text-[10px] font-mono text-muted-foreground">
+                                    ({group.itemCount} {group.itemCount === 1 ? "item" : "items"})
+                                  </span>
+                                  {group.hasPricedItems && (
+                                    <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-medium">
+                                      {schemes.rent && group.minRentMonthly > 0
+                                        ? `Rent from ₹${group.minRentMonthly.toLocaleString("en-IN")}/mo`
+                                        : `From ${formatCurrency(group.minPrice)}`}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 text-xs">
+                                  <button
+                                    type="button"
+                                    onClick={() => selectGroupItems(group.items)}
+                                    className="text-[11px] text-primary hover:underline font-semibold cursor-pointer"
+                                  >
+                                    Select All ({group.itemCount})
+                                  </button>
+                                  <span className="text-muted-foreground/40">·</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => deselectGroupItems(group.items)}
+                                    className="text-[11px] text-muted-foreground hover:underline cursor-pointer"
+                                  >
+                                    Deselect
+                                  </button>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                          {group.items.map((item) => {
+                            const sItem = findServerItem(item.id);
+                            const price = item.basePrice;
 
-                      return (
-                        <tr
-                          key={item.id}
-                          className={`hover:bg-muted/30 transition ${item.isChild ? "bg-muted/5" : ""} ${!item.hasPrice ? "opacity-75" : ""}`}
-                        >
+                            return (
+                              <tr
+                                key={item.id}
+                                className={`hover:bg-muted/30 transition ${item.isChild ? "bg-muted/5" : ""} ${!item.hasPrice ? "opacity-75" : ""}`}
+                              >
                           <td className="px-3 py-2 text-center">
                             <input
                               type="checkbox"
@@ -1891,7 +2177,10 @@ export default function ProductCatalogShareModal({
                         </tr>
                       );
                     })}
-                  </tbody>
+                  </Fragment>
+                ))
+              )}
+            </tbody>
                 </table>
               </div>
             </div>
@@ -2285,6 +2574,85 @@ export default function ProductCatalogShareModal({
               </div>
             </div>
 
+            {/* Catalog Context & Category Index Page / Table of Contents */}
+            {categoryHierarchy.length > 0 && (
+              <div
+                id="catalog-context-index"
+                className="rounded-xl border-2 border-black bg-zinc-50 p-3 space-y-2.5 break-inside-avoid shadow-2xs"
+              >
+                <div className="flex items-center justify-between border-b border-gray-300 pb-1.5 flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">📑</span>
+                    <div>
+                      <h2 className="text-xs font-black uppercase tracking-wider text-black">
+                        Catalog Context &amp; Category Index
+                      </h2>
+                      <p className="text-[9px] text-gray-600">
+                        Table of contents by Department &amp; Subcategory with product counts and starting rates. Click any link to jump directly to that section.
+                      </p>
+                    </div>
+                  </div>
+                  <span className="px-2 py-0.5 rounded bg-black text-white text-[8.5px] font-bold">
+                    {categoryHierarchy.length} Main Categories · {flatSubcategoryGroups.length} Subcategories
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                  {categoryHierarchy.map((main) => (
+                    <div
+                      key={main.categoryName}
+                      className="rounded-lg border border-gray-300 bg-white p-2 flex flex-col justify-between"
+                    >
+                      <div className="flex items-center justify-between border-b border-gray-200 pb-1 mb-1.5">
+                        <span className="font-black text-[10px] text-black uppercase flex items-center gap-1">
+                          <span>{main.icon}</span>
+                          <span>{main.categoryName}</span>
+                        </span>
+                        <span className="text-[8.5px] font-bold px-1.5 py-0.2 rounded bg-gray-100 text-gray-800 border border-gray-200">
+                          {main.totalItems} items
+                        </span>
+                      </div>
+
+                      <div className="space-y-1">
+                        {main.subcategories.map((sub) => {
+                          const anchorTarget = printLayout === "cards" ? `#cards-${sub.id}` : `#${sub.id}`;
+                          return (
+                            <div
+                              key={sub.id}
+                              className="flex items-center justify-between text-[9px] py-0.5 px-1 rounded hover:bg-gray-50 border border-transparent hover:border-gray-200 transition"
+                            >
+                              <a
+                                href={anchorTarget}
+                                className="font-bold text-blue-700 hover:text-blue-900 hover:underline flex items-center gap-1 truncate max-w-[150px]"
+                                title={`Jump to ${sub.displaySubcategory}`}
+                              >
+                                <span>›</span>
+                                <span className="truncate">{sub.displaySubcategory}</span>
+                              </a>
+                              <div className="flex items-center gap-1.5 text-right shrink-0">
+                                <span className="font-mono text-[8px] text-gray-500">
+                                  {sub.itemCount} {sub.itemCount === 1 ? "item" : "items"}
+                                </span>
+                                {sub.hasPricedItems ? (
+                                  <span className="text-[8px] font-semibold text-emerald-800 bg-emerald-50 px-1 rounded border border-emerald-200">
+                                    {schemes.rent && sub.minRentMonthly > 0
+                                      ? `₹${sub.minRentMonthly.toLocaleString("en-IN")}/mo`
+                                      : formatCurrency(sub.minPrice)}
+                                  </span>
+                                ) : (
+                                  <span className="text-[7.5px] text-gray-400">On req</span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Matrix Table Section (Always present in DOM so SVGs and table can be printed) */}
             <div
               id="print-matrix-section"
@@ -2320,12 +2688,38 @@ export default function ProductCatalogShareModal({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-300">
-                  {activeItems.map((item) => {
-                    const sItem = findServerItem(item.id);
-                    const price = item.basePrice;
+                  {flatSubcategoryGroups.map((group) => (
+                    <Fragment key={`print-${group.id}`}>
+                      <tr id={group.id} className="category-section-banner break-inside-avoid bg-zinc-900 text-white">
+                        <td colSpan={totalPrintCols} className="px-2.5 py-1.5 font-bold">
+                          <div className="flex items-center justify-between flex-wrap gap-2 text-white">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-sm">{group.icon}</span>
+                              <span className="text-[10px] font-black uppercase tracking-wider text-white">
+                                {group.categoryName} › {group.subcategoryName}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-[9px]">
+                              <span className="px-1.5 py-0.2 rounded bg-white/20 text-white font-mono">
+                                {group.itemCount} {group.itemCount === 1 ? "Product" : "Products"}
+                              </span>
+                              {group.hasPricedItems && (
+                                <span className="text-emerald-300 font-semibold">
+                                  {schemes.rent && group.minRentMonthly > 0
+                                    ? `Rent from ₹${group.minRentMonthly.toLocaleString("en-IN")}/mo`
+                                    : `From ${formatCurrency(group.minPrice)}`}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                      {group.items.map((item) => {
+                        const sItem = findServerItem(item.id);
+                        const price = item.basePrice;
 
-                    return (
-                      <tr key={item.id} className="break-inside-avoid">
+                        return (
+                          <tr key={item.id} className="break-inside-avoid">
                         <td className="px-2 py-2 align-middle">
                           <div className="flex flex-col items-center p-0.5 rounded bg-white border border-gray-300 w-12 shrink-0">
                             <QRCode
@@ -2429,21 +2823,47 @@ export default function ProductCatalogShareModal({
                       </tr>
                     );
                   })}
-                </tbody>
+                </Fragment>
+              ))}
+            </tbody>
               </table>
             </div>
 
             {/* Cards Grid Section (Always present in DOM so SVGs and cards can be printed) */}
             <div
               id="print-cards-section"
-              className="grid grid-cols-1 md:grid-cols-2 gap-3"
-              style={{ display: printLayout === "cards" ? "grid" : "none" }}
+              className="space-y-4"
+              style={{ display: printLayout === "cards" ? "block" : "none" }}
             >
-              {activeItems.map((item) => (
-                <div
-                  key={item.id}
-                  className="print-card-item rounded-xl border border-gray-300 p-3 bg-white flex flex-col justify-between gap-2.5 break-inside-avoid shadow-2xs"
-                >
+              {flatSubcategoryGroups.map((group) => (
+                <div key={group.id} id={`cards-${group.id}`} className="space-y-2.5 break-inside-avoid">
+                  <div className="category-section-banner rounded-lg bg-zinc-900 text-white px-3 py-1.5 flex items-center justify-between break-inside-avoid">
+                    <div className="flex items-center gap-2">
+                      <span>{group.icon}</span>
+                      <span className="text-xs font-black uppercase tracking-wide">
+                        {group.categoryName} › {group.subcategoryName}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-[9px]">
+                      <span className="font-mono px-2 py-0.5 rounded bg-white/20 text-white font-bold">
+                        {group.itemCount} {group.itemCount === 1 ? "Item" : "Items"}
+                      </span>
+                      {group.hasPricedItems && (
+                        <span className="text-emerald-300 font-semibold">
+                          {schemes.rent && group.minRentMonthly > 0
+                            ? `Rent from ₹${group.minRentMonthly.toLocaleString("en-IN")}/mo`
+                            : `From ${formatCurrency(group.minPrice)}`}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {group.items.map((item) => (
+                      <div
+                        key={item.id}
+                        className="print-card-item rounded-xl border border-gray-300 p-3 bg-white flex flex-col justify-between gap-2.5 break-inside-avoid shadow-2xs"
+                      >
                   <div className="flex items-start gap-3">
                     <div className="flex flex-col items-center justify-center p-1.5 rounded-lg bg-white border border-gray-300 shrink-0">
                       <QRCode
@@ -2565,6 +2985,9 @@ export default function ProductCatalogShareModal({
                 </div>
               ))}
             </div>
+          </div>
+        ))}
+      </div>
 
             {/* Print Footer */}
             <div id="print-sheet-footer" className="pt-3 border-t-2 border-black text-[9px] text-gray-700 leading-normal flex items-start justify-between gap-4">
