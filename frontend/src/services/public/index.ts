@@ -577,6 +577,7 @@ export async function listPublicProducts(options?: {
   subcategory?: string;
   min_price?: number;
   max_price?: number;
+  ordering?: string;
   include_variants?: boolean;
   /** Server renders only: cache the response for this many seconds. */
   revalidate?: number;
@@ -594,6 +595,7 @@ export async function listPublicProducts(options?: {
   if (options?.subcategory) params.set("subcategory", options.subcategory);
   if (options?.min_price) params.set("min_price", String(options.min_price));
   if (options?.max_price) params.set("max_price", String(options.max_price));
+  if (options?.ordering) params.set("ordering", options.ordering);
   if (options?.include_variants) params.set("include_variants", "true");
 
   const qs = params.toString() ? `?${params.toString()}` : "";

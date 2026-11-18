@@ -160,15 +160,15 @@ export default function PublicProductInteractiveDetail({
 
   return (
     <>
-      <section className="public-surface relative overflow-hidden p-6 sm:p-8 lg:p-10">
+      <section className="public-surface relative overflow-hidden p-3.5 sm:p-6 lg:p-10">
         <div className="pointer-events-none absolute inset-x-14 top-0 h-px bg-gradient-to-r from-transparent via-[var(--surface-border-strong)]/70 to-transparent" />
 
         {/* Back to base product link — shown on variant pages */}
         {isVariantPage && initialProduct.parent_product_id && (
-          <div className="mb-6">
+          <div className="mb-4 sm:mb-6">
             <Link
               href={`/products/${initialProduct.parent_product_code || initialProduct.parent_product_id}`}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-border/70 bg-background px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-border/70 bg-background px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
               View all variants of this product
@@ -176,7 +176,7 @@ export default function PublicProductInteractiveDetail({
           </div>
         )}
 
-        <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
+        <div className="grid gap-5 lg:gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
           <div className="space-y-4">
             <PublicProductDetailMedia
               product={displayProduct}

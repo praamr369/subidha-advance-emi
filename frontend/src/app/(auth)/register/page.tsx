@@ -434,21 +434,21 @@ export default function RegisterPage() {
       </section>
 
       {/* Right Panel - Form */}
-      <section className="relative flex flex-col items-center justify-center py-10">
-        <div className="relative mx-auto w-full max-w-[34rem] px-6 sm:px-8">
-          <div className="xl:hidden mb-8">
-            <AuthBrand tone="light" className="dark:hidden" />
-            <AuthBrand tone="dark" className="hidden dark:flex" />
+      <section className="relative flex flex-col items-center justify-center py-6 sm:py-10">
+        <div className="relative mx-auto w-full max-w-[34rem] px-3 sm:px-8">
+          <div className="xl:hidden mb-5">
+            <AuthBrand compact tone="light" className="dark:hidden" />
+            <AuthBrand compact tone="dark" className="hidden dark:flex" />
           </div>
-          <div className="mb-6 xl:hidden">
+          <div className="mb-5 xl:hidden">
             <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
               <ShieldCheck className="h-3.5 w-3.5" />
               Customer Registration
             </div>
-            <h1 className="mt-4 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+            <h1 className="mt-3 text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
               {t("auth.register.mobileFormTitle")}
             </h1>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            <p className="mt-1 text-xs sm:text-sm leading-5 sm:leading-6 text-muted-foreground">
               {t("auth.register.mobileFormDesc")}
             </p>
           </div>
@@ -467,11 +467,11 @@ export default function RegisterPage() {
           </div>
 
           {/* Quick 1-Click Google Customer Registration */}
-          <div className="mb-6 rounded-3xl border border-border bg-card p-5 shadow-sm space-y-3">
+          <div className="mb-5 sm:mb-6 rounded-2xl sm:rounded-3xl border border-border bg-card p-4 sm:p-5 shadow-sm space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-sm font-semibold text-foreground">Fast Customer Registration with Google</div>
-                <p className="text-xs text-muted-foreground mt-0.5">Instant registration with your Gmail ID (100% Free)</p>
+                <div className="text-xs sm:text-sm font-semibold text-foreground">Fast Customer Registration with Google</div>
+                <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5">Instant registration with your Gmail ID (100% Free)</p>
               </div>
             </div>
             <GoogleSignInButton
@@ -482,172 +482,180 @@ export default function RegisterPage() {
             />
           </div>
 
-          <div className="relative flex items-center justify-center mb-6">
+          <div className="relative flex items-center justify-center mb-5 sm:mb-6">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-border" />
             </div>
-            <div className="relative bg-background px-3 text-xs uppercase tracking-wider text-muted-foreground">
+            <div className="relative bg-background px-3 text-[11px] sm:text-xs uppercase tracking-wider text-muted-foreground">
               or register manually below
             </div>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Identity Details */}
-            <div className="rounded-3xl border border-border bg-card p-4 shadow-sm sm:p-6">
-              <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+            <div className="rounded-2xl sm:rounded-3xl border border-border bg-card p-4 shadow-sm sm:p-6">
+              <div className="mb-4 sm:mb-6 flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <h3 className="text-lg font-semibold text-card-foreground">
+                  <h3 className="text-base sm:text-lg font-semibold text-card-foreground">
                     {t("auth.register.identitySectionTitle")}
                   </h3>
-                  <p className="mt-1 text-sm text-muted-foreground">
+                  <p className="mt-1 text-xs sm:text-sm text-muted-foreground">
                     {t("auth.register.identitySectionDesc")}
                   </p>
                 </div>
-                <div className="rounded-2xl border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
+                <div className="rounded-xl sm:rounded-2xl border border-border bg-background px-2.5 py-1 sm:px-3 sm:py-2 text-[11px] sm:text-xs text-muted-foreground">
                   {t("auth.register.step1Label")}
                 </div>
               </div>
 
-                <div className="grid gap-5 md:grid-cols-2">
-                  <div className="space-y-2 md:col-span-2">
-                    <label
-                      htmlFor="username"
-                      className="text-sm font-medium text-foreground"
-                    >
-                      {t("auth.register.usernameLabel")}
-                    </label>
-                    <div className="relative">
-                      <UserRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <input
-                        id="username"
-                        name="username"
-                        autoComplete="username"
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                        placeholder={t("auth.register.usernamePlaceholder")}
-                        className="h-12 w-full rounded-xl border border-border bg-card pl-10 pr-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:border-[var(--ring)] focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
-                        required
-                        disabled={submitting}
-                      />
-                    </div>
-                    {fieldErrors.username ? <p className="text-sm text-destructive">{fieldErrors.username}</p> : null}
+              <div className="grid gap-4 sm:gap-5 md:grid-cols-2">
+                <div className="space-y-1.5 sm:space-y-2 md:col-span-2">
+                  <label
+                    htmlFor="username"
+                    className="text-xs sm:text-sm font-medium text-foreground"
+                  >
+                    {t("auth.register.usernameLabel")}
+                  </label>
+                  <div className="relative">
+                    <UserRound className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      id="username"
+                      name="username"
+                      autoComplete="username"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      placeholder={t("auth.register.usernamePlaceholder")}
+                      className="h-12 w-full rounded-xl border border-border bg-card pl-10 pr-3 text-base sm:text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:border-[var(--ring)] focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
+                      required
+                      disabled={submitting}
+                    />
                   </div>
+                  {fieldErrors.username ? <p className="text-xs sm:text-sm text-destructive">{fieldErrors.username}</p> : null}
+                </div>
 
-                <div className="space-y-2">
+                <div className="space-y-1.5 sm:space-y-2">
                   <label
                     htmlFor="phone"
-                    className="text-sm font-medium text-foreground"
+                    className="text-xs sm:text-sm font-medium text-foreground"
                   >
                     {t("auth.register.phoneLabel")}
                   </label>
                   <div className="relative">
-                    <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Phone className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <input
                       id="phone"
                       name="phone"
+                      type="tel"
+                      inputMode="tel"
                       autoComplete="tel"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
                       placeholder={t("auth.register.phonePlaceholder")}
-                      className="h-12 w-full rounded-xl border border-border bg-card pl-10 pr-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:border-[var(--ring)] focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
+                      className="h-12 w-full rounded-xl border border-border bg-card pl-10 pr-3 text-base sm:text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:border-[var(--ring)] focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
                       required
                       disabled={submitting}
                     />
                   </div>
-                  {fieldErrors.phone ? <p className="text-sm text-destructive">{fieldErrors.phone}</p> : null}
+                  {fieldErrors.phone ? <p className="text-xs sm:text-sm text-destructive">{fieldErrors.phone}</p> : null}
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-1.5 sm:space-y-2">
                   <label
                     htmlFor="email"
-                    className="text-sm font-medium text-foreground"
+                    className="text-xs sm:text-sm font-medium text-foreground"
                   >
                     {t("auth.register.emailLabel")}
                   </label>
                   <div className="relative">
-                    <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <input
                       id="email"
                       name="email"
                       type="email"
+                      inputMode="email"
+                      autoCapitalize="none"
                       autoComplete="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder={t("auth.register.emailPlaceholder")}
-                      className="h-12 w-full rounded-xl border border-border bg-card pl-10 pr-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:border-[var(--ring)] focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
+                      className="h-12 w-full rounded-xl border border-border bg-card pl-10 pr-3 text-base sm:text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:border-[var(--ring)] focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
                       required
                       disabled={submitting}
                     />
                   </div>
-                  {fieldErrors.email ? <p className="text-sm text-destructive">{fieldErrors.email}</p> : null}
+                  {fieldErrors.email ? <p className="text-xs sm:text-sm text-destructive">{fieldErrors.email}</p> : null}
                 </div>
 
-                <div className="space-y-2">
-                  <label
-                    htmlFor="firstName"
-                    className="text-sm font-medium text-foreground"
-                  >
-                    {t("auth.register.firstNameLabel")}
-                  </label>
-                  <input
-                    id="firstName"
-                    name="firstName"
-                    autoComplete="given-name"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    placeholder={t("auth.register.firstNamePlaceholder")}
-                    className="h-12 w-full rounded-xl border border-border bg-card px-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:border-[var(--ring)] focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
-                    disabled={submitting}
-                  />
-                </div>
+                <div className="grid grid-cols-2 gap-3 md:col-span-2">
+                  <div className="space-y-1.5 sm:space-y-2">
+                    <label
+                      htmlFor="firstName"
+                      className="text-xs sm:text-sm font-medium text-foreground"
+                    >
+                      {t("auth.register.firstNameLabel")}
+                    </label>
+                    <input
+                      id="firstName"
+                      name="firstName"
+                      autoComplete="given-name"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      placeholder={t("auth.register.firstNamePlaceholder")}
+                      className="h-12 w-full rounded-xl border border-border bg-card px-3 text-base sm:text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:border-[var(--ring)] focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
+                      disabled={submitting}
+                    />
+                  </div>
 
-                <div className="space-y-2">
-                  <label
-                    htmlFor="lastName"
-                    className="text-sm font-medium text-foreground"
-                  >
-                    {t("auth.register.lastNameLabel")}
-                  </label>
-                  <input
-                    id="lastName"
-                    name="lastName"
-                    autoComplete="family-name"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    placeholder={t("auth.register.lastNamePlaceholder")}
-                    className="h-12 w-full rounded-xl border border-border bg-card px-3 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:border-[var(--ring)] focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
-                    disabled={submitting}
-                  />
+                  <div className="space-y-1.5 sm:space-y-2">
+                    <label
+                      htmlFor="lastName"
+                      className="text-xs sm:text-sm font-medium text-foreground"
+                    >
+                      {t("auth.register.lastNameLabel")}
+                    </label>
+                    <input
+                      id="lastName"
+                      name="lastName"
+                      autoComplete="family-name"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      placeholder={t("auth.register.lastNamePlaceholder")}
+                      className="h-12 w-full rounded-xl border border-border bg-card px-3 text-base sm:text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:border-[var(--ring)] focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
+                      disabled={submitting}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* Password Setup */}
-            <div className="rounded-3xl border border-border bg-card p-4 shadow-sm sm:p-6">
-              <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+            <div className="rounded-2xl sm:rounded-3xl border border-border bg-card p-4 shadow-sm sm:p-6">
+              <div className="mb-4 sm:mb-6 flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <h3 className="text-lg font-semibold text-card-foreground">
+                  <h3 className="text-base sm:text-lg font-semibold text-card-foreground">
                     {t("auth.register.passwordSetupTitle")}
                   </h3>
-                  <p className="mt-1 text-sm text-muted-foreground">
+                  <p className="mt-1 text-xs sm:text-sm text-muted-foreground">
                     {t("auth.register.passwordSetupDesc")}
                   </p>
                 </div>
-                <div className="rounded-2xl border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
+                <div className="rounded-xl sm:rounded-2xl border border-border bg-background px-2.5 py-1 sm:px-3 sm:py-2 text-[11px] sm:text-xs text-muted-foreground">
                   {t("auth.register.step2Label")}
                 </div>
               </div>
 
-              <div className="grid gap-5 md:grid-cols-2">
-                <div className="space-y-2">
+              <div className="grid gap-4 sm:gap-5 md:grid-cols-2">
+                <div className="space-y-1.5 sm:space-y-2">
                   <label
                     htmlFor="password"
-                    className="text-sm font-medium text-foreground"
+                    className="text-xs sm:text-sm font-medium text-foreground"
                   >
                     {t("auth.register.passwordLabel")}
                   </label>
                   <div className="relative">
-                    <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <input
                       id="password"
                       name="password"
@@ -656,7 +664,7 @@ export default function RegisterPage() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder={t("auth.register.passwordPlaceholder")}
-                      className="h-12 w-full rounded-xl border border-border bg-card pl-10 pr-11 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:border-[var(--ring)] focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
+                      className="h-12 w-full rounded-xl border border-border bg-card pl-10 pr-12 text-base sm:text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:border-[var(--ring)] focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
                       required
                       disabled={submitting}
                     />
@@ -664,7 +672,7 @@ export default function RegisterPage() {
                       type="button"
                       onClick={() => setShowPassword((prev) => !prev)}
                       disabled={submitting}
-                      className="absolute right-3 top-1/2 inline-flex -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2 disabled:opacity-50"
+                      className="absolute right-1 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground transition hover:text-foreground touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 disabled:opacity-50"
                       aria-label={
                         showPassword ? "Hide password" : "Show password"
                       }
@@ -677,7 +685,7 @@ export default function RegisterPage() {
                     </button>
                   </div>
 
-                  {fieldErrors.password ? <p className="text-sm text-destructive">{fieldErrors.password}</p> : null}
+                  {fieldErrors.password ? <p className="text-xs sm:text-sm text-destructive">{fieldErrors.password}</p> : null}
                   <div className="workspace-filter-bar space-y-2 p-3">
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-muted-foreground">
@@ -700,15 +708,15 @@ export default function RegisterPage() {
                   </div>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-1.5 sm:space-y-2">
                   <label
                     htmlFor="confirmPassword"
-                    className="text-sm font-medium text-foreground"
+                    className="text-xs sm:text-sm font-medium text-foreground"
                   >
                     {t("auth.register.confirmPasswordLabel")}
                   </label>
                   <div className="relative">
-                    <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <input
                       id="confirmPassword"
                       name="confirmPassword"
@@ -717,7 +725,7 @@ export default function RegisterPage() {
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       placeholder={t("auth.register.confirmPasswordPlaceholder")}
-                      className="h-12 w-full rounded-xl border border-border bg-card pl-10 pr-11 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:border-[var(--ring)] focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
+                      className="h-12 w-full rounded-xl border border-border bg-card pl-10 pr-12 text-base sm:text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:border-[var(--ring)] focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
                       required
                       disabled={submitting}
                     />
@@ -725,7 +733,7 @@ export default function RegisterPage() {
                       type="button"
                       onClick={() => setShowConfirmPassword((prev) => !prev)}
                       disabled={submitting}
-                      className="absolute right-3 top-1/2 inline-flex -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2 disabled:opacity-50"
+                      className="absolute right-1 top-1/2 inline-flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground transition hover:text-foreground touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 disabled:opacity-50"
                       aria-label={
                         showConfirmPassword
                           ? "Hide confirm password"
@@ -740,33 +748,33 @@ export default function RegisterPage() {
                     </button>
                   </div>
 
-                  {fieldErrors.confirmPassword ? <p className="text-sm text-destructive">{fieldErrors.confirmPassword}</p> : null}
+                  {fieldErrors.confirmPassword ? <p className="text-xs sm:text-sm text-destructive">{fieldErrors.confirmPassword}</p> : null}
                   <div className="workspace-filter-bar p-3">
                     <div className="text-xs text-muted-foreground">
                       {t("auth.register.accountTypeLabel")}
                     </div>
-                    <div className="mt-1 text-sm font-medium text-foreground">
+                    <div className="mt-1 text-xs sm:text-sm font-medium text-foreground">
                       {t("auth.register.accountTypeValue")}
                     </div>
-                    <div className="mt-3 text-xs leading-5 text-muted-foreground">
+                    <div className="mt-2 text-[11px] sm:text-xs leading-5 text-muted-foreground">
                       {t("auth.register.accountTypeDesc")}
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <div className="mt-4 grid grid-cols-2 gap-2 text-[11px] sm:text-xs">
                 <FieldHint
                   ok={passwordChecks.minLength}
-                  text="At least 8 characters"
+                  text="At least 8 chars"
                 />
                 <FieldHint
                   ok={passwordChecks.hasLetter}
-                  text="Contains a letter"
+                  text="Has letter"
                 />
                 <FieldHint
                   ok={passwordChecks.hasNumber}
-                  text="Contains a number"
+                  text="Has number"
                 />
                 <FieldHint
                   ok={isPasswordConfirmed}
@@ -778,18 +786,18 @@ export default function RegisterPage() {
             {/* Actions & Summary */}
             <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_280px]">
               <div className="space-y-4">
-                <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+                <div className="rounded-2xl border border-blue-200 bg-blue-50 px-3.5 py-3 text-xs sm:text-sm text-blue-800">
                   {t("auth.register.alertText")}
                 </div>
 
                 {error ? (
-                  <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  <div className="rounded-2xl border border-red-200 bg-red-50 px-3.5 py-3 text-xs sm:text-sm text-red-700">
                     {error}
                   </div>
                 ) : null}
 
                 {successMessage ? (
-                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-3.5 py-3 text-xs sm:text-sm text-emerald-700">
                     {successMessage}
                   </div>
                 ) : null}
@@ -798,7 +806,7 @@ export default function RegisterPage() {
                   <ActionButton
                     type="submit"
                     disabled={submitting}
-                    className="public-action-primary h-12 flex-1 justify-center disabled:opacity-50"
+                    className="public-action-primary h-12 sm:h-13 flex-1 text-base font-semibold justify-center shadow-md active:scale-[0.99] transition touch-manipulation disabled:opacity-50"
                   >
                     {submitting ? t("auth.register.creatingAccount") : t("auth.register.createAccountBtn")}
                     {!submitting && <ArrowRight className="h-4 w-4 ml-2" />}
@@ -806,14 +814,14 @@ export default function RegisterPage() {
 
                   <Link
                     href="/login"
-                    className="inline-flex h-11 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
+                    className="inline-flex h-12 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground transition hover:bg-muted touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/35 focus-visible:ring-offset-2"
                   >
                     {t("auth.register.backToSignIn")}
                   </Link>
                 </div>
               </div>
 
-              <aside className="rounded-3xl border border-border bg-card p-4 shadow-sm sm:p-5">
+              <aside className="hidden xl:block rounded-3xl border border-border bg-card p-5 shadow-sm">
                 <h3 className="text-sm font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                   {t("auth.register.summaryTitle")}
                 </h3>

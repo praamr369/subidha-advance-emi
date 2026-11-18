@@ -128,7 +128,7 @@ export const PUBLIC_LANG_COOKIE = "subidha_public_lang";
  */
 export const NON_PUBLIC_PATH_PREFIXES = [
   "/admin", "/cashier", "/customer", "/partner", "/staff", "/vendor",
-  "/login", "/logout", "/register", "/forgot-password", "/reset-password",
+  "/login", "/business", "/logout", "/register", "/forgot-password", "/reset-password",
   "/forms", "/profile", "/settings", "/unauthorized", "/api",
 ] as const;
 

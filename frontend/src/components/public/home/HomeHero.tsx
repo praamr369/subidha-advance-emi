@@ -41,18 +41,18 @@ export default function HomeHero({ copy, title, subtitle, companyName, stats }: 
       )}
     >
       <div className="grid lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
-        <div className="flex flex-col justify-center gap-6 p-6 sm:p-10 lg:p-12">
+        <div className="flex flex-col justify-center gap-4 sm:gap-6 p-4 sm:p-10 lg:p-12">
           <p className={cn("inline-flex w-fit items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold", tone.line, tone.wash, tone.muted)}>
             <MapPin className={cn("h-3.5 w-3.5", tone.accentText)} aria-hidden="true" />
             {companyName} · {brandConfig.publicBranchLocation}
           </p>
 
-          <h1 className={cn("text-balance text-3xl font-semibold leading-[1.18] tracking-tight sm:text-4xl lg:text-5xl", tone.text)}>
+          <h1 className={cn("text-balance text-2xl font-semibold leading-[1.2] tracking-tight sm:text-4xl lg:text-5xl", tone.text)}>
             {title}
           </h1>
-          <p className={cn("max-w-xl text-base leading-7 sm:text-lg sm:leading-8", tone.muted)}>{subtitle}</p>
+          <p className={cn("max-w-xl text-sm leading-6 sm:text-lg sm:leading-8", tone.muted)}>{subtitle}</p>
 
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-2.5 sm:gap-3">
             <Link href={ROUTES.public.products} className="public-action-primary gap-2">
               {copy.explore}
               <ArrowRight className="h-4 w-4" aria-hidden="true" />

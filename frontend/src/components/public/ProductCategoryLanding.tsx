@@ -18,21 +18,25 @@ function formatPrice(value: string | null | undefined): string | null {
 function ProductCard({ product, categoryName, dict }: { product: PublicProduct; categoryName: string; dict: any }) {
   const price = formatPrice(product.base_price);
   const alt = `${product.name} at Subidha Furniture Asansol`;
+  const href = `/products/${product.product_code}`;
   return (
-    <li className="flex flex-col overflow-hidden rounded-2xl border border-border bg-card">
-      <div className="relative aspect-[4/3] w-full bg-muted">
+    <li className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card transition hover:shadow-md">
+      <Link href={href} className="absolute inset-0 z-10">
+        <span className="sr-only">View {product.name}</span>
+      </Link>
+      <div className="relative aspect-[4/3] w-full bg-muted overflow-hidden">
         {product.image ? (
-          <Image src={product.image} alt={alt} fill sizes="(max-width: 768px) 100vw, 33vw" className="object-cover" unoptimized={true} />
+          <Image src={product.image} alt={alt} fill sizes="(max-width: 640px) 50vw, 33vw" className="object-cover transition-transform duration-300 group-hover:scale-105" unoptimized={true} />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-sm text-muted-foreground">
+          <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground p-2 text-center">
             {categoryName} at Subidha Furniture
           </div>
         )}
       </div>
-      <div className="flex flex-1 flex-col gap-1 p-4">
-        <h3 className="text-base font-semibold text-foreground">{product.name}</h3>
-        {price ? <p className="text-sm font-medium text-foreground">{price}</p> : null}
-        <p className="mt-auto pt-2 text-xs text-muted-foreground">{dict.public.ProductCategoryLanding_text2}</p>
+      <div className="flex flex-1 flex-col gap-1 p-2.5 sm:p-4">
+        <h3 className="text-xs sm:text-base font-semibold text-foreground line-clamp-2">{product.name}</h3>
+        {price ? <p className="text-xs sm:text-sm font-bold text-foreground">{price}</p> : null}
+        <p className="mt-auto pt-1 text-[10px] sm:text-xs text-muted-foreground">{dict.public.ProductCategoryLanding_text2}</p>
       </div>
     </li>
   );
@@ -89,7 +93,7 @@ export default async function ProductCategoryLanding({ category }: { category: P
           <section className="flex flex-col gap-4">
             <h2 className="text-xl font-semibold text-foreground">{category.name} at our Asansol showroom</h2>
             {matched.length > 0 ? (
-              <ul className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              <ul className="grid grid-cols-2 gap-2.5 sm:gap-5 sm:grid-cols-2 lg:grid-cols-3">
                 {matched.slice(0, 24).map((product) => (
                   <ProductCard key={product.id} product={product} categoryName={category.name} dict={dict} />
                 ))}

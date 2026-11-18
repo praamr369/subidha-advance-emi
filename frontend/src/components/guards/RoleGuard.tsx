@@ -43,7 +43,18 @@ export default function RoleGuard({
         return;
       }
       const next = pathname || "/";
-      router.replace(`/login?next=${encodeURIComponent(next)}`);
+      const isBusinessScope =
+        pathname?.startsWith("/admin") ||
+        pathname?.startsWith("/partner") ||
+        pathname?.startsWith("/vendor") ||
+        pathname?.startsWith("/staff") ||
+        pathname?.startsWith("/cashier") ||
+        normalizedAllowedRoles.some((r) =>
+          ["ADMIN", "PARTNER", "VENDOR", "STAFF", "CASHIER"].includes(r)
+        );
+
+      const targetLogin = isBusinessScope ? "/business/login" : "/login";
+      router.replace(`${targetLogin}?next=${encodeURIComponent(next)}`);
       return;
     }
 

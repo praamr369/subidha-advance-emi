@@ -43,6 +43,7 @@ export const ROUTES = {
     contractsRent: "/contracts/rent",
     contractsLease: "/contracts/lease",
     login: "/login",
+    businessLogin: "/business/login",
     register: "/register",
     unauthorized: "/unauthorized",
   },

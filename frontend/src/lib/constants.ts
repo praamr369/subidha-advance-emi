@@ -15,6 +15,7 @@ export const API_BASE_URL = ENV_API_BASE_URL;
 export const APP_ROUTES = {
   home: "/",
   login: "/login",
+  businessLogin: "/business/login",
   register: "/register",
   customerDashboard: "/customer",
   partnerDashboard: "/partner",

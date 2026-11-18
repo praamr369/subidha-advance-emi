@@ -12,6 +12,9 @@ type AuthLayoutShellProps = {
   panelDescription?: string;
   className?: string;
   compactMobileBrand?: boolean;
+  badgeLabel?: string;
+  footerBadges?: ReactNode;
+  hideDefaultFooterBadges?: boolean;
 };
 
 const DEFAULT_PANEL_TITLE = "Subidha Furniture secure operations access";
@@ -41,6 +44,9 @@ export default function AuthLayoutShell({
   panelDescription = DEFAULT_PANEL_DESCRIPTION,
   className,
   compactMobileBrand = true,
+  badgeLabel = "Secure Entry",
+  footerBadges,
+  hideDefaultFooterBadges = false,
 }: AuthLayoutShellProps) {
   return (
     <section className={cn("auth-stage w-full", className)}>
@@ -94,38 +100,44 @@ export default function AuthLayoutShell({
         </div>
         </aside>
 
-        <div className="relative flex min-h-full flex-col justify-center bg-background lg:bg-transparent">
-          <div className="relative mx-auto w-full max-w-xl px-4 py-8 sm:px-8 lg:px-10">
-            <div className="mb-5 lg:hidden">
+        <div className="relative flex min-h-full flex-col justify-center bg-transparent">
+          <div className="relative mx-auto w-full max-w-xl px-3 py-4 sm:px-8 sm:py-8 lg:px-10">
+            <div className="mb-4 lg:hidden">
               <AuthBrand compact={compactMobileBrand} tone="light" className="dark:hidden" />
               <AuthBrand compact={compactMobileBrand} tone="dark" className="hidden dark:flex" />
             </div>
 
-            <div className="public-card dark:bg-card dark:border-border dark:shadow-none p-5 sm:p-7">
-              <div className="workspace-pill w-fit px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                <ShieldCheck className="h-3.5 w-3.5" />
-                Secure Entry
+            <div className="public-card dark:bg-card dark:border-border dark:shadow-none p-4 sm:p-7 rounded-2xl sm:rounded-[1.75rem]">
+              <div className="workspace-pill w-fit px-2.5 py-0.5 sm:px-3 sm:py-1 text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                <ShieldCheck className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                {badgeLabel}
               </div>
-              <h1 className="mt-4 text-2xl font-semibold tracking-tight text-foreground sm:text-[1.9rem]">
+              <h1 className="mt-3 sm:mt-4 text-xl sm:text-2xl font-semibold tracking-tight text-foreground sm:text-[1.9rem]">
                 {formTitle}
               </h1>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">{formSubtitle}</p>
-              <div className="mt-6">{children}</div>
+              <p className="mt-1.5 sm:mt-2 text-xs sm:text-sm leading-5 sm:leading-6 text-muted-foreground">{formSubtitle}</p>
+              <div className="mt-5 sm:mt-6">{children}</div>
 
-              <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-border/80 pt-5 text-xs text-muted-foreground">
-                <span className="inline-flex items-center gap-1.5">
-                  <ShieldCheck className="h-3.5 w-3.5" />
-                  Session-safe routing
-                </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <WalletCards className="h-3.5 w-3.5" />
-                  Collections remain audited
-                </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <ArrowUpRight className="h-3.5 w-3.5" />
-                  Use your approved role account
-                </span>
-              </div>
+              {footerBadges ? (
+                <div className="mt-6 border-t border-border/80 pt-4 text-xs text-muted-foreground">
+                  {footerBadges}
+                </div>
+              ) : hideDefaultFooterBadges ? null : (
+                <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-border/80 pt-5 text-xs text-muted-foreground">
+                  <span className="inline-flex items-center gap-1.5">
+                    <ShieldCheck className="h-3.5 w-3.5" />
+                    Session-safe routing
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <WalletCards className="h-3.5 w-3.5" />
+                    Collections remain audited
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <ArrowUpRight className="h-3.5 w-3.5" />
+                    Use your approved role account
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>

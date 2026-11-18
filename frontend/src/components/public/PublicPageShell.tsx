@@ -57,7 +57,7 @@ export default function PublicPageShell({
   return (
     <div
       className={cn(
-        "mx-auto flex w-full flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8 lg:py-10",
+        "mx-auto flex w-full flex-col gap-5 px-3 py-4 sm:gap-8 sm:px-6 lg:px-8 lg:py-10",
         className
       )}
       style={{ maxWidth }}
@@ -73,7 +73,7 @@ export default function PublicPageShell({
       {breadcrumbs.length > 0 ? (
         <nav
           aria-label="Breadcrumb"
-          className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground"
+          className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-muted-foreground"
         >
           {breadcrumbs.map((crumb, index) => {
             const isLast = index === breadcrumbs.length - 1;

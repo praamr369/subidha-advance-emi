@@ -31,7 +31,7 @@ export default function PartnersPage() {
       }}
       actions={[
         { label: "Contact Store", href: ROUTES.public.contact, variant: "secondary" },
-        { label: "Login", href: ROUTES.public.login, variant: "primary" },
+        { label: "Partner Login", href: ROUTES.public.businessLogin, variant: "primary" },
       ]}
     >
       <section className="space-y-4">
@@ -109,7 +109,7 @@ export default function PartnersPage() {
         actions={[
           { href: ROUTES.public.contact, label: "Contact Store", variant: "secondary" },
           { href: ROUTES.public.contracts, label: "Explore Contracts", variant: "secondary" },
-          { href: ROUTES.public.login, label: "Login", variant: "primary" },
+          { href: ROUTES.public.businessLogin, label: "Partner Login", variant: "primary" },
         ]}
       />
     </PublicPageShell>

@@ -2129,6 +2129,15 @@ button {
   box-shadow: 0 30px 90px -58px rgba(15, 23, 42, 0.58);
 }
 
+@media (max-width: 640px) {
+  .public-app .auth-shell {
+    border-radius: 1.25rem;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+  }
+}
+
 .public-app .auth-shell::after {
   content: "";
   position: absolute;

@@ -12,10 +12,15 @@ import { logoutRequest } from "@/services/auth.service";
 export function useLogout() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { logout } = useAuth();
+  const { logout, role } = useAuth();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const handleLogout = useCallback(async () => {
+    const isBusiness = ["ADMIN", "PARTNER", "VENDOR", "STAFF", "CASHIER"].includes(
+      (role || "").trim().toUpperCase()
+    );
+    const targetLogin = isBusiness ? (ROUTES.public.businessLogin || "/business/login") : ROUTES.public.login;
+
     try {
       setIsLoggingOut(true);
 
@@ -42,15 +47,15 @@ export function useLogout() {
 
       if (typeof window !== "undefined") {
         // 4. Hard navigation to completely wipe React memory and ensure a clean login page
-        window.location.replace(ROUTES.public.login + "?logout=1");
+        window.location.replace(`${targetLogin}?logout=1`);
         return;
       }
 
-      router.replace(ROUTES.public.login);
+      router.replace(targetLogin);
       router.refresh();
       setIsLoggingOut(false);
     }
-  }, [logout, queryClient, router]);
+  }, [logout, queryClient, role, router]);
 
   return {
     logout: handleLogout,

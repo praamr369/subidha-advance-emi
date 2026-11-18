@@ -51,9 +51,9 @@ export default function PublicHeroBanner({
   return (
     <section
       className={cn(
-        "public-hero-banner public-hero group relative overflow-hidden p-6 sm:p-8 contain-paint",
+        "public-hero-banner public-hero group relative overflow-hidden p-4 sm:p-8 contain-paint",
         legalVariant ? "ring-1 ring-border/60" : "ring-1 ring-border/50",
-        compact ? "min-h-[14rem]" : "min-h-[20rem]"
+        compact ? "min-h-[10rem] sm:min-h-[14rem]" : "min-h-[12rem] sm:min-h-[20rem]"
       )}
     >
       <div className="pointer-events-none absolute inset-0">
@@ -86,11 +86,11 @@ export default function PublicHeroBanner({
               {eyebrow}
             </div>
           ) : null}
-          <h1 className={cn("mt-2 max-w-3xl font-semibold tracking-tight text-foreground", compact ? "text-3xl sm:text-4xl" : "text-4xl sm:text-5xl")}>
+          <h1 className={cn("mt-2 max-w-3xl font-semibold tracking-tight text-foreground", compact ? "text-2xl sm:text-3xl lg:text-4xl" : "text-2xl sm:text-4xl lg:text-5xl")}>
             {title}
           </h1>
           {subtitle ? (
-            <p className={cn("mt-4 max-w-2xl text-muted-foreground", compact ? "text-sm leading-7" : "text-base leading-7")}>
+            <p className={cn("mt-2 sm:mt-4 max-w-2xl text-muted-foreground", compact ? "text-xs sm:text-sm leading-5 sm:leading-7" : "text-sm sm:text-base leading-6 sm:leading-7")}>
               {subtitle}
             </p>
           ) : null}

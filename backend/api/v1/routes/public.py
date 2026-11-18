@@ -476,6 +476,20 @@ class PublicProductsView(generics.ListAPIView):
             
         if max_price and max_price.isdigit():
             queryset = queryset.filter(base_price__lte=int(max_price))
+
+        ordering = self.request.query_params.get("ordering", "").strip().lower()
+        if ordering == "price_asc":
+            queryset = queryset.order_by("base_price", "id")
+        elif ordering == "price_desc":
+            queryset = queryset.order_by("-base_price", "id")
+        elif ordering == "newest":
+            queryset = queryset.order_by("-id")
+        elif ordering == "random":
+            queryset = queryset.order_by("?")
+        elif ordering == "name_asc":
+            queryset = queryset.order_by("name", "id")
+        elif ordering == "name_desc":
+            queryset = queryset.order_by("-name", "id")
             
         return queryset
 

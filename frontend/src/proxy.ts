@@ -7,6 +7,7 @@ const PUBLIC_PATHS = new Set([
   "/contact",
   "/how-it-works",
   "/login",
+  "/business/login",
   "/logout",
   "/register",
   "/unauthorized",
@@ -23,6 +24,7 @@ const ROLE_BASE_PATHS: Record<string, string> = {
   PARTNER: "/partner",
   CUSTOMER: "/customer",
   VENDOR: "/vendor",
+  STAFF: "/staff",
 };
 
 function normalizeRole(role: string | undefined): string {
@@ -43,6 +45,7 @@ function getRequiredRoleForPath(pathname: string): string | null {
   if (pathname === "/partner" || pathname.startsWith("/partner/")) return "PARTNER";
   if (pathname === "/customer" || pathname.startsWith("/customer/")) return "CUSTOMER";
   if (pathname === "/vendor" || pathname.startsWith("/vendor/")) return "VENDOR";
+  if (pathname === "/staff" || pathname.startsWith("/staff/")) return "STAFF";
   return null;
 }
 
@@ -57,9 +60,9 @@ export function proxy(request: NextRequest) {
     const authPresent = request.cookies.get("subidha_auth")?.value === "1";
     const role = normalizeRole(request.cookies.get("subidha_role")?.value);
 
-    if (pathname === "/login") {
+    if (pathname === "/login" || pathname === "/business/login") {
       if (request.nextUrl.searchParams.get("logout") === "1") {
-        const res = NextResponse.redirect(new URL("/login", request.url));
+        const res = NextResponse.redirect(new URL(pathname, request.url));
         res.cookies.delete("subidha_auth");
         res.cookies.delete("subidha_role");
         return res;

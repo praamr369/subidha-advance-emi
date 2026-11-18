@@ -32,50 +32,50 @@ const proofPoints = [
 ] as const;
 
   return (
-    <section className="public-hero relative overflow-hidden p-5 sm:p-7 lg:p-8">
+    <section className="public-hero relative overflow-hidden p-4 sm:p-7 lg:p-8">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_78%_12%,rgba(214,170,94,0.22),transparent_32%),radial-gradient(circle_at_16%_84%,rgba(112,72,42,0.14),transparent_34%)]" />
-      <div className="relative z-10 grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,0.9fr)] lg:items-center">
-        <div className="space-y-6">
+      <div className="relative z-10 grid gap-6 sm:gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,0.9fr)] lg:items-center">
+        <div className="space-y-4 sm:space-y-6">
           <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-[color-mix(in_oklab,var(--surface-card-elevated)_78%,transparent)] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground shadow-[inset_0_1px_0_var(--hairline-shine)]">
             <ReceiptText className="h-3.5 w-3.5 text-primary" />
             Public enquiry handoff
           </div>
 
-          <div className="space-y-4">
-            <h1 className="max-w-4xl text-4xl font-semibold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
+          <div className="space-y-3 sm:space-y-4">
+            <h1 className="max-w-4xl text-2xl font-semibold tracking-tight text-foreground sm:text-4xl lg:text-5xl">
               Apply / Enquire
             </h1>
-            <p className="max-w-3xl text-base leading-8 text-muted-foreground sm:text-lg">
+            <p className="max-w-3xl text-sm leading-6 sm:text-base sm:leading-8 text-muted-foreground lg:text-lg">
               Share your product preference, plan interest, monthly comfort, and contact details so Subidha Furniture can guide you through SFEMI Advance EMI, rent, lease, or direct-sale options.
             </p>
-            <div className="public-card-sm max-w-3xl px-4 py-3 text-sm leading-6 text-muted-foreground">
+            <div className="public-card-sm max-w-3xl px-3.5 py-2.5 sm:px-4 sm:py-3 text-xs sm:text-sm leading-5 sm:leading-6 text-muted-foreground">
               <strong className="font-semibold text-foreground">{dict.public.ApplyEnquiryHero_text10}</strong> This form starts branch follow-up only. Financial records, receipt documents, SFEMI IDs, rent/lease deposits, and contracts are never created from the public page alone.
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-3">
-            <Link href={ROUTES.public.products} className="public-action-secondary">
+          <div className="flex flex-wrap gap-2.5 sm:gap-3">
+            <Link href={ROUTES.public.products} className="public-action-secondary h-9 sm:h-11 px-3.5 sm:px-5 text-xs sm:text-sm">
               Browse products
             </Link>
-            <Link href={ROUTES.public.luckyPlan} className="public-action-secondary">
+            <Link href={ROUTES.public.luckyPlan} className="public-action-secondary h-9 sm:h-11 px-3.5 sm:px-5 text-xs sm:text-sm">
               SFEMI rules
             </Link>
-            <Link href={ROUTES.public.contact} className="public-action-primary gap-2">
+            <Link href={ROUTES.public.contact} className="public-action-primary h-9 sm:h-11 px-3.5 sm:px-5 text-xs sm:text-sm gap-1.5 sm:gap-2">
               Contact branch
-              <ArrowRight className="h-4 w-4" />
+              <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Link>
           </div>
         </div>
 
         <div className="relative">
-          <div className="relative w-full overflow-hidden rounded-[1.6rem] shadow-[0_24px_54px_-24px_rgba(15,23,42,0.6)]">
+          <div className="relative w-full overflow-hidden rounded-[1.4rem] sm:rounded-[1.6rem] shadow-[0_24px_54px_-24px_rgba(15,23,42,0.6)]">
             <Image
               src="/images/banner_apply.jpg"
               alt={dict.public.ApplyEnquiryHero_attr15}
               width={800}
               height={533}
               priority
-              className="w-full object-cover min-h-[22rem] lg:min-h-[30rem]"
+              className="w-full object-cover min-h-[12rem] sm:min-h-[22rem] lg:min-h-[30rem]"
             />
           </div>
           <div className="pointer-events-none absolute -left-3 top-8 hidden rounded-xl border border-border/70 bg-[color-mix(in_oklab,var(--surface-card-elevated)_84%,transparent)] px-4 py-3 shadow-[0_22px_54px_-38px_rgba(15,23,42,0.74)] backdrop-blur md:block">

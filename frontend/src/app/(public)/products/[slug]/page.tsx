@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { Suspense } from "react";
 
 import ProductDetailWorkflowBoundary from "@/components/public/ProductDetailWorkflowBoundary";
+import ProductDetailShareWishlist from "@/components/public/ProductDetailShareWishlist";
 import ProductReviews from "@/components/public/ProductReviews";
 import ProductReactionWidget from "@/components/public/ProductReactionWidget";
 import ProductEnquiryHandoffPanel from "@/components/public/ProductEnquiryHandoffPanel";
@@ -151,24 +152,7 @@ export default async function ProductDetailPage({ params, searchParams }: Produc
         { label: "Contact", href: ROUTES.public.contact, variant: "secondary" },
       ]}
     >
-      <Link
-        href={ROUTES.public.products}
-        className="inline-flex items-center gap-2 rounded-lg text-sm font-medium text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]/45 focus-visible:ring-offset-2"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Back to catalogue
-      </Link>
-
-      {whatsappOrderHref ? (
-        <a
-          href={whatsappOrderHref}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 rounded-xl bg-[#25D366] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#25D366]/50 focus-visible:ring-offset-2"
-        >
-          Order on WhatsApp
-        </a>
-      ) : null}
+      <ProductDetailShareWishlist product={product} whatsappOrderHref={whatsappOrderHref} />
 
       <PublicProductInteractiveDetail
         initialProduct={product}

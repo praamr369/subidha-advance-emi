@@ -88,16 +88,8 @@ export default async function ProductsPage({
   return (
     <PublicPageShell
       title={dictionary.common.products}
-      subtitle="Browse the live catalogue and enquire with your preferred product in one flow."
-      heroSlot={
-        <ProductCatalogueHero
-          title={dictionary.common.products}
-          subtitle="Browse the live catalogue and enquire with your preferred product in one controlled flow. Public product pages help selection only; final stock, plan type, documents, and financial records are confirmed by the branch."
-          count={count}
-          mediaReadyCount={mediaReadyCount}
-          categoryCount={categorySummaries.length}
-        />
-      }
+      subtitle="Browse our furniture and appliance catalogue in Asansol with transparent SFEMI and cash purchase options."
+      heroSlot={<></>}
       breadcrumbs={[
         { label: dictionary.common.home, href: ROUTES.public.home },
         { label: dictionary.common.products },
@@ -114,12 +106,10 @@ export default async function ProductsPage({
       />
       <PublicSeoJsonLd payload={buildFaqJsonLd(PRODUCTS_FAQS)} />
 
-      <ProductCategoryDiscovery categories={categorySummaries} />
-
-      {/* Primary Shopping Section - Quick Commerce Style */}
-      <section className="mt-2 mb-8">
+      {/* Primary E-Commerce Shopping Experience */}
+      <section className="mb-8">
         {error ? (
-          <div className="rounded-[1.6rem] border border-red-200/90 bg-[linear-gradient(180deg,rgba(254,242,242,0.98),rgba(254,226,226,0.9))] px-5 py-4 text-sm text-red-700 shadow-[0_16px_36px_-28px_rgba(127,29,29,0.42)]">
+          <div className="rounded-2xl border border-red-200/90 bg-red-50/90 px-5 py-4 text-sm text-red-700 shadow-sm">
             {error}
           </div>
         ) : (
