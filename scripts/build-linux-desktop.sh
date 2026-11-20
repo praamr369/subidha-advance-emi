@@ -44,9 +44,13 @@ if [ ! -d "node_modules/@tauri-apps" ]; then
     npm install
 fi
 
-# 4. Compile Desktop Application
-echo "🔨 Compiling native Linux desktop binary..."
+# 4. Clean Snap environment leaks if running from VS Code / Cursor terminal
+unset GTK_PATH GTK_EXE_PREFIX GSETTINGS_SCHEMA_DIR GDK_PIXBUF_MODULE_FILE GDK_PIXBUF_MODULEDIR GIO_MODULE_DIR LOCPATH GTK_MODULES LD_LIBRARY_PATH
+export XDG_DATA_DIRS="${XDG_DATA_DIRS_VSCODE_SNAP_ORIG:-/usr/local/share/:/usr/share/}"
 export GDK_BACKEND=x11
+
+# 5. Compile Desktop Application
+echo "🔨 Compiling native Linux desktop binary..."
 npm run tauri:build
 
 echo ""
