@@ -369,6 +369,83 @@ def get_single_pim_stock(obj):
     return 0
 
 
+def resolve_pim_image_url(obj):
+    """
+    Resolve canonical image URL for a PimProduct instance.
+    Checks in order:
+    1. Direct obj.image
+    2. obj.media_items (kind=IMAGE, is_hero first, then any image)
+    3. If variant (has parent), parent.variants matching sku code
+    4. If base blueprint, any variant image
+    5. obj.assets (hero first, then any)
+    6. Parent blueprint image/media/assets if child variant
+    """
+    if not obj:
+        return None
+
+    if getattr(obj, "image", None):
+        try:
+            return obj.image.url
+        except Exception:
+            return str(obj.image)
+
+    # Media items (prioritizing in-memory/prefetched items if available)
+    if hasattr(obj, "media_items"):
+        try:
+            media_list = list(obj.media_items.all())
+            hero_m = next((m for m in media_list if getattr(m, "kind", None) == "IMAGE" and getattr(m, "is_hero", False) and getattr(m, "file", None)), None)
+            if hero_m and hero_m.file:
+                return hero_m.file
+            first_m = next((m for m in media_list if getattr(m, "kind", None) == "IMAGE" and getattr(m, "file", None)), None)
+            if first_m and first_m.file:
+                return first_m.file
+        except Exception:
+            pass
+
+    # Variant SKU match on parent
+    if getattr(obj, "parent_id", None) and getattr(obj, "parent", None) and hasattr(obj.parent, "variants"):
+        try:
+            for v in obj.parent.variants.all():
+                if getattr(v, "sku", None) == obj.code and getattr(v, "image", None):
+                    return str(v.image)
+        except Exception:
+            pass
+
+    # Base blueprint variants
+    if not getattr(obj, "parent_id", None) and hasattr(obj, "variants"):
+        try:
+            for v in obj.variants.all():
+                if getattr(v, "image", None):
+                    return str(v.image)
+        except Exception:
+            pass
+
+    # Assets
+    if hasattr(obj, "assets"):
+        try:
+            assets_list = list(obj.assets.all())
+            hero_a = next((a for a in assets_list if getattr(a, "is_hero", False) and getattr(a, "image", None)), None)
+            if hero_a and hero_a.image:
+                try:
+                    return hero_a.image.url
+                except Exception:
+                    return str(hero_a.image)
+            first_a = next((a for a in assets_list if getattr(a, "image", None)), None)
+            if first_a and first_a.image:
+                try:
+                    return first_a.image.url
+                except Exception:
+                    return str(first_a.image)
+        except Exception:
+            pass
+
+    # Parent fallback
+    if getattr(obj, "parent_id", None) and getattr(obj, "parent", None):
+        return resolve_pim_image_url(obj.parent)
+
+    return None
+
+
 class PimProductListSerializer(serializers.ModelSerializer):
     category_name = serializers.SerializerMethodField()
     subcategory_name = serializers.SerializerMethodField()
@@ -381,6 +458,7 @@ class PimProductListSerializer(serializers.ModelSerializer):
     child_count = serializers.SerializerMethodField()
     full_name = serializers.SerializerMethodField()
     current_stock_qty = serializers.SerializerMethodField()
+    image = serializers.SerializerMethodField()
 
     class Meta:
         model = PimProduct
@@ -389,8 +467,11 @@ class PimProductListSerializer(serializers.ModelSerializer):
             "subcategory", "subcategory_name", "base_price",
             "is_active", "is_published", "product_type", "variant_count",
             "parent_id", "parent_code", "parent_name", "parent_is_published", "child_count",
-            "attributes", "current_stock_qty",
+            "attributes", "current_stock_qty", "image",
         ]
+
+    def get_image(self, obj):
+        return resolve_pim_image_url(obj)
 
     def get_current_stock_qty(self, obj):
         stock_map = self.context.get("stock_map")
@@ -464,6 +545,7 @@ class PimProductDetailSerializer(serializers.ModelSerializer):
     # For variant PimProducts: the SKU-specific VariantAttributeValues from ProductVariant
     variant_attribute_values = serializers.SerializerMethodField()
     current_stock_qty = serializers.SerializerMethodField()
+    image = serializers.SerializerMethodField()
 
     class Meta:
         model = PimProduct
@@ -479,7 +561,7 @@ class PimProductDetailSerializer(serializers.ModelSerializer):
             "rent_monthly_yield_percent", "lease_monthly_yield_percent",
             "is_emi_enabled", "is_rent_enabled", "is_lease_enabled", "is_direct_sale_enabled",
             "attributes", "variants", "variant_count",
-            "inherited_attribute_values", "variant_attribute_values", "current_stock_qty",
+            "inherited_attribute_values", "variant_attribute_values", "current_stock_qty", "image",
         ]
 
     def _effective_category(self, obj):
@@ -533,6 +615,9 @@ class PimProductDetailSerializer(serializers.ModelSerializer):
         if not variant:
             return []
         return VariantAttributeValueSerializer(variant.attribute_values.all(), many=True).data
+
+    def get_image(self, obj):
+        return resolve_pim_image_url(obj)
 
 
 class PimProductCreateUpdateSerializer(serializers.ModelSerializer):

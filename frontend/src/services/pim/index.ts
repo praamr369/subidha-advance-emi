@@ -118,6 +118,8 @@ export interface PimProduct {
   category_name: string;
   subcategory: number | null;
   subcategory_name: string | null;
+  image?: string | null;
+  image_url?: string | null;
   base_price: string;
   cost_price: string | null;
   rent_monthly_yield_percent?: string | null;
@@ -309,6 +311,7 @@ export interface PriceListQuoteItem {
   current_stock_qty: number;
   specs: string[];
   public_url: string;
+  image_url?: string | null;
   quotes: {
     direct_sale: {
       available: boolean;

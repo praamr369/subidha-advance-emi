@@ -3,7 +3,8 @@ from decimal import Decimal
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from products_pim.models import PimProduct, ProductCategory
+from products_pim.models import PimProduct, ProductCategory, ProductMediaItem, ProductVariant
+from products_pim.serializers import PimProductDetailSerializer, PimProductListSerializer
 from tests.helpers import create_admin_user, create_customer_user
 
 URL = "/api/v1/pim/products/price-list-quote/"
@@ -229,4 +230,165 @@ class PriceListQuoteApiTests(APITestCase):
         item_codes = [i["code"] for i in data["items"]]
         self.assertIn("OFFICE-CHAIR-01", item_codes)
         self.assertNotIn("SOFA-ROYAL", item_codes)
+
+    def test_image_url_direct_image(self):
+        sofa_with_img = PimProduct.objects.create(
+            code="SOFA-IMG-DIRECT",
+            name="Sofa With Direct Photo",
+            category=self.category,
+            base_price=Decimal("25000.00"),
+            image="products/direct_sofa.jpg",
+            is_active=True,
+            is_published=True,
+        )
+        res = self.client.post(
+            URL,
+            {"product_ids": [sofa_with_img.id], "include_variants": False},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        item = res.json()["items"][0]
+        self.assertIsNotNone(item["image_url"])
+        self.assertIn("products/direct_sofa.jpg", item["image_url"])
+
+    def test_image_url_media_items_hero_and_filters_non_image(self):
+        sofa_media = PimProduct.objects.create(
+            code="SOFA-MEDIA-GALLERY",
+            name="Sofa With Media Items",
+            category=self.category,
+            base_price=Decimal("28000.00"),
+            is_active=True,
+            is_published=True,
+        )
+        # Create non-image media items that must be filtered out
+        ProductMediaItem.objects.create(
+            product=sofa_media,
+            kind="VIDEO",
+            file="https://cdn.example.com/tour.mp4",
+            is_hero=True,
+        )
+        ProductMediaItem.objects.create(
+            product=sofa_media,
+            kind="MODEL_3D",
+            file="https://cdn.example.com/mesh.glb",
+            is_hero=True,
+        )
+        # Secondary image
+        ProductMediaItem.objects.create(
+            product=sofa_media,
+            kind="IMAGE",
+            file="https://cdn.example.com/gallery_side.jpg",
+            is_hero=False,
+            display_order=2,
+        )
+        # Primary hero image
+        ProductMediaItem.objects.create(
+            product=sofa_media,
+            kind="IMAGE",
+            file="https://cdn.example.com/gallery_hero.jpg",
+            is_hero=True,
+            display_order=1,
+        )
+
+        res = self.client.post(
+            URL,
+            {"product_ids": [sofa_media.id], "include_variants": False},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        item = res.json()["items"][0]
+        # Should pick the hero IMAGE, never video or 3d model
+        self.assertEqual(item["image_url"], "https://cdn.example.com/gallery_hero.jpg")
+
+    def test_image_url_variant_inherits_parent_image(self):
+        # Base product has a hero image in media items
+        ProductMediaItem.objects.create(
+            product=self.sofa_base,
+            kind="IMAGE",
+            file="https://cdn.example.com/sofa_base_hero.jpg",
+            is_hero=True,
+        )
+        # Child variant SOFA-ROYAL-VELVET has no image of its own
+        res = self.client.post(
+            URL,
+            {"product_ids": [self.sofa_base.id], "include_variants": True},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        items_by_code = {i["code"]: i for i in res.json()["items"]}
+        # Child must inherit parent base hero photo
+        self.assertEqual(
+            items_by_code["SOFA-ROYAL-VELVET"]["image_url"],
+            "https://cdn.example.com/sofa_base_hero.jpg",
+        )
+
+    def test_image_url_variant_override_custom_photo(self):
+        # Base product has a hero image
+        ProductMediaItem.objects.create(
+            product=self.sofa_base,
+            kind="IMAGE",
+            file="https://cdn.example.com/sofa_base_hero.jpg",
+            is_hero=True,
+        )
+        # Variant SKU SOFA-ROYAL-LEATHER has its own ProductVariant with custom image
+        ProductVariant.objects.create(
+            product=self.sofa_base,
+            sku="SOFA-ROYAL-LEATHER",
+            price=Decimal("36000.00"),
+            image="https://cdn.example.com/leather_brown_variant.jpg",
+        )
+        res = self.client.post(
+            URL,
+            {"product_ids": [self.sofa_base.id], "include_variants": True},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        items_by_code = {i["code"]: i for i in res.json()["items"]}
+        # Child variant must use its specific variant image instead of parent hero
+        self.assertEqual(
+            items_by_code["SOFA-ROYAL-LEATHER"]["image_url"],
+            "https://cdn.example.com/leather_brown_variant.jpg",
+        )
+        # Child without specific variant image still inherits parent hero
+        self.assertEqual(
+            items_by_code["SOFA-ROYAL-VELVET"]["image_url"],
+            "https://cdn.example.com/sofa_base_hero.jpg",
+        )
+
+    def test_image_url_null_when_no_media(self):
+        plain = PimProduct.objects.create(
+            code="PLAIN-NO-IMG",
+            name="Plain Sofa Without Photo",
+            category=self.category,
+            base_price=Decimal("15000.00"),
+            is_active=True,
+            is_published=True,
+        )
+        res = self.client.post(
+            URL,
+            {"product_ids": [plain.id], "include_variants": False},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        item = res.json()["items"][0]
+        self.assertIsNone(item["image_url"])
+
+    def test_pim_serializers_expose_image(self):
+        ProductMediaItem.objects.create(
+            product=self.sofa_base,
+            kind="IMAGE",
+            file="https://cdn.example.com/sofa_base_hero.jpg",
+            is_hero=True,
+        )
+        # Test List serializer
+        list_data = PimProductListSerializer(self.sofa_base).data
+        self.assertEqual(list_data["image"], "https://cdn.example.com/sofa_base_hero.jpg")
+
+        # Test Detail serializer
+        detail_data = PimProductDetailSerializer(self.sofa_base).data
+        self.assertEqual(detail_data["image"], "https://cdn.example.com/sofa_base_hero.jpg")
+
+        # Test Child variant inherits via serializer
+        child_list_data = PimProductListSerializer(self.sofa_velvet).data
+        self.assertEqual(child_list_data["image"], "https://cdn.example.com/sofa_base_hero.jpg")
 

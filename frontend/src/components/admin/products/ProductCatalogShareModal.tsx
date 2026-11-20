@@ -51,6 +51,7 @@ export interface ProductCatalogShareModalProps {
 }
 
 export type CatalogSchemeType = "direct_sale" | "rent" | "lease" | "sfemi";
+export type PrintLayoutType = "matrix" | "cards" | "showcase";
 
 export interface ResolvedCatalogItem {
   id: number;
@@ -73,12 +74,15 @@ export interface ResolvedCatalogItem {
   leaseYieldPercent: number;
   specs: string[];
   publicUrl: string;
+  imageUrl: string | null;
   brand?: string;
   rentMonthly: number;
   rentDeposit: number;
   leaseMonthly: number;
   leaseDeposit: number;
   sfemiMonthly: number;
+  dimensions?: string;
+  warranty?: string;
 }
 
 export interface CategorySubcategoryGroup {
@@ -148,8 +152,89 @@ function getCategoryIcon(catName: string, subcatName: string = ""): string {
   return "📦";
 }
 
-function resolveItemSpecs(p: PimProduct): string[] {
+function resolveProductImageUrl(p: PimProduct, origin: string): string | null {
+  const normalize = (url: string | null | undefined): string | null => {
+    if (!url || typeof url !== "string") return null;
+    const clean = url.trim();
+    if (!clean) return null;
+    if (clean.startsWith("http://") || clean.startsWith("https://") || clean.startsWith("data:")) {
+      return clean;
+    }
+    return `${origin}${clean.startsWith("/") ? "" : "/"}${clean}`;
+  };
+
+  // 1. Direct p.image or p.image_url
+  const direct = normalize(p.image) || normalize((p as any).image_url);
+  if (direct) return direct;
+
+  // 2. Media items
+  const mediaItems = (p as any).media_items;
+  if (Array.isArray(mediaItems) && mediaItems.length > 0) {
+    const hero = mediaItems.find((m: any) => m?.is_hero && (m.file || m.file_url));
+    if (hero) {
+      const u = normalize(hero.file || hero.file_url);
+      if (u) return u;
+    }
+    const firstImg = mediaItems.find((m: any) => (m?.kind === "IMAGE" || !m?.kind) && (m.file || m.file_url));
+    if (firstImg) {
+      const u = normalize(firstImg.file || firstImg.file_url);
+      if (u) return u;
+    }
+  }
+
+  // 3. Variants
+  if (Array.isArray(p.variants) && p.variants.length > 0) {
+    for (const v of p.variants) {
+      const u = normalize(v.image);
+      if (u) return u;
+    }
+  }
+
+  // 4. Assets
+  const assets = (p as any).assets;
+  if (Array.isArray(assets) && assets.length > 0) {
+    const heroA = assets.find((a: any) => a?.is_hero && a.image);
+    if (heroA) {
+      const u = normalize(heroA.image);
+      if (u) return u;
+    }
+    const firstA = assets.find((a: any) => a?.image);
+    if (firstA) {
+      const u = normalize(firstA.image);
+      if (u) return u;
+    }
+  }
+
+  return null;
+}
+
+function resolveItemSpecs(p: PimProduct): { specs: string[]; dimensions?: string; warranty?: string } {
   const specs: string[] = [];
+  let dimensions: string | undefined;
+  let warranty: string | undefined;
+
+  // Real outer dimensions
+  if (p.ar_width_cm && p.ar_depth_cm) {
+    dimensions = p.ar_height_cm
+      ? `Size: ${p.ar_width_cm} × ${p.ar_depth_cm} × ${p.ar_height_cm} cm`
+      : `Footprint: ${p.ar_width_cm} × ${p.ar_depth_cm} cm`;
+    specs.push(dimensions);
+  }
+
+  // Warranty
+  if (p.warranty_enabled !== false) {
+    const mfg = p.warranty_months_manufacturing ?? 12;
+    const str = p.warranty_months_structural ?? 36;
+    if (str > 0) {
+      warranty = `${Math.round(str / 12)} Yrs Structural · ${mfg} Mo Mfg Warranty`;
+    } else if (mfg > 0) {
+      warranty = `${mfg} Months Warranty`;
+    }
+    if (warranty && !specs.some((s) => s.toLowerCase().includes("warranty"))) {
+      specs.push(`🛡️ ${warranty}`);
+    }
+  }
+
   if (Array.isArray(p.variant_attribute_values) && p.variant_attribute_values.length > 0) {
     for (const va of p.variant_attribute_values) {
       if (va.value_text) {
@@ -165,7 +250,15 @@ function resolveItemSpecs(p: PimProduct): string[] {
       }
     }
   }
-  return specs;
+  if (Array.isArray(p.inherited_attribute_values) && p.inherited_attribute_values.length > 0) {
+    for (const ia of p.inherited_attribute_values) {
+      const val = ia.display_value || ia.value_text;
+      if (val && !specs.some((s) => s.includes(ia.attribute_name))) {
+        specs.push(`${ia.attribute_name}: ${val}`);
+      }
+    }
+  }
+  return { specs, dimensions, warranty };
 }
 
 const AVAILABLE_RENT_TENURES = [3, 6, 9, 12, 24, 36];
@@ -215,7 +308,7 @@ export default function ProductCatalogShareModal({
 
   // Modal active tabs
   const [activeTab, setActiveTab] = useState<"matrix" | "whatsapp" | "print" | "links" | "text">("matrix");
-  const [printLayout, setPrintLayout] = useState<"matrix" | "cards">("matrix"); // Default matrix for multi-page handover
+  const [printLayout, setPrintLayout] = useState<PrintLayoutType>("matrix"); // Default matrix for multi-page handover
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
@@ -338,7 +431,8 @@ export default function ProductCatalogShareModal({
       const price = Number(base.base_price) || 0;
       const rentYield = Number(base.rent_monthly_yield_percent) || 5.0;
       const leaseYield = Number(base.lease_monthly_yield_percent) || 3.5;
-      const specs = resolveItemSpecs(base);
+      const { specs, dimensions, warranty } = resolveItemSpecs(base);
+      const baseImg = resolveProductImageUrl(base, origin);
       const publicUrl = `${origin}/products/${encodeURIComponent(base.code)}`;
       const catName = base.category_name || "";
       const subcatName = base.subcategory_name || "";
@@ -364,7 +458,10 @@ export default function ProductCatalogShareModal({
         rentYieldPercent: rentYield,
         leaseYieldPercent: leaseYield,
         specs,
+        dimensions,
+        warranty,
         publicUrl,
+        imageUrl: baseImg,
         brand: base.brand,
         rentMonthly: Math.round((price * rentYield * 12) / primaryRentTenure / 100),
         rentDeposit: Math.round((price * depPct) / 100),
@@ -386,7 +483,8 @@ export default function ProductCatalogShareModal({
             const childPrice = Number(child.base_price) || price;
             const childRentYield = Number(child.rent_monthly_yield_percent) || rentYield;
             const childLeaseYield = Number(child.lease_monthly_yield_percent) || leaseYield;
-            const childSpecs = resolveItemSpecs(child);
+            const { specs: childSpecs, dimensions: childDims, warranty: childWarr } = resolveItemSpecs(child);
+            const childImg = resolveProductImageUrl(child, origin) || baseImg;
             const childSku = child.code;
             const childUrl = `${origin}/products/${encodeURIComponent(base.code)}?sku=${encodeURIComponent(childSku)}`;
             const childCatName = child.category_name || catName;
@@ -413,7 +511,10 @@ export default function ProductCatalogShareModal({
               rentYieldPercent: childRentYield,
               leaseYieldPercent: childLeaseYield,
               specs: childSpecs,
+              dimensions: childDims || dimensions,
+              warranty: childWarr || warranty,
               publicUrl: childUrl,
+              imageUrl: childImg,
               brand: child.brand || base.brand,
               rentMonthly: Math.round((childPrice * childRentYield * 12) / primaryRentTenure / 100),
               rentDeposit: Math.round((childPrice * depPct) / 100),
@@ -435,7 +536,8 @@ export default function ProductCatalogShareModal({
         const price = Number(item.base_price) || 0;
         const rentYield = Number(item.rent_monthly_yield_percent) || 5.0;
         const leaseYield = Number(item.lease_monthly_yield_percent) || 3.5;
-        const specs = resolveItemSpecs(item);
+        const { specs: orphanSpecs, dimensions: orphanDims, warranty: orphanWarr } = resolveItemSpecs(item);
+        const orphanImg = resolveProductImageUrl(item, origin) || (parent ? resolveProductImageUrl(parent, origin) : null);
         const childSku = item.code;
         const publicUrl = `${origin}/products/${encodeURIComponent(parentCode)}?sku=${encodeURIComponent(childSku)}`;
         const catName = item.category_name || parent?.category_name || "";
@@ -461,8 +563,11 @@ export default function ProductCatalogShareModal({
           currentStock: item.current_stock_qty ?? 0,
           rentYieldPercent: rentYield,
           leaseYieldPercent: leaseYield,
-          specs,
+          specs: orphanSpecs,
+          dimensions: orphanDims,
+          warranty: orphanWarr,
           publicUrl,
+          imageUrl: orphanImg,
           brand: item.brand,
           rentMonthly: Math.round((price * rentYield * 12) / primaryRentTenure / 100),
           rentDeposit: Math.round((price * depPct) / 100),
@@ -720,7 +825,7 @@ export default function ProductCatalogShareModal({
   const pricedCount = resolvedItems.filter((i) => i.hasPrice).length;
 
   const totalInteractiveCols =
-    4 +
+    5 +
     (schemes.direct_sale ? 1 : 0) +
     (schemes.rent ? selectedRentTenures.length : 0) +
     (schemes.lease ? selectedLeaseTenures.length : 0) +
@@ -728,7 +833,7 @@ export default function ProductCatalogShareModal({
     1;
 
   const totalPrintCols =
-    4 +
+    5 +
     (schemes.direct_sale ? 1 : 0) +
     (schemes.rent ? selectedRentTenures.length : 0) +
     (schemes.lease ? selectedLeaseTenures.length : 0) +
@@ -1054,11 +1159,17 @@ export default function ProductCatalogShareModal({
   };
 
   // Generate standalone, self-contained HTML document for pixel-perfect multi-page A4 printing
-  const generateFullPrintDocumentHtml = (layout: "matrix" | "cards"): string => {
+  const generateFullPrintDocumentHtml = (layout: PrintLayoutType): string => {
     const headerEl = document.getElementById("print-sheet-header");
     const indexEl = document.getElementById("catalog-context-index");
     const footerEl = document.getElementById("print-sheet-footer");
-    const bodyEl = document.getElementById(layout === "matrix" ? "print-matrix-section" : "print-cards-section");
+    const sectionId =
+      layout === "matrix"
+        ? "print-matrix-section"
+        : layout === "cards"
+        ? "print-cards-section"
+        : "print-showcase-section";
+    const bodyEl = document.getElementById(sectionId);
 
     const headerHtml = headerEl ? headerEl.innerHTML : "";
     const indexHtml = indexEl ? indexEl.outerHTML : "";
@@ -1070,7 +1181,7 @@ export default function ProductCatalogShareModal({
 <head>
   <meta charset="utf-8" />
   <base href="${origin}/" />
-  <title>${businessInfo.name} - Official Showroom Price List (${activeItems.length} Products)</title>
+  <title>${businessInfo.name} - Official Showroom Catalog & Price List (${activeItems.length} Products)</title>
   <style>
     @page {
       size: A4 portrait;
@@ -1139,9 +1250,6 @@ export default function ProductCatalogShareModal({
       background-color: #18181b !important;
       color: #ffffff !important;
     }
-      page-break-inside: avoid;
-      break-inside: avoid;
-    }
     /* Table Styling for Multi-Page Matrix */
     table {
       width: 100%;
@@ -1190,6 +1298,25 @@ export default function ProductCatalogShareModal({
       justify-content: space-between !important;
       min-height: 110px !important;
       margin-bottom: 8px !important;
+    }
+    /* Brand Advertising Showcase Grid Styling */
+    .showcase-grid {
+      display: grid !important;
+      grid-template-columns: repeat(2, 1fr) !important;
+      gap: 12px !important;
+    }
+    .print-showcase-item {
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+      border: 1.5px solid #6b7280 !important;
+      border-radius: 10px !important;
+      padding: 10px !important;
+      background: #ffffff !important;
+      display: flex !important;
+      flex-direction: column !important;
+      justify-content: space-between !important;
+      margin-bottom: 10px !important;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
     }
     /* SVG QR Code crisp vector rendering */
     svg {
@@ -1259,15 +1386,23 @@ export default function ProductCatalogShareModal({
     .gap-2 { gap: 8px !important; }
     .gap-2\\.5 { gap: 10px !important; }
     .gap-3 { gap: 12px !important; }
+    .gap-3\\.5 { gap: 14px !important; }
     .gap-4 { gap: 16px !important; }
     .mt-0\\.5 { margin-top: 2px !important; }
     .mt-1 { margin-top: 4px !important; }
     .mt-2 { margin-top: 8px !important; }
+    .w-11 { width: 44px !important; }
     .w-12 { width: 48px !important; }
     .w-14 { width: 56px !important; }
     .w-16 { width: 64px !important; }
+    .w-20 { width: 80px !important; }
+    .w-32 { width: 128px !important; }
+    .h-11 { height: 44px !important; }
+    .h-12 { height: 48px !important; }
     .h-14 { height: 56px !important; }
     .h-16 { height: 64px !important; }
+    .h-20 { height: 80px !important; }
+    .h-32 { height: 128px !important; }
     .w-\[115px\] { width: 115px !important; }
     .max-w-\[200px\] { max-width: 200px !important; }
     .max-w-\[220px\] { max-width: 220px !important; }
@@ -1279,6 +1414,8 @@ export default function ProductCatalogShareModal({
       height: auto;
       object-fit: contain;
       display: block;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
     }
     a {
       color: #1d4ed8 !important;
@@ -1328,7 +1465,7 @@ export default function ProductCatalogShareModal({
       setTimeout(function() {
         window.focus();
         window.print();
-      }, 150);
+      }, 350);
     };
   <\/script>
 </body>
@@ -1336,7 +1473,7 @@ export default function ProductCatalogShareModal({
   };
 
   // Print helper: prints seamless multi-page sheet across 100, 200, 500+ items
-  const handlePrint = (layoutOverride?: "matrix" | "cards") => {
+  const handlePrint = (layoutOverride?: PrintLayoutType) => {
     const layout = layoutOverride || printLayout;
     const fullHtml = generateFullPrintDocumentHtml(layout);
 
@@ -1370,24 +1507,24 @@ export default function ProductCatalogShareModal({
       setTimeout(() => {
         frame.contentWindow?.focus();
         frame.contentWindow?.print();
-      }, 250);
+      }, 350);
     }
   };
 
   // Download complete standalone HTML print sheet
-  const handleDownloadHtml = (layoutOverride?: "matrix" | "cards") => {
+  const handleDownloadHtml = (layoutOverride?: PrintLayoutType) => {
     const layout = layoutOverride || printLayout;
     const fullHtml = generateFullPrintDocumentHtml(layout);
     const blob = new Blob([fullHtml], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.download = `subidha-price-list-${layout}-${activeItems.length}-products.html`;
+    a.download = `subidha-catalog-${layout}-${activeItems.length}-products.html`;
     a.href = url;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    setStatusNotification(`Downloaded offline printable HTML file (${activeItems.length} products)!`);
+    setStatusNotification(`Downloaded offline printable HTML file (${activeItems.length} products - ${layout.toUpperCase()})!`);
     setTimeout(() => setStatusNotification(null), 4000);
   };
 
@@ -1878,7 +2015,8 @@ export default function ProductCatalogShareModal({
                   <thead className="bg-muted/60 border-b border-border text-[11px] font-semibold text-muted-foreground uppercase">
                     <tr>
                       <th className="px-3 py-2 text-center w-10">Select</th>
-                      <th className="px-3 py-2 w-16">QR</th>
+                      <th className="px-3 py-2 w-16 text-center">QR</th>
+                      <th className="px-3 py-2 w-16 text-center">Photo</th>
                       <th className="px-3 py-2 min-w-[200px]">Product & Variant SKU</th>
                       <th className="px-3 py-2 text-center">Stock</th>
                       {schemes.direct_sale && (
@@ -1971,6 +2109,7 @@ export default function ProductCatalogShareModal({
                           </tr>
                           {group.items.map((item) => {
                             const sItem = findServerItem(item.id);
+                            const finalImg = sItem?.image_url || item.imageUrl;
                             const price = item.basePrice;
 
                             return (
@@ -1986,8 +2125,8 @@ export default function ProductCatalogShareModal({
                               className="rounded border-border text-primary cursor-pointer"
                             />
                           </td>
-                          <td className="px-3 py-2">
-                            <div className="flex flex-col items-center p-1 rounded bg-white border border-slate-200 w-14 shadow-2xs">
+                          <td className="px-3 py-2 text-center">
+                            <div className="flex flex-col items-center p-1 rounded bg-white border border-slate-200 w-14 shadow-2xs mx-auto">
                               <QRCode
                                 value={item.publicUrl}
                                 size={44}
@@ -1995,6 +2134,23 @@ export default function ProductCatalogShareModal({
                                 style={{ height: "auto", maxWidth: "100%", width: "100%" }}
                               />
                             </div>
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            {finalImg ? (
+                              <div className="w-14 h-14 rounded-lg border border-border bg-white p-0.5 flex items-center justify-center overflow-hidden shrink-0 shadow-2xs mx-auto">
+                                <img
+                                  src={finalImg}
+                                  alt={item.fullName}
+                                  className="w-full h-full object-contain"
+                                  loading="lazy"
+                                />
+                              </div>
+                            ) : (
+                              <div className="w-14 h-14 rounded-lg border border-border/60 bg-muted/40 flex flex-col items-center justify-center text-center p-0.5 shrink-0 mx-auto">
+                                <span className="text-base">{getCategoryIcon(item.categoryName, item.subcategoryName)}</span>
+                                <span className="text-[7.5px] text-muted-foreground font-mono">No photo</span>
+                              </div>
+                            )}
                           </td>
                           <td className="px-3 py-2">
                             <div className="flex items-center gap-1.5 flex-wrap">
@@ -2257,7 +2413,7 @@ export default function ProductCatalogShareModal({
                           : "text-muted-foreground hover:text-foreground"
                       }`}
                     >
-                      Compact Table Matrix (Best for 50–500 products handover)
+                      Compact Table Matrix (50–500 prods)
                     </button>
                     <button
                       type="button"
@@ -2269,6 +2425,17 @@ export default function ProductCatalogShareModal({
                       }`}
                     >
                       Showroom Visual Cards
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPrintLayout("showcase")}
+                      className={`px-3 py-1 text-xs font-medium rounded-md transition cursor-pointer ${
+                        printLayout === "showcase"
+                          ? "bg-card text-foreground shadow-xs font-semibold"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      ⭐ Brand Advertising Showcase (Flyer/Handover)
                     </button>
                   </div>
                 </div>
@@ -2615,7 +2782,12 @@ export default function ProductCatalogShareModal({
 
                       <div className="space-y-1">
                         {main.subcategories.map((sub) => {
-                          const anchorTarget = printLayout === "cards" ? `#cards-${sub.id}` : `#${sub.id}`;
+                          const anchorTarget =
+                            printLayout === "showcase"
+                              ? `#showcase-${sub.id}`
+                              : printLayout === "cards"
+                              ? `#cards-${sub.id}`
+                              : `#${sub.id}`;
                           return (
                             <div
                               key={sub.id}
@@ -2662,7 +2834,8 @@ export default function ProductCatalogShareModal({
               <table className="w-full text-left text-xs border-collapse">
                 <thead className="bg-gray-100 border-b-2 border-gray-400 text-[10px] font-bold text-black uppercase tracking-wider">
                   <tr>
-                    <th className="px-2 py-2 w-14">QR Code</th>
+                    <th className="px-2 py-2 w-12 text-center">QR Code</th>
+                    <th className="px-2 py-2 w-12 text-center">Photo</th>
                     <th className="px-2 py-2">Product & Variant Details</th>
                     <th className="px-2 py-2">Specifications</th>
                     <th className="px-2 py-2 text-center w-16">Stock</th>
@@ -2716,15 +2889,16 @@ export default function ProductCatalogShareModal({
                       </tr>
                       {group.items.map((item) => {
                         const sItem = findServerItem(item.id);
+                        const finalImg = sItem?.image_url || item.imageUrl;
                         const price = item.basePrice;
 
                         return (
                           <tr key={item.id} className="break-inside-avoid">
-                        <td className="px-2 py-2 align-middle">
-                          <div className="flex flex-col items-center p-0.5 rounded bg-white border border-gray-300 w-12 shrink-0">
+                        <td className="px-2 py-2 align-middle text-center">
+                          <div className="flex flex-col items-center p-0.5 rounded bg-white border border-gray-300 w-11 shrink-0 mx-auto">
                             <QRCode
                               value={item.publicUrl}
-                              size={40}
+                              size={38}
                               level="M"
                               style={{ height: "auto", maxWidth: "100%", width: "100%" }}
                             />
@@ -2732,11 +2906,28 @@ export default function ProductCatalogShareModal({
                               href={item.publicUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-[6.5px] text-blue-700 font-bold mt-0.5 hover:underline"
+                              className="text-[6px] text-blue-700 font-bold mt-0.5 hover:underline"
                             >
                               Scan / Open
                             </a>
                           </div>
+                        </td>
+                        <td className="px-2 py-2 align-middle text-center">
+                          {finalImg ? (
+                            <div className="w-12 h-12 rounded border border-gray-300 bg-white p-0.5 flex items-center justify-center overflow-hidden shrink-0 mx-auto shadow-2xs">
+                              <img
+                                src={finalImg}
+                                alt={item.fullName}
+                                className="w-full h-full object-contain"
+                                loading="eager"
+                              />
+                            </div>
+                          ) : (
+                            <div className="w-12 h-12 rounded border border-gray-200 bg-gray-50 flex flex-col items-center justify-center text-center p-0.5 shrink-0 mx-auto">
+                              <span className="text-sm">{getCategoryIcon(item.categoryName, item.subcategoryName)}</span>
+                              <span className="text-[6px] text-gray-400 font-mono">No photo</span>
+                            </div>
+                          )}
                         </td>
                         <td className="px-2 py-2 align-middle">
                           <div className="font-bold text-black text-xs leading-snug">{item.fullName}</div>
@@ -2859,48 +3050,71 @@ export default function ProductCatalogShareModal({
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {group.items.map((item) => (
+                    {group.items.map((item) => {
+                      const sItem = findServerItem(item.id);
+                      const finalImg = sItem?.image_url || item.imageUrl;
+                      const price = item.basePrice;
+
+                      return (
                       <div
                         key={item.id}
                         className="print-card-item rounded-xl border border-gray-300 p-3 bg-white flex flex-col justify-between gap-2.5 break-inside-avoid shadow-2xs"
                       >
                   <div className="flex items-start gap-3">
-                    <div className="flex flex-col items-center justify-center p-1.5 rounded-lg bg-white border border-gray-300 shrink-0">
+                    {/* Product Photo */}
+                    <div className="w-20 h-20 rounded-lg border border-gray-300 bg-white p-1 flex items-center justify-center overflow-hidden shrink-0 shadow-2xs">
+                      {finalImg ? (
+                        <img
+                          src={finalImg}
+                          alt={item.fullName}
+                          className="w-full h-full object-contain"
+                          loading="eager"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gray-50 flex flex-col items-center justify-center text-center p-0.5">
+                          <span className="text-xl">{getCategoryIcon(item.categoryName, item.subcategoryName)}</span>
+                          <span className="text-[6.5px] text-gray-400 font-mono mt-0.5">No photo</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* QR Code */}
+                    <div className="flex flex-col items-center justify-center p-1 rounded-lg bg-white border border-gray-300 shrink-0 w-[64px]">
                       <QRCode
                         value={item.publicUrl}
-                        size={65}
+                        size={50}
                         level="M"
                         style={{ height: "auto", maxWidth: "100%", width: "100%" }}
                       />
-                      <span className="text-[7.5px] text-gray-600 font-bold mt-1 text-center">
+                      <span className="text-[6.5px] text-gray-600 font-bold mt-0.5 text-center">
                         Scan to View
                       </span>
                       <a
                         href={item.publicUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-[7.5px] text-blue-700 font-bold hover:underline mt-0.5 text-center"
+                        className="text-[6.5px] text-blue-700 font-bold hover:underline text-center"
                       >
-                        Open Online ↗
+                        Open ↗
                       </a>
                     </div>
 
                     <div className="min-w-0 flex-1">
-                      <div className="font-bold text-xs text-black">{item.fullName}</div>
-                      <p className="font-mono text-[10px] text-gray-600 mt-0.5">
+                      <div className="font-bold text-xs text-black leading-snug">{item.fullName}</div>
+                      <p className="font-mono text-[9px] text-gray-600 mt-0.5">
                         Code: <strong>{item.code}</strong> {item.brand ? `· Brand: ${item.brand}` : ""}
                       </p>
-                      <p className="text-[10px] text-gray-500">{item.category}</p>
+                      <p className="text-[9px] text-gray-500">{item.category}</p>
 
                       <div className="mt-1">
                         <a
                           href={item.publicUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-[9px] font-bold text-blue-700 hover:text-blue-900 hover:underline break-all"
+                          className="inline-flex items-center gap-1 text-[8.5px] font-bold text-blue-700 hover:text-blue-900 hover:underline break-all"
                         >
                           <span>🔗 Webapp Link:</span>
-                          <span className="font-mono text-[8.5px]">
+                          <span className="font-mono text-[8px]">
                             {item.publicUrl.replace(/^https?:\/\//, "")}
                           </span>
                         </a>
@@ -2911,7 +3125,7 @@ export default function ProductCatalogShareModal({
                           {item.specs.map((s, idx) => (
                             <span
                               key={idx}
-                              className="text-[9px] font-medium bg-gray-100 px-1 py-0.2 rounded border border-gray-300 text-black"
+                              className="text-[8.5px] font-medium bg-gray-100 px-1 py-0.2 rounded border border-gray-300 text-black"
                             >
                               {s}
                             </span>
@@ -2983,11 +3197,203 @@ export default function ProductCatalogShareModal({
                     )}
                   </div>
                 </div>
+                      );
+                    })}
+                  </div>
+                </div>
               ))}
             </div>
-          </div>
-        ))}
-      </div>
+
+            {/* Brand Advertising Showcase Section (Always present in DOM so SVGs and cards can be printed) */}
+            <div
+              id="print-showcase-section"
+              className="space-y-4"
+              style={{ display: printLayout === "showcase" ? "block" : "none" }}
+            >
+              {flatSubcategoryGroups.map((group) => (
+                <div key={group.id} id={`showcase-${group.id}`} className="space-y-3 break-inside-avoid">
+                  <div className="category-section-banner rounded-lg bg-zinc-900 text-white px-3 py-1.5 flex items-center justify-between break-inside-avoid">
+                    <div className="flex items-center gap-2">
+                      <span>{group.icon}</span>
+                      <span className="text-xs font-black uppercase tracking-wide">
+                        {group.categoryName} › {group.subcategoryName}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-[9px]">
+                      <span className="font-mono px-2 py-0.5 rounded bg-white/20 text-white font-bold">
+                        {group.itemCount} {group.itemCount === 1 ? "Item" : "Items"}
+                      </span>
+                      {group.hasPricedItems && (
+                        <span className="text-emerald-300 font-semibold">
+                          {schemes.rent && group.minRentMonthly > 0
+                            ? `Rent from ₹${group.minRentMonthly.toLocaleString("en-IN")}/mo`
+                            : `From ${formatCurrency(group.minPrice)}`}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="showcase-grid grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                    {group.items.map((item) => {
+                      const sItem = findServerItem(item.id);
+                      const finalImg = sItem?.image_url || item.imageUrl;
+                      const price = item.basePrice;
+
+                      return (
+                        <div
+                          key={item.id}
+                          className="print-showcase-item rounded-xl border-2 border-gray-400 p-3 bg-white flex flex-col justify-between gap-2.5 break-inside-avoid shadow-sm"
+                        >
+                          {/* Top Hero: Large Photo + QR & Identity */}
+                          <div className="flex items-start gap-3">
+                            {/* Large Photo */}
+                            <div className="relative w-32 h-32 rounded-xl border border-gray-300 bg-slate-50 p-1 flex items-center justify-center overflow-hidden shrink-0 shadow-2xs">
+                              {finalImg ? (
+                                <img
+                                  src={finalImg}
+                                  alt={item.fullName}
+                                  className="w-full h-full object-contain"
+                                  loading="eager"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex flex-col items-center justify-center text-center p-1">
+                                  <span className="text-3xl">{getCategoryIcon(item.categoryName, item.subcategoryName)}</span>
+                                  <span className="text-[7.5px] text-gray-400 font-mono mt-1">Official Showroom Collection</span>
+                                </div>
+                              )}
+                              <span className="absolute bottom-1 left-1 bg-black/85 text-white text-[7.5px] font-bold px-1.5 py-0.2 rounded uppercase tracking-wider">
+                                {item.brand || "Subidha Core"}
+                              </span>
+                            </div>
+
+                            {/* Identity & QR */}
+                            <div className="min-w-0 flex-1 flex flex-col justify-between h-32">
+                              <div>
+                                <div className="flex items-center justify-between gap-1">
+                                  <span className="text-[8px] font-bold uppercase tracking-wider text-gray-500">
+                                    {item.categoryName} › {item.subcategoryName}
+                                  </span>
+                                  {item.currentStock > 0 ? (
+                                    <span className="px-1.5 py-0.2 rounded text-[7.5px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-300">
+                                      ✓ {item.currentStock} Ready
+                                    </span>
+                                  ) : (
+                                    <span className="text-[7.5px] text-gray-500 font-medium">Available on Order</span>
+                                  )}
+                                </div>
+
+                                <h3 className="font-black text-xs text-black uppercase tracking-tight mt-0.5 line-clamp-2">
+                                  {item.fullName}
+                                </h3>
+
+                                <div className="font-mono text-[8.5px] text-gray-600 mt-0.5">
+                                  Code: <strong>{item.code}</strong> {item.isChild ? `(Variant SKU: ${item.sku})` : ""}
+                                </div>
+                              </div>
+
+                              {/* QR Code Bar */}
+                              <div className="flex items-center gap-2 pt-1 border-t border-gray-200">
+                                <div className="w-12 h-12 bg-white p-0.5 rounded border border-gray-300 shrink-0 flex items-center justify-center">
+                                  <QRCode
+                                    value={item.publicUrl}
+                                    size={44}
+                                    level="M"
+                                    style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+                                  />
+                                </div>
+                                <div className="min-w-0 text-[8px] text-gray-600 leading-tight">
+                                  <span className="font-bold text-black block">Scan for 3D View:</span>
+                                  <a
+                                    href={item.publicUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-blue-700 font-bold hover:underline truncate block"
+                                  >
+                                    {item.publicUrl.replace(/^https?:\/\//, "")}
+                                  </a>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Spec Pills */}
+                          {item.specs.length > 0 && (
+                            <div className="flex flex-wrap gap-1 py-1 border-y border-gray-200">
+                              {item.specs.map((s, idx) => (
+                                <span
+                                  key={idx}
+                                  className="text-[8.5px] font-medium bg-gray-100 text-gray-800 px-1.5 py-0.2 rounded border border-gray-300"
+                                >
+                                  {s}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Promotional Pricing Strip */}
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-xs bg-gray-50 p-2 rounded-lg border border-gray-200">
+                            {/* Direct Sale */}
+                            {schemes.direct_sale && (
+                              <div className="p-1 rounded bg-white border border-gray-300">
+                                <span className="block text-[8px] font-bold text-gray-600 uppercase">Direct Sale MRP</span>
+                                <span className="text-xs font-black text-black">
+                                  {item.hasPrice ? formatCurrency(item.basePrice) : "On Request"}
+                                </span>
+                              </div>
+                            )}
+
+                            {/* Smart Rent */}
+                            {schemes.rent && (
+                              <div className="p-1 rounded bg-sky-50 border border-sky-300">
+                                <span className="block text-[8px] font-bold text-sky-900 uppercase">Smart Rent</span>
+                                {selectedRentTenures.slice(0, 2).map((t) => {
+                                  const m = Math.round((item.basePrice * item.rentYieldPercent * 12) / t / 100);
+                                  return (
+                                    <div key={t} className="text-[9.5px] font-bold text-sky-950">
+                                      {t}m: ₹{m.toLocaleString("en-IN")}/mo
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+
+                            {/* Commercial Lease */}
+                            {schemes.lease && (
+                              <div className="p-1 rounded bg-indigo-50 border border-indigo-300">
+                                <span className="block text-[8px] font-bold text-indigo-900 uppercase">Comm. Lease</span>
+                                {selectedLeaseTenures.slice(0, 2).map((t) => {
+                                  const m = Math.round((item.basePrice * item.leaseYieldPercent * 12) / t / 100);
+                                  return (
+                                    <div key={t} className="text-[9.5px] font-bold text-indigo-950">
+                                      {t}m: ₹{m.toLocaleString("en-IN")}/mo
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+
+                            {/* SFEMI Promotion */}
+                            {schemes.sfemi && (
+                              <div className="p-1 rounded bg-amber-50 border border-amber-300">
+                                <span className="block text-[8px] font-bold text-amber-900 uppercase">⭐ SFEMI Promo</span>
+                                {selectedSfemiTenures.map((t) => {
+                                  const m = Math.round(item.basePrice / t);
+                                  return (
+                                    <div key={t} className="text-[9.5px] font-black text-amber-950">
+                                      {t === 15 ? "15m Promo: " : `${t}m: `}₹{m.toLocaleString("en-IN")}/mo
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
 
             {/* Print Footer */}
             <div id="print-sheet-footer" className="pt-3 border-t-2 border-black text-[9px] text-gray-700 leading-normal flex items-start justify-between gap-4">

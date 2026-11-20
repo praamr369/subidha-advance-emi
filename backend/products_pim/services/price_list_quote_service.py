@@ -126,7 +126,15 @@ def generate_price_list_quote(
     initial_products = list(
         PimProduct.objects.filter(id__in=product_ids)
         .select_related("category", "subcategory", "parent")
-        .prefetch_related("attributes__attribute", "variants__attribute_values__attribute")
+        .prefetch_related(
+            "attributes__attribute",
+            "variants__attribute_values__attribute",
+            "media_items",
+            "assets",
+            "parent__variants",
+            "parent__media_items",
+            "parent__assets",
+        )
     )
 
     all_products: list[PimProduct] = []
@@ -138,7 +146,15 @@ def generate_price_list_quote(
         child_qs = list(
             PimProduct.objects.filter(parent_id__in=base_ids)
             .select_related("category", "subcategory", "parent")
-            .prefetch_related("attributes__attribute", "variants__attribute_values__attribute")
+            .prefetch_related(
+                "attributes__attribute",
+                "variants__attribute_values__attribute",
+                "media_items",
+                "assets",
+                "parent__variants",
+                "parent__media_items",
+                "parent__assets",
+            )
             .order_by("code")
         )
         children_by_parent: dict[int, list[PimProduct]] = {}
@@ -259,6 +275,102 @@ def generate_price_list_quote(
                     ),
                 }
 
+        # Resolve image URL with robust cascading fallbacks
+        image_url = None
+
+        def _fmt_url(raw: str | None) -> str | None:
+            if not raw or not str(raw).strip():
+                return None
+            s = str(raw).strip()
+            if s.startswith("http://") or s.startswith("https://") or s.startswith("data:"):
+                return s
+            return f"{origin}{'' if s.startswith('/') else '/'}{s}"
+
+        # 1. Direct p.image
+        if bool(getattr(p, "image", None)):
+            try:
+                image_url = _fmt_url(p.image.url)
+            except Exception:
+                image_url = _fmt_url(str(p.image))
+
+        # 2. Own media_items (IMAGE kind only, prioritize hero)
+        if not image_url and hasattr(p, "media_items"):
+            for m in p.media_items.all():
+                if getattr(m, "kind", None) == "IMAGE" and getattr(m, "is_hero", False) and getattr(m, "file", None):
+                    image_url = _fmt_url(m.file)
+                    break
+            if not image_url:
+                for m in p.media_items.all():
+                    if getattr(m, "kind", None) == "IMAGE" and getattr(m, "file", None):
+                        image_url = _fmt_url(m.file)
+                        break
+
+        # 3. If child variant SKU: check parent's ProductVariant matching this SKU code
+        if not image_url and p.parent and hasattr(p.parent, "variants"):
+            for v in p.parent.variants.all():
+                if getattr(v, "sku", None) == p.code and getattr(v, "image", None):
+                    image_url = _fmt_url(v.image)
+                    break
+
+        # 4. If base blueprint: check own ProductVariant images
+        if not image_url and not p.parent and hasattr(p, "variants"):
+            for v in p.variants.all():
+                if getattr(v, "image", None):
+                    image_url = _fmt_url(v.image)
+                    break
+
+        # 5. Own assets (prioritize hero)
+        if not image_url and hasattr(p, "assets"):
+            for a in p.assets.all():
+                if getattr(a, "is_hero", False) and bool(getattr(a, "image", None)):
+                    try:
+                        image_url = _fmt_url(a.image.url)
+                        break
+                    except Exception:
+                        pass
+            if not image_url:
+                for a in p.assets.all():
+                    if bool(getattr(a, "image", None)):
+                        try:
+                            image_url = _fmt_url(a.image.url)
+                            break
+                        except Exception:
+                            pass
+
+        # 6. Fallback to parent blueprint's image, media_items, and assets
+        if not image_url and p.parent:
+            if bool(getattr(p.parent, "image", None)):
+                try:
+                    image_url = _fmt_url(p.parent.image.url)
+                except Exception:
+                    pass
+            if not image_url and hasattr(p.parent, "media_items"):
+                for m in p.parent.media_items.all():
+                    if getattr(m, "kind", None) == "IMAGE" and getattr(m, "is_hero", False) and getattr(m, "file", None):
+                        image_url = _fmt_url(m.file)
+                        break
+                if not image_url:
+                    for m in p.parent.media_items.all():
+                        if getattr(m, "kind", None) == "IMAGE" and getattr(m, "file", None):
+                            image_url = _fmt_url(m.file)
+                            break
+            if not image_url and hasattr(p.parent, "assets"):
+                for a in p.parent.assets.all():
+                    if getattr(a, "is_hero", False) and bool(getattr(a, "image", None)):
+                        try:
+                            image_url = _fmt_url(a.image.url)
+                            break
+                        except Exception:
+                            pass
+                if not image_url:
+                    for a in p.parent.assets.all():
+                        if bool(getattr(a, "image", None)):
+                            try:
+                                image_url = _fmt_url(a.image.url)
+                                break
+                            except Exception:
+                                pass
+
         items.append({
             "id": p.id,
             "is_child": is_child,
@@ -280,6 +392,7 @@ def generate_price_list_quote(
             "current_stock_qty": stock_qty,
             "specs": specs,
             "public_url": public_url,
+            "image_url": image_url,
             "quotes": {
                 "direct_sale": direct_sale_quote,
                 "rent": {
