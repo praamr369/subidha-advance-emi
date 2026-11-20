@@ -392,3 +392,64 @@ class PriceListQuoteApiTests(APITestCase):
         child_list_data = PimProductListSerializer(self.sofa_velvet).data
         self.assertEqual(child_list_data["image"], "https://cdn.example.com/sofa_base_hero.jpg")
 
+    def test_image_url_sibling_variant_distinct_gallery_distribution(self):
+        # Product with multiple gallery images
+        dining_base = PimProduct.objects.create(
+            code="DINING-SET",
+            name="Solid Teak Dining Table",
+            category=self.category,
+            base_price=Decimal("40000.00"),
+            is_active=True,
+            is_published=True,
+        )
+        child_4s = PimProduct.objects.create(
+            code="DINING-SET-4S",
+            name="Dining Table 4 Seater",
+            parent=dining_base,
+            category=self.category,
+            base_price=Decimal("40000.00"),
+            is_active=True,
+            is_published=True,
+        )
+        child_6s = PimProduct.objects.create(
+            code="DINING-SET-6S",
+            name="Dining Table 6 Seater",
+            parent=dining_base,
+            category=self.category,
+            base_price=Decimal("55000.00"),
+            is_active=True,
+            is_published=True,
+        )
+        # 2 distinct images in media gallery
+        ProductMediaItem.objects.create(
+            product=dining_base,
+            kind="IMAGE",
+            file="https://cdn.example.com/dining_4seater.jpg",
+            title="Dining 4 Seater",
+            is_hero=False,
+            display_order=1,
+        )
+        ProductMediaItem.objects.create(
+            product=dining_base,
+            kind="IMAGE",
+            file="https://cdn.example.com/dining_6seater.jpg",
+            title="Dining 6 Seater",
+            is_hero=False,
+            display_order=2,
+        )
+        res = self.client.post(
+            URL,
+            {"product_ids": [dining_base.id], "include_variants": True},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        items_by_code = {i["code"]: i for i in res.json()["items"]}
+        # Both variants receive distinct images matching their keyword or sibling index!
+        img_4s = items_by_code["DINING-SET-4S"]["image_url"]
+        img_6s = items_by_code["DINING-SET-6S"]["image_url"]
+        self.assertIsNotNone(img_4s)
+        self.assertIsNotNone(img_6s)
+        self.assertNotEqual(img_4s, img_6s)
+        self.assertIn("dining_4seater.jpg", img_4s)
+        self.assertIn("dining_6seater.jpg", img_6s)
+

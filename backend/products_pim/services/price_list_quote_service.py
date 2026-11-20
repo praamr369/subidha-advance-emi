@@ -161,6 +161,11 @@ def generate_price_list_quote(
         for child in child_qs:
             children_by_parent.setdefault(child.parent_id, []).append(child)
 
+        sibling_index_map: dict[int, tuple[int, int]] = {}
+        for p_id, c_list in children_by_parent.items():
+            for idx, c in enumerate(c_list):
+                sibling_index_map[c.id] = (idx, len(c_list))
+
         for p in initial_products:
             if not p.parent_id:
                 if p.id not in seen_ids:
@@ -293,7 +298,16 @@ def generate_price_list_quote(
             except Exception:
                 image_url = _fmt_url(str(p.image))
 
-        # 2. Own media_items (IMAGE kind only, prioritize hero)
+        # 2. Operational source product image
+        if not image_url and getattr(p, "source_product", None):
+            sp = p.source_product
+            if bool(getattr(sp, "image", None)):
+                try:
+                    image_url = _fmt_url(sp.image.url)
+                except Exception:
+                    image_url = _fmt_url(str(sp.image))
+
+        # 3. Own media_items (IMAGE kind only, prioritize hero)
         if not image_url and hasattr(p, "media_items"):
             for m in p.media_items.all():
                 if getattr(m, "kind", None) == "IMAGE" and getattr(m, "is_hero", False) and getattr(m, "file", None):
@@ -305,21 +319,84 @@ def generate_price_list_quote(
                         image_url = _fmt_url(m.file)
                         break
 
-        # 3. If child variant SKU: check parent's ProductVariant matching this SKU code
-        if not image_url and p.parent and hasattr(p.parent, "variants"):
+        # 4. If child variant SKU: check parent's ProductVariant matching this SKU code
+        matching_v = None
+        if p.parent and hasattr(p.parent, "variants"):
+            p_code_clean = (p.code or "").strip().lower()
             for v in p.parent.variants.all():
-                if getattr(v, "sku", None) == p.code and getattr(v, "image", None):
-                    image_url = _fmt_url(v.image)
-                    break
+                v_sku_clean = (getattr(v, "sku", None) or "").strip().lower()
+                if v_sku_clean == p_code_clean or (v_sku_clean and p_code_clean and (v_sku_clean in p_code_clean or p_code_clean in v_sku_clean)):
+                    matching_v = v
+                    if not image_url and getattr(v, "image", None):
+                        image_url = _fmt_url(v.image)
+                        break
+                    if not image_url and getattr(v, "operational_product", None) and getattr(v.operational_product, "image", None):
+                        try:
+                            image_url = _fmt_url(v.operational_product.image.url)
+                            break
+                        except Exception:
+                            image_url = _fmt_url(str(v.operational_product.image))
+                            break
 
-        # 4. If base blueprint: check own ProductVariant images
+        # 5. Check parent media items linked to this variant (by variant FK, SKU code, or keyword)
+        if not image_url and p.parent and hasattr(p.parent, "media_items"):
+            parent_images = [
+                m for m in p.parent.media_items.all()
+                if getattr(m, "kind", None) == "IMAGE" and getattr(m, "file", None)
+            ]
+            # 5a. Linked variant FK
+            if matching_v:
+                for m in parent_images:
+                    if getattr(m, "variant_id", None) == matching_v.id:
+                        image_url = _fmt_url(m.file)
+                        break
+            # 5b. Title or file containing SKU code
+            if not image_url and p.code:
+                p_code_lower = p.code.strip().lower()
+                for m in parent_images:
+                    t = (getattr(m, "title", None) or "").lower()
+                    f = (str(getattr(m, "file", None)) or "").lower()
+                    if p_code_lower in t or p_code_lower in f:
+                        image_url = _fmt_url(m.file)
+                        break
+
+            # 5c. Attribute keyword scoring
+            if not image_url:
+                import re
+                name_tokens = set(re.findall(r"[a-z0-9]+", (p.name or "").lower()))
+                code_tokens = set(re.findall(r"[a-z0-9]+", (p.code or "").lower()))
+                all_tokens = name_tokens | code_tokens
+                # Filter out generic family words that all siblings share
+                common_words = {"product", "model", "standard", "item", (p.parent.name or "").lower()}
+                distinctive_tokens = {tok for tok in all_tokens if tok not in common_words and len(tok) >= 1}
+
+                best_m = None
+                best_score = 0
+                for m in parent_images:
+                    m_str = f"{getattr(m, 'title', '')} {getattr(m, 'file', '')}".lower()
+                    m_tokens = set(re.findall(r"[a-z0-9]+", m_str))
+                    score = len(distinctive_tokens & m_tokens) * 3 + len(all_tokens & m_tokens)
+                    if score > best_score:
+                        best_score = score
+                        best_m = m
+
+                if best_m and best_score >= 3:
+                    image_url = _fmt_url(best_m.file)
+
+            # 5d. Distribute distinct gallery images across sibling variants by index
+            if not image_url and len(parent_images) > 1 and p.id in sibling_index_map:
+                s_idx, _ = sibling_index_map[p.id]
+                assigned_m = parent_images[s_idx % len(parent_images)]
+                image_url = _fmt_url(assigned_m.file)
+
+        # 6. If base blueprint: check own ProductVariant images
         if not image_url and not p.parent and hasattr(p, "variants"):
             for v in p.variants.all():
                 if getattr(v, "image", None):
                     image_url = _fmt_url(v.image)
                     break
 
-        # 5. Own assets (prioritize hero)
+        # 7. Own assets (prioritize hero)
         if not image_url and hasattr(p, "assets"):
             for a in p.assets.all():
                 if getattr(a, "is_hero", False) and bool(getattr(a, "image", None)):
@@ -337,7 +414,7 @@ def generate_price_list_quote(
                         except Exception:
                             pass
 
-        # 6. Fallback to parent blueprint's image, media_items, and assets
+        # 8. Fallback to parent blueprint's hero image, media_items, and assets
         if not image_url and p.parent:
             if bool(getattr(p.parent, "image", None)):
                 try:

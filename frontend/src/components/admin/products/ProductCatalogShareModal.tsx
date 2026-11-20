@@ -155,7 +155,13 @@ function getCategoryIcon(catName: string, subcatName: string = ""): string {
   return "📦";
 }
 
-function resolveProductImageUrl(p: PimProduct, origin: string): string | null {
+function resolveProductImageUrl(
+  p: PimProduct,
+  origin: string,
+  parent?: PimProduct,
+  siblingIndex?: number,
+  totalSiblings?: number
+): string | null {
   const normalize = (url: string | null | undefined): string | null => {
     if (!url || typeof url !== "string") return null;
     const clean = url.trim();
@@ -166,11 +172,15 @@ function resolveProductImageUrl(p: PimProduct, origin: string): string | null {
     return `${origin}${clean.startsWith("/") ? "" : "/"}${clean}`;
   };
 
-  // 1. Direct p.image or p.image_url
-  const direct = normalize(p.image) || normalize((p as any).image_url);
+  // 1. Direct p.image or p.image_url or source_product image
+  const direct =
+    normalize(p.image) ||
+    normalize((p as any).image_url) ||
+    normalize((p as any).source_product_image) ||
+    normalize((p as any).source_product?.image);
   if (direct) return direct;
 
-  // 2. Media items
+  // 2. Own media items
   const mediaItems = (p as any).media_items;
   if (Array.isArray(mediaItems) && mediaItems.length > 0) {
     const hero = mediaItems.find((m: any) => m?.is_hero && (m.file || m.file_url));
@@ -185,7 +195,120 @@ function resolveProductImageUrl(p: PimProduct, origin: string): string | null {
     }
   }
 
-  // 3. Variants
+  // 3. If child variant: check parent's ProductVariant matching this SKU code
+  let matchingVariant: any = null;
+  if (parent) {
+    const pCodeClean = (p.code || "").trim().toLowerCase();
+    const pSkuClean = (((p as any).sku || "") as string).trim().toLowerCase();
+    const pNameClean = (p.name || "").trim().toLowerCase();
+
+    if (Array.isArray(parent.variants) && parent.variants.length > 0) {
+      for (const v of parent.variants) {
+        const vSkuClean = (v.sku || "").trim().toLowerCase();
+        const vNameClean = ((v.variant_name || "") as string).trim().toLowerCase();
+        if (
+          (vSkuClean && (vSkuClean === pCodeClean || vSkuClean === pSkuClean)) ||
+          (v.id && (v.id === (p as any).variant_id || (v as any).child_pim_id === p.id)) ||
+          (vSkuClean && pCodeClean && (vSkuClean.includes(pCodeClean) || pCodeClean.includes(vSkuClean))) ||
+          (vNameClean && pNameClean && vNameClean === pNameClean)
+        ) {
+          matchingVariant = v;
+          if (v.image) {
+            const u = normalize(v.image);
+            if (u) return u;
+          }
+          if ((v as any).operational_product_image) {
+            const u = normalize((v as any).operational_product_image);
+            if (u) return u;
+          }
+          if ((v as any).operational_product?.image) {
+            const u = normalize((v as any).operational_product.image);
+            if (u) return u;
+          }
+          if ((v as any).image_url) {
+            const u = normalize((v as any).image_url);
+            if (u) return u;
+          }
+          break;
+        }
+      }
+    }
+
+    // 4. Check parent media items linked to this variant (FK, SKU code, or distinctive attribute keywords)
+    const parentMedia = (parent as any).media_items;
+    if (Array.isArray(parentMedia) && parentMedia.length > 0) {
+      const parentImages = parentMedia.filter(
+        (m: any) => (m.kind === "IMAGE" || !m.kind) && (m.file || m.file_url)
+      );
+
+      // 4a. Media item linked to matching variant FK
+      if (matchingVariant?.id) {
+        const fkMatch = parentImages.find(
+          (m: any) =>
+            m.variant_id === matchingVariant.id ||
+            (m.variant && (m.variant.id === matchingVariant.id || m.variant.sku === matchingVariant.sku))
+        );
+        if (fkMatch) {
+          const u = normalize(fkMatch.file || fkMatch.file_url);
+          if (u) return u;
+        }
+      }
+
+      // 4b. Title or file containing SKU code
+      if (p.code) {
+        const pCodeLower = p.code.toLowerCase();
+        const skuMatch = parentImages.find((m: any) => {
+          const t = (m.title || "").toLowerCase();
+          const f = (m.file || m.file_url || "").toLowerCase();
+          return t.includes(pCodeLower) || f.includes(pCodeLower);
+        });
+        if (skuMatch) {
+          const u = normalize(skuMatch.file || skuMatch.file_url);
+          if (u) return u;
+        }
+      }
+
+      // 4c. Distinctive attribute keyword scoring
+      const extractTokens = (str: string) => (str.toLowerCase().match(/[a-z0-9]+/g) || []);
+      const pTokens = new Set([...extractTokens(p.name || ""), ...extractTokens(p.code || "")]);
+      const commonTokens = new Set(["product", "model", "standard", "item", ...extractTokens(parent.name || "")]);
+      const distinctiveTokens = Array.from(pTokens).filter((t) => !commonTokens.has(t) && t.length >= 1);
+
+      if (distinctiveTokens.length > 0) {
+        let bestScore = 0;
+        let bestM: any = null;
+        for (const m of parentImages) {
+          const mTokens = new Set(extractTokens(`${m.title || ""} ${m.file || m.file_url || ""}`));
+          let score = 0;
+          for (const dt of distinctiveTokens) {
+            if (mTokens.has(dt)) score += 3;
+          }
+          for (const pt of pTokens) {
+            if (mTokens.has(pt)) score += 1;
+          }
+          if (score > bestScore) {
+            bestScore = score;
+            bestM = m;
+          }
+        }
+        if (bestM && bestScore >= 3) {
+          const u = normalize(bestM.file || bestM.file_url);
+          if (u) return u;
+        }
+      }
+
+      // 4d. Distribute distinct gallery images across sibling variants by index
+      if (parentImages.length > 1 && typeof siblingIndex === "number") {
+        const assignedM = parentImages[siblingIndex % parentImages.length];
+        if (assignedM) {
+          const u = normalize(assignedM.file || assignedM.file_url);
+          if (u) return u;
+        }
+      }
+    }
+  }
+
+  // 5. If base blueprint: check own variants
   if (Array.isArray(p.variants) && p.variants.length > 0) {
     for (const v of p.variants) {
       const u = normalize(v.image);
@@ -193,7 +316,7 @@ function resolveProductImageUrl(p: PimProduct, origin: string): string | null {
     }
   }
 
-  // 4. Assets
+  // 6. Assets
   const assets = (p as any).assets;
   if (Array.isArray(assets) && assets.length > 0) {
     const heroA = assets.find((a: any) => a?.is_hero && a.image);
@@ -205,6 +328,28 @@ function resolveProductImageUrl(p: PimProduct, origin: string): string | null {
     if (firstA) {
       const u = normalize(firstA.image);
       if (u) return u;
+    }
+  }
+
+  // 7. Fallback to parent blueprint hero image
+  if (parent) {
+    const parentDirect = normalize(parent.image) || normalize((parent as any).image_url);
+    if (parentDirect) return parentDirect;
+
+    const parentMedia = (parent as any).media_items;
+    if (Array.isArray(parentMedia) && parentMedia.length > 0) {
+      const hero = parentMedia.find((m: any) => m?.is_hero && (m.file || m.file_url));
+      if (hero) {
+        const u = normalize(hero.file || hero.file_url);
+        if (u) return u;
+      }
+      const firstImg = parentMedia.find(
+        (m: any) => (m?.kind === "IMAGE" || !m?.kind) && (m.file || m.file_url)
+      );
+      if (firstImg) {
+        const u = normalize(firstImg.file || firstImg.file_url);
+        if (u) return u;
+      }
     }
   }
 
@@ -523,13 +668,14 @@ export default function ProductCatalogShareModal({
       // If including variants, add children under this base
       if (includeVariants) {
         const children = childrenByParent.get(base.id) ?? [];
-        for (const child of children) {
+        for (let childIdx = 0; childIdx < children.length; childIdx++) {
+          const child = children[childIdx];
           if (!addedIds.has(child.id)) {
             const childPrice = Number(child.base_price) || price;
             const childRentYield = Number(child.rent_monthly_yield_percent) || rentYield;
             const childLeaseYield = Number(child.lease_monthly_yield_percent) || leaseYield;
             const { specs: childSpecs, dimensions: childDims, warranty: childWarr } = resolveItemSpecs(child);
-            const childImg = resolveProductImageUrl(child, origin) || baseImg;
+            const childImg = resolveProductImageUrl(child, origin, base, childIdx, children.length) || baseImg;
             const childSku = child.code;
             const childUrl = `${origin}/products/${encodeURIComponent(base.code)}?sku=${encodeURIComponent(childSku)}`;
             const childCatName = child.category_name || catName;
@@ -582,7 +728,7 @@ export default function ProductCatalogShareModal({
         const rentYield = Number(item.rent_monthly_yield_percent) || 5.0;
         const leaseYield = Number(item.lease_monthly_yield_percent) || 3.5;
         const { specs: orphanSpecs, dimensions: orphanDims, warranty: orphanWarr } = resolveItemSpecs(item);
-        const orphanImg = resolveProductImageUrl(item, origin) || (parent ? resolveProductImageUrl(parent, origin) : null);
+        const orphanImg = resolveProductImageUrl(item, origin, parent, 0, 1) || (parent ? resolveProductImageUrl(parent, origin) : null);
         const childSku = item.code;
         const publicUrl = `${origin}/products/${encodeURIComponent(parentCode)}?sku=${encodeURIComponent(childSku)}`;
         const catName = item.category_name || parent?.category_name || "";
@@ -2269,18 +2415,24 @@ export default function ProductCatalogShareModal({
                           </td>
                           <td className="px-3 py-2 text-center">
                             {finalImg ? (
-                              <div className="w-14 h-14 rounded-lg border border-border bg-white p-0.5 flex items-center justify-center overflow-hidden shrink-0 shadow-2xs mx-auto">
+                              <div className="w-20 h-20 rounded-xl border border-border bg-white p-1 flex items-center justify-center overflow-hidden shrink-0 shadow-2xs mx-auto relative group">
                                 <img
                                   src={finalImg}
                                   alt={item.fullName}
                                   className="w-full h-full object-contain"
                                   loading="lazy"
                                 />
+                                {item.isChild && (
+                                  <span className="absolute bottom-0 inset-x-0 bg-black/85 text-white text-[7px] font-bold text-center py-0.5 truncate px-1 uppercase tracking-tight">
+                                    {item.name.replace(item.parentName || "", "").replace(/^[\s—–-]+/, "") || item.sku}
+                                  </span>
+                                )}
                               </div>
                             ) : (
-                              <div className="w-14 h-14 rounded-lg border border-border/60 bg-muted/40 flex flex-col items-center justify-center text-center p-0.5 shrink-0 mx-auto">
-                                <span className="text-base">{getCategoryIcon(item.categoryName, item.subcategoryName)}</span>
-                                <span className="text-[7.5px] text-muted-foreground font-mono">No photo</span>
+                              <div className="w-20 h-20 rounded-xl border border-border/60 bg-muted/40 flex flex-col items-center justify-center text-center p-1 shrink-0 mx-auto">
+                                <span className="text-xl">{getCategoryIcon(item.categoryName, item.subcategoryName)}</span>
+                                <span className="text-[7.5px] text-muted-foreground font-mono mt-0.5">No photo</span>
+                                <span className="text-[7px] font-bold text-muted-foreground font-mono truncate max-w-[70px]">{item.sku}</span>
                               </div>
                             )}
                           </td>
@@ -2545,7 +2697,7 @@ export default function ProductCatalogShareModal({
                           : "text-muted-foreground hover:text-foreground"
                       }`}
                     >
-                      Compact Table Matrix (50–500 prods)
+                      Table Matrix (Catalog Photos &amp; Specs)
                     </button>
                     <button
                       type="button"
@@ -2556,7 +2708,7 @@ export default function ProductCatalogShareModal({
                           : "text-muted-foreground hover:text-foreground"
                       }`}
                     >
-                      Showroom Visual Cards
+                      🖼️ Full Image Catalog Tiles (Offline Flyer)
                     </button>
                     <button
                       type="button"
@@ -2567,7 +2719,7 @@ export default function ProductCatalogShareModal({
                           : "text-muted-foreground hover:text-foreground"
                       }`}
                     >
-                      ⭐ Brand Advertising Showcase (Flyer/Handover)
+                      ⭐ Executive Brand Lookbook (Luxury Showcase)
                     </button>
                   </div>
                 </div>
@@ -3268,11 +3420,11 @@ export default function ProductCatalogShareModal({
                 <thead className="bg-gray-100 border-b-2 border-gray-400 text-[10px] font-bold text-black uppercase tracking-wider">
                   <tr>
                     {showItemQrCodes && <th className="px-2 py-2 w-12 text-center">QR Code</th>}
-                    <th className="px-2 py-2 w-12 text-center">Photo</th>
-                    <th className="px-2 py-2">Product & Variant Details</th>
-                    <th className="px-2 py-2">Specifications</th>
-                    <th className="px-2 py-2 text-center w-16">Stock</th>
-                    {schemes.direct_sale && <th className="px-2 py-2 text-right">Direct Sale</th>}
+                    <th className="px-2 py-2 w-24 text-center">Catalog Photo</th>
+                    <th className="px-2 py-2 min-w-[180px]">Product &amp; Variant SKU</th>
+                    <th className="px-2 py-2 min-w-[150px]">Specifications &amp; Warranty</th>
+                    <th className="px-2 py-2 text-center w-20">Showroom Stock</th>
+                    {schemes.direct_sale && <th className="px-2 py-2 text-right">Direct Sale (MRP)</th>}
                     {schemes.rent &&
                       selectedRentTenures.map((t) => (
                         <th key={t} className="px-2 py-2 text-right">
@@ -3356,60 +3508,80 @@ export default function ProductCatalogShareModal({
                                 )}
                         <td className="px-2 py-2 align-middle text-center">
                           {finalImg ? (
-                            <div className="w-12 h-12 rounded border border-gray-300 bg-white p-0.5 flex items-center justify-center overflow-hidden shrink-0 mx-auto shadow-2xs">
+                            <div className="w-20 h-20 rounded-lg border border-gray-300 bg-white p-1 flex items-center justify-center overflow-hidden shrink-0 mx-auto shadow-2xs relative">
                               <img
                                 src={finalImg}
                                 alt={item.fullName}
                                 className="w-full h-full object-contain"
                                 loading="eager"
                               />
+                              {item.isChild && (
+                                <span className="absolute bottom-0 inset-x-0 bg-black/85 text-white text-[6.5px] font-bold text-center py-0.5 truncate px-0.5 uppercase tracking-tight">
+                                  {item.name.replace(item.parentName || "", "").replace(/^[\s—–-]+/, "") || item.sku}
+                                </span>
+                              )}
                             </div>
                           ) : (
-                            <div className="w-12 h-12 rounded border border-gray-200 bg-gray-50 flex flex-col items-center justify-center text-center p-0.5 shrink-0 mx-auto">
-                              <span className="text-sm">{getCategoryIcon(item.categoryName, item.subcategoryName)}</span>
-                              <span className="text-[6px] text-gray-400 font-mono">No photo</span>
+                            <div className="w-20 h-20 rounded-lg border border-gray-200 bg-gray-50 flex flex-col items-center justify-center text-center p-1 shrink-0 mx-auto">
+                              <span className="text-lg">{getCategoryIcon(item.categoryName, item.subcategoryName)}</span>
+                              <span className="text-[6.5px] text-gray-400 font-mono mt-0.5">No photo</span>
+                              <span className="text-[6.5px] font-bold text-gray-500 font-mono truncate max-w-[70px]">{item.sku}</span>
                             </div>
                           )}
                         </td>
                         <td className="px-2 py-2 align-middle">
-                          <div className="font-bold text-black text-xs leading-snug">{item.fullName}</div>
-                          <div className="font-mono text-[9px] text-gray-600">
-                            SKU: {item.sku} {item.brand ? `· ${item.brand}` : ""}
+                          <div className="font-extrabold text-black text-xs leading-snug">{item.fullName}</div>
+                          <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                            <span className="font-mono text-[8.5px] font-bold px-1.5 py-0.2 rounded bg-gray-100 text-gray-800 border border-gray-300">
+                              SKU: {item.sku}
+                            </span>
+                            {item.brand && (
+                              <span className="text-[8.5px] font-semibold text-gray-600">Brand: {item.brand}</span>
+                            )}
                           </div>
-                          <div className="text-[9px] text-gray-500">{item.category}</div>
-                          <div className="mt-1">
-                            <a
-                              href={item.publicUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-[9px] font-bold text-blue-700 hover:text-blue-900 hover:underline"
-                              title="Click to view product online"
-                            >
-                              <span>🔗 View Online:</span>
-                              <span className="font-mono text-[8.5px] truncate max-w-[200px]">
-                                {item.publicUrl.replace(/^https?:\/\//, "")}
-                              </span>
-                              <span className="text-[8px]">↗</span>
-                            </a>
+                          <div className="text-[8.5px] text-gray-500 mt-0.5">{item.category}</div>
+                          <div className="mt-0.5 text-[8px] font-semibold text-blue-800">
+                            🏷️ subidhafurnitureasansol.com › <span className="font-mono font-bold">{item.sku}</span>
                           </div>
                         </td>
                         <td className="px-2 py-2 align-middle">
-                          <div className="text-[10px] text-gray-800">
-                            {item.specs.length > 0 ? item.specs.join(" · ") : "Standard model"}
-                          </div>
+                          {item.specs.length > 0 ? (
+                            <div className="flex flex-col gap-0.5 text-[9px] text-gray-800">
+                              {item.dimensions && (
+                                <div className="font-bold text-gray-900">📏 {item.dimensions}</div>
+                              )}
+                              {item.warranty && (
+                                <div className="font-semibold text-gray-700">🛡️ {item.warranty}</div>
+                              )}
+                              {item.specs.filter((s) => s !== item.dimensions && s !== item.warranty && !s.includes("🛡️")).length > 0 && (
+                                <div className="text-gray-600 text-[8.5px] leading-tight">
+                                  {item.specs.filter((s) => s !== item.dimensions && s !== item.warranty && !s.includes("🛡️")).join(" · ")}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-[9px] text-gray-500">Standard showroom model</span>
+                          )}
                         </td>
                         <td className="px-2 py-2 text-center align-middle whitespace-nowrap">
                           {item.currentStock > 0 ? (
-                            <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold text-green-800 bg-green-50 border border-green-300">
-                              {item.currentStock} Ready
-                            </span>
+                            <div className="inline-flex flex-col items-center px-1.5 py-0.5 rounded bg-green-50 border border-green-300">
+                              <span className="text-[9px] font-black text-green-900">{item.currentStock} Ready</span>
+                              <span className="text-[6.5px] font-bold text-green-700 uppercase">Showroom Dispatch</span>
+                            </div>
                           ) : (
-                            <span className="text-[9px] text-gray-500">Order</span>
+                            <div className="inline-flex flex-col items-center px-1.5 py-0.5 rounded bg-gray-50 border border-gray-200">
+                              <span className="text-[9px] font-bold text-gray-700">Order</span>
+                              <span className="text-[6.5px] text-gray-500">Custom Built</span>
+                            </div>
                           )}
                         </td>
                         {schemes.direct_sale && (
-                          <td className="px-2 py-2 text-right font-bold text-black align-middle whitespace-nowrap">
-                            {item.hasPrice ? formatCurrency(price) : "Contact"}
+                          <td className="px-2 py-2 text-right align-middle whitespace-nowrap">
+                            <div className="font-black text-black text-xs">
+                              {item.hasPrice ? formatCurrency(price) : "Contact"}
+                            </div>
+                            <div className="text-[7px] font-bold text-gray-500 uppercase tracking-tight">Showroom MRP</div>
                           </td>
                         )}
                         {schemes.rent &&
@@ -3419,9 +3591,11 @@ export default function ProductCatalogShareModal({
                             }
                             const sRent = sItem?.quotes?.rent?.tenures?.[String(t)];
                             const m = sRent ? Number(sRent.monthly_amount) : Math.round((price * item.rentYieldPercent * 12) / t / 100);
+                            const dep = sRent ? Number(sRent.deposit_amount) : Math.round((price * (depositPercent ?? 20)) / 100);
                             return (
                               <td key={t} className="px-2 py-2 text-right align-middle whitespace-nowrap">
-                                <div className="font-bold text-black">₹{m.toLocaleString("en-IN")}/mo</div>
+                                <div className="font-black text-sky-950 text-xs">₹{m.toLocaleString("en-IN")}/mo</div>
+                                <div className="text-[7px] text-sky-700 font-bold">{t}m · Dep: ₹{dep}</div>
                               </td>
                             );
                           })}
@@ -3434,7 +3608,8 @@ export default function ProductCatalogShareModal({
                             const m = sLease ? Number(sLease.monthly_amount) : Math.round((price * item.leaseYieldPercent * 12) / t / 100);
                             return (
                               <td key={t} className="px-2 py-2 text-right align-middle whitespace-nowrap">
-                                <div className="font-bold text-black">₹{m.toLocaleString("en-IN")}/mo</div>
+                                <div className="font-black text-indigo-950 text-xs">₹{m.toLocaleString("en-IN")}/mo</div>
+                                <div className="text-[7px] text-indigo-700 font-bold">{t}m · Tax OpEx</div>
                               </td>
                             );
                           })}
@@ -3447,9 +3622,18 @@ export default function ProductCatalogShareModal({
                             const m = sSfemi ? Number(sSfemi.monthly_amount) : Math.round(price / t);
                             return (
                               <td key={t} className="px-2 py-2 text-right align-middle whitespace-nowrap font-black">
-                                <div className={t === 15 ? "text-black underline font-black" : "text-black font-bold"}>
-                                  ₹{m.toLocaleString("en-IN")}/mo
-                                </div>
+                                {t === 15 ? (
+                                  <div className="rounded p-1 bg-emerald-50 border border-emerald-400 text-right">
+                                    <div className="font-black text-black text-xs">⭐ ₹{m.toLocaleString("en-IN")}/mo</div>
+                                    <div className="text-[7px] font-black text-emerald-800 uppercase tracking-tight">15M Special Promotion</div>
+                                    <div className="text-[6.5px] font-bold text-emerald-900 leading-tight">Remaining Future EMIs Waived</div>
+                                  </div>
+                                ) : (
+                                  <div>
+                                    <div className="font-black text-black text-xs">₹{m.toLocaleString("en-IN")}/mo</div>
+                                    <div className="text-[7px] text-emerald-700 font-bold">{t}m Advance EMI</div>
+                                  </div>
+                                )}
                               </td>
                             );
                           })}
@@ -3507,147 +3691,149 @@ export default function ProductCatalogShareModal({
                           return (
                             <div
                               key={item.id}
-                              className="print-card-item rounded-xl border border-gray-300 p-3 bg-white flex flex-col justify-between gap-2.5 break-inside-avoid shadow-2xs"
+                              className="print-card-item rounded-xl border-2 border-gray-400 p-3 bg-white flex flex-col justify-between gap-2.5 break-inside-avoid shadow-xs"
                             >
-                              <div className="flex items-start gap-3">
-                                {/* Product Photo */}
-                                <div className="w-20 h-20 rounded-lg border border-gray-300 bg-white p-1 flex items-center justify-center overflow-hidden shrink-0 shadow-2xs">
-                                  {finalImg ? (
-                                    <img
-                                      src={finalImg}
-                                      alt={item.fullName}
-                                      className="w-full h-full object-contain"
-                                      loading="eager"
-                                    />
-                                  ) : (
-                                    <div className="w-full h-full bg-gray-50 flex flex-col items-center justify-center text-center p-0.5">
-                                      <span className="text-xl">{getCategoryIcon(item.categoryName, item.subcategoryName)}</span>
-                                      <span className="text-[6.5px] text-gray-400 font-mono mt-0.5">No photo</span>
-                                    </div>
+                              {/* Card Top: Department & Stock Header */}
+                              <div className="flex items-center justify-between gap-2 pb-1 border-b border-gray-200 text-[9px]">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-bold text-gray-800 uppercase tracking-wider">{item.category}</span>
+                                  {item.isChild && (
+                                    <span className="px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 border border-amber-300 font-extrabold text-[7.5px] uppercase">
+                                      {item.name.replace(item.parentName || "", "").replace(/^[\s—–-]+/, "") || "Variant"}
+                                    </span>
                                   )}
                                 </div>
+                                {item.currentStock > 0 ? (
+                                  <span className="px-2 py-0.5 rounded-full font-bold text-green-900 bg-green-100 border border-green-300 text-[7.5px]">
+                                    🟢 {item.currentStock} Ready in Showroom
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-0.5 rounded-full font-bold text-gray-700 bg-gray-100 border border-gray-300 text-[7.5px]">
+                                    🟡 Made to Order
+                                  </span>
+                                )}
+                              </div>
 
-                                {/* QR Code */}
-                                {showItemQrCodes && (
-                                  <div className="flex flex-col items-center justify-center p-1 rounded-lg bg-white border border-gray-300 shrink-0 w-[64px]">
-                                    <QRCode
-                                      value={item.publicUrl}
-                                      size={50}
-                                      level="M"
-                                      style={{ height: "auto", maxWidth: "100%", width: "100%" }}
-                                    />
-                                    <span className="text-[6.5px] text-gray-600 font-bold mt-0.5 text-center">
-                                      Scan to View
-                                    </span>
-                                    <a
-                                      href={item.publicUrl}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-[6.5px] text-blue-700 font-bold hover:underline text-center"
-                                    >
-                                      Open ↗
-                                    </a>
+                              {/* Full Image Catalog Tile */}
+                              <div className="relative w-full h-44 rounded-xl border border-gray-300 bg-gradient-to-b from-white to-gray-50/50 p-2 flex items-center justify-center overflow-hidden shrink-0 shadow-2xs">
+                                {finalImg ? (
+                                  <img
+                                    src={finalImg}
+                                    alt={item.fullName}
+                                    className="w-full h-full object-contain"
+                                    loading="eager"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full bg-gray-50 flex flex-col items-center justify-center text-center p-2">
+                                    <span className="text-3xl">{getCategoryIcon(item.categoryName, item.subcategoryName)}</span>
+                                    <span className="text-[8.5px] text-gray-500 font-bold mt-1 uppercase tracking-wider">Showroom Catalog</span>
+                                    <span className="text-[7.5px] text-gray-400 font-mono">SKU: {item.sku}</span>
                                   </div>
                                 )}
 
-                    <div className="min-w-0 flex-1">
-                      <div className="font-bold text-xs text-black leading-snug">{item.fullName}</div>
-                      <p className="font-mono text-[9px] text-gray-600 mt-0.5">
-                        Code: <strong>{item.code}</strong> {item.brand ? `· Brand: ${item.brand}` : ""}
-                      </p>
-                      <p className="text-[9px] text-gray-500">{item.category}</p>
+                                {/* Top Left SKU badge */}
+                                <div className="absolute top-2 left-2 flex items-center gap-1">
+                                  <span className="px-2 py-0.5 rounded-md bg-black/85 text-white font-mono text-[8.5px] font-bold shadow-xs">
+                                    {item.sku}
+                                  </span>
+                                </div>
 
-                      <div className="mt-1">
-                        <a
-                          href={item.publicUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-[8.5px] font-bold text-blue-700 hover:text-blue-900 hover:underline break-all"
-                        >
-                          <span>🔗 Webapp Link:</span>
-                          <span className="font-mono text-[8px]">
-                            {item.publicUrl.replace(/^https?:\/\//, "")}
-                          </span>
-                        </a>
-                      </div>
+                                {/* Top Right Micro QR Code */}
+                                {showItemQrCodes && (
+                                  <div className="absolute top-2 right-2 p-1 rounded-lg bg-white/95 border border-gray-300 shadow-xs flex flex-col items-center w-12">
+                                    <QRCode value={item.publicUrl} size={36} level="M" style={{ height: "auto", width: "100%" }} />
+                                    <span className="text-[5.5px] text-blue-700 font-black mt-0.5">3D / AR ↗</span>
+                                  </div>
+                                )}
 
-                      {item.specs.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {item.specs.map((s, idx) => (
-                            <span
-                              key={idx}
-                              className="text-[8.5px] font-medium bg-gray-100 px-1 py-0.2 rounded border border-gray-300 text-black"
-                            >
-                              {s}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                                {/* Bottom spec quick banner */}
+                                {item.dimensions && (
+                                  <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-black/75 text-white text-[7.5px] font-semibold backdrop-blur-xs">
+                                    📏 {item.dimensions}
+                                  </div>
+                                )}
+                              </div>
 
-                  {/* Pricing Grid */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 pt-2 border-t border-gray-300 text-xs">
-                    {schemes.direct_sale && (
-                      <div className="p-1.5 rounded bg-gray-50 border border-gray-300">
-                        <span className="block text-[9px] font-bold text-gray-600 uppercase">
-                          Direct Sale
-                        </span>
-                        <span className="text-xs font-bold text-black">
-                          {item.hasPrice ? formatCurrency(item.basePrice) : "On Request"}
-                        </span>
-                      </div>
-                    )}
+                              {/* Title & Detailed Specs */}
+                              <div>
+                                <div className="font-extrabold text-xs text-black leading-snug">{item.fullName}</div>
+                                <div className="flex items-center gap-2 text-[8.5px] text-gray-600 mt-0.5">
+                                  <span>Model: <strong>{item.code}</strong></span>
+                                  {item.brand && <span>· Brand: <strong>{item.brand}</strong></span>}
+                                </div>
 
-                    {schemes.rent && (
-                      <div className="p-1.5 rounded bg-sky-50 border border-sky-300">
-                        <span className="block text-[9px] font-bold text-sky-800 uppercase">
-                          Rent
-                        </span>
-                        {selectedRentTenures.map((t) => {
-                          const m = Math.round((item.basePrice * item.rentYieldPercent * 12) / t / 100);
-                          return (
-                            <div key={t} className="text-[10px] font-bold text-black">
-                              {t}m: ₹{m.toLocaleString("en-IN")}/mo
+                                {item.specs.length > 0 && (
+                                  <div className="flex flex-wrap gap-1 mt-1">
+                                    {item.specs.map((s, idx) => (
+                                      <span
+                                        key={idx}
+                                        className="text-[8px] font-semibold bg-gray-100 px-1.5 py-0.2 rounded border border-gray-300 text-gray-800"
+                                      >
+                                        {s}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Advertising Pricing Matrix */}
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 pt-2 border-t border-gray-300 text-xs">
+                                {schemes.direct_sale && (
+                                  <div className="p-1.5 rounded-lg bg-gray-50 border border-gray-300 flex flex-col justify-between">
+                                    <span className="block text-[7.5px] font-bold text-gray-600 uppercase tracking-tight">Direct Sale (MRP)</span>
+                                    <span className="text-xs font-black text-black">
+                                      {item.hasPrice ? formatCurrency(item.basePrice) : "On Request"}
+                                    </span>
+                                    <span className="text-[6.5px] text-gray-500 font-medium">Showroom Best Offer</span>
+                                  </div>
+                                )}
+
+                                {schemes.rent && (
+                                  <div className="p-1.5 rounded-lg bg-sky-50 border border-sky-300 flex flex-col justify-between">
+                                    <span className="block text-[7.5px] font-bold text-sky-800 uppercase tracking-tight">Smart Rent</span>
+                                    {selectedRentTenures.slice(0, 2).map((t) => {
+                                      const m = Math.round((item.basePrice * item.rentYieldPercent * 12) / t / 100);
+                                      return (
+                                        <div key={t} className="text-[10px] font-black text-sky-950">
+                                          {t}m: ₹{m.toLocaleString("en-IN")}/mo
+                                        </div>
+                                      );
+                                    })}
+                                    <span className="text-[6.5px] text-sky-700 font-medium">Refundable Deposit</span>
+                                  </div>
+                                )}
+
+                                {schemes.lease && (
+                                  <div className="p-1.5 rounded-lg bg-indigo-50 border border-indigo-300 flex flex-col justify-between">
+                                    <span className="block text-[7.5px] font-bold text-indigo-800 uppercase tracking-tight">Commercial Lease</span>
+                                    {selectedLeaseTenures.slice(0, 2).map((t) => {
+                                      const m = Math.round((item.basePrice * item.leaseYieldPercent * 12) / t / 100);
+                                      return (
+                                        <div key={t} className="text-[10px] font-black text-indigo-950">
+                                          {t}m: ₹{m.toLocaleString("en-IN")}/mo
+                                        </div>
+                                      );
+                                    })}
+                                    <span className="text-[6.5px] text-indigo-700 font-medium">Tax-Deductible OpEx</span>
+                                  </div>
+                                )}
+
+                                {schemes.sfemi && (
+                                  <div className="p-1.5 rounded-lg bg-emerald-50 border border-emerald-400 flex flex-col justify-between shadow-2xs">
+                                    <span className="block text-[7.5px] font-black text-emerald-900 uppercase tracking-tight">⭐ SFEMI Plan</span>
+                                    {selectedSfemiTenures.map((t) => {
+                                      const m = Math.round(item.basePrice / t);
+                                      return (
+                                        <div key={t} className="text-[10px] font-black text-emerald-950">
+                                          {t === 15 ? "15m: " : `${t}m: `}₹{m.toLocaleString("en-IN")}/mo
+                                        </div>
+                                      );
+                                    })}
+                                    <span className="text-[6.5px] text-emerald-800 font-bold leading-tight">Remaining Future EMIs Waived</span>
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {schemes.lease && (
-                      <div className="p-1.5 rounded bg-indigo-50 border border-indigo-300">
-                        <span className="block text-[9px] font-bold text-indigo-800 uppercase">
-                          Lease
-                        </span>
-                        {selectedLeaseTenures.map((t) => {
-                          const m = Math.round((item.basePrice * item.leaseYieldPercent * 12) / t / 100);
-                          return (
-                            <div key={t} className="text-[10px] font-bold text-black">
-                              {t}m: ₹{m.toLocaleString("en-IN")}/mo
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {schemes.sfemi && (
-                      <div className="p-1.5 rounded bg-emerald-50 border border-emerald-300">
-                        <span className="block text-[9px] font-bold text-emerald-800 uppercase">
-                          SFEMI
-                        </span>
-                        {selectedSfemiTenures.map((t) => {
-                          const m = Math.round(item.basePrice / t);
-                          return (
-                            <div key={t} className="text-[10px] font-black text-black">
-                              {t === 15 ? "⭐ 15m Promo: " : `${t}m: `}₹{m.toLocaleString("en-IN")}/mo
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </div>
                           );
                         })}
                       </div>
@@ -3705,7 +3891,7 @@ export default function ProductCatalogShareModal({
                               {/* Top Hero: Large Photo + QR & Identity */}
                               <div className="flex items-start gap-3">
                                 {/* Large Photo */}
-                                <div className="relative w-32 h-32 rounded-xl border border-gray-300 bg-slate-50 p-1 flex items-center justify-center overflow-hidden shrink-0 shadow-2xs">
+                                <div className="relative w-36 h-36 rounded-xl border border-gray-300 bg-slate-50 p-1 flex items-center justify-center overflow-hidden shrink-0 shadow-2xs">
                                   {finalImg ? (
                                     <img
                                       src={finalImg}
@@ -3719,13 +3905,18 @@ export default function ProductCatalogShareModal({
                                       <span className="text-[7.5px] text-gray-400 font-mono mt-1">Official Showroom Collection</span>
                                     </div>
                                   )}
-                                  <span className="absolute bottom-1 left-1 bg-black/85 text-white text-[7.5px] font-bold px-1.5 py-0.2 rounded uppercase tracking-wider">
-                                    {item.brand || "Subidha Core"}
+                                  <span className="absolute top-1 left-1 bg-black/85 text-white font-mono text-[7px] font-bold px-1.5 py-0.2 rounded">
+                                    {item.sku}
                                   </span>
+                                  {item.isChild && (
+                                    <span className="absolute bottom-1 inset-x-1 bg-amber-500 text-black text-[6.5px] font-extrabold px-1 py-0.2 rounded text-center truncate uppercase tracking-tight shadow-xs">
+                                      {item.name.replace(item.parentName || "", "").replace(/^[\s—–-]+/, "") || "Variant"}
+                                    </span>
+                                  )}
                                 </div>
 
                                 {/* Identity & QR */}
-                                <div className="min-w-0 flex-1 flex flex-col justify-between h-32">
+                                <div className="min-w-0 flex-1 flex flex-col justify-between h-36">
                                   <div>
                                     <div className="flex items-center justify-between gap-1">
                                       <span className="text-[8px] font-bold uppercase tracking-wider text-gray-500">
@@ -3745,31 +3936,27 @@ export default function ProductCatalogShareModal({
                                     </h3>
 
                                     <div className="font-mono text-[8.5px] text-gray-600 mt-0.5">
-                                      Code: <strong>{item.code}</strong> {item.isChild ? `(Variant SKU: ${item.sku})` : ""}
+                                      Model: <strong>{item.code}</strong> {item.brand ? `· Brand: ${item.brand}` : ""}
+                                    </div>
+                                    <div className="text-[8px] text-blue-800 font-semibold mt-0.5">
+                                      🏷️ subidhafurnitureasansol.com › <span className="font-mono font-bold">{item.sku}</span>
                                     </div>
                                   </div>
 
                                   {/* QR Code Bar */}
                                   {showItemQrCodes && (
                                     <div className="flex items-center gap-2 pt-1 border-t border-gray-200">
-                                      <div className="w-12 h-12 bg-white p-0.5 rounded border border-gray-300 shrink-0 flex items-center justify-center">
+                                      <div className="w-11 h-11 bg-white p-0.5 rounded border border-gray-300 shrink-0 flex items-center justify-center">
                                         <QRCode
                                           value={item.publicUrl}
-                                          size={44}
+                                          size={40}
                                           level="M"
                                           style={{ height: "auto", maxWidth: "100%", width: "100%" }}
                                         />
                                       </div>
                                       <div className="min-w-0 text-[8px] text-gray-600 leading-tight">
-                                        <span className="font-bold text-black block">Scan for 3D View:</span>
-                                        <a
-                                          href={item.publicUrl}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="text-blue-700 font-bold hover:underline truncate block"
-                                        >
-                                          {item.publicUrl.replace(/^https?:\/\//, "")}
-                                        </a>
+                                        <span className="font-bold text-black block">Scan for 360° View &amp; Booking:</span>
+                                        <span className="text-[7px] text-gray-500 font-mono">Mobile Instant Verification</span>
                                       </div>
                                     </div>
                                   )}
