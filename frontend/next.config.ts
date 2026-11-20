@@ -208,6 +208,7 @@ const nextConfig: NextConfig = {
   compress: true,
   poweredByHeader: false,
   experimental: {
+    agentUpgrade: "security",
     optimizePackageImports: [
       "lucide-react",
       "date-fns",
