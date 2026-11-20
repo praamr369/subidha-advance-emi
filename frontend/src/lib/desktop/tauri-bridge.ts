@@ -36,6 +36,36 @@ export function isTauriDesktop(): boolean {
 }
 
 /**
+ * Native Desktop Window Controls (Minimize / Maximize / Close)
+ */
+export async function minimizeWindow(): Promise<void> {
+  if (!isTauriDesktop()) return;
+  try {
+    await window.__TAURI_INTERNALS__!.invoke("minimize_window");
+  } catch (err) {
+    console.warn("Failed to minimize window:", err);
+  }
+}
+
+export async function toggleMaximizeWindow(): Promise<void> {
+  if (!isTauriDesktop()) return;
+  try {
+    await window.__TAURI_INTERNALS__!.invoke("toggle_maximize_window");
+  } catch (err) {
+    console.warn("Failed to toggle maximize window:", err);
+  }
+}
+
+export async function closeWindow(): Promise<void> {
+  if (!isTauriDesktop()) return;
+  try {
+    await window.__TAURI_INTERNALS__!.invoke("close_window");
+  } catch (err) {
+    console.warn("Failed to close window:", err);
+  }
+}
+
+/**
  * Fetch desktop runtime metadata.
  */
 export async function getDesktopSystemInfo(): Promise<DesktopSystemInfo> {

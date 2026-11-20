@@ -13,12 +13,13 @@
     "windows": [
       {
         "title": "SUBIDHA CORE — Business Control Center",
-        "width": 1440,
-        "height": 900,
-        "minWidth": 1024,
-        "minHeight": 700,
+        "width": 1280,
+        "height": 768,
+        "minWidth": 800,
+        "minHeight": 500,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "maximized": true
       }
     ],
     "security": {

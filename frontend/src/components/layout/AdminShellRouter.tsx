@@ -8,7 +8,7 @@ import RoleGuard from "@/components/guards/RoleGuard";
 import DashboardShell from "@/components/layout/DashboardShell";
 import DesktopTopNavProgress from "@/components/layout/DesktopTopNavProgress";
 import { AdminStandardHubSkeleton } from "@/components/feedback/RouteLoadingSkeleton";
-import { applyAdminDesktopScale } from "@/lib/admin-desktop-zoom";
+import { applyAdminDesktopScale, zoomIn, zoomOut, resetZoom } from "@/lib/admin-desktop-zoom";
 import { AdminWorkspaceDockProvider } from "@/components/layout/AdminWorkspaceDockContext";
 
 function isPrintDocumentRoute(pathname: string): boolean {
@@ -24,8 +24,46 @@ export default function AdminShellRouter({ children }: { children: ReactNode }) 
       return;
     }
     applyAdminDesktopScale(true);
+
+    // Global desktop shortcut listeners for Zoom and Laptop Resolution Scaling
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+
+      // Ctrl + '+' or Ctrl + '=' -> Zoom In
+      if (e.key === "+" || e.key === "=") {
+        e.preventDefault();
+        zoomIn();
+      }
+      // Ctrl + '-' -> Zoom Out
+      else if (e.key === "-") {
+        e.preventDefault();
+        zoomOut();
+      }
+      // Ctrl + '0' -> Reset Zoom (Default 80% ERP view)
+      else if (e.key === "0") {
+        e.preventDefault();
+        resetZoom();
+      }
+    };
+
+    const handleWheel = (e: WheelEvent) => {
+      if (e.ctrlKey) {
+        e.preventDefault();
+        if (e.deltaY < 0) {
+          zoomIn();
+        } else if (e.deltaY > 0) {
+          zoomOut();
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("wheel", handleWheel, { passive: false });
+
     return () => {
       applyAdminDesktopScale(false);
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("wheel", handleWheel);
     };
   }, [pathname]);
 
