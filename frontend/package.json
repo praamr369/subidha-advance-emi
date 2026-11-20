@@ -4,6 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "NEXT_TELEMETRY_DISABLED=1 next dev",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
     "build": "node scripts/run-next-build.mjs",
     "build:smoke": "node scripts/run-next-build.mjs --smoke",
     "start": "next start",
@@ -52,6 +55,7 @@
     "@radix-ui/react-toggle-group": "^1.1.11",
     "@tanstack/react-query": "^5.90.21",
     "@tanstack/react-query-devtools": "^5.91.3",
+    "@tauri-apps/api": "^2.1.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
     "embla-carousel-autoplay": "^8.6.0",
@@ -77,6 +81,7 @@
   "devDependencies": {
     "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4",
+    "@tauri-apps/cli": "^2.1.0",
     "@types/estree": "^1.0.8",
     "@types/json-schema": "^7.0.15",
     "@types/marked": "^5.0.2",
