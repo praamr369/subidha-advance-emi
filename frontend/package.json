@@ -5,8 +5,8 @@
   "scripts": {
     "dev": "NEXT_TELEMETRY_DISABLED=1 next dev",
     "tauri": "tauri",
-    "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build",
+    "tauri:dev": "GDK_BACKEND=x11 tauri dev",
+    "tauri:build": "GDK_BACKEND=x11 tauri build",
     "build": "node scripts/run-next-build.mjs",
     "build:smoke": "node scripts/run-next-build.mjs --smoke",
     "start": "next start",

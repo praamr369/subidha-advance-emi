@@ -46,6 +46,7 @@ fi
 
 # 4. Compile Desktop Application
 echo "🔨 Compiling native Linux desktop binary..."
+export GDK_BACKEND=x11
 npm run tauri:build
 
 echo ""
