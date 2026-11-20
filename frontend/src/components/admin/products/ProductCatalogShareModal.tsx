@@ -5,6 +5,8 @@ import QRCode from "react-qr-code";
 import {
   AlertCircle,
   Boxes,
+  Building2,
+  Calendar,
   Check,
   CheckCircle2,
   ChevronDown,
@@ -26,6 +28,7 @@ import {
   RefreshCw,
   Search,
   Share2,
+  ShieldCheck,
   Sparkles,
   Star,
   Table as TableIcon,
@@ -277,6 +280,30 @@ export default function ProductCatalogShareModal({
   const [customerName, setCustomerName] = useState<string>("");
   const [customerPhone, setCustomerPhone] = useState<string>("");
 
+  // Commercial Quotation & Proposal Personalization
+  const [quotationNumber, setQuotationNumber] = useState<string>(() => {
+    const d = new Date();
+    const dateStr = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+    return `QT-${dateStr}-${randomSuffix}`;
+  });
+  const [quotationValidityDays, setQuotationValidityDays] = useState<number>(15);
+  const [salesConsultant, setSalesConsultant] = useState<string>("Pradip Roy (Showroom Manager)");
+  const [showSignatoryBlock, setShowSignatoryBlock] = useState<boolean>(true);
+  const [taxNote, setTaxNote] = useState<string>(
+    "All Direct Sale prices are inclusive of applicable GST (18%/12%). Formal GST invoice & HSN breakdown provided on booking."
+  );
+
+  // Interactive Print-to-Digital Bridge (Per-Item Micro QR Codes)
+  const [showItemQrCodes, setShowItemQrCodes] = useState<boolean>(true);
+
+  // Professional Print Engine & Pagination Controls
+  const [pageBreakPerCategory, setPageBreakPerCategory] = useState<boolean>(false);
+  const [inkSaverMode, setInkSaverMode] = useState<boolean>(false);
+
+  // Executive Booklet Cover Page
+  const [includeCoverPage, setIncludeCoverPage] = useState<boolean>(false);
+
   // Product Scope: selected products vs all available products
   const [productScope, setProductScope] = useState<"selected" | "all_pim">(
     selectedProducts.length > 0 ? "selected" : "all_pim"
@@ -382,6 +409,24 @@ export default function ProductCatalogShareModal({
   }, [businessInfo.logoUrl, origin]);
 
   const webappCatalogUrl = `${origin}/products`;
+
+  const currentDateFormatted = useMemo(() => {
+    return new Date().toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  }, []);
+
+  const validityEndDate = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + quotationValidityDays);
+    return d.toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  }, [quotationValidityDays]);
 
   // Combine products based on scope and extra loaded
   const effectiveSourceProducts = useMemo<PimProduct[]>(() => {
@@ -833,7 +878,8 @@ export default function ProductCatalogShareModal({
     1;
 
   const totalPrintCols =
-    5 +
+    (showItemQrCodes ? 1 : 0) +
+    4 +
     (schemes.direct_sale ? 1 : 0) +
     (schemes.rent ? selectedRentTenures.length : 0) +
     (schemes.lease ? selectedLeaseTenures.length : 0) +
@@ -1160,6 +1206,7 @@ export default function ProductCatalogShareModal({
 
   // Generate standalone, self-contained HTML document for pixel-perfect multi-page A4 printing
   const generateFullPrintDocumentHtml = (layout: PrintLayoutType): string => {
+    const coverEl = document.getElementById("print-sheet-cover");
     const headerEl = document.getElementById("print-sheet-header");
     const indexEl = document.getElementById("catalog-context-index");
     const footerEl = document.getElementById("print-sheet-footer");
@@ -1171,6 +1218,7 @@ export default function ProductCatalogShareModal({
         : "print-showcase-section";
     const bodyEl = document.getElementById(sectionId);
 
+    const coverHtml = includeCoverPage && coverEl ? coverEl.outerHTML : "";
     const headerHtml = headerEl ? headerEl.innerHTML : "";
     const indexHtml = indexEl ? indexEl.outerHTML : "";
     const bodyHtml = bodyEl ? bodyEl.innerHTML : "";
@@ -1185,7 +1233,29 @@ export default function ProductCatalogShareModal({
   <style>
     @page {
       size: A4 portrait;
-      margin: 8mm 8mm 10mm 8mm;
+      margin: 10mm 8mm 12mm 8mm;
+      @top-left {
+        content: "${businessInfo.name} · Official Showroom Handover";
+        font-size: 7.5px;
+        font-weight: bold;
+        color: #4b5563;
+      }
+      @top-right {
+        content: "Ref: ${quotationNumber} · Date: ${currentDateFormatted}";
+        font-size: 7.5px;
+        color: #6b7280;
+      }
+      @bottom-left {
+        content: "Showroom: ${businessInfo.address.replace(/"/g, "'")} · 📞 ${businessInfo.phone}";
+        font-size: 7.5px;
+        color: #6b7280;
+      }
+      @bottom-right {
+        content: "Page " counter(page) " of " counter(pages);
+        font-size: 8px;
+        font-weight: 700;
+        color: #111827;
+      }
     }
     html {
       scroll-behavior: smooth;
@@ -1211,6 +1281,67 @@ export default function ProductCatalogShareModal({
       background: #ffffff;
       padding: 4mm 6mm;
     }
+    .cover-box {
+      page-break-after: always !important;
+      break-after: page !important;
+    }
+    .cover-page-container {
+      min-height: 255mm !important;
+      page-break-after: always !important;
+      break-after: page !important;
+      display: flex !important;
+      flex-direction: column !important;
+      justify-content: space-between !important;
+      padding: 16mm 14mm !important;
+      border: 3px double #18181b !important;
+      background: #ffffff !important;
+      margin-bottom: 20px !important;
+      box-sizing: border-box !important;
+    }
+    ${pageBreakPerCategory ? `
+      .category-major-group {
+        page-break-before: always !important;
+        break-before: page !important;
+      }
+      .category-major-group:first-of-type {
+        page-break-before: auto !important;
+        break-before: auto !important;
+      }
+    ` : ""}
+    ${inkSaverMode ? `
+      body, .print-wrapper {
+        background: #ffffff !important;
+        color: #000000 !important;
+      }
+      .category-section-banner,
+      tr.category-section-banner td {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+        border: 1.5px solid #000000 !important;
+      }
+      .bg-black,
+      .bg-zinc-900 {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+        border: 1px solid #000000 !important;
+      }
+      .text-white {
+        color: #000000 !important;
+      }
+      .bg-sky-50, .bg-indigo-50, .bg-amber-50, .bg-emerald-50, .bg-gray-50, .bg-zinc-50 {
+        background-color: #ffffff !important;
+        border-color: #9ca3af !important;
+      }
+      .text-sky-800, .text-sky-900, .text-sky-950,
+      .text-indigo-800, .text-indigo-900, .text-indigo-950,
+      .text-amber-800, .text-amber-900, .text-amber-950,
+      .text-emerald-800, .text-emerald-900, .text-emerald-950 {
+        color: #000000 !important;
+      }
+      img {
+        filter: grayscale(100%) contrast(105%) !important;
+      }
+    ` : ""}
     .header-box {
       border-bottom: 2px solid #000000;
       padding-bottom: 10px;
@@ -1454,7 +1585,8 @@ export default function ProductCatalogShareModal({
   </style>
 </head>
 <body>
-  <div class="print-wrapper">
+  <div class="print-wrapper ${inkSaverMode ? "ink-saver-active" : ""}">
+    ${coverHtml ? `<div class="cover-box">${coverHtml}</div>` : ""}
     <div class="header-box">${headerHtml}</div>
     ${indexHtml ? `<div class="index-box">${indexHtml}</div>` : ""}
     <div class="body-box">${bodyHtml}</div>
@@ -2460,6 +2592,184 @@ export default function ProductCatalogShareModal({
                   </button>
                 </div>
               </div>
+
+              {/* Showroom Handover & Customization Suite */}
+              <div className="bg-card p-4 rounded-xl border border-border shadow-xs space-y-3.5">
+                <div className="flex items-center justify-between border-b border-border pb-2.5 flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-amber-500" />
+                    <span className="text-xs font-bold text-foreground uppercase tracking-wide">
+                      Showroom Handover &amp; Quotation Controls
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-muted-foreground">
+                    Customized for official client handovers, commercial proposals &amp; multi-page printouts
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                  {/* Column 1: Quotation Metadata */}
+                  <div className="space-y-2.5 rounded-lg border border-border/80 bg-muted/20 p-3">
+                    <span className="font-bold text-foreground text-[11px] uppercase tracking-wider flex items-center gap-1.5">
+                      <FileText className="h-3.5 w-3.5 text-primary" />
+                      1. Quotation &amp; Proposal Details
+                    </span>
+
+                    <div>
+                      <label className="text-[10.5px] text-muted-foreground block mb-0.5">Quotation Ref #:</label>
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="text"
+                          value={quotationNumber}
+                          onChange={(e) => setQuotationNumber(e.target.value)}
+                          className="w-full h-7 rounded border border-border bg-background px-2 font-mono text-[11px] font-bold text-foreground focus:outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const d = new Date();
+                            const dateStr = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+                            setQuotationNumber(`QT-${dateStr}-${Math.floor(1000 + Math.random() * 9000)}`);
+                          }}
+                          className="h-7 px-1.5 rounded border border-border bg-background hover:bg-muted text-[10px] text-muted-foreground cursor-pointer"
+                          title="Regenerate Ref"
+                        >
+                          <RefreshCw className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10.5px] text-muted-foreground block mb-0.5">Validity:</label>
+                        <select
+                          value={quotationValidityDays}
+                          onChange={(e) => setQuotationValidityDays(Number(e.target.value))}
+                          className="w-full h-7 rounded border border-border bg-background px-2 text-[11px] font-medium text-foreground focus:outline-none"
+                        >
+                          <option value={7}>7 Days</option>
+                          <option value={15}>15 Days</option>
+                          <option value={30}>30 Days</option>
+                          <option value={60}>60 Days</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10.5px] text-muted-foreground block mb-0.5">Expiry Date:</label>
+                        <div className="h-7 rounded border border-border/60 bg-muted/40 px-2 flex items-center text-[10.5px] font-semibold text-emerald-700 dark:text-emerald-400">
+                          {validityEndDate}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[10.5px] text-muted-foreground block mb-0.5">Showroom Consultant:</label>
+                      <input
+                        type="text"
+                        value={salesConsultant}
+                        onChange={(e) => setSalesConsultant(e.target.value)}
+                        className="w-full h-7 rounded border border-border bg-background px-2 text-[11px] text-foreground focus:outline-none"
+                        placeholder="Consultant name..."
+                      />
+                    </div>
+                  </div>
+
+                  {/* Column 2: Department Filter & Tax Disclosure */}
+                  <div className="space-y-2.5 rounded-lg border border-border/80 bg-muted/20 p-3">
+                    <span className="font-bold text-foreground text-[11px] uppercase tracking-wider flex items-center gap-1.5">
+                      <Building2 className="h-3.5 w-3.5 text-primary" />
+                      2. Scope &amp; Commercial Terms
+                    </span>
+
+                    <div>
+                      <label className="text-[10.5px] text-muted-foreground block mb-0.5">Target Department Handover:</label>
+                      <select
+                        value={selectedCategory}
+                        onChange={(e) => setSelectedCategory(e.target.value)}
+                        className="w-full h-7 rounded border border-border bg-background px-2 text-[11px] font-bold text-foreground focus:outline-none"
+                      >
+                        <option value="all">
+                          All Departments ({resolvedItems.filter((i) => !excludeUnpriced || i.hasPrice).length} products)
+                        </option>
+                        {availableCategories.map(([cat, count]) => (
+                          <option key={cat} value={cat}>
+                            {cat} ({count} {count === 1 ? "product" : "products"})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[10.5px] text-muted-foreground block mb-0.5">Tax &amp; GST Disclosure:</label>
+                      <textarea
+                        rows={3}
+                        value={taxNote}
+                        onChange={(e) => setTaxNote(e.target.value)}
+                        className="w-full rounded border border-border bg-background p-1.5 text-[10.5px] text-foreground focus:outline-none leading-tight"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Column 3: Professional Print Switches */}
+                  <div className="space-y-2 rounded-lg border border-border/80 bg-muted/20 p-3">
+                    <span className="font-bold text-foreground text-[11px] uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                      <ShieldCheck className="h-3.5 w-3.5 text-primary" />
+                      3. Document Formatting &amp; Engine
+                    </span>
+
+                    <label className="flex items-center gap-2 text-[11.5px] text-foreground cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={includeCoverPage}
+                        onChange={(e) => setIncludeCoverPage(e.target.checked)}
+                        className="rounded border-border text-primary focus:ring-0"
+                      />
+                      <span className="font-medium">⭐ Include Executive Cover Page</span>
+                    </label>
+
+                    <label className="flex items-center gap-2 text-[11.5px] text-foreground cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={showItemQrCodes}
+                        onChange={(e) => setShowItemQrCodes(e.target.checked)}
+                        className="rounded border-border text-primary focus:ring-0"
+                      />
+                      <span>Per-Product Micro QR Codes (Scan-to-View 3D)</span>
+                    </label>
+
+                    <label className="flex items-center gap-2 text-[11.5px] text-foreground cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={pageBreakPerCategory}
+                        onChange={(e) => setPageBreakPerCategory(e.target.checked)}
+                        className="rounded border-border text-primary focus:ring-0"
+                      />
+                      <span>Department Page Breaks (Clean fresh page per dept)</span>
+                    </label>
+
+                    <label className="flex items-center gap-2 text-[11.5px] text-foreground cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={inkSaverMode}
+                        onChange={(e) => setInkSaverMode(e.target.checked)}
+                        className="rounded border-border text-primary focus:ring-0"
+                      />
+                      <span className="text-emerald-700 dark:text-emerald-400 font-medium">
+                        🌿 Eco Ink-Saver Mode (B&amp;W Laser / Crisp Clean)
+                      </span>
+                    </label>
+
+                    <label className="flex items-center gap-2 text-[11.5px] text-foreground cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={showSignatoryBlock}
+                        onChange={(e) => setShowSignatoryBlock(e.target.checked)}
+                        className="rounded border-border text-primary focus:ring-0"
+                      />
+                      <span>Authorized Signatory &amp; Showroom Seal Block</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -2591,6 +2901,120 @@ export default function ProductCatalogShareModal({
               activeTab === "print" ? "block" : "hidden"
             }`}
           >
+            {/* Case 5: Executive Booklet Cover Page (Only when enabled) */}
+            {includeCoverPage && (
+              <div
+                id="print-sheet-cover"
+                className="cover-page-container rounded-2xl border-4 border-black p-8 sm:p-12 bg-white text-black flex flex-col justify-between mb-8 shadow-sm"
+                style={{ minHeight: "260mm", pageBreakAfter: "always", breakAfter: "page" }}
+              >
+                {/* Top Brand Header */}
+                <div className="text-center space-y-3">
+                  <div className="mx-auto w-24 h-24 rounded-2xl border-2 border-black bg-white p-2 flex items-center justify-center overflow-hidden shadow-sm">
+                    <img
+                      src={resolvedLogoUrl}
+                      alt={`${businessInfo.name} Brand Logo`}
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+                  <div>
+                    <h1 className="text-3xl font-black uppercase tracking-wider text-black">
+                      {businessInfo.name}
+                    </h1>
+                    <p className="text-sm font-bold text-gray-800 uppercase tracking-widest mt-0.5">
+                      Premium Furniture &amp; Home Appliances Showroom
+                    </p>
+                    <p className="text-xs text-gray-600 mt-1 font-medium">
+                      Direct Sale · Smart Rent Plans · Corporate Lease · SFEMI Advance EMI
+                    </p>
+                  </div>
+                  <div className="w-24 h-0.5 bg-black mx-auto mt-2"></div>
+                </div>
+
+                {/* Center Proposal & Quotation Block */}
+                <div className="my-auto py-6 space-y-6">
+                  <div className="text-center space-y-2">
+                    <span className="inline-block px-4 py-1 rounded-full bg-black text-white text-xs font-black tracking-widest uppercase">
+                      Official Showroom Catalog &amp; Price Specification
+                    </span>
+                    <h2 className="text-xl font-black uppercase text-gray-900 tracking-tight">
+                      {selectedCategory === "all" ? "Comprehensive Product Catalog" : `${selectedCategory} Department Handover`}
+                    </h2>
+                    <p className="text-xs text-gray-600 max-w-lg mx-auto">
+                      Detailed product specifications, outer dimensions, warranty coverage, direct showroom pricing, flexible rent tenures, and approved SFEMI monthly promotional schedules.
+                    </p>
+                  </div>
+
+                  <div className="max-w-xl mx-auto rounded-xl border-2 border-black bg-zinc-50 p-6 space-y-3 shadow-2xs">
+                    <div className="grid grid-cols-2 gap-4 text-xs">
+                      <div>
+                        <span className="text-[10px] font-bold uppercase text-gray-500 block">Quotation Reference:</span>
+                        <span className="font-mono font-black text-sm text-black">{quotationNumber}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold uppercase text-gray-500 block">Date of Issue:</span>
+                        <span className="font-medium text-black">{currentDateFormatted}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold uppercase text-gray-500 block">Quotation Validity:</span>
+                        <span className="font-semibold text-emerald-800">{validityEndDate} ({quotationValidityDays} Days)</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold uppercase text-gray-500 block">Showroom Consultant:</span>
+                        <span className="font-bold text-black">{salesConsultant}</span>
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-gray-300">
+                      <span className="text-[10px] font-bold uppercase text-gray-500 block">Exclusively Prepared For:</span>
+                      <div className="text-base font-black text-black mt-0.5">
+                        {customerName.trim() || "Valued Showroom Client / Prospective Buyer"}
+                      </div>
+                      {customerPhone.trim() && (
+                        <div className="text-xs text-gray-700 font-medium">Contact: {customerPhone.trim()}</div>
+                      )}
+                    </div>
+
+                    <div className="pt-2 border-t border-gray-200 flex items-center justify-between text-[11px] font-medium text-gray-700">
+                      <span>Scope: <strong>{activeItems.length} Products</strong> Selected</span>
+                      <span>Departments: <strong>{categoryHierarchy.length} Categories</strong></span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bottom Showroom Identity & Master QR */}
+                <div className="pt-6 border-t-2 border-black flex items-center justify-between gap-6">
+                  <div className="space-y-1 text-left text-xs">
+                    <p className="font-bold text-black">📍 Showroom Address:</p>
+                    <p className="text-gray-700 text-[11px] max-w-md leading-relaxed">{businessInfo.address}</p>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-gray-800 pt-1">
+                      <span>📞 Phone: <strong>{businessInfo.phone}</strong></span>
+                      <span>✉️ Email: {businessInfo.email}</span>
+                      <span>🌐 Web: <strong>{businessInfo.website}</strong></span>
+                    </div>
+                    <p className="text-[10px] text-gray-500 font-mono mt-1">
+                      Official Showroom Publication · Authorized by {businessInfo.name} Management
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col items-center justify-center p-2 rounded-xl bg-zinc-50 border-2 border-black text-center shrink-0 w-[125px]">
+                    <div className="w-20 h-20 bg-white p-1 rounded-lg border border-gray-300 flex items-center justify-center shadow-2xs">
+                      <QRCode
+                        value={webappCatalogUrl}
+                        size={76}
+                        level="M"
+                        style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+                      />
+                    </div>
+                    <span className="text-[8px] font-black uppercase text-black mt-1">
+                      Scan Online Catalog
+                    </span>
+                    <span className="text-[7.5px] text-blue-700 font-bold">3D / AR Mobile Store</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Header for Print Sheet: Complete Advertising, Marketing & Handover Brand Header */}
             <div id="print-sheet-header" className="border-b-2 border-black pb-3 space-y-3">
               {/* Top Branding Row */}
@@ -2613,7 +3037,7 @@ export default function ProductCatalogShareModal({
                         {businessInfo.name}
                       </h1>
                       <span className="px-2 py-0.5 rounded bg-black text-white text-[9px] font-black tracking-wider uppercase">
-                        Official Catalog Handover
+                        {selectedCategory === "all" ? "Official Catalog Handover" : `${selectedCategory} Department Handover`}
                       </span>
                     </div>
                     <p className="text-xs text-gray-800 font-bold mt-0.5">
@@ -2638,12 +3062,15 @@ export default function ProductCatalogShareModal({
                       </span>
                     </div>
 
-                    {customerName.trim() && (
-                      <div className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-amber-50 text-xs font-bold text-black border border-amber-300">
-                        👤 Prepared for: <span className="underline">{customerName.trim()}</span>{" "}
+                    <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[10.5px]">
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-amber-50 text-black border border-amber-300 font-bold">
+                        👤 Prepared for: <span className="underline">{customerName.trim() || "Showroom Visitor / Client"}</span>{" "}
                         {customerPhone.trim() ? `(${customerPhone.trim()})` : ""}
                       </div>
-                    )}
+                      <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-100 text-gray-800 border border-gray-300">
+                        Assisted by: <strong>{salesConsultant}</strong>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -2677,8 +3104,14 @@ export default function ProductCatalogShareModal({
                     <span className="inline-block px-3 py-1 rounded bg-black text-white font-bold tracking-wider text-[11px]">
                       OFFICIAL PRICE LIST
                     </span>
-                    <p className="text-[11px] text-gray-600 mt-1 font-medium">
-                      Date: {new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                    <p className="text-[11px] text-gray-900 mt-1 font-mono font-bold">
+                      Ref: {quotationNumber}
+                    </p>
+                    <p className="text-[10px] text-gray-600 mt-0.5">
+                      Date: {currentDateFormatted}
+                    </p>
+                    <p className="text-[9.5px] text-emerald-800 font-semibold mt-0.5">
+                      Valid till: {validityEndDate} ({quotationValidityDays}d)
                     </p>
                     <p className="text-[10px] text-gray-500 mt-0.5 font-mono">
                       {activeItems.length} Products Selected
@@ -2834,7 +3267,7 @@ export default function ProductCatalogShareModal({
               <table className="w-full text-left text-xs border-collapse">
                 <thead className="bg-gray-100 border-b-2 border-gray-400 text-[10px] font-bold text-black uppercase tracking-wider">
                   <tr>
-                    <th className="px-2 py-2 w-12 text-center">QR Code</th>
+                    {showItemQrCodes && <th className="px-2 py-2 w-12 text-center">QR Code</th>}
                     <th className="px-2 py-2 w-12 text-center">Photo</th>
                     <th className="px-2 py-2">Product & Variant Details</th>
                     <th className="px-2 py-2">Specifications</th>
@@ -2861,57 +3294,66 @@ export default function ProductCatalogShareModal({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-300">
-                  {flatSubcategoryGroups.map((group) => (
-                    <Fragment key={`print-${group.id}`}>
-                      <tr id={group.id} className="category-section-banner break-inside-avoid bg-zinc-900 text-white">
-                        <td colSpan={totalPrintCols} className="px-2.5 py-1.5 font-bold">
-                          <div className="flex items-center justify-between flex-wrap gap-2 text-white">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-sm">{group.icon}</span>
-                              <span className="text-[10px] font-black uppercase tracking-wider text-white">
-                                {group.categoryName} › {group.subcategoryName}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2 text-[9px]">
-                              <span className="px-1.5 py-0.2 rounded bg-white/20 text-white font-mono">
-                                {group.itemCount} {group.itemCount === 1 ? "Product" : "Products"}
-                              </span>
-                              {group.hasPricedItems && (
-                                <span className="text-emerald-300 font-semibold">
-                                  {schemes.rent && group.minRentMonthly > 0
-                                    ? `Rent from ₹${group.minRentMonthly.toLocaleString("en-IN")}/mo`
-                                    : `From ${formatCurrency(group.minPrice)}`}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                      {group.items.map((item) => {
-                        const sItem = findServerItem(item.id);
-                        const finalImg = sItem?.image_url || item.imageUrl;
-                        const price = item.basePrice;
+                  {categoryHierarchy.map((mainGroup) => (
+                    <Fragment key={`print-major-${mainGroup.categoryName}`}>
+                      {mainGroup.subcategories.map((group, groupIdx) => (
+                        <Fragment key={`print-${group.id}`}>
+                          <tr
+                            id={group.id}
+                            className={`category-section-banner break-inside-avoid bg-zinc-900 text-white ${
+                              pageBreakPerCategory && groupIdx === 0 ? "category-major-group" : ""
+                            }`}
+                          >
+                            <td colSpan={totalPrintCols} className="px-2.5 py-1.5 font-bold">
+                              <div className="flex items-center justify-between flex-wrap gap-2 text-white">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-sm">{group.icon}</span>
+                                  <span className="text-[10px] font-black uppercase tracking-wider text-white">
+                                    {group.categoryName} › {group.subcategoryName}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2 text-[9px]">
+                                  <span className="px-1.5 py-0.2 rounded bg-white/20 text-white font-mono">
+                                    {group.itemCount} {group.itemCount === 1 ? "Product" : "Products"}
+                                  </span>
+                                  {group.hasPricedItems && (
+                                    <span className="text-emerald-300 font-semibold">
+                                      {schemes.rent && group.minRentMonthly > 0
+                                        ? `Rent from ₹${group.minRentMonthly.toLocaleString("en-IN")}/mo`
+                                        : `From ${formatCurrency(group.minPrice)}`}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                          {group.items.map((item) => {
+                            const sItem = findServerItem(item.id);
+                            const finalImg = sItem?.image_url || item.imageUrl;
+                            const price = item.basePrice;
 
-                        return (
-                          <tr key={item.id} className="break-inside-avoid">
-                        <td className="px-2 py-2 align-middle text-center">
-                          <div className="flex flex-col items-center p-0.5 rounded bg-white border border-gray-300 w-11 shrink-0 mx-auto">
-                            <QRCode
-                              value={item.publicUrl}
-                              size={38}
-                              level="M"
-                              style={{ height: "auto", maxWidth: "100%", width: "100%" }}
-                            />
-                            <a
-                              href={item.publicUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-[6px] text-blue-700 font-bold mt-0.5 hover:underline"
-                            >
-                              Scan / Open
-                            </a>
-                          </div>
-                        </td>
+                            return (
+                              <tr key={item.id} className="break-inside-avoid">
+                                {showItemQrCodes && (
+                                  <td className="px-2 py-2 align-middle text-center">
+                                    <div className="flex flex-col items-center p-0.5 rounded bg-white border border-gray-300 w-11 shrink-0 mx-auto">
+                                      <QRCode
+                                        value={item.publicUrl}
+                                        size={38}
+                                        level="M"
+                                        style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+                                      />
+                                      <a
+                                        href={item.publicUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-[6px] text-blue-700 font-bold mt-0.5 hover:underline"
+                                      >
+                                        Scan / Open
+                                      </a>
+                                    </div>
+                                  </td>
+                                )}
                         <td className="px-2 py-2 align-middle text-center">
                           {finalImg ? (
                             <div className="w-12 h-12 rounded border border-gray-300 bg-white p-0.5 flex items-center justify-center overflow-hidden shrink-0 mx-auto shadow-2xs">
@@ -3016,7 +3458,9 @@ export default function ProductCatalogShareModal({
                   })}
                 </Fragment>
               ))}
-            </tbody>
+            </Fragment>
+          ))}
+        </tbody>
               </table>
             </div>
 
@@ -3026,78 +3470,85 @@ export default function ProductCatalogShareModal({
               className="space-y-4"
               style={{ display: printLayout === "cards" ? "block" : "none" }}
             >
-              {flatSubcategoryGroups.map((group) => (
-                <div key={group.id} id={`cards-${group.id}`} className="space-y-2.5 break-inside-avoid">
-                  <div className="category-section-banner rounded-lg bg-zinc-900 text-white px-3 py-1.5 flex items-center justify-between break-inside-avoid">
-                    <div className="flex items-center gap-2">
-                      <span>{group.icon}</span>
-                      <span className="text-xs font-black uppercase tracking-wide">
-                        {group.categoryName} › {group.subcategoryName}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 text-[9px]">
-                      <span className="font-mono px-2 py-0.5 rounded bg-white/20 text-white font-bold">
-                        {group.itemCount} {group.itemCount === 1 ? "Item" : "Items"}
-                      </span>
-                      {group.hasPricedItems && (
-                        <span className="text-emerald-300 font-semibold">
-                          {schemes.rent && group.minRentMonthly > 0
-                            ? `Rent from ₹${group.minRentMonthly.toLocaleString("en-IN")}/mo`
-                            : `From ${formatCurrency(group.minPrice)}`}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {group.items.map((item) => {
-                      const sItem = findServerItem(item.id);
-                      const finalImg = sItem?.image_url || item.imageUrl;
-                      const price = item.basePrice;
-
-                      return (
-                      <div
-                        key={item.id}
-                        className="print-card-item rounded-xl border border-gray-300 p-3 bg-white flex flex-col justify-between gap-2.5 break-inside-avoid shadow-2xs"
-                      >
-                  <div className="flex items-start gap-3">
-                    {/* Product Photo */}
-                    <div className="w-20 h-20 rounded-lg border border-gray-300 bg-white p-1 flex items-center justify-center overflow-hidden shrink-0 shadow-2xs">
-                      {finalImg ? (
-                        <img
-                          src={finalImg}
-                          alt={item.fullName}
-                          className="w-full h-full object-contain"
-                          loading="eager"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-gray-50 flex flex-col items-center justify-center text-center p-0.5">
-                          <span className="text-xl">{getCategoryIcon(item.categoryName, item.subcategoryName)}</span>
-                          <span className="text-[6.5px] text-gray-400 font-mono mt-0.5">No photo</span>
+              {categoryHierarchy.map((mainGroup) => (
+                <div
+                  key={`cards-major-${mainGroup.categoryName}`}
+                  className={`space-y-4 ${pageBreakPerCategory ? "category-major-group" : ""}`}
+                >
+                  {mainGroup.subcategories.map((group) => (
+                    <div key={group.id} id={`cards-${group.id}`} className="space-y-2.5 break-inside-avoid">
+                      <div className="category-section-banner rounded-lg bg-zinc-900 text-white px-3 py-1.5 flex items-center justify-between break-inside-avoid">
+                        <div className="flex items-center gap-2">
+                          <span>{group.icon}</span>
+                          <span className="text-xs font-black uppercase tracking-wide">
+                            {group.categoryName} › {group.subcategoryName}
+                          </span>
                         </div>
-                      )}
-                    </div>
+                        <div className="flex items-center gap-2 text-[9px]">
+                          <span className="font-mono px-2 py-0.5 rounded bg-white/20 text-white font-bold">
+                            {group.itemCount} {group.itemCount === 1 ? "Item" : "Items"}
+                          </span>
+                          {group.hasPricedItems && (
+                            <span className="text-emerald-300 font-semibold">
+                              {schemes.rent && group.minRentMonthly > 0
+                                ? `Rent from ₹${group.minRentMonthly.toLocaleString("en-IN")}/mo`
+                                : `From ${formatCurrency(group.minPrice)}`}
+                            </span>
+                          )}
+                        </div>
+                      </div>
 
-                    {/* QR Code */}
-                    <div className="flex flex-col items-center justify-center p-1 rounded-lg bg-white border border-gray-300 shrink-0 w-[64px]">
-                      <QRCode
-                        value={item.publicUrl}
-                        size={50}
-                        level="M"
-                        style={{ height: "auto", maxWidth: "100%", width: "100%" }}
-                      />
-                      <span className="text-[6.5px] text-gray-600 font-bold mt-0.5 text-center">
-                        Scan to View
-                      </span>
-                      <a
-                        href={item.publicUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[6.5px] text-blue-700 font-bold hover:underline text-center"
-                      >
-                        Open ↗
-                      </a>
-                    </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {group.items.map((item) => {
+                          const sItem = findServerItem(item.id);
+                          const finalImg = sItem?.image_url || item.imageUrl;
+                          const price = item.basePrice;
+
+                          return (
+                            <div
+                              key={item.id}
+                              className="print-card-item rounded-xl border border-gray-300 p-3 bg-white flex flex-col justify-between gap-2.5 break-inside-avoid shadow-2xs"
+                            >
+                              <div className="flex items-start gap-3">
+                                {/* Product Photo */}
+                                <div className="w-20 h-20 rounded-lg border border-gray-300 bg-white p-1 flex items-center justify-center overflow-hidden shrink-0 shadow-2xs">
+                                  {finalImg ? (
+                                    <img
+                                      src={finalImg}
+                                      alt={item.fullName}
+                                      className="w-full h-full object-contain"
+                                      loading="eager"
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full bg-gray-50 flex flex-col items-center justify-center text-center p-0.5">
+                                      <span className="text-xl">{getCategoryIcon(item.categoryName, item.subcategoryName)}</span>
+                                      <span className="text-[6.5px] text-gray-400 font-mono mt-0.5">No photo</span>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* QR Code */}
+                                {showItemQrCodes && (
+                                  <div className="flex flex-col items-center justify-center p-1 rounded-lg bg-white border border-gray-300 shrink-0 w-[64px]">
+                                    <QRCode
+                                      value={item.publicUrl}
+                                      size={50}
+                                      level="M"
+                                      style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+                                    />
+                                    <span className="text-[6.5px] text-gray-600 font-bold mt-0.5 text-center">
+                                      Scan to View
+                                    </span>
+                                    <a
+                                      href={item.publicUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-[6.5px] text-blue-700 font-bold hover:underline text-center"
+                                    >
+                                      Open ↗
+                                    </a>
+                                  </div>
+                                )}
 
                     <div className="min-w-0 flex-1">
                       <div className="font-bold text-xs text-black leading-snug">{item.fullName}</div>
@@ -3197,9 +3648,11 @@ export default function ProductCatalogShareModal({
                     )}
                   </div>
                 </div>
-                      );
-                    })}
-                  </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>
@@ -3210,111 +3663,118 @@ export default function ProductCatalogShareModal({
               className="space-y-4"
               style={{ display: printLayout === "showcase" ? "block" : "none" }}
             >
-              {flatSubcategoryGroups.map((group) => (
-                <div key={group.id} id={`showcase-${group.id}`} className="space-y-3 break-inside-avoid">
-                  <div className="category-section-banner rounded-lg bg-zinc-900 text-white px-3 py-1.5 flex items-center justify-between break-inside-avoid">
-                    <div className="flex items-center gap-2">
-                      <span>{group.icon}</span>
-                      <span className="text-xs font-black uppercase tracking-wide">
-                        {group.categoryName} › {group.subcategoryName}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 text-[9px]">
-                      <span className="font-mono px-2 py-0.5 rounded bg-white/20 text-white font-bold">
-                        {group.itemCount} {group.itemCount === 1 ? "Item" : "Items"}
-                      </span>
-                      {group.hasPricedItems && (
-                        <span className="text-emerald-300 font-semibold">
-                          {schemes.rent && group.minRentMonthly > 0
-                            ? `Rent from ₹${group.minRentMonthly.toLocaleString("en-IN")}/mo`
-                            : `From ${formatCurrency(group.minPrice)}`}
-                        </span>
-                      )}
-                    </div>
-                  </div>
+              {categoryHierarchy.map((mainGroup) => (
+                <div
+                  key={`showcase-major-${mainGroup.categoryName}`}
+                  className={`space-y-4 ${pageBreakPerCategory ? "category-major-group" : ""}`}
+                >
+                  {mainGroup.subcategories.map((group) => (
+                    <div key={group.id} id={`showcase-${group.id}`} className="space-y-3 break-inside-avoid">
+                      <div className="category-section-banner rounded-lg bg-zinc-900 text-white px-3 py-1.5 flex items-center justify-between break-inside-avoid">
+                        <div className="flex items-center gap-2">
+                          <span>{group.icon}</span>
+                          <span className="text-xs font-black uppercase tracking-wide">
+                            {group.categoryName} › {group.subcategoryName}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 text-[9px]">
+                          <span className="font-mono px-2 py-0.5 rounded bg-white/20 text-white font-bold">
+                            {group.itemCount} {group.itemCount === 1 ? "Item" : "Items"}
+                          </span>
+                          {group.hasPricedItems && (
+                            <span className="text-emerald-300 font-semibold">
+                              {schemes.rent && group.minRentMonthly > 0
+                                ? `Rent from ₹${group.minRentMonthly.toLocaleString("en-IN")}/mo`
+                                : `From ${formatCurrency(group.minPrice)}`}
+                            </span>
+                          )}
+                        </div>
+                      </div>
 
-                  <div className="showcase-grid grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                    {group.items.map((item) => {
-                      const sItem = findServerItem(item.id);
-                      const finalImg = sItem?.image_url || item.imageUrl;
-                      const price = item.basePrice;
+                      <div className="showcase-grid grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                        {group.items.map((item) => {
+                          const sItem = findServerItem(item.id);
+                          const finalImg = sItem?.image_url || item.imageUrl;
+                          const price = item.basePrice;
 
-                      return (
-                        <div
-                          key={item.id}
-                          className="print-showcase-item rounded-xl border-2 border-gray-400 p-3 bg-white flex flex-col justify-between gap-2.5 break-inside-avoid shadow-sm"
-                        >
-                          {/* Top Hero: Large Photo + QR & Identity */}
-                          <div className="flex items-start gap-3">
-                            {/* Large Photo */}
-                            <div className="relative w-32 h-32 rounded-xl border border-gray-300 bg-slate-50 p-1 flex items-center justify-center overflow-hidden shrink-0 shadow-2xs">
-                              {finalImg ? (
-                                <img
-                                  src={finalImg}
-                                  alt={item.fullName}
-                                  className="w-full h-full object-contain"
-                                  loading="eager"
-                                />
-                              ) : (
-                                <div className="w-full h-full flex flex-col items-center justify-center text-center p-1">
-                                  <span className="text-3xl">{getCategoryIcon(item.categoryName, item.subcategoryName)}</span>
-                                  <span className="text-[7.5px] text-gray-400 font-mono mt-1">Official Showroom Collection</span>
-                                </div>
-                              )}
-                              <span className="absolute bottom-1 left-1 bg-black/85 text-white text-[7.5px] font-bold px-1.5 py-0.2 rounded uppercase tracking-wider">
-                                {item.brand || "Subidha Core"}
-                              </span>
-                            </div>
-
-                            {/* Identity & QR */}
-                            <div className="min-w-0 flex-1 flex flex-col justify-between h-32">
-                              <div>
-                                <div className="flex items-center justify-between gap-1">
-                                  <span className="text-[8px] font-bold uppercase tracking-wider text-gray-500">
-                                    {item.categoryName} › {item.subcategoryName}
-                                  </span>
-                                  {item.currentStock > 0 ? (
-                                    <span className="px-1.5 py-0.2 rounded text-[7.5px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-300">
-                                      ✓ {item.currentStock} Ready
-                                    </span>
+                          return (
+                            <div
+                              key={item.id}
+                              className="print-showcase-item rounded-xl border-2 border-gray-400 p-3 bg-white flex flex-col justify-between gap-2.5 break-inside-avoid shadow-sm"
+                            >
+                              {/* Top Hero: Large Photo + QR & Identity */}
+                              <div className="flex items-start gap-3">
+                                {/* Large Photo */}
+                                <div className="relative w-32 h-32 rounded-xl border border-gray-300 bg-slate-50 p-1 flex items-center justify-center overflow-hidden shrink-0 shadow-2xs">
+                                  {finalImg ? (
+                                    <img
+                                      src={finalImg}
+                                      alt={item.fullName}
+                                      className="w-full h-full object-contain"
+                                      loading="eager"
+                                    />
                                   ) : (
-                                    <span className="text-[7.5px] text-gray-500 font-medium">Available on Order</span>
+                                    <div className="w-full h-full flex flex-col items-center justify-center text-center p-1">
+                                      <span className="text-3xl">{getCategoryIcon(item.categoryName, item.subcategoryName)}</span>
+                                      <span className="text-[7.5px] text-gray-400 font-mono mt-1">Official Showroom Collection</span>
+                                    </div>
+                                  )}
+                                  <span className="absolute bottom-1 left-1 bg-black/85 text-white text-[7.5px] font-bold px-1.5 py-0.2 rounded uppercase tracking-wider">
+                                    {item.brand || "Subidha Core"}
+                                  </span>
+                                </div>
+
+                                {/* Identity & QR */}
+                                <div className="min-w-0 flex-1 flex flex-col justify-between h-32">
+                                  <div>
+                                    <div className="flex items-center justify-between gap-1">
+                                      <span className="text-[8px] font-bold uppercase tracking-wider text-gray-500">
+                                        {item.categoryName} › {item.subcategoryName}
+                                      </span>
+                                      {item.currentStock > 0 ? (
+                                        <span className="px-1.5 py-0.2 rounded text-[7.5px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-300">
+                                          ✓ {item.currentStock} Ready
+                                        </span>
+                                      ) : (
+                                        <span className="text-[7.5px] text-gray-500 font-medium">Available on Order</span>
+                                      )}
+                                    </div>
+
+                                    <h3 className="font-black text-xs text-black uppercase tracking-tight mt-0.5 line-clamp-2">
+                                      {item.fullName}
+                                    </h3>
+
+                                    <div className="font-mono text-[8.5px] text-gray-600 mt-0.5">
+                                      Code: <strong>{item.code}</strong> {item.isChild ? `(Variant SKU: ${item.sku})` : ""}
+                                    </div>
+                                  </div>
+
+                                  {/* QR Code Bar */}
+                                  {showItemQrCodes && (
+                                    <div className="flex items-center gap-2 pt-1 border-t border-gray-200">
+                                      <div className="w-12 h-12 bg-white p-0.5 rounded border border-gray-300 shrink-0 flex items-center justify-center">
+                                        <QRCode
+                                          value={item.publicUrl}
+                                          size={44}
+                                          level="M"
+                                          style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+                                        />
+                                      </div>
+                                      <div className="min-w-0 text-[8px] text-gray-600 leading-tight">
+                                        <span className="font-bold text-black block">Scan for 3D View:</span>
+                                        <a
+                                          href={item.publicUrl}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-blue-700 font-bold hover:underline truncate block"
+                                        >
+                                          {item.publicUrl.replace(/^https?:\/\//, "")}
+                                        </a>
+                                      </div>
+                                    </div>
                                   )}
                                 </div>
-
-                                <h3 className="font-black text-xs text-black uppercase tracking-tight mt-0.5 line-clamp-2">
-                                  {item.fullName}
-                                </h3>
-
-                                <div className="font-mono text-[8.5px] text-gray-600 mt-0.5">
-                                  Code: <strong>{item.code}</strong> {item.isChild ? `(Variant SKU: ${item.sku})` : ""}
-                                </div>
                               </div>
-
-                              {/* QR Code Bar */}
-                              <div className="flex items-center gap-2 pt-1 border-t border-gray-200">
-                                <div className="w-12 h-12 bg-white p-0.5 rounded border border-gray-300 shrink-0 flex items-center justify-center">
-                                  <QRCode
-                                    value={item.publicUrl}
-                                    size={44}
-                                    level="M"
-                                    style={{ height: "auto", maxWidth: "100%", width: "100%" }}
-                                  />
-                                </div>
-                                <div className="min-w-0 text-[8px] text-gray-600 leading-tight">
-                                  <span className="font-bold text-black block">Scan for 3D View:</span>
-                                  <a
-                                    href={item.publicUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-blue-700 font-bold hover:underline truncate block"
-                                  >
-                                    {item.publicUrl.replace(/^https?:\/\//, "")}
-                                  </a>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
 
                           {/* Spec Pills */}
                           {item.specs.length > 0 && (
@@ -3388,34 +3848,63 @@ export default function ProductCatalogShareModal({
                             )}
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>
 
             {/* Print Footer */}
-            <div id="print-sheet-footer" className="pt-3 border-t-2 border-black text-[9px] text-gray-700 leading-normal flex items-start justify-between gap-4">
-              <div>
-                <p>
-                  <strong>Terms & Notes:</strong> Indicative pricing based on current showroom catalog. Rent & Lease agreements require identity & address verification (KYC). Security deposit is 100% refundable upon product return in good order. SFEMI Advance EMI operates under approved transparent promotional benefits (Remaining Future EMIs Waived for Beneficiaries under the 15-Month Promotion).
-                </p>
-                <p className="mt-0.5">
-                  {businessInfo.name} · Showroom: {businessInfo.address} · 📞 {businessInfo.phone} · 🌐{" "}
-                  <a
-                    href={webappCatalogUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-700 font-bold underline hover:text-blue-900"
-                  >
-                    {businessInfo.website}
-                  </a>
-                </p>
+            <div id="print-sheet-footer" className="pt-3 border-t-2 border-black text-[9px] text-gray-700 leading-normal space-y-3 break-inside-avoid">
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-1">
+                  <p>
+                    <strong>Commercial Terms &amp; Tax:</strong> {taxNote}
+                  </p>
+                  <p>
+                    <strong>Terms &amp; Notes:</strong> Indicative pricing based on current showroom catalog. Rent &amp; Lease agreements require identity &amp; address verification (KYC). Security deposit is 100% refundable upon product return in good order. SFEMI Advance EMI operates under approved transparent promotional benefits (Remaining Future EMIs Waived for Beneficiaries under the 15-Month Promotion).
+                  </p>
+                  <p className="mt-0.5">
+                    {businessInfo.name} · Showroom: {businessInfo.address} · 📞 {businessInfo.phone} · 🌐{" "}
+                    <a
+                      href={webappCatalogUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-700 font-bold underline hover:text-blue-900"
+                    >
+                      {businessInfo.website}
+                    </a>
+                  </p>
+                </div>
+                <div className="shrink-0 text-right font-mono text-[9px] text-gray-500 space-y-0.5">
+                  <div>Quotation: <strong>{quotationNumber}</strong></div>
+                  <div>Valid: {validityEndDate}</div>
+                  <div className="text-[8px] text-gray-400">Page Reference Sheet</div>
+                </div>
               </div>
-              <div className="shrink-0 text-right font-mono text-[9px] text-gray-500">
-                Official Price List Sheet
-              </div>
+
+              {/* Dual Authorized Signatory & Seal Block */}
+              {showSignatoryBlock && (
+                <div className="pt-2 border-t border-gray-300 grid grid-cols-2 gap-6 break-inside-avoid">
+                  <div className="p-2.5 rounded-lg border border-gray-400 bg-gray-50/50 text-center">
+                    <div className="h-8 border-b border-dashed border-gray-400 mb-1"></div>
+                    <div className="text-[9px] font-bold uppercase text-gray-800">Customer Acceptance &amp; Signature</div>
+                    <div className="text-[8px] text-gray-500">
+                      Client: {customerName.trim() || "________________________"} · Date: ____/____/2026
+                    </div>
+                  </div>
+                  <div className="p-2.5 rounded-lg border border-gray-400 bg-gray-50/50 text-center">
+                    <div className="h-8 border-b border-dashed border-gray-400 mb-1 flex items-end justify-center">
+                      <span className="text-[8px] text-gray-400 italic font-mono">[ Official Seal / Authorized Signature ]</span>
+                    </div>
+                    <div className="text-[9px] font-bold uppercase text-gray-800">For {businessInfo.name}</div>
+                    <div className="text-[8px] text-gray-500">Authorized Signatory · {salesConsultant}</div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

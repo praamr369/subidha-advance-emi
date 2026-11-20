@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import type { ReactNode } from "react";
 
@@ -12,6 +12,16 @@ import { OfflineNetworkBanner } from "@/components/common/OfflineNetworkBanner";
 import { DynamicAnalyticsTracker } from "@/components/common/DynamicAnalyticsTracker";
 
 const gaId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#faf7f2" },
+    { media: "(prefers-color-scheme: dark)", color: "#18181b" },
+  ],
+};
 
 export const metadata: Metadata = {
   title: {

@@ -324,6 +324,81 @@
   --sidebar-ring: oklch(0.72 0.058 86);
 }
 
+/* Fallback color tokens for legacy engines/devices lacking CSS oklch() support */
+@supports not (color: oklch(0 0 0)) {
+  :root {
+    --background: #f4f0eb;
+    --foreground: #2d2621;
+    --card: #ffffff;
+    --card-foreground: #2d2621;
+    --popover: #ffffff;
+    --popover-foreground: #2d2621;
+    --primary: #755233;
+    --primary-foreground: #faf6f0;
+    --secondary: #eeeae4;
+    --secondary-foreground: #38302a;
+    --muted: #eae6e0;
+    --muted-foreground: #6c635b;
+    --accent: #e7e0d6;
+    --accent-foreground: #433931;
+    --success: #2e7d32;
+    --success-foreground: #faf6f0;
+    --warning: #b45309;
+    --warning-foreground: #38302a;
+    --danger: #c53030;
+    --danger-foreground: #ffffff;
+    --info: #1d4ed8;
+    --info-foreground: #ffffff;
+    --destructive: #c53030;
+    --destructive-foreground: #ffffff;
+    --border: #d4cec7;
+    --input: #cfc8c0;
+    --ring: #8b6542;
+    --surface-shell: #f4f0eb;
+    --surface-card: #ffffff;
+    --surface-card-elevated: #ffffff;
+    --surface-muted: #eae6e0;
+    --sidebar-surface: #38302a;
+    --topbar-surface: #ffffff;
+  }
+
+  .dark {
+    --background: #1e1b18;
+    --foreground: #f2eee8;
+    --card: #26221e;
+    --card-foreground: #f2eee8;
+    --popover: #26221e;
+    --popover-foreground: #f2eee8;
+    --primary: #c99f70;
+    --primary-foreground: #1e1b18;
+    --secondary: #2f2a24;
+    --secondary-foreground: #eae5de;
+    --muted: #2f2a24;
+    --muted-foreground: #9e958c;
+    --accent: #37302a;
+    --accent-foreground: #f2eee8;
+    --success: #388e3c;
+    --success-foreground: #ffffff;
+    --warning: #d97706;
+    --warning-foreground: #1e1b18;
+    --danger: #dc2626;
+    --danger-foreground: #ffffff;
+    --info: #2563eb;
+    --info-foreground: #ffffff;
+    --destructive: #dc2626;
+    --destructive-foreground: #ffffff;
+    --border: #3d3630;
+    --input: #3d3630;
+    --ring: #c99f70;
+    --surface-shell: #1a1715;
+    --surface-card: #26221e;
+    --surface-card-elevated: #26221e;
+    --surface-muted: #2f2a24;
+    --sidebar-surface: #1e1b18;
+    --topbar-surface: #26221e;
+  }
+}
+
 html {
   color-scheme: light;
   font-size: 16px;
@@ -338,7 +413,12 @@ html.dark {
  * Delivers clean, compact ERP control-room layout on desktop/laptop displays
  * --------------------------------------------------------------------------- */
 @media (min-width: 768px) {
-  /* Sleek custom 6px desktop scrollbars */
+  /* Sleek custom 6px desktop scrollbars (WebKit & Gecko / Firefox standard) */
+  html.admin-desktop-view * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklab, var(--muted-foreground) 26%, transparent) transparent;
+  }
+
   html.admin-desktop-view ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -930,6 +1010,16 @@ textarea::placeholder {
   opacity: 1;
 }
 
+/* W3C standard scrollbars for Firefox / Gecko */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--primary) var(--muted);
+}
+
+.dark * {
+  scrollbar-color: color-mix(in oklab, var(--muted-foreground) 42%, var(--muted) 58%) var(--muted);
+}
+
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -1006,6 +1096,16 @@ a, button, input, select, textarea {
     opacity 0.2s ease,
     transform 0.2s ease,
     box-shadow 0.2s ease;
+  touch-action: manipulation;
+}
+
+/* Mobile WebKit (iOS Safari) safeguard: prevent auto-zoom on input focus */
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
 }
 
 .transition-opacity-smooth {
