@@ -63,6 +63,10 @@ export function OfflineNetworkBanner() {
   }, []);
 
   if (!isOnline) {
+    const isCounterAdmin =
+      typeof window !== "undefined" &&
+      (window.location.pathname.startsWith("/admin") || window.location.pathname.startsWith("/cashier"));
+
     return (
       <div
         role="alert"
@@ -70,7 +74,11 @@ export function OfflineNetworkBanner() {
         className="fixed bottom-4 left-1/2 z-[9999] flex -translate-x-1/2 items-center gap-2.5 rounded-2xl border border-amber-300 bg-amber-600/95 px-4 py-2.5 text-xs font-semibold text-white shadow-2xl backdrop-blur transition-all dark:border-amber-600 dark:bg-amber-600/95"
       >
         <WifiOff className="h-4 w-4 shrink-0 animate-pulse text-amber-100" />
-        <span>Counter Offline — Sales, stock audits, & purchases will queue locally and auto-sync when online.</span>
+        <span>
+          {isCounterAdmin
+            ? "Counter Offline — Sales, stock audits, & purchases will queue locally and auto-sync when online."
+            : "Offline Mode — You are currently offline. Cached views remain accessible."}
+        </span>
       </div>
     );
   }

@@ -11,6 +11,7 @@ import { WorkspaceBrandMark } from "@/components/brand/WorkspaceBrandMark";
 import { brandConfig } from "@/config/brand";
 import { useAuth } from "@/hooks/useAuth";
 import { useLogout } from "@/hooks/useLogout";
+import { InstallAppMenuItem } from "@/components/common/PwaInstallPrompt";
 import { LogOut, FileText, ScrollText, Bell, LineChart, Package, ShieldCheck, CreditCard, ChevronRight } from "lucide-react";
 import Link from "next/link";
 
@@ -85,7 +86,8 @@ export default function PartnerShellRouter({ children }: { children: ReactNode }
               <SidebarLink href="/partner/notifications" icon={Bell} label="Notifications" onClick={closeMobileMenu} />
             </nav>
 
-            <div className="mt-auto pt-6 pb-4">
+            <div className="mt-auto pt-6 pb-4 space-y-3">
+              <InstallAppMenuItem onComplete={closeMobileMenu} />
               <button
                 onClick={() => {
                   closeMobileMenu();

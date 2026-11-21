@@ -4,6 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "NEXT_TELEMETRY_DISABLED=1 next dev",
+    "tauri": "node scripts/run-tauri.mjs",
+    "tauri:dev": "node scripts/run-tauri.mjs dev",
+    "tauri:build": "node scripts/run-tauri.mjs build",
     "build": "node scripts/run-next-build.mjs",
     "build:smoke": "node scripts/run-next-build.mjs --smoke",
     "start": "next start",
@@ -34,7 +37,8 @@
     "test:kyc-frontend": "node scripts/run-kyc-frontend-tests.mjs",
     "test:invoice-delivery": "node scripts/run-invoice-delivery-tests.mjs",
     "test:production-fix": "node scripts/run-production-fix-tests.mjs",
-    "test:unit": "npm run test:kyc-frontend && npm run test:dashboard-presets && npm run test:invoice-delivery && npm run test:production-fix"
+    "test:offline": "node scripts/test-offline-resilience.mjs",
+    "test:unit": "npm run test:kyc-frontend && npm run test:dashboard-presets && npm run test:invoice-delivery && npm run test:production-fix && npm run test:offline"
   },
   "dependencies": {
     "@google/model-viewer": "^4.3.1",
@@ -52,6 +56,8 @@
     "@radix-ui/react-toggle-group": "^1.1.11",
     "@tanstack/react-query": "^5.90.21",
     "@tanstack/react-query-devtools": "^5.91.3",
+    "@tauri-apps/api": "^2.1.1",
+    "@tauri-apps/plugin-opener": "^2.7.3",
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
     "embla-carousel-autoplay": "^8.6.0",
@@ -60,7 +66,7 @@
     "input-otp": "^1.4.2",
     "lucide-react": "^0.577.0",
     "marked": "^18.0.9",
-    "next": "^16.4.2",
+    "next": "^16.4.6",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-easy-crop": "^6.2.3",
@@ -77,6 +83,7 @@
   "devDependencies": {
     "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4",
+    "@tauri-apps/cli": "^2.1.0",
     "@types/estree": "^1.0.8",
     "@types/json-schema": "^7.0.15",
     "@types/marked": "^5.0.2",

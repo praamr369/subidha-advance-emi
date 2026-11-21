@@ -1,9 +1,9 @@
-// SUBIDHA CORE — Enterprise Offline Service Worker (v4.0)
-// Complete offline counter resilience for Asansol showroom with zero interference to financial invariants.
+// SUBIDHA CORE — Enterprise Offline Service Worker (v5.0)
+// Mobile PWA resilience for Customers, Partners, Staff, Vendors, and Counter POS.
 
-const STATIC_CACHE_NAME = "subidha-core-static-v4";
-const PAGES_CACHE_NAME = "subidha-core-pages-v4";
-const API_CACHE_NAME = "subidha-core-api-v4";
+const STATIC_CACHE_NAME = "subidha-core-static-v5";
+const PAGES_CACHE_NAME = "subidha-core-pages-v5";
+const API_CACHE_NAME = "subidha-core-api-v5";
 
 const STATIC_ASSETS = [
   "/brand/logo.png",
@@ -18,7 +18,22 @@ const STATIC_ASSETS = [
   "/manifest.webmanifest",
 ];
 
-const CORE_ADMIN_ROUTES = [
+const CORE_APP_ROUTES = [
+  "/",
+  "/login",
+  "/business/login",
+  "/customer",
+  "/customer/dashboard",
+  "/customer/catalog",
+  "/customer/payments",
+  "/customer/contracts",
+  "/partner",
+  "/partner/catalog",
+  "/partner/customers",
+  "/partner/collections",
+  "/staff",
+  "/staff/profile",
+  "/vendor",
   "/admin",
   "/admin/billing/direct-sale",
   "/admin/billing/direct-sales",
@@ -34,6 +49,8 @@ const CORE_ADMIN_ROUTES = [
   "/admin/collections",
   "/admin/offline",
 ];
+
+const CORE_ADMIN_ROUTES = CORE_APP_ROUTES;
 
 // Install: Cache critical static assets immediately
 self.addEventListener("install", (event) => {
@@ -195,10 +212,30 @@ self.addEventListener("fetch", (event) => {
           const pathCached = await caches.match(url.pathname);
           if (pathCached) return pathCached;
 
-          // 3. For any /admin route, serve the cached admin shell
+          // 3. Check role-specific cached shells for offline navigation
+          if (url.pathname.startsWith("/customer")) {
+            const customerShell = await caches.match("/customer");
+            if (customerShell) return customerShell;
+          }
+          if (url.pathname.startsWith("/partner")) {
+            const partnerShell = await caches.match("/partner");
+            if (partnerShell) return partnerShell;
+          }
+          if (url.pathname.startsWith("/staff")) {
+            const staffShell = await caches.match("/staff");
+            if (staffShell) return staffShell;
+          }
+          if (url.pathname.startsWith("/vendor")) {
+            const vendorShell = await caches.match("/vendor");
+            if (vendorShell) return vendorShell;
+          }
           if (url.pathname.startsWith("/admin")) {
             const adminShell = await caches.match("/admin");
             if (adminShell) return adminShell;
+          }
+          const homeShell = await caches.match("/");
+          if (homeShell && (url.pathname === "/" || url.pathname.startsWith("/public"))) {
+            return homeShell;
           }
 
           // 4. Default Offline Shell
@@ -207,21 +244,21 @@ self.addEventListener("fetch", (event) => {
             <html lang="en">
             <head>
               <meta charset="utf-8"/>
-              <title>SUBIDHA CORE — Offline Mode</title>
-              <meta name="viewport" content="width=device-width, initial-scale=1"/>
+              <title>Subidha — Offline</title>
+              <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
               <style>
-                body { font-family: system-ui, -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #0f172a; color: #f8fafc; }
-                .card { max-width: 480px; padding: 2.5rem; text-align: center; background: #1e293b; border-radius: 1rem; border: 1px solid #334155; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
-                h1 { font-size: 1.5rem; margin-bottom: 0.75rem; color: #f59e0b; }
-                p { font-size: 0.95rem; line-height: 1.5; color: #94a3b8; margin-bottom: 1.5rem; }
-                button { background: #d97706; color: white; border: none; padding: 0.75rem 1.5rem; font-weight: 600; border-radius: 0.5rem; cursor: pointer; }
-                button:hover { background: #b45309; }
+                body { font-family: system-ui, -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #0f172a; color: #f8fafc; padding: 1rem; box-sizing: border-box; }
+                .card { max-width: 440px; width: 100%; padding: 2rem; text-align: center; background: #1e293b; border-radius: 1.25rem; border: 1px solid #334155; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
+                h1 { font-size: 1.35rem; margin-bottom: 0.75rem; color: #f59e0b; }
+                p { font-size: 0.9rem; line-height: 1.5; color: #94a3b8; margin-bottom: 1.5rem; }
+                button { background: #0284c7; color: white; border: none; padding: 0.75rem 1.5rem; font-weight: 600; border-radius: 0.75rem; cursor: pointer; font-size: 0.95rem; width: 100%; }
+                button:hover { background: #0369a1; }
               </style>
             </head>
             <body>
               <div class="card">
-                <h1>Store Offline Mode Active</h1>
-                <p>SUBIDHA CORE is operating in offline resilience mode. Your cached data, counter POS, and pending outbox remain fully accessible.</p>
+                <h1>Device Offline</h1>
+                <p>You are currently offline. Any previously cached views, customer details, and queued actions will remain safely available and reconnect once online.</p>
                 <button onclick="window.location.reload()">Retry Connection</button>
               </div>
             </body>

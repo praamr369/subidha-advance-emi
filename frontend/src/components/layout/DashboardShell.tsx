@@ -119,6 +119,10 @@ const AdminOfflineControlCenter = dynamic(
   () => import("@/components/admin/offline/AdminOfflineControlCenter"),
   { ssr: false }
 );
+const DesktopAppPill = dynamic(
+  () => import("@/components/desktop/DesktopAppPill"),
+  { ssr: false }
+);
 const AdminWorkspaceDock = dynamic(
   () => import("@/components/layout/AdminWorkspaceDock"),
   { ssr: false }
@@ -1569,6 +1573,7 @@ function Topbar({
             </button>
 
             <AdminDockTopbarButton />
+            <DesktopAppPill />
             <AdminOfflineControlCenter />
             <ThemeToggle variant="dashboard" />
             <NotificationBellDropdown role={role} />

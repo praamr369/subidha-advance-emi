@@ -88,10 +88,9 @@ function normalizeStoredSession(value: unknown): StoredSession | null {
 export function getSession(): StoredSession | null {
   if (!isBrowser()) return null;
 
-  const raw = window.localStorage.getItem(SESSION_KEY);
-  if (!raw) return null;
-
   try {
+    const raw = window.localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
     return normalizeStoredSession(JSON.parse(raw));
   } catch {
     return null;
@@ -108,7 +107,11 @@ export function setSession(session: StoredSession): void {
   const normalized = normalizeStoredSession(session);
   if (!normalized) return;
 
-  window.localStorage.setItem(SESSION_KEY, JSON.stringify(normalized));
+  try {
+    window.localStorage.setItem(SESSION_KEY, JSON.stringify(normalized));
+  } catch {
+    // ignore storage restrictions
+  }
   setAccessToken(normalized.accessToken);
   setRefreshToken(normalized.refreshToken);
   syncAuthCookies(normalized);
@@ -122,7 +125,11 @@ export function storeSession(session: StoredSession): void {
 export function clearSession(silent = false): void {
   if (!isBrowser()) return;
 
-  window.localStorage.removeItem(SESSION_KEY);
+  try {
+    window.localStorage.removeItem(SESSION_KEY);
+  } catch {
+    // ignore
+  }
   clearTokens();
   syncAuthCookies(null);
   

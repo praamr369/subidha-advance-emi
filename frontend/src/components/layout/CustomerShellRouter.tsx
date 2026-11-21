@@ -11,6 +11,7 @@ import { WorkspaceBrandMark } from "@/components/brand/WorkspaceBrandMark";
 import { brandConfig } from "@/config/brand";
 import { useAuth } from "@/hooks/useAuth";
 import { useLogout } from "@/hooks/useLogout";
+import { InstallAppMenuItem } from "@/components/common/PwaInstallPrompt";
 import {
   Bell,
   ChevronRight,
@@ -156,7 +157,8 @@ export default function CustomerShellRouter({ children }: { children: ReactNode 
               <SidebarLink href="/customer/privacy/dashboard" icon={ShieldCheck} label="Privacy Dashboard" onClick={closeMobileMenu} />
             </nav>
 
-            <div className="mt-auto px-3 pb-6 pt-4 border-t border-border">
+            <div className="mt-auto px-3 pb-6 pt-4 border-t border-border space-y-3">
+              <InstallAppMenuItem onComplete={closeMobileMenu} />
               <button
                 onClick={() => {
                   closeMobileMenu();

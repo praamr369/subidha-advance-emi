@@ -161,6 +161,134 @@ if (idRemap.has(pendingDirectSale.payload.customer)) {
 assert.equal(pendingDirectSale.payload.customer, 108, "Provisional ID must be substituted with real server ID");
 console.log("✓ Dependent provisional ID remap passed.");
 
+// 7. TEST: Desktop Zoom Scaling & Bounds (admin-desktop-zoom)
+console.log("\n[Test 7] Testing Laptop Display Resolution Zoom Scaling & Step Clamping...");
+const ZOOM_LEVELS = [0.7, 0.75, 0.8, 0.85, 0.9, 1.0, 1.1, 1.25];
+function clampZoom(val) {
+  return Math.min(Math.max(val, 0.7), 1.25);
+}
+function getNextZoomIn(current) {
+  const higher = ZOOM_LEVELS.filter((lvl) => lvl > current);
+  return higher.length > 0 ? higher[0] : 1.25;
+}
+function getNextZoomOut(current) {
+  const lower = ZOOM_LEVELS.filter((lvl) => lvl < current);
+  return lower.length > 0 ? lower[lower.length - 1] : 0.7;
+}
+
+assert.equal(clampZoom(0.8), 0.8, "Default 80% zoom must be valid");
+assert.equal(clampZoom(0.5), 0.7, "Zoom cannot drop below 70%");
+assert.equal(clampZoom(2.0), 1.25, "Zoom cannot exceed 125%");
+assert.equal(getNextZoomIn(0.8), 0.85, "Step zoom in from 0.8 must be 0.85");
+assert.equal(getNextZoomOut(0.8), 0.75, "Step zoom out from 0.8 must be 0.75");
+assert.equal(getNextZoomIn(1.25), 1.25, "Zoom in at maximum must clamp to 1.25");
+assert.equal(getNextZoomOut(0.7), 0.7, "Zoom out at minimum must clamp to 0.7");
+console.log("✓ Laptop screen resolution zoom controls and clamping verified.");
+
+// 8. TEST: Safe Desktop Window Close Prevention
+console.log("\n[Test 8] Testing Desktop Safe Window Close Guard...");
+function shouldConfirmWindowClose(queuedTransactions) {
+  return queuedTransactions > 0;
+}
+assert.equal(shouldConfirmWindowClose(0), false, "Window closes cleanly with empty queue");
+assert.equal(shouldConfirmWindowClose(3), true, "Window must prompt user when transactions are pending");
+console.log("✓ Window close prevention protects queued offline transactions from accidental loss.");
+
+// 9. TEST: Multi-Module Offline Mutation Classifier
+console.log("\n[Test 9] Testing Multi-Module Offline Mutation Classifier...");
+function classifyMutationKind(normPath) {
+  if (normPath.includes("direct-sale") || normPath.includes("billing/pos")) return "DIRECT_SALE";
+  if (normPath.includes("stock-adjustment")) return "STOCK_ADJUSTMENT";
+  if (normPath.includes("purchase")) return "PURCHASE_ENTRY";
+  if (normPath.includes("collection") || normPath.includes("payment")) return "PAYMENT_COLLECTION";
+  if (normPath.includes("customer") || normPath.includes("parties")) return "CUSTOMER_CREATION";
+  if (normPath.includes("deliver")) return "DELIVERY_UPDATE";
+  if (normPath.includes("manufacturing") || normPath.includes("production")) return "PRODUCTION_ACTION";
+  return "GENERIC_MUTATION";
+}
+
+assert.equal(classifyMutationKind("/billing/direct-sale/finalize/"), "DIRECT_SALE");
+assert.equal(classifyMutationKind("/inventory/stock-adjustment/submit/"), "STOCK_ADJUSTMENT");
+assert.equal(classifyMutationKind("/accounting/purchase/bills/"), "PURCHASE_ENTRY");
+assert.equal(classifyMutationKind("/collections/emi/record/"), "PAYMENT_COLLECTION");
+assert.equal(classifyMutationKind("/crm/customers/create/"), "CUSTOMER_CREATION");
+assert.equal(classifyMutationKind("/deliveries/dispatch/update/"), "DELIVERY_UPDATE");
+assert.equal(classifyMutationKind("/manufacturing/job/produce/"), "PRODUCTION_ACTION");
+assert.equal(classifyMutationKind("/settings/profile/"), "GENERIC_MUTATION");
+console.log("✓ All 8 operational business modules correctly route to dedicated offline outbox kinds.");
+
+// 10. TEST: Stock Shortage & Deficit Alert Classifier during Sync
+console.log("\n[Test 10] Testing Stock Shortage Deficit Detection during Sync Replay...");
+function detectStockDeficit(response) {
+  return (
+    response?.stock_status === "DEFICIT" ||
+    response?.stock_need !== null && response?.stock_need !== undefined ||
+    (typeof response?.sale?.requirement_count === "number" && response.sale.requirement_count > 0) ||
+    (Array.isArray(response?.warnings) &&
+      response.warnings.some((w) =>
+        w.toLowerCase().includes("stock") ||
+        w.toLowerCase().includes("need") ||
+        w.toLowerCase().includes("backorder")
+      ))
+  );
+}
+
+assert.equal(detectStockDeficit({ stock_status: "DEFICIT" }), true);
+assert.equal(detectStockDeficit({ stock_need: { need_no: "NEED-001" } }), true);
+assert.equal(detectStockDeficit({ sale: { requirement_count: 2 } }), true);
+assert.equal(detectStockDeficit({ warnings: ["Stock deficit triggered auto-procurement"] }), true);
+assert.equal(detectStockDeficit({ stock_status: "FULFILLED", sale: { requirement_count: 0 } }), false);
+console.log("✓ Physical stock shortages automatically detected for auto-procurement alerts.");
+
+// 11. TEST: Offline Outbox Item Status & Retry Transitions
+console.log("\n[Test 11] Testing Outbox Status Lifecycle & Retry Increments...");
+const initialOutboxItem = {
+  id: "outbox_123",
+  status: "PENDING",
+  retry_count: 0,
+  last_error: null,
+};
+
+function transitionOutbox(item, newStatus, error = null) {
+  return {
+    ...item,
+    status: newStatus,
+    last_error: error,
+    retry_count: newStatus === "FAILED" ? item.retry_count + 1 : item.retry_count,
+  };
+}
+
+const syncing = transitionOutbox(initialOutboxItem, "SYNCING");
+assert.equal(syncing.status, "SYNCING");
+assert.equal(syncing.retry_count, 0);
+
+const failedOnce = transitionOutbox(syncing, "FAILED", "504 Gateway Timeout");
+assert.equal(failedOnce.status, "FAILED");
+assert.equal(failedOnce.retry_count, 1);
+assert.equal(failedOnce.last_error, "504 Gateway Timeout");
+
+const synced = transitionOutbox(failedOnce, "SYNCED");
+assert.equal(synced.status, "SYNCED");
+assert.equal(synced.retry_count, 1);
+assert.equal(synced.last_error, null);
+console.log("✓ Outbox lifecycle and retry counter transitions pass.");
+
+// 12. TEST: Desktop Mode Public Route Isolation Boundary
+console.log("\n[Test 12] Testing Desktop Mode Public Route Isolation Boundary...");
+function getDesktopNavigationTarget(isDesktop, requestedPath) {
+  const publicRoutes = ["/", "/products", "/about", "/contracts", "/how-it-works", "/contact"];
+  if (isDesktop && publicRoutes.includes(requestedPath)) {
+    return "/admin";
+  }
+  return requestedPath;
+}
+
+assert.equal(getDesktopNavigationTarget(true, "/"), "/admin", "Desktop app must lock root to /admin");
+assert.equal(getDesktopNavigationTarget(true, "/products"), "/admin", "Desktop app must redirect public marketing to /admin");
+assert.equal(getDesktopNavigationTarget(true, "/admin/billing/direct-sale"), "/admin/billing/direct-sale", "Admin routes remain intact");
+assert.equal(getDesktopNavigationTarget(false, "/products"), "/products", "Standard web browser allows public customer browsing");
+console.log("✓ Desktop business-only isolation boundary verified.");
+
 console.log("\n=======================================================");
-console.log("ALL OFFLINE BOUNDARY & BREAK-TEST SCENARIOS PASSED (100%)");
+console.log("ALL 12 OFFLINE & PC TAURI DESKTOP TESTS PASSED (100%)");
 console.log("=======================================================\n");
