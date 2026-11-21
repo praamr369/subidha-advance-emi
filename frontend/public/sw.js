@@ -192,53 +192,57 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // 2. Full Page Navigation (HTML): Network-first with cache fallback
+  // 2. Full Page Navigation (HTML): Stale-While-Revalidate with Instant Cache Return
   if (request.mode === "navigate") {
     event.respondWith(
-      fetch(request)
-        .then((response) => {
-          if (response && response.status === 200) {
-            const clone = response.clone();
-            caches.open(PAGES_CACHE_NAME).then((cache) => cache.put(request, clone));
-          }
-          return response;
-        })
-        .catch(async () => {
-          // 1. Check exact requested URL
-          const cached = await caches.match(request);
-          if (cached) return cached;
+      (async () => {
+        // Match exact or role-specific cached shell
+        const cached = await caches.match(request);
+        const pathCached = !cached ? await caches.match(url.pathname) : null;
+        let roleShell = null;
 
-          // 2. Check exact pathname (ignoring query strings)
-          const pathCached = await caches.match(url.pathname);
-          if (pathCached) return pathCached;
-
-          // 3. Check role-specific cached shells for offline navigation
-          if (url.pathname.startsWith("/customer")) {
-            const customerShell = await caches.match("/customer");
-            if (customerShell) return customerShell;
-          }
-          if (url.pathname.startsWith("/partner")) {
-            const partnerShell = await caches.match("/partner");
-            if (partnerShell) return partnerShell;
-          }
-          if (url.pathname.startsWith("/staff")) {
-            const staffShell = await caches.match("/staff");
-            if (staffShell) return staffShell;
-          }
-          if (url.pathname.startsWith("/vendor")) {
-            const vendorShell = await caches.match("/vendor");
-            if (vendorShell) return vendorShell;
-          }
+        if (!cached && !pathCached) {
           if (url.pathname.startsWith("/admin")) {
-            const adminShell = await caches.match("/admin");
-            if (adminShell) return adminShell;
+            roleShell = await caches.match("/admin");
+          } else if (url.pathname.startsWith("/business/login") || url.pathname.startsWith("/login")) {
+            roleShell = await caches.match("/business/login");
+          } else if (url.pathname.startsWith("/customer")) {
+            roleShell = await caches.match("/customer");
+          } else if (url.pathname.startsWith("/partner")) {
+            roleShell = await caches.match("/partner");
+          } else if (url.pathname.startsWith("/staff")) {
+            roleShell = await caches.match("/staff");
+          } else if (url.pathname.startsWith("/vendor")) {
+            roleShell = await caches.match("/vendor");
           }
-          const homeShell = await caches.match("/");
-          if (homeShell && (url.pathname === "/" || url.pathname.startsWith("/public"))) {
-            return homeShell;
-          }
+        }
 
-          // 4. Default Offline Shell
+        const immediateResponse = cached || pathCached || roleShell;
+
+        // Background revalidation to keep cached shell fresh
+        const networkFetch = fetch(request)
+          .then((response) => {
+            if (response && response.status === 200) {
+              const clone = response.clone();
+              caches.open(PAGES_CACHE_NAME).then((cache) => cache.put(request, clone));
+            }
+            return response;
+          })
+          .catch(() => undefined);
+
+        // If we have any cached shell, return it INSTANTLY (0ms network delay)
+        if (immediateResponse) {
+          return immediateResponse;
+        }
+
+        // Otherwise wait for network response on cold start
+        const networkRes = await networkFetch;
+        if (networkRes) return networkRes;
+
+        const homeShell = await caches.match("/");
+        if (homeShell) return homeShell;
+
+        // 4. Default Offline Shell fallback
           return new Response(
             `<!DOCTYPE html>
             <html lang="en">

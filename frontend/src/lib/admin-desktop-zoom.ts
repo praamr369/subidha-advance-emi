@@ -2,6 +2,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { isTauriDesktop, setNativeDesktopZoom } from "@/lib/desktop/tauri-bridge";
 
 export const ADMIN_ZOOM_STORAGE_KEY = "subidha:admin-desktop-zoom:v1";
 export const DEFAULT_ADMIN_ZOOM = "0.8"; // 80% default ERP scale fits perfectly on 1366x768 & laptop screens
@@ -70,19 +71,35 @@ export function applyAdminDesktopScale(active: boolean, zoomValue?: string): voi
   if (typeof document === "undefined") return;
   const root = document.documentElement;
   const zoom = zoomValue || getStoredAdminZoom();
+  const numZoom = parseFloat(zoom) || 0.8;
 
   if (active) {
     root.classList.add("admin-desktop-view");
     root.style.setProperty("--admin-desktop-zoom", zoom);
-    // Apply CSS zoom so all typography, layouts, tables, and sidebars scale proportionally
-    try {
-      (root.style as unknown as Record<string, string>).zoom = zoom;
-    } catch {
-      // fallback
+
+    if (isTauriDesktop()) {
+      // Hardware-accelerated GPU zoom via Tauri native Webview Window API.
+      // Avoids WebKit CPU layout thrashing, repaint stutter, and lag.
+      setNativeDesktopZoom(numZoom).catch(() => {});
+      try {
+        (root.style as unknown as Record<string, string>).zoom = "";
+      } catch {
+        // fallback
+      }
+    } else {
+      // Standard browser fallback
+      try {
+        (root.style as unknown as Record<string, string>).zoom = zoom;
+      } catch {
+        // fallback
+      }
     }
   } else {
     root.classList.remove("admin-desktop-view");
     root.style.removeProperty("--admin-desktop-zoom");
+    if (isTauriDesktop()) {
+      setNativeDesktopZoom(1.0).catch(() => {});
+    }
     try {
       (root.style as unknown as Record<string, string>).zoom = "";
     } catch {

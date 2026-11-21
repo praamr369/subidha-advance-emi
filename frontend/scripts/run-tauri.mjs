@@ -28,6 +28,14 @@ if (env.XDG_DATA_DIRS_VSCODE_SNAP_ORIG) {
 if (!env.GDK_BACKEND) {
   env.GDK_BACKEND = "x11";
 }
+// Disable DMA-BUF renderer to eliminate WebKitGTK frame drops on Linux
+if (!env.WEBKIT_DISABLE_DMABUF_RENDERER) {
+  env.WEBKIT_DISABLE_DMABUF_RENDERER = "1";
+}
+// Force hardware-accelerated GPU compositing
+if (!env.WEBKIT_FORCE_COMPOSITING_MODE) {
+  env.WEBKIT_FORCE_COMPOSITING_MODE = "1";
+}
 
 const args = process.argv.slice(2);
 const child = spawn("npx", ["tauri", ...args], {

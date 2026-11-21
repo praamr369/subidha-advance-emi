@@ -55,6 +55,11 @@ fn close_window(window: tauri::Window) {
     let _ = window.close();
 }
 
+#[tauri::command]
+fn set_desktop_zoom(window: tauri::WebviewWindow, factor: f64) {
+    let _ = window.set_zoom(factor);
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -64,7 +69,8 @@ pub fn run() {
             get_offline_status,
             minimize_window,
             toggle_maximize_window,
-            close_window
+            close_window,
+            set_desktop_zoom
         ])
         .run(tauri::generate_context!())
         .expect("error while running SUBIDHA CORE desktop application");

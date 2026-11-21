@@ -66,6 +66,20 @@ export async function closeWindow(): Promise<void> {
 }
 
 /**
+ * Native GPU-accelerated Webview Zoom Scaling.
+ * Unlike CSS zoom which causes CPU-bound reflows on WebKit,
+ * this scales the webview surface directly in the compositor.
+ */
+export async function setNativeDesktopZoom(factor: number): Promise<void> {
+  if (!isTauriDesktop()) return;
+  try {
+    await window.__TAURI_INTERNALS__!.invoke("set_desktop_zoom", { factor });
+  } catch (err) {
+    console.warn("Failed to set native desktop zoom:", err);
+  }
+}
+
+/**
  * Fetch desktop runtime metadata.
  */
 export async function getDesktopSystemInfo(): Promise<DesktopSystemInfo> {
