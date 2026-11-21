@@ -6,8 +6,8 @@
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:3000",
-    "beforeBuildCommand": "npm run build",
-    "frontendDist": "http://localhost:3000"
+    "beforeBuildCommand": "",
+    "frontendDist": "https://subidhafurnitureasansol.com"
   },
   "app": {
     "windows": [

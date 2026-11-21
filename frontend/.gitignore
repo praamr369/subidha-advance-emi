@@ -47,5 +47,6 @@ next-env.d.ts
 
 # tauri
 /src-tauri/target/
+/public/downloads/
 
 !.env.local.example
