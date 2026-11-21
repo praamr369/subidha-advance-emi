@@ -178,7 +178,11 @@ def link_brochure_enquiry_to_crm(enquiry: BrochureEnquiry) -> BrochureEnquiry:
             )
     except Exception as exc:  # CRM must never block safe public lead capture.
         warning = f"CRM sync deferred: {exc}"[:1000]
-        logger.exception("Brochure enquiry CRM sync failed for %s", enquiry.enquiry_no)
+        logger.warning(
+            "Brochure enquiry CRM sync deferred for %s: %s",
+            enquiry.enquiry_no,
+            exc,
+        )
         linked_count = sum(
             bool(value)
             for value in (

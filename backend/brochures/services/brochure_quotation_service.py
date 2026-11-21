@@ -489,10 +489,11 @@ def record_crm_quotation_event(quotation, event, *, changed_by=None):
         )
         return interaction
     except Exception as exc:
-        logger.exception(
-            "Quotation CRM interaction failed for %s event %s",
+        logger.warning(
+            "Quotation CRM interaction deferred for %s event %s: %s",
             quotation.quotation_no,
             event,
+            exc,
         )
         warning = f"CRM interaction deferred for {event}: {exc}"[:500]
         current = (quotation.internal_note or "").strip()
