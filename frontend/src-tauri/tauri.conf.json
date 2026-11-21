@@ -13,6 +13,7 @@
     "windows": [
       {
         "title": "SUBIDHA CORE — Business Control Center",
+        "url": "/admin",
         "width": 1280,
         "height": 768,
         "minWidth": 800,
