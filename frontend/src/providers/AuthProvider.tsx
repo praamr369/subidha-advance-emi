@@ -52,17 +52,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     function syncSession() {
       if (!active) return;
 
-      const latest = getSession();
-      setUser(latest);
-      setHydrated(true);
+      try {
+        const latest = getSession();
+        setUser(latest);
+      } catch (err) {
+        console.warn("Session sync failed:", err);
+      } finally {
+        setHydrated(true);
+      }
     }
 
     syncSession();
+
+    // Fallback: guarantee hydrated is marked true within 150ms even if storage stalls
+    const safetyTimer = setTimeout(() => {
+      if (active) setHydrated(true);
+    }, 150);
 
     window.addEventListener("storage", syncSession);
     window.addEventListener("subidha:session", syncSession);
     return () => {
       active = false;
+      clearTimeout(safetyTimer);
       window.removeEventListener("storage", syncSession);
       window.removeEventListener("subidha:session", syncSession);
     };

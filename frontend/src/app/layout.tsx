@@ -9,6 +9,7 @@ import "./globals.css";
 import AppProviders from "@/providers/AppProviders";
 import SkipNav from "@/components/ui/SkipNav";
 import { OfflineNetworkBanner } from "@/components/common/OfflineNetworkBanner";
+import { PwaInstallPrompt } from "@/components/common/PwaInstallPrompt";
 import { DynamicAnalyticsTracker } from "@/components/common/DynamicAnalyticsTracker";
 
 const gaId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
@@ -46,7 +47,10 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: brandConfig.systemProductName,
+    title: "Subidha",
+  },
+  formatDetection: {
+    telephone: false,
   },
 };
 
@@ -81,6 +85,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         ) : null}
         <SkipNav />
         <OfflineNetworkBanner />
+        <PwaInstallPrompt />
         <AppProviders>
           <DynamicAnalyticsTracker />
           {children}

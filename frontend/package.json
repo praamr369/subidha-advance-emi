@@ -37,7 +37,8 @@
     "test:kyc-frontend": "node scripts/run-kyc-frontend-tests.mjs",
     "test:invoice-delivery": "node scripts/run-invoice-delivery-tests.mjs",
     "test:production-fix": "node scripts/run-production-fix-tests.mjs",
-    "test:unit": "npm run test:kyc-frontend && npm run test:dashboard-presets && npm run test:invoice-delivery && npm run test:production-fix"
+    "test:offline": "node scripts/test-offline-resilience.mjs",
+    "test:unit": "npm run test:kyc-frontend && npm run test:dashboard-presets && npm run test:invoice-delivery && npm run test:production-fix && npm run test:offline"
   },
   "dependencies": {
     "@google/model-viewer": "^4.3.1",

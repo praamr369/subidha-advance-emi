@@ -1,11 +1,11 @@
 {
-  "name": "SUBIDHA CORE — ERP & POS",
-  "short_name": "SUBIDHA CORE",
-  "description": "SUBIDHA CORE Retail Operations, POS, Inventory, and Accounting System",
-  "start_url": "/admin",
+  "name": "Subidha Furniture — Retail & Customer Portal",
+  "short_name": "Subidha",
+  "description": "Subidha Furniture Mobile App for Customers, Partners, Staff, and Retail Operations",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "orientation": "any",
+  "orientation": "portrait-primary",
   "background_color": "#ffffff",
   "theme_color": "#0f172a",
   "icons": [
@@ -34,7 +34,36 @@
       "purpose": "maskable"
     }
   ],
-  "categories": ["business", "finance", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Customer Portal",
+      "short_name": "Customer",
+      "description": "View EMI schedules, payments, and contracts",
+      "url": "/customer",
+      "icons": [{ "src": "/brand/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Partner Workspace",
+      "short_name": "Partner",
+      "description": "Partner collections, commissions, and customer onboarding",
+      "url": "/partner",
+      "icons": [{ "src": "/brand/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Staff Workspace",
+      "short_name": "Staff",
+      "description": "Staff tasks, attendance, and operations",
+      "url": "/staff",
+      "icons": [{ "src": "/brand/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Vendor Workspace",
+      "short_name": "Vendor",
+      "description": "Vendor orders, quotations, and settlements",
+      "url": "/vendor",
+      "icons": [{ "src": "/brand/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "categories": ["shopping", "business", "finance", "productivity"],
   "lang": "en-IN"
 }
-
