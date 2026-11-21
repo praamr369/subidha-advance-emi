@@ -10,7 +10,9 @@ import {
   type OfflineSyncStatus,
 } from "@/lib/desktop/tauri-bridge";
 import { useAdminDesktopZoom } from "@/lib/admin-desktop-zoom";
-import { Monitor, Wifi, WifiOff, Minus, Plus, Square, X } from "lucide-react";
+import { subscribeOfflineOutbox } from "@/lib/offline/offline-db";
+import { subscribeSyncState, type SyncProgressState } from "@/lib/offline/offline-sync";
+import { Monitor, Wifi, WifiOff, RefreshCw, Minus, Plus, Square, X } from "lucide-react";
 
 export default function DesktopAppPill() {
   const [isTauri, setIsTauri] = useState(false);
@@ -19,6 +21,7 @@ export default function DesktopAppPill() {
     queuedTransactions: 0,
     lastSyncedAt: null,
   });
+  const [syncProgress, setSyncProgress] = useState<SyncProgressState | null>(null);
 
   const { zoom, zoomIn, zoomOut, resetZoom } = useAdminDesktopZoom();
   const zoomPercent = Math.round(parseFloat(zoom || "0.8") * 100);
@@ -33,21 +36,45 @@ export default function DesktopAppPill() {
 
     updateStatus();
 
+    // Subscribe to outbox changes & real-time sync progress
+    const unsubscribeOutbox = subscribeOfflineOutbox(() => {
+      updateStatus();
+    });
+
+    const unsubscribeSync = subscribeSyncState((state) => {
+      setSyncProgress(state);
+      updateStatus();
+    });
+
     window.addEventListener("online", updateStatus);
     window.addEventListener("offline", updateStatus);
 
     return () => {
+      unsubscribeOutbox();
+      unsubscribeSync();
       window.removeEventListener("online", updateStatus);
       window.removeEventListener("offline", updateStatus);
     };
   }, []);
 
+  const handleSafeClose = async () => {
+    if (syncStatus.queuedTransactions > 0) {
+      const confirmed = window.confirm(
+        `Notice: You have ${syncStatus.queuedTransactions} unsynced transactions in your offline queue.\n\nThey are stored safely on your laptop and will sync when you next reopen the app, but they have not reached the server yet.\n\nClose the desktop app now?`
+      );
+      if (!confirmed) return;
+    }
+    await closeWindow();
+  };
+
   return (
     <div className="inline-flex items-center gap-1.5">
-      {/* 1. App Status & Offline Sync Pill */}
+      {/* 1. App Status & Real-time Offline Sync Pill */}
       <div
         className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
-          syncStatus.isOnline
+          syncProgress?.isSyncing
+            ? "bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-300 dark:border-blue-700"
+            : syncStatus.isOnline
             ? "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700"
             : "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-300 dark:border-amber-700 animate-pulse"
         }`}
@@ -58,11 +85,16 @@ export default function DesktopAppPill() {
         }
       >
         <Monitor className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
-        <span>{isTauri ? "Linux Desktop" : "Web ERP"}</span>
+        <span className="hidden sm:inline">{isTauri ? "Linux Desktop" : "Web ERP"}</span>
 
         <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-600" />
 
-        {syncStatus.isOnline ? (
+        {syncProgress?.isSyncing ? (
+          <span className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 font-medium">
+            <RefreshCw className="w-3 h-3 animate-spin" />
+            <span>Syncing ({syncProgress.syncedCount}/{syncProgress.totalPending})</span>
+          </span>
+        ) : syncStatus.isOnline ? (
           <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
             <Wifi className="w-3 h-3" />
             <span>Synced</span>
@@ -78,7 +110,7 @@ export default function DesktopAppPill() {
       {/* 2. Interactive Zoom In / Out Controls */}
       <div
         className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-100 px-1 py-0.5 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 shadow-2xs"
-        title="Screen Scaling & Zoom (Ctrl + / Ctrl - / Ctrl 0)"
+        title="Screen Scaling & Zoom (Ctrl + / Ctrl - / Ctrl 0 / Ctrl Wheel)"
       >
         <button
           type="button"
@@ -135,9 +167,9 @@ export default function DesktopAppPill() {
 
           <button
             type="button"
-            onClick={closeWindow}
+            onClick={handleSafeClose}
             className="rounded p-1 hover:bg-red-500 hover:text-white dark:hover:bg-red-600 cursor-pointer transition-colors"
-            title="Close application"
+            title="Close application safely"
             aria-label="Close"
           >
             <X className="w-3.5 h-3.5 text-slate-600 dark:text-slate-300" />

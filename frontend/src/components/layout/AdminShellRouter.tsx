@@ -26,21 +26,22 @@ export default function AdminShellRouter({ children }: { children: ReactNode }) 
     applyAdminDesktopScale(true);
 
     // Global desktop shortcut listeners for Zoom and Laptop Resolution Scaling
+    let wheelThrottle = false;
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!e.ctrlKey && !e.metaKey) return;
 
-      // Ctrl + '+' or Ctrl + '=' -> Zoom In
-      if (e.key === "+" || e.key === "=") {
+      const isZoomIn = e.key === "+" || e.key === "=" || e.code === "NumpadAdd" || (e.shiftKey && (e.key === "+" || e.code === "Equal"));
+      const isZoomOut = e.key === "-" || e.key === "_" || e.code === "NumpadSubtract" || e.code === "Minus";
+      const isZoomReset = e.key === "0" || e.code === "Numpad0" || e.code === "Digit0";
+
+      if (isZoomIn) {
         e.preventDefault();
         zoomIn();
-      }
-      // Ctrl + '-' -> Zoom Out
-      else if (e.key === "-") {
+      } else if (isZoomOut) {
         e.preventDefault();
         zoomOut();
-      }
-      // Ctrl + '0' -> Reset Zoom (Default 80% ERP view)
-      else if (e.key === "0") {
+      } else if (isZoomReset) {
         e.preventDefault();
         resetZoom();
       }
@@ -49,6 +50,12 @@ export default function AdminShellRouter({ children }: { children: ReactNode }) 
     const handleWheel = (e: WheelEvent) => {
       if (e.ctrlKey) {
         e.preventDefault();
+        if (wheelThrottle) return;
+        wheelThrottle = true;
+        setTimeout(() => {
+          wheelThrottle = false;
+        }, 120);
+
         if (e.deltaY < 0) {
           zoomIn();
         } else if (e.deltaY > 0) {
