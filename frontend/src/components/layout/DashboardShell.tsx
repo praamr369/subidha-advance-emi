@@ -197,8 +197,8 @@ const SIDEBAR_COLLAPSED_LEGACY_KEY = "subidha:dashboard-sidebar-collapsed:v1";
 const SIDEBAR_GROUPS_KEY = "subidha:dashboard-sidebar-groups:v1";
 /** Browser-local layout preference only (max width of dashboard content stage). Not financial data. */
 const WORKSPACE_WIDTH_PRESET_KEY = "subidha:workspace-width-preset:v1";
-/** Browser-local content width caps (100% zoom friendly; still bounded by viewport). */
-const WORKSPACE_WIDTH_CSS_VALUES = ["1440px", "1480px", "1680px"] as const;
+/** Browser-local content width caps (100% fluid full-width friendly across all laptop resolutions). */
+const WORKSPACE_WIDTH_CSS_VALUES = ["100%", "100%", "100%"] as const;
 const DASHBOARD_SHELL_EVENT = "subidha:dashboard-shell";
 
 function sidebarCollapsedKey(sessionId: number | null, role: NavigationRole) {

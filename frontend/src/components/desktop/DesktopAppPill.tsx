@@ -24,7 +24,7 @@ export default function DesktopAppPill() {
   const [syncProgress, setSyncProgress] = useState<SyncProgressState | null>(null);
 
   const { zoom, zoomIn, zoomOut, resetZoom } = useAdminDesktopZoom();
-  const zoomPercent = Math.round(parseFloat(zoom || "0.8") * 100);
+  const zoomPercent = Math.round(parseFloat(zoom || "1.0") * 100);
 
   useEffect(() => {
     setIsTauri(isTauriDesktop());
@@ -126,7 +126,7 @@ export default function DesktopAppPill() {
           type="button"
           onClick={resetZoom}
           className="px-1.5 py-0.5 text-[11px] font-semibold hover:text-primary cursor-pointer transition-colors"
-          title="Click to reset zoom (Default 80%)"
+          title="Click to reset zoom (Default 100%)"
         >
           {zoomPercent}%
         </button>

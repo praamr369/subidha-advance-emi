@@ -68,13 +68,13 @@ export function MetricCard({
   return (
     <article
       className={cn(
-        "rounded-xl border border-[color-mix(in_oklab,var(--surface-border-strong)_78%,white_22%)] bg-[linear-gradient(180deg,color-mix(in_oklab,white_98%,var(--surface-muted)_2%),color-mix(in_oklab,var(--surface-card-soft)_82%,var(--surface-muted)_18%))] p-4 shadow-[0_18px_45px_-38px_rgba(15,23,42,0.34)]",
+        "rounded-lg border border-[color-mix(in_oklab,var(--surface-border-strong)_78%,white_22%)] bg-[linear-gradient(180deg,color-mix(in_oklab,white_98%,var(--surface-muted)_2%),color-mix(in_oklab,var(--surface-card-soft)_82%,var(--surface-muted)_18%))] p-2.5 sm:p-3 shadow-2xs transition-all",
         className
       )}
     >
-      <p className="enterprise-eyebrow">{label}</p>
-      <div className="enterprise-metric mt-2 text-foreground">{value}</div>
-      {detail ? <p className="mt-2 text-sm leading-6 text-muted-foreground">{detail}</p> : null}
+      <p className="enterprise-eyebrow text-[11px] leading-tight truncate text-muted-foreground">{label}</p>
+      <div className="enterprise-metric mt-1 text-base sm:text-lg font-bold text-foreground leading-tight truncate">{value}</div>
+      {detail ? <p className="mt-0.5 text-[11px] leading-tight text-muted-foreground truncate">{detail}</p> : null}
     </article>
   );
 }

@@ -21,7 +21,7 @@ export default function ERPMetricStrip({ metrics, className }: ERPMetricStripPro
   if (metrics.length === 0) return null;
 
   return (
-    <div className={cn("grid gap-3 md:grid-cols-2 xl:grid-cols-4", className)}>
+    <div className={cn("grid gap-2 grid-cols-2 sm:grid-cols-3 xl:grid-cols-6", className)}>
       {metrics.map((metric) => (
         <MetricCard
           key={metric.label}

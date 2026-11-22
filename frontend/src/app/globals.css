@@ -413,6 +413,72 @@ html.dark {
  * Delivers clean, compact ERP control-room layout on desktop/laptop displays
  * --------------------------------------------------------------------------- */
 @media (min-width: 768px) {
+  /* Fluid 100% full-width desktop ERP workbench (zero horizontal overflow) */
+  html.admin-desktop-view {
+    --workspace-gap: 0.625rem;
+    --workspace-max-width: 100%;
+  }
+
+  html.admin-desktop-view .workspace-content-cap {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-inline: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  html.admin-desktop-view .workspace-shell-stage {
+    padding: 0.375rem 0.625rem !important;
+  }
+
+  html.admin-desktop-view .portal-page {
+    padding: 0 !important;
+    gap: 0.625rem !important;
+  }
+
+  /* Compact ERP header in admin desktop view */
+  html.admin-desktop-view .portal-page-header {
+    padding: 0.5rem 0.75rem !important;
+    border-radius: 0.75rem !important;
+  }
+
+  html.admin-desktop-view .portal-page-header .enterprise-title {
+    font-size: 1.15rem !important;
+    line-height: 1.35 !important;
+  }
+
+  html.admin-desktop-view .portal-page-header p {
+    font-size: 0.78rem !important;
+    line-height: 1.35 !important;
+    margin-top: 0.2rem !important;
+  }
+
+  /* Compact ERP action buttons */
+  html.admin-desktop-view .portal-page-actions a,
+  html.admin-desktop-view .portal-page-actions button {
+    height: 1.875rem !important;
+    padding: 0 0.65rem !important;
+    font-size: 0.75rem !important;
+  }
+
+  /* Compact ERP KPI & stat tiles */
+  html.admin-desktop-view .portal-stat-tile,
+  html.admin-desktop-view .portal-page-stats .portal-stat-tile,
+  html.admin-desktop-view .workspace-kpi-band .portal-stat-tile {
+    padding: 0.375rem 0.625rem !important;
+    border-radius: 0.5rem !important;
+  }
+
+  html.admin-desktop-view .enterprise-eyebrow {
+    font-size: 0.65rem !important;
+    letter-spacing: 0.06em !important;
+  }
+
+  html.admin-desktop-view .enterprise-metric {
+    font-size: 1.05rem !important;
+    line-height: 1.25 !important;
+  }
+
   /* Sleek custom 6px desktop scrollbars (WebKit & Gecko / Firefox standard) */
   html.admin-desktop-view * {
     scrollbar-width: thin;
@@ -437,26 +503,31 @@ html.dark {
     background: color-mix(in oklab, var(--muted-foreground) 48%, transparent);
   }
 
-  /* Desktop high-density data tables */
+  /* Desktop high-density data tables with sticky header */
   html.admin-desktop-view table {
     font-variant-numeric: tabular-nums;
+    width: 100%;
   }
 
   html.admin-desktop-view table thead th {
     font-size: 0.72rem;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
-    padding: 0.5rem 0.75rem;
+    letter-spacing: 0.06em;
+    padding: 0.375rem 0.625rem;
     background: color-mix(in oklab, var(--surface-muted) 65%, var(--card) 35%);
     border-bottom: 1.5px solid var(--border);
     white-space: nowrap;
     user-select: none;
+    position: sticky;
+    top: 0;
+    z-index: 2;
   }
 
   html.admin-desktop-view table tbody td {
-    padding: 0.5rem 0.75rem;
-    font-size: 0.82rem;
+    padding: 0.375rem 0.625rem;
+    font-size: 0.8rem;
+    line-height: 1.25;
     border-bottom: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
   }
 

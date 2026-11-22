@@ -5,17 +5,17 @@ import { useSyncExternalStore } from "react";
 import { isTauriDesktop, setNativeDesktopZoom } from "@/lib/desktop/tauri-bridge";
 
 export const ADMIN_ZOOM_STORAGE_KEY = "subidha:admin-desktop-zoom:v1";
-export const DEFAULT_ADMIN_ZOOM = "0.8"; // 80% default ERP scale fits perfectly on 1366x768 & laptop screens
+export const DEFAULT_ADMIN_ZOOM = "1.0"; // 100% standard ERP scale fits natively on all laptop & desktop screens
 export const ADMIN_ZOOM_EVENT = "subidha:admin-zoom-change";
 
 export const ADMIN_ZOOM_OPTIONS = [
   { value: "0.7", label: "70% (Ultra Compact)" },
   { value: "0.75", label: "75% (Small Laptop)" },
-  { value: "0.8", label: "80% (Desktop ERP — Recommended)" },
+  { value: "0.8", label: "80% (Dense ERP)" },
   { value: "0.85", label: "85% (Balanced Compact)" },
   { value: "0.9", label: "90% (Comfortable)" },
   { value: "0.95", label: "95% (Near Standard)" },
-  { value: "1.0", label: "100% (Standard)" },
+  { value: "1.0", label: "100% (Standard — Recommended)" },
   { value: "1.1", label: "110% (Large)" },
   { value: "1.25", label: "125% (Extra Large)" },
 ] as const;

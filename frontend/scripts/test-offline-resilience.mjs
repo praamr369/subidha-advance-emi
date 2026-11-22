@@ -289,6 +289,27 @@ assert.equal(getDesktopNavigationTarget(true, "/admin/billing/direct-sale"), "/a
 assert.equal(getDesktopNavigationTarget(false, "/products"), "/products", "Standard web browser allows public customer browsing");
 console.log("✓ Desktop business-only isolation boundary verified.");
 
+// 13. TEST: Service Worker Navigation Contract & Syntax Guard
+console.log("\n[Test 13] Testing Service Worker Navigation Contract & Syntax Guard...");
+const { readFileSync } = await import("node:fs");
+const { resolve, dirname } = await import("node:path");
+const { fileURLToPath } = await import("node:url");
+
+const __curDir = dirname(fileURLToPath(import.meta.url));
+const swPath = resolve(__curDir, "../public/sw.js");
+const swContent = readFileSync(swPath, "utf-8");
+
+// Ensure cache version was bumped to v6
+assert.ok(swContent.includes("subidha-core-static-v6"), "sw.js cache must be bumped to v6");
+assert.ok(swContent.includes("subidha-core-pages-v6"), "sw.js pages cache must be bumped to v6");
+
+// Verify all respondWith calls have invoked functions or Promises
+const respondWithCount = (swContent.match(/event\.respondWith\(/g) || []).length;
+const invokedIifeCount = (swContent.match(/\}\)\(\)\s*\n\s*\);/g) || []).length;
+assert.equal(respondWithCount, 4, "Must have exactly 4 respondWith handlers");
+assert.equal(invokedIifeCount, 4, "All 4 respondWith handlers must be invoked IIFEs");
+console.log("✓ Service Worker WebKit compatibility & respondWith contract verified.");
+
 console.log("\n=======================================================");
-console.log("ALL 12 OFFLINE & PC TAURI DESKTOP TESTS PASSED (100%)");
+console.log("ALL 13 OFFLINE & PC TAURI DESKTOP TESTS PASSED (100%)");
 console.log("=======================================================\n");

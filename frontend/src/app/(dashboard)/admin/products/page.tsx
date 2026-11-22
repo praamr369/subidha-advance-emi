@@ -1572,25 +1572,17 @@ export default function AdminProductsPage() {
     <ERPPageShell
       eyebrow="Products"
       title="Products & Blueprints"
-      subtitle="Product Register for all operations — create blueprints in PIM, publish to unlock subscriptions, inventory, and sales. Filters are URL-cached."
+      subtitle="Product Register for all operations — create blueprints in PIM, publish to unlock subscriptions, inventory, and sales."
       breadcrumbs={[{ label: "Admin", href: "/admin" }, { label: "Products" }]}
       actions={[
-        { onClick: () => openWorkflow("admin.createProduct"), label: "+ Create Product (Drawer)", variant: "primary" },
-        { href: "/admin/products/create", label: "Create Product (Page)", variant: "secondary" },
+        { onClick: () => openWorkflow("admin.createProduct"), label: "+ Create Product", variant: "primary" },
         { href: "/admin/products/masters", label: "Manage Masters", variant: "secondary" },
         { onClick: () => setActiveTab("cost-stock"), label: "Item Cost & Stock", variant: "secondary" },
         { onClick: () => setActiveTab("help"), label: "PIM Guide", variant: "secondary" },
-        { href: "/admin/subscriptions/advance-emi/create", label: "Create Subscription", variant: "secondary" },
       ]}
-      stats={[
-        { label: "Total Products", value: payload.catalog_total_count || payload.count },
-        { label: "Filtered", value: payload.count },
-        { label: "Inventory Ready", value: summary.inventory_ready, tone: summary.inventory_ready ? "success" : "warning" },
-        { label: "Image Missing", value: summary.image_missing, tone: summary.image_missing ? "warning" : "success" },
-      ]}
-      statusBadge={{ label: "Admin Workspace", tone: "info" }}
+      statusBadge={{ label: "Active Register", tone: "info" }}
     >
-      <div className="space-y-6">
+      <div className="space-y-2.5">
         <ERPMetricStrip metrics={[
           { label: "Total products", value: payload.catalog_total_count || payload.count, detail: `${rangeText} visible` },
           { label: "Total base value", value: formatRupee(summary.total_base_value), detail: "Filtered product value" },
@@ -1600,36 +1592,54 @@ export default function AdminProductsPage() {
           { label: "Image missing", value: summary.image_missing, detail: "Catalog cleanup needed" },
         ]} />
 
-        {/* Tab switcher */}
-        <div className="flex gap-1 p-1 rounded-xl bg-muted w-fit flex-wrap">
-          <button
-            type="button"
-            onClick={() => setActiveTab("subscription")}
-            className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === "subscription" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-          >
-            <Package2 className="h-4 w-4" /> Product Register
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("pim")}
-            className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === "pim" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-          >
-            <Layers className="h-4 w-4" /> PIM Blueprints
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("cost-stock")}
-            className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === "cost-stock" ? "bg-background shadow-sm text-foreground font-semibold" : "text-muted-foreground hover:text-foreground"}`}
-          >
-            <Boxes className="h-4 w-4 text-primary" /> Item Cost, Stock &amp; FG Tracking
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("help")}
-            className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab === "help" ? "bg-background shadow-sm text-foreground font-semibold" : "text-muted-foreground hover:text-foreground"}`}
-          >
-            <CircleHelp className="size-4 text-primary" /> PIM &amp; Workflow Guide
-          </button>
+        {/* Tab switcher + Variant SKU toggle */}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex gap-1 p-1 rounded-lg bg-muted w-fit flex-wrap">
+            <button
+              type="button"
+              onClick={() => setActiveTab("subscription")}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${activeTab === "subscription" ? "bg-background shadow-xs text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              <Package2 className="h-3.5 w-3.5" /> Product Register
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("pim")}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${activeTab === "pim" ? "bg-background shadow-xs text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              <Layers className="h-3.5 w-3.5" /> PIM Blueprints
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("cost-stock")}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${activeTab === "cost-stock" ? "bg-background shadow-xs text-foreground font-semibold" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              <Boxes className="h-3.5 w-3.5 text-primary" /> Item Cost, Stock &amp; FG
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("help")}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${activeTab === "help" ? "bg-background shadow-xs text-foreground font-semibold" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              <CircleHelp className="size-3.5 text-primary" /> PIM Guide
+            </button>
+          </div>
+
+          {activeTab === "subscription" && (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => { setShowVariantSkus((v) => !v); setPage(1); }}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md border transition-colors ${showVariantSkus ? "bg-violet-50 border-violet-300 text-violet-700 dark:bg-violet-950 dark:border-violet-700 dark:text-violet-300" : "bg-muted border-border text-muted-foreground hover:text-foreground"}`}
+              >
+                <GitBranch className="h-3 w-3" />
+                {showVariantSkus ? "Hiding base product only" : "Show Variant SKUs"}
+              </button>
+              {!showVariantSkus && (
+                <span className="text-[11px] text-muted-foreground hidden sm:inline">Variant SKUs hidden</span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Item Cost, Stock & Finished Goods Tracking Panel */}
@@ -1643,22 +1653,8 @@ export default function AdminProductsPage() {
 
         {/* Subscription products section */}
         {activeTab === "subscription" && <>
-        {/* Variant SKU toggle — hidden by default since they're managed via PIM */}
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => { setShowVariantSkus((v) => !v); setPage(1); }}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${showVariantSkus ? "bg-violet-50 border-violet-300 text-violet-700" : "bg-muted border-muted-foreground/20 text-muted-foreground hover:text-foreground"}`}
-          >
-            <GitBranch className="h-3 w-3" />
-            {showVariantSkus ? "Hiding base product only" : "Show Variant SKUs"}
-          </button>
-          {!showVariantSkus && (
-            <span className="text-xs text-muted-foreground">Variant SKUs are hidden — managed via PIM base product</span>
-          )}
-        </div>
         {/* Item-type segmented register — every type is a tab with a live count */}
-        <nav aria-label="Product item type" className="flex flex-wrap gap-2">
+        <nav aria-label="Product item type" className="flex flex-wrap gap-1.5">
           {([
             { value: "", label: "All types" },
             { value: "FINISHED_GOOD", label: ITEM_TYPE_LABELS.FINISHED_GOOD },
@@ -1678,33 +1674,33 @@ export default function AdminProductsPage() {
                 key={tab.label}
                 type="button"
                 onClick={() => changeFilter("item_type", tab.value)}
-                className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+                className={`rounded-full border px-2.5 py-1 text-xs font-medium transition ${
                   active
-                    ? "border-primary bg-primary text-primary-foreground"
+                    ? "border-primary bg-primary text-primary-foreground shadow-2xs"
                     : "border-border bg-background text-foreground hover:bg-muted"
                 }`}
               >
                 {tab.label}
                 {typeof tabCount === "number" ? (
-                  <span className="ml-1.5 tabular-nums opacity-70">{tabCount}</span>
+                  <span className="ml-1 tabular-nums opacity-75">{tabCount}</span>
                 ) : null}
               </button>
             );
           })}
         </nav>
 
-        <ERPSectionShell title="Filters" description="All filters run on the full dataset. State is cached in the URL — refresh keeps your filters.">
-          <form onSubmit={applyFilters} className="space-y-3">
+        <ERPSectionShell title="Filters">
+          <form onSubmit={applyFilters} className="space-y-2">
             {/* Row 1: Search + quick dropdowns */}
-            <div className="flex flex-wrap gap-2">
-              <label htmlFor="f-setqueryinput-e-target-value-placeholder" className="relative flex-1 min-w-50">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <div className="flex flex-wrap items-center gap-1.5">
+              <label htmlFor="f-setqueryinput-e-target-value-placeholder" className="relative flex-1 min-w-[200px]">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                 <input
                   type="text"
                   value={queryInput}
                   onChange={(e) => setQueryInput(e.target.value)}
                   placeholder="Search name, code, SKU, description…"
-                  className="h-10 w-full rounded-xl border border-border bg-background pl-9 pr-4 text-sm outline-none transition focus:border-ring"
+                  className="h-8.5 w-full rounded-lg border border-border bg-background pl-8 pr-3 text-xs outline-none transition focus:border-ring"
                 />
               </label>
 
@@ -1712,7 +1708,7 @@ export default function AdminProductsPage() {
               <select
                 value={filters.item_type}
                 onChange={(e) => changeFilter("item_type", e.target.value)}
-                className="h-10 rounded-xl border border-border bg-background px-3 text-sm outline-none transition focus:border-ring"
+                className="h-8.5 rounded-lg border border-border bg-background px-2.5 text-xs outline-none transition focus:border-ring"
               >
                 <option value="">All item types</option>
                 {catalogOptions.item_type_choices.length > 0
@@ -1738,7 +1734,7 @@ export default function AdminProductsPage() {
                   setFilters(next);
                   syncUrl(next, 1, pageSize);
                 }}
-                className="h-10 rounded-xl border border-border bg-background px-3 text-sm outline-none transition focus:border-ring"
+                className="h-8.5 rounded-lg border border-border bg-background px-2.5 text-xs outline-none transition focus:border-ring"
               >
                 <option value="">All categories</option>
                 {catalogOptions.categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
@@ -1748,28 +1744,28 @@ export default function AdminProductsPage() {
               <select
                 value={filters.subcategory}
                 onChange={(e) => changeFilter("subcategory", e.target.value)}
-                className="h-10 rounded-xl border border-border bg-background px-3 text-sm outline-none transition focus:border-ring"
+                className="h-8.5 rounded-lg border border-border bg-background px-2.5 text-xs outline-none transition focus:border-ring"
                 disabled={!filters.category || subcategoryOptions.length === 0}
               >
                 <option value="">All subcategories</option>
                 {subcategoryOptions.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
               </select>
 
-              <div className="flex gap-2">
-                <button type="submit" className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:opacity-95">
+              <div className="flex items-center gap-1.5">
+                <button type="submit" className="inline-flex h-8.5 items-center justify-center rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground transition hover:opacity-95 cursor-pointer">
                   Search
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowAdvanced(v => !v)}
-                  className={`inline-flex h-10 items-center gap-1.5 rounded-xl border px-3 text-sm font-medium transition hover:bg-muted ${showAdvanced || filterCount > 0 ? "border-primary text-primary bg-primary/5" : "border-border text-foreground bg-background"}`}
+                  className={`inline-flex h-8.5 items-center gap-1 rounded-lg border px-2.5 text-xs font-medium transition hover:bg-muted cursor-pointer ${showAdvanced || filterCount > 0 ? "border-primary text-primary bg-primary/5" : "border-border text-foreground bg-background"}`}
                 >
-                  <SlidersHorizontal className="h-4 w-4" />
+                  <SlidersHorizontal className="h-3 w-3" />
                   Filters{filterCount > 0 ? ` (${filterCount})` : ""}
                 </button>
                 {filterCount > 0 && (
-                  <button type="button" onClick={resetFilters} className="inline-flex h-10 items-center gap-1 rounded-xl border border-border bg-background px-3 text-sm font-medium text-muted-foreground transition hover:bg-muted">
-                    <X className="h-3.5 w-3.5" /> Clear all
+                  <button type="button" onClick={resetFilters} className="inline-flex h-8.5 items-center gap-1 rounded-lg border border-border bg-background px-2 text-xs font-medium text-muted-foreground transition hover:bg-muted cursor-pointer">
+                    <X className="h-3 w-3" /> Clear
                   </button>
                 )}
               </div>
@@ -1862,12 +1858,12 @@ export default function AdminProductsPage() {
             )}
           </form>
 
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex flex-wrap gap-2">
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-1.5">
+            <div className="flex flex-wrap items-center gap-1.5">
               <select
                 value={pageSize}
                 onChange={(e) => changePageSize(Number(e.target.value))}
-                className="h-9 rounded-lg border border-border bg-background px-3 text-sm"
+                className="h-8 rounded-md border border-border bg-background px-2 text-xs"
               >
                 <option value={20}>20 / page</option>
                 <option value={50}>50 / page</option>
@@ -1877,9 +1873,9 @@ export default function AdminProductsPage() {
                 type="button"
                 onClick={() => void loadPage()}
                 disabled={refreshing || loading}
-                className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-background px-3 text-sm font-medium transition hover:bg-muted disabled:opacity-60"
+                className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-xs font-medium transition hover:bg-muted disabled:opacity-60 cursor-pointer"
               >
-                <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+                <RefreshCw className={`h-3 w-3 ${refreshing ? "animate-spin" : ""}`} />
                 {refreshing ? "Refreshing…" : "Refresh"}
               </button>
               <button
@@ -1896,9 +1892,9 @@ export default function AdminProductsPage() {
                   { key: "image_status", header: "image_status" },
                   { key: "created_at", header: "created_at" },
                 ], exportRows)}
-                className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-foreground px-3 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-60"
+                className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-foreground px-2.5 text-xs font-medium text-background transition hover:opacity-90 disabled:opacity-60 cursor-pointer"
               >
-                <Download className="h-3.5 w-3.5" /> Export
+                <Download className="h-3 w-3" /> Export
               </button>
               <button
                 type="button"
@@ -1907,16 +1903,16 @@ export default function AdminProductsPage() {
                   setSubQRItems(rows.map(productRecordToQRLabel));
                   setSubQRItem(null);
                 }}
-                className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-background px-3 text-sm font-medium transition hover:bg-muted disabled:opacity-60"
+                className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-xs font-medium transition hover:bg-muted disabled:opacity-60 cursor-pointer"
                 title="Bulk print or download Showroom QR codes for products on this page"
               >
-                <QrCode className="h-3.5 w-3.5" /> Bulk QR Labels ({rows.length})
+                <QrCode className="h-3 w-3" /> Bulk QR Labels ({rows.length})
               </button>
             </div>
-            <Link href="/admin/products/masters" className="text-sm text-primary hover:underline">Manage Masters →</Link>
+            <Link href="/admin/products/masters" className="text-xs font-medium text-primary hover:underline">Manage Masters →</Link>
           </div>
 
-          <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-800">
+          <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-300">
             Safe edit boundary: product master changes affect future onboarding only. Existing contracts keep saved pricing.
           </div>
         </ERPSectionShell>
@@ -1927,9 +1923,9 @@ export default function AdminProductsPage() {
         {!loading && !error ? (
           <ERPSectionShell title="Product rows" description={`${rangeText}. Click any row to open detail.`}>
             {/* Pagination */}
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-2.5 text-sm text-muted-foreground">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground">
               <span>{rangeText}</span>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <button
                   type="button"
                   disabled={!payload.has_previous || page <= 1}

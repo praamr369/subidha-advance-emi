@@ -211,8 +211,8 @@ export default function PortalPage({
   return (
     <div
       className={cn(
-        "portal-page flex w-full min-w-0 max-w-none flex-col gap-[var(--workspace-gap)]",
-        isPopup ? "popup-workflow-page px-0 py-1 sm:px-0 sm:py-1 lg:px-0 lg:py-1" : "px-3 py-4 sm:px-4 sm:py-5 lg:px-6 lg:py-6 xl:px-8",
+        "portal-page flex w-full min-w-0 max-w-none flex-col gap-[var(--workspace-gap,0.75rem)]",
+        isPopup ? "popup-workflow-page px-0 py-1" : "px-0 py-0",
         className
       )}
       style={widthStyle}

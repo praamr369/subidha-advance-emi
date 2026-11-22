@@ -17,7 +17,12 @@ export function OfflineNetworkBanner() {
     // to prevent CPU/network contention during initial mobile paint and hydration
     if ("serviceWorker" in navigator) {
       const registerSW = () => {
-        navigator.serviceWorker.register("/sw.js").catch(() => {});
+        navigator.serviceWorker
+          .register("/sw.js")
+          .then((registration) => {
+            registration.update().catch(() => {});
+          })
+          .catch(() => {});
       };
       if (document.readyState === "complete") {
         registerSW();
