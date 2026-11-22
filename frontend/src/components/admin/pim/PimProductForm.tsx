@@ -897,16 +897,19 @@ export default function PimProductForm({
     setName(val);
     if (!isEdit) {
       const lower = val.toLowerCase();
+      const isFurniture = /bed|cot|sofa|couch|chair|table|desk|wardrobe|almirah|cupboard|cabinet|dining|dressing|bookshelf|showcase|bench|stool|stand|unit|rack|divan|mattress/.test(lower);
       if (
-        lower.includes("plyboard") ||
-        lower.includes("ply board") ||
-        lower.includes("commercial ply") ||
-        lower.includes("cushion") ||
-        lower.includes("fitting") ||
-        lower.includes("hardware") ||
-        lower.includes("handle") ||
-        lower.includes("drawer slide") ||
-        lower.includes("hinge")
+        !isFurniture && (
+          lower.includes("plyboard") ||
+          lower.includes("ply board") ||
+          lower.includes("commercial ply") ||
+          lower.includes("cushion") ||
+          lower.includes("fitting") ||
+          lower.includes("hardware") ||
+          lower.includes("handle") ||
+          lower.includes("drawer slide") ||
+          lower.includes("hinge")
+        )
       ) {
         if (productType !== "ACCESSORY") {
           setProductType("ACCESSORY");
@@ -919,11 +922,13 @@ export default function PimProductForm({
           }
         }
       } else if (
-        lower.includes("raw timber") ||
-        lower.includes("foam sheet") ||
-        lower.includes("screw") ||
-        lower.includes("adhesive") ||
-        lower.includes("fevicol")
+        !isFurniture && (
+          lower.includes("raw timber") ||
+          lower.includes("foam sheet") ||
+          lower.includes("screw") ||
+          lower.includes("adhesive") ||
+          lower.includes("fevicol")
+        )
       ) {
         if (productType !== "RAW_MATERIAL") {
           setProductType("RAW_MATERIAL");
@@ -2029,7 +2034,10 @@ export default function PimProductForm({
               onChange={(e) => handleNameChange(e.target.value)}
               placeholder="Teak Queen Bed with Storage"
             />
-            {name && (name.toLowerCase().includes("plyboard") || name.toLowerCase().includes("commercial ply")) && productType === "FINISHED_GOOD" && (
+            {name &&
+              (name.toLowerCase().includes("plyboard") || name.toLowerCase().includes("commercial ply")) &&
+              !/bed|cot|sofa|couch|chair|table|desk|wardrobe|almirah|cupboard|cabinet|dining|dressing|bookshelf|showcase|bench|stool|stand|unit|rack|divan|mattress/.test(name.toLowerCase()) &&
+              productType === "FINISHED_GOOD" && (
               <div className="mt-2 flex items-center justify-between p-2.5 rounded-lg border border-purple-200 bg-purple-50 dark:bg-purple-950/30 dark:border-purple-800 text-xs text-purple-900 dark:text-purple-200 gap-2 flex-wrap">
                 <div className="flex items-center gap-1.5 font-medium">
                   <Puzzle className="h-4 w-4 text-purple-600 dark:text-purple-400 shrink-0" />

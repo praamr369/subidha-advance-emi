@@ -16,17 +16,18 @@ class Command(BaseCommand):
             changed = False
             fields = []
 
-            # If inferred is not FINISHED_GOOD but PIM is currently FINISHED_GOOD, update it
-            if inferred != "FINISHED_GOOD" and pim.product_type == "FINISHED_GOOD":
-                pim.product_type = inferred
-                changed = True
-                fields.append("product_type")
-            elif pim.source_product and getattr(pim.source_product, "item_type", "") in ("ACCESSORY", "RAW_MATERIAL", "SERVICE"):
-                op_type = getattr(pim.source_product, "item_type")
+            # 1. Operational product explicit item_type takes precedence
+            op_type = getattr(pim.source_product, "item_type", "") if pim.source_product else ""
+            if op_type in ("FINISHED_GOOD", "ACCESSORY", "RAW_MATERIAL", "SERVICE"):
                 if pim.product_type != op_type:
                     pim.product_type = op_type
                     changed = True
                     fields.append("product_type")
+            elif not pim.product_type or inferred != pim.product_type:
+                # Update when classification is missing or needs correction per improved heuristics
+                pim.product_type = inferred
+                changed = True
+                fields.append("product_type")
 
             if changed:
                 pim.save(update_fields=fields)
@@ -39,6 +40,11 @@ class Command(BaseCommand):
                 if getattr(sp, "item_type", None) != pim.product_type:
                     sp.item_type = pim.product_type
                     sp.save(update_fields=["item_type"])
+                try:
+                    from inventory.models import InventoryItem
+                    InventoryItem.objects.filter(product=sp).exclude(stock_item_type=pim.product_type).update(stock_item_type=pim.product_type)
+                except Exception:
+                    pass
 
             # Propagate to child variants if this is a parent
             if not pim.parent_id and pim.product_type:

@@ -167,3 +167,22 @@ class PimTreePagingTests(APITestCase):
         self.assertEqual(pim_ply1.product_type, "RAW_MATERIAL")
         ply1.refresh_from_db()
         self.assertEqual(ply1.item_type, "RAW_MATERIAL")
+
+        # 5. Test updating to FINISHED_GOOD succeeds and is NOT reverted by heuristics
+        update_fg_resp = self.client.patch(detail_url, {"product_type": "FINISHED_GOOD"})
+        self.assertEqual(update_fg_resp.status_code, status.HTTP_200_OK)
+        pim_ply1.refresh_from_db()
+        self.assertEqual(pim_ply1.product_type, "FINISHED_GOOD")
+        ply1.refresh_from_db()
+        self.assertEqual(ply1.item_type, "FINISHED_GOOD")
+
+        # 6. Test finished furniture with material keywords (e.g. PlyBoard & Laminates Bed) infers FINISHED_GOOD
+        bed_prod = Product.objects.create(
+            name="PlyBoard & Laminates Bed",
+            product_code="PLYBOARDLAMI-0001",
+            category="Furniture / Bed",
+            base_price=Decimal("18500"),
+        )
+        self.assertEqual(infer_product_type(bed_prod), "FINISHED_GOOD")
+        pim_bed = ensure_pim_product_for_product(bed_prod)
+        self.assertEqual(pim_bed.product_type, "FINISHED_GOOD")

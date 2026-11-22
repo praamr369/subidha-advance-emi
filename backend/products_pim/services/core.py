@@ -14,26 +14,66 @@ from django.db import transaction
 
 def infer_product_type(product) -> str:
     """Infer the correct PIM product classification from product attributes and heuristics."""
-    # 1. Direct explicit classification on operational product
-    item_type = getattr(product, "item_type", "") or ""
-    if item_type in ("ACCESSORY", "ADD_ON"):
-        return "ACCESSORY"
-    if item_type == "RAW_MATERIAL":
-        return "RAW_MATERIAL"
-    if item_type == "SERVICE":
-        return "SERVICE"
-
-    # 2. Heuristic inference from code, name, category
     code = (getattr(product, "product_code", "") or getattr(product, "code", "") or "").upper()
     name = (getattr(product, "name", "") or "").lower()
     category_val = getattr(product, "category", "") or ""
     cat = str(getattr(category_val, "name", category_val) or "").lower()
 
-    # Accessories: Commercial Plyboard, cushions, fittings, hardware, handles, drawer slides
+    # 1. Explicit code prefixes always take absolute precedence
     if (
-        code.startswith("ACC-")
-        or code.startswith("COMM-PLYB")
-        or "plyboard" in name
+        code.startswith("FG-")
+        or code.startswith("BED-")
+        or code.startswith("SOF-")
+        or code.startswith("TAB-")
+        or code.startswith("CHR-")
+        or code.startswith("ALM-")
+        or code.startswith("WRD-")
+    ):
+        return "FINISHED_GOOD"
+    if code.startswith("ACC-") or code.startswith("COMM-PLYB"):
+        return "ACCESSORY"
+    if code.startswith("RAW-"):
+        return "RAW_MATERIAL"
+    if code.startswith("SRV-") or code.startswith("SVC-"):
+        return "SERVICE"
+
+    # 2. Category checks
+    if "raw material" in cat:
+        return "RAW_MATERIAL"
+    if "service" in cat:
+        return "SERVICE"
+    if "accessory" in cat or "accessories" in cat:
+        return "ACCESSORY"
+
+    # 3. Check for finished furniture indicators in name or category
+    furniture_keywords = (
+        "bed", "cot", "sofa", "couch", "chair", "table", "desk",
+        "wardrobe", "almirah", "cupboard", "cabinet", "dining", "dressing",
+        "bookshelf", "showcase", "bench", "stool", "stand", "unit", "rack",
+        "divan", "mattress"
+    )
+    is_furniture_item = (
+        "furniture" in cat
+        or any(k in name for k in furniture_keywords)
+        or any(k in cat for k in furniture_keywords)
+    )
+
+    # Check if this is explicitly a part, spare, hardware, or fitting rather than the whole furniture
+    is_part_or_fitting = any(
+        p in name for p in (
+            "fitting", "hardware", "handle", "drawer slide", "hinge", "screw",
+            "bracket", "knob", "caster", "wheel", "channel", "cushion cover"
+        )
+    )
+
+    if is_furniture_item and not is_part_or_fitting:
+        # Finished furniture products (e.g. "PlyBoard & Laminates Bed", "Timber Dining Table")
+        # are FINISHED_GOOD, even if their name mentions plyboard, timber, laminates, or cushions.
+        return "FINISHED_GOOD"
+
+    # 4. Accessories: Commercial Plyboard, cushions, fittings, hardware, handles, drawer slides
+    if (
+        "plyboard" in name
         or "ply board" in name
         or "commercial ply" in name
         or "cushion" in name
@@ -43,16 +83,12 @@ def infer_product_type(product) -> str:
         or "drawer slide" in name
         or "hinge" in name
         or "bedside tool" in name
-        or "accessory" in cat
-        or "accessories" in cat
     ):
         return "ACCESSORY"
 
-    # Raw Materials: Timber, screws, nails, adhesive, raw foam sheets
+    # 5. Raw Materials: Timber, screws, nails, adhesive, raw foam sheets
     if (
-        code.startswith("RAW-")
-        or "raw material" in cat
-        or "timber" in name
+        "timber" in name
         or "sal wood" in name
         or "screw" in name
         or "foam sheet" in name
@@ -61,12 +97,9 @@ def infer_product_type(product) -> str:
     ):
         return "RAW_MATERIAL"
 
-    # Services: Labor, polish finish, assembly, delivery, repair
+    # 6. Services: Labor, polish finish, assembly, delivery, repair
     if (
-        code.startswith("SRV-")
-        or code.startswith("SVC-")
-        or "service" in cat
-        or "service" in name
+        "service" in name
         or "labor" in name
         or "labour" in name
         or "polish finish" in name
@@ -74,6 +107,17 @@ def infer_product_type(product) -> str:
         or "delivery charge" in name
     ):
         return "SERVICE"
+
+    # 7. Explicit classification fallback on operational product or PIM product
+    explicit_type = (
+        getattr(product, "item_type", "")
+        or getattr(product, "product_type", "")
+        or ""
+    )
+    if explicit_type in ("FINISHED_GOOD", "ACCESSORY", "RAW_MATERIAL", "SERVICE"):
+        return explicit_type
+    if explicit_type == "ADD_ON":
+        return "ACCESSORY"
 
     return "FINISHED_GOOD"
 
@@ -105,13 +149,9 @@ def ensure_pim_product_for_product(product) -> "object | None":
             needs_save = True
             fields_to_update.append("base_price")
 
-        target_type = infer_product_type(product)
-        if target_type != "FINISHED_GOOD" and existing.product_type == "FINISHED_GOOD":
-            existing.product_type = target_type
-            needs_save = True
-            fields_to_update.append("product_type")
-        elif getattr(product, "item_type", None) and getattr(product, "item_type") in ("ACCESSORY", "RAW_MATERIAL", "SERVICE") and existing.product_type != getattr(product, "item_type"):
-            existing.product_type = getattr(product, "item_type")
+        # Classification: only set if unset; never overwrite existing PIM classification with heuristics
+        if not existing.product_type:
+            existing.product_type = infer_product_type(product)
             needs_save = True
             fields_to_update.append("product_type")
 
@@ -123,10 +163,10 @@ def ensure_pim_product_for_product(product) -> "object | None":
     by_code = PimProduct.objects.filter(code=product.product_code).first()
     if by_code is not None:
         fields = ["source_product"]
-        target_type = infer_product_type(product)
-        if target_type != "FINISHED_GOOD" and by_code.product_type == "FINISHED_GOOD":
-            by_code.product_type = target_type
+        if not by_code.product_type:
+            by_code.product_type = infer_product_type(product)
             fields.append("product_type")
+
         if by_code.source_product_id != product.id:
             by_code.source_product = product
             by_code.save(update_fields=fields)
@@ -148,6 +188,15 @@ def ensure_pim_product_for_product(product) -> "object | None":
         # Link to the PimProduct corresponding to the variant's parent Operational Product
         parent_id = product.pim_variant.product_id
 
+    initial_type = infer_product_type(product)
+    if initial_type not in ("FINISHED_GOOD", "ACCESSORY", "RAW_MATERIAL", "SERVICE"):
+        initial_type = "FINISHED_GOOD"
+
+    # Keep operational product item_type in sync with inferred type if needed
+    if getattr(product, "item_type", None) != initial_type and hasattr(product, "pk") and product.pk:
+        type(product).objects.filter(pk=product.pk).update(item_type=initial_type)
+        product.item_type = initial_type
+
     return PimProduct.objects.create(
         code=product.product_code,
         source_product=product,
@@ -158,7 +207,7 @@ def ensure_pim_product_for_product(product) -> "object | None":
         is_active=getattr(product, "is_active", True),
         is_published=False,
         parent_id=parent_id,
-        product_type=infer_product_type(product),
+        product_type=initial_type,
     )
 
 

@@ -241,20 +241,40 @@ class PimProductViewSet(viewsets.ModelViewSet):
         
         pim_product = serializer.save()
 
-        # Synchronize product_type across operational source product, child PIM items, and variants
+        # Synchronize product_type across operational source product, child PIM items, variants, and inventory items
         if pim_product.product_type != old_type or pim_product.product_type:
             if pim_product.source_product_id:
                 sp = pim_product.source_product
                 if getattr(sp, "item_type", None) != pim_product.product_type:
                     sp.item_type = pim_product.product_type
                     sp.save(update_fields=["item_type"])
+                try:
+                    from inventory.models import InventoryItem
+                    InventoryItem.objects.filter(product=sp).exclude(stock_item_type=pim_product.product_type).update(stock_item_type=pim_product.product_type)
+                except Exception:
+                    pass
             # Sync all child variant PIM products
             pim_product.child_pim_products.exclude(product_type=pim_product.product_type).update(product_type=pim_product.product_type)
+            # Sync operational products linked to child PIM products
+            for child in pim_product.child_pim_products.select_related("source_product").all():
+                if child.source_product and getattr(child.source_product, "item_type", None) != pim_product.product_type:
+                    child.source_product.item_type = pim_product.product_type
+                    child.source_product.save(update_fields=["item_type"])
+                    try:
+                        from inventory.models import InventoryItem
+                        InventoryItem.objects.filter(product=child.source_product).exclude(stock_item_type=pim_product.product_type).update(stock_item_type=pim_product.product_type)
+                    except Exception:
+                        pass
             # Sync operational products linked to ProductVariants
             for variant in pim_product.variants.select_related("operational_product").all():
                 if variant.operational_product and getattr(variant.operational_product, "item_type", None) != pim_product.product_type:
                     variant.operational_product.item_type = pim_product.product_type
                     variant.operational_product.save(update_fields=["item_type"])
+                    try:
+                        from inventory.models import InventoryItem
+                        InventoryItem.objects.filter(product=variant.operational_product).exclude(stock_item_type=pim_product.product_type).update(stock_item_type=pim_product.product_type)
+                    except Exception:
+                        pass
         
         name_changed = pim_product.name != old_name
         code_changed = pim_product.code != old_code
