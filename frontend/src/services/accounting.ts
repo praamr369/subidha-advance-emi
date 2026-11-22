@@ -228,9 +228,39 @@ export type VendorOperationalSummary = {
   timeline: VendorOperationalTimelineRow[];
 };
 
+export type RecurringExpenseSetup = {
+  id: number;
+  title: string;
+  frequency: "MONTHLY" | "QUARTERLY" | "ANNUAL";
+  expense_account: number;
+  expense_account_code?: string;
+  expense_account_name?: string;
+  vendor?: number | null;
+  vendor_name?: string | null;
+  branch?: number | null;
+  branch_code?: string | null;
+  branch_name?: string | null;
+  payment_mode: "CASH" | "UPI" | "BANK";
+  finance_account?: number | null;
+  finance_account_name?: string | null;
+  gross_amount: string;
+  tax_amount?: string | null;
+  net_amount: string;
+  recurring_day: number;
+  is_active: boolean;
+  notes?: string;
+  last_voucher_date?: string | null;
+  vouchers_count?: number;
+  created_at?: string;
+  updated_at?: string;
+};
+
 export type ExpenseVoucher = {
   id: number;
   voucher_no: string;
+  expense_type?: "ONE_TIME" | "MONTHLY_RECURRING";
+  recurring_setup?: number | null;
+  recurring_setup_title?: string | null;
   expense_date: string;
   branch?: number | null;
   branch_code?: string | null;
@@ -1154,7 +1184,7 @@ export type Phase3BridgeRunResponse = {
 };
 
 function buildQuery(
-  params: Record<string, string | number | undefined | null>
+  params: Record<string, string | number | boolean | undefined | null>
 ): string {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
@@ -1320,6 +1350,40 @@ export function postExpenseVoucher(id: number) {
       body: JSON.stringify({}),
     }
   );
+}
+
+export function listRecurringExpenses(params: Record<string, string | number | boolean | undefined | null> = {}) {
+  return apiFetch<AccountingPaginatedResponse<RecurringExpenseSetup>>(
+    `/accounting/recurring-expenses/${buildQuery(params)}`
+  );
+}
+
+export function createRecurringExpense(payload: Partial<RecurringExpenseSetup>) {
+  return apiFetch<RecurringExpenseSetup>("/accounting/recurring-expenses/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateRecurringExpense(id: number, payload: Partial<RecurringExpenseSetup>) {
+  return apiFetch<RecurringExpenseSetup>(`/accounting/recurring-expenses/${id}/`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function toggleRecurringExpenseActive(id: number) {
+  return apiFetch<RecurringExpenseSetup>(`/accounting/recurring-expenses/${id}/toggle-active/`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
+export function generateRecurringExpenseVoucher(id: number, payload?: { expense_date?: string; bill_no?: string; notes?: string }) {
+  return apiFetch<{ created: boolean; voucher: ExpenseVoucher }>(`/accounting/recurring-expenses/${id}/generate-voucher/`, {
+    method: "POST",
+    body: JSON.stringify(payload || {}),
+  });
 }
 
 export function listEmployees(params: Record<string, string | number | undefined | null> = {}) {

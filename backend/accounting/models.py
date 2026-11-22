@@ -245,6 +245,17 @@ class ExpenseVoucherStatus(models.TextChoices):
     CANCELLED = "CANCELLED", "Cancelled"
 
 
+class ExpenseType(models.TextChoices):
+    ONE_TIME = "ONE_TIME", "One-Time / Ad-hoc"
+    MONTHLY_RECURRING = "MONTHLY_RECURRING", "Monthly Recurring"
+
+
+class RecurringExpenseFrequency(models.TextChoices):
+    MONTHLY = "MONTHLY", "Monthly"
+    QUARTERLY = "QUARTERLY", "Quarterly"
+    ANNUAL = "ANNUAL", "Annual"
+
+
 class SalarySheetStatus(models.TextChoices):
     DRAFT = "DRAFT", "Draft"
     APPROVED = "APPROVED", "Approved"
@@ -2132,12 +2143,129 @@ class DepreciationLine(AccountingTimeStampedModel):
         super().save(*args, **kwargs)
 
 
+class RecurringExpenseSetup(AccountingTimeStampedModel):
+    title = models.CharField(
+        max_length=200,
+        help_text="e.g. Showroom Rent, Delivery Van EMI, Internet Broadband",
+    )
+    frequency = models.CharField(
+        max_length=20,
+        choices=RecurringExpenseFrequency.choices,
+        default=RecurringExpenseFrequency.MONTHLY,
+        db_index=True,
+    )
+    expense_account = models.ForeignKey(
+        ChartOfAccount,
+        on_delete=models.PROTECT,
+        related_name="recurring_expense_setups",
+    )
+    vendor = models.ForeignKey(
+        Vendor,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="recurring_expense_setups",
+    )
+    branch = models.ForeignKey(
+        "branch_control.Branch",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="recurring_expense_setups",
+    )
+    payment_mode = models.CharField(
+        max_length=10,
+        choices=PaymentMethod.choices,
+        default=PaymentMethod.BANK,
+        db_index=True,
+    )
+    finance_account = models.ForeignKey(
+        FinanceAccount,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="recurring_expense_setups",
+    )
+    gross_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    tax_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        default=Decimal("0.00"),
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    net_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    recurring_day = models.PositiveSmallIntegerField(
+        default=1,
+        help_text="Day of month when this expense is due (1-31)",
+    )
+    is_active = models.BooleanField(
+        default=True,
+        db_index=True,
+        help_text="Toggle active or inactive for this recurring expense setup",
+    )
+    notes = models.TextField(blank=True, default="")
+    last_voucher_date = models.DateField(null=True, blank=True)
+
+    class Meta:
+        db_table = "accounting_recurring_expense_setups"
+        ordering = ["-is_active", "recurring_day", "title"]
+
+    def clean(self):
+        errors = {}
+        if self.expense_account_id and self.expense_account.account_type != ChartOfAccountType.EXPENSE:
+            errors["expense_account"] = "Recurring expense setups must use an EXPENSE chart account."
+        if self.finance_account_id and not self.finance_account.is_active:
+            errors["finance_account"] = "Finance account must be active."
+        if self.recurring_day < 1 or self.recurring_day > 31:
+            errors["recurring_day"] = "Recurring day must be between 1 and 31."
+
+        tax = self.tax_amount or MONEY_ZERO
+        if (self.gross_amount or MONEY_ZERO) <= MONEY_ZERO and (self.net_amount or MONEY_ZERO) > MONEY_ZERO:
+            self.gross_amount = (self.net_amount - tax) if (self.net_amount > tax and (self.net_amount - tax) > MONEY_ZERO) else self.net_amount
+        elif (self.net_amount or MONEY_ZERO) <= MONEY_ZERO and (self.gross_amount or MONEY_ZERO) > MONEY_ZERO:
+            self.net_amount = self.gross_amount + tax
+
+        if (self.gross_amount or MONEY_ZERO) <= MONEY_ZERO:
+            errors["gross_amount"] = "Gross amount must be greater than zero."
+        if (self.net_amount or MONEY_ZERO) <= MONEY_ZERO:
+            errors["net_amount"] = "Net amount must be greater than zero."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+
 class ExpenseVoucher(AccountingTimeStampedModel):
     voucher_no = models.CharField(
         max_length=40,
         unique=True,
         db_index=True,
         default=generate_voucher_no,
+    )
+    expense_type = models.CharField(
+        max_length=20,
+        choices=ExpenseType.choices,
+        default=ExpenseType.ONE_TIME,
+        db_index=True,
+    )
+    recurring_setup = models.ForeignKey(
+        "accounting.RecurringExpenseSetup",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="vouchers",
     )
     expense_date = models.DateField(db_index=True)
     vendor = models.ForeignKey(

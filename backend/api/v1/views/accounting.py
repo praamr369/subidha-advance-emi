@@ -23,6 +23,7 @@ from accounting.models import (
     LeaveType,
     MoneyMovement,
     PayrollPeriod,
+    RecurringExpenseSetup,
     SalaryPayment,
     SalarySheet,
     StaffAdvance,
@@ -91,6 +92,7 @@ from api.v1.serializers.accounting import (
     MoneyMovementSerializer,
     PayrollPeriodCloseSerializer,
     PayrollPeriodSerializer,
+    RecurringExpenseSetupSerializer,
     SalaryPaymentSerializer,
     SalarySheetSerializer,
     StaffAdvanceSerializer,
@@ -434,12 +436,86 @@ class VendorViewSet(AdminAccountingModelViewSet):
         )
 
 
+class RecurringExpenseSetupViewSet(AdminAccountingModelViewSet):
+    queryset = RecurringExpenseSetup.objects.select_related(
+        "expense_account",
+        "vendor",
+        "branch",
+        "finance_account",
+    ).prefetch_related("vouchers").all()
+    serializer_class = RecurringExpenseSetupSerializer
+    search_fields = ["title", "notes", "vendor__name", "expense_account__name"]
+    ordering_fields = ["recurring_day", "net_amount", "created_at", "title"]
+    ordering = ["-is_active", "recurring_day", "title"]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        is_active = self.request.query_params.get("is_active")
+        if is_active is not None and is_active != "":
+            active_bool = str(is_active).strip().lower() in ("true", "1", "yes")
+            queryset = queryset.filter(is_active=active_bool)
+        branch_id = self.request.query_params.get("branch")
+        if branch_id:
+            queryset = queryset.filter(branch_id=branch_id)
+        frequency = self.request.query_params.get("frequency")
+        if frequency:
+            queryset = queryset.filter(frequency=frequency.upper())
+        return queryset
+
+    @action(detail=True, methods=["post"], url_path="toggle-active")
+    def toggle_active(self, request, pk=None):
+        setup = self.get_object()
+        setup.is_active = not setup.is_active
+        setup.save(update_fields=["is_active", "updated_at"])
+        serializer = self.get_serializer(setup)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="generate-voucher")
+    def generate_voucher(self, request, pk=None):
+        from django.utils import timezone
+        setup = self.get_object()
+        expense_date_str = request.data.get("expense_date")
+        if expense_date_str:
+            from datetime import date
+            try:
+                expense_date = date.fromisoformat(expense_date_str)
+            except Exception:
+                expense_date = timezone.localdate()
+        else:
+            expense_date = timezone.localdate()
+
+        notes = request.data.get("notes") or setup.notes or f"Recurring {setup.get_frequency_display()}: {setup.title}"
+        bill_no = request.data.get("bill_no", "")
+
+        voucher = ExpenseVoucher.objects.create(
+            expense_type="MONTHLY_RECURRING",
+            recurring_setup=setup,
+            expense_date=expense_date,
+            vendor=setup.vendor,
+            expense_account=setup.expense_account,
+            gross_amount=setup.gross_amount,
+            tax_amount=setup.tax_amount,
+            net_amount=setup.net_amount,
+            branch=setup.branch,
+            payment_mode=setup.payment_mode,
+            finance_account=setup.finance_account,
+            notes=notes,
+            bill_no=bill_no,
+        )
+        setup.last_voucher_date = expense_date
+        setup.save(update_fields=["last_voucher_date", "updated_at"])
+
+        voucher_serializer = ExpenseVoucherSerializer(voucher, context=self.get_serializer_context())
+        return Response({"created": True, "voucher": voucher_serializer.data}, status=status.HTTP_201_CREATED)
+
+
 class ExpenseVoucherViewSet(AdminAccountingModelViewSet):
     queryset = ExpenseVoucher.objects.select_related(
         "vendor",
         "expense_account",
         "finance_account",
         "posted_journal_entry",
+        "recurring_setup",
     ).all()
     serializer_class = ExpenseVoucherSerializer
     search_fields = ["voucher_no", "vendor__name", "bill_no", "notes"]
@@ -451,6 +527,12 @@ class ExpenseVoucherViewSet(AdminAccountingModelViewSet):
         branch_id = self.request.query_params.get("branch")
         if branch_id:
             queryset = queryset.filter(branch_id=branch_id)
+        expense_type = self.request.query_params.get("expense_type")
+        if expense_type:
+            queryset = queryset.filter(expense_type=expense_type.upper())
+        recurring_setup_id = self.request.query_params.get("recurring_setup")
+        if recurring_setup_id:
+            queryset = queryset.filter(recurring_setup_id=recurring_setup_id)
         return queryset
 
     def get_serializer_class(self):

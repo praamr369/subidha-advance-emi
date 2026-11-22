@@ -27,6 +27,7 @@ from api.v1.views.accounting import (
     # MOVED TO HR (Session 4): LeaveTypeViewSet,
     MoneyMovementViewSet,
     # MOVED TO HR (Session 4): PayrollPeriodViewSet,
+    RecurringExpenseSetupViewSet,
     SalaryPaymentViewSet,
     # MOVED TO HR (Session 4): SalarySheetViewSet,
     StaffLedgerView,
@@ -90,6 +91,7 @@ router.register(r"finance-accounts", FinanceAccountViewSet, basename="accounting
 router.register(r"money-movements", MoneyMovementViewSet, basename="accounting-money-movements")
 router.register(r"vendors", VendorViewSet, basename="accounting-vendors")
 router.register(r"expenses", ExpenseVoucherViewSet, basename="accounting-expenses")
+router.register(r"recurring-expenses", RecurringExpenseSetupViewSet, basename="accounting-recurring-expenses")
 # MOVED TO HR MODULE (Session 4 Consolidation - 2026-06-24)
 # router.register(r"employees", EmployeeProfileViewSet, basename="accounting-employees") # → hr/staff/
 # router.register(r"attendance", EmployeeAttendanceViewSet, basename="accounting-attendance") # → hr/attendance/

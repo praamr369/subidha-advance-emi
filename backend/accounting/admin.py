@@ -28,6 +28,7 @@ from accounting.models import (
     MoneyMovement,
     PayrollPeriod,
     PostingLock,
+    RecurringExpenseSetup,
     SalaryPayment,
     SalarySheet,
     SalarySheetLine,
@@ -72,11 +73,18 @@ class VendorAdmin(UnfoldModelAdmin):
     list_filter = ("is_active",)
 
 
+@admin.register(RecurringExpenseSetup)
+class RecurringExpenseSetupAdmin(UnfoldModelAdmin):
+    list_display = ("title", "frequency", "recurring_day", "net_amount", "is_active", "expense_account")
+    search_fields = ("title", "notes")
+    list_filter = ("is_active", "frequency", "payment_mode")
+
+
 @admin.register(ExpenseVoucher)
 class ExpenseVoucherAdmin(UnfoldModelAdmin):
-    list_display = ("voucher_no", "expense_date", "vendor", "net_amount", "status")
+    list_display = ("voucher_no", "expense_date", "expense_type", "vendor", "net_amount", "status")
     search_fields = ("voucher_no", "bill_no", "vendor__name")
-    list_filter = ("status", "payment_mode")
+    list_filter = ("status", "expense_type", "payment_mode")
 
 
 @admin.register(EmployeeProfile)

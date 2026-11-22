@@ -32,6 +32,7 @@ from accounting.models import (
     MoneyMovementStatus,
     PayrollPeriod,
     PayrollPeriodStatus,
+    RecurringExpenseSetup,
     SalaryPayment,
     SalarySheetLine,
     SalarySheet,
@@ -632,6 +633,46 @@ class VendorSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at", "updated_at"]
 
 
+class RecurringExpenseSetupSerializer(serializers.ModelSerializer):
+    expense_account_code = serializers.CharField(source="expense_account.code", read_only=True)
+    expense_account_name = serializers.CharField(source="expense_account.name", read_only=True)
+    vendor_name = serializers.CharField(source="vendor.name", read_only=True)
+    branch_code = serializers.CharField(source="branch.code", read_only=True)
+    branch_name = serializers.CharField(source="branch.name", read_only=True)
+    finance_account_name = serializers.CharField(source="finance_account.name", read_only=True)
+    vouchers_count = serializers.IntegerField(source="vouchers.count", read_only=True)
+
+    class Meta:
+        model = RecurringExpenseSetup
+        fields = [
+            "id",
+            "title",
+            "frequency",
+            "expense_account",
+            "expense_account_code",
+            "expense_account_name",
+            "vendor",
+            "vendor_name",
+            "branch",
+            "branch_code",
+            "branch_name",
+            "payment_mode",
+            "finance_account",
+            "finance_account_name",
+            "gross_amount",
+            "tax_amount",
+            "net_amount",
+            "recurring_day",
+            "is_active",
+            "notes",
+            "last_voucher_date",
+            "vouchers_count",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "vouchers_count", "created_at", "updated_at"]
+
+
 class ExpenseVoucherSerializer(serializers.ModelSerializer):
     vendor_name = serializers.CharField(source="vendor.name", read_only=True)
     branch_code = serializers.CharField(source="branch.code", read_only=True)
@@ -652,12 +693,19 @@ class ExpenseVoucherSerializer(serializers.ModelSerializer):
         source="posted_journal_entry.entry_no",
         read_only=True,
     )
+    recurring_setup_title = serializers.CharField(
+        source="recurring_setup.title",
+        read_only=True,
+    )
 
     class Meta:
         model = ExpenseVoucher
         fields = [
             "id",
             "voucher_no",
+            "expense_type",
+            "recurring_setup",
+            "recurring_setup_title",
             "expense_date",
             "vendor",
             "vendor_name",
@@ -688,6 +736,7 @@ class ExpenseVoucherSerializer(serializers.ModelSerializer):
             "status",
             "posted_journal_entry",
             "posted_journal_entry_no",
+            "recurring_setup_title",
             "created_at",
             "updated_at",
         ]

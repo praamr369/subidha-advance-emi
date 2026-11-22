@@ -174,3 +174,84 @@ class AccountingExpensePostingTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("detail", response.data)
         self.assertIn("must be approved", response.data["detail"])
+
+    def test_recurring_expense_setup_crud_and_toggle(self):
+        from rest_framework.test import APIClient
+        from accounting.models import RecurringExpenseSetup, RecurringExpenseFrequency
+
+        client = APIClient()
+        client.force_authenticate(user=self.admin)
+
+        create_res = client.post(
+            "/api/v1/accounting/recurring-expenses/",
+            {
+                "title": "Showroom Monthly Rent",
+                "frequency": "MONTHLY",
+                "expense_account": self.expense_chart.id,
+                "finance_account": self.finance_account.id,
+                "gross_amount": "25000.00",
+                "tax_amount": "0.00",
+                "net_amount": "25000.00",
+                "payment_mode": "BANK",
+                "recurring_day": 5,
+                "is_active": True,
+                "notes": "Payable on 5th of every month to landlord",
+            },
+            format="json",
+        )
+        self.assertEqual(create_res.status_code, 201)
+        setup_id = create_res.data["id"]
+        self.assertEqual(create_res.data["title"], "Showroom Monthly Rent")
+        self.assertTrue(create_res.data["is_active"])
+
+        # Toggle inactive
+        toggle_res = client.post(f"/api/v1/accounting/recurring-expenses/{setup_id}/toggle-active/")
+        self.assertEqual(toggle_res.status_code, 200)
+        self.assertFalse(toggle_res.data["is_active"])
+
+        # Toggle back to active
+        toggle_res2 = client.post(f"/api/v1/accounting/recurring-expenses/{setup_id}/toggle-active/")
+        self.assertEqual(toggle_res2.status_code, 200)
+        self.assertTrue(toggle_res2.data["is_active"])
+
+    def test_recurring_expense_generate_voucher_action(self):
+        from rest_framework.test import APIClient
+        from accounting.models import RecurringExpenseSetup
+
+        setup = RecurringExpenseSetup.objects.create(
+            title="Commercial Vehicle EMI",
+            frequency="MONTHLY",
+            expense_account=self.expense_chart,
+            finance_account=self.finance_account,
+            gross_amount=Decimal("12500.00"),
+            tax_amount=Decimal("0.00"),
+            net_amount=Decimal("12500.00"),
+            payment_mode="BANK",
+            recurring_day=10,
+            is_active=True,
+            notes="Vehicle Loan EMI",
+        )
+
+        client = APIClient()
+        client.force_authenticate(user=self.admin)
+
+        gen_res = client.post(
+            f"/api/v1/accounting/recurring-expenses/{setup.id}/generate-voucher/",
+            {"expense_date": "2026-11-10", "bill_no": "EMI-NOV-2026"},
+            format="json",
+        )
+        self.assertEqual(gen_res.status_code, 201)
+        voucher_data = gen_res.data["voucher"]
+        self.assertEqual(voucher_data["expense_type"], "MONTHLY_RECURRING")
+        self.assertEqual(voucher_data["recurring_setup"], setup.id)
+        self.assertEqual(voucher_data["net_amount"], "12500.00")
+        self.assertEqual(voucher_data["status"], "DRAFT")
+        self.assertEqual(voucher_data["bill_no"], "EMI-NOV-2026")
+
+        setup.refresh_from_db()
+        self.assertEqual(str(setup.last_voucher_date), "2026-11-10")
+
+        # Test filtering by expense_type
+        list_res = client.get("/api/v1/accounting/expenses/?expense_type=MONTHLY_RECURRING")
+        self.assertEqual(list_res.status_code, 200)
+        self.assertTrue(any(v["id"] == voucher_data["id"] for v in list_res.data["results"]))
