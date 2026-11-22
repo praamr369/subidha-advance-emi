@@ -119,10 +119,6 @@ const AdminOfflineControlCenter = dynamic(
   () => import("@/components/admin/offline/AdminOfflineControlCenter"),
   { ssr: false }
 );
-const DesktopAppPill = dynamic(
-  () => import("@/components/desktop/DesktopAppPill"),
-  { ssr: false }
-);
 const AdminWorkspaceDock = dynamic(
   () => import("@/components/layout/AdminWorkspaceDock"),
   { ssr: false }
@@ -197,8 +193,8 @@ const SIDEBAR_COLLAPSED_LEGACY_KEY = "subidha:dashboard-sidebar-collapsed:v1";
 const SIDEBAR_GROUPS_KEY = "subidha:dashboard-sidebar-groups:v1";
 /** Browser-local layout preference only (max width of dashboard content stage). Not financial data. */
 const WORKSPACE_WIDTH_PRESET_KEY = "subidha:workspace-width-preset:v1";
-/** Browser-local content width caps (100% fluid full-width friendly across all laptop resolutions). */
-const WORKSPACE_WIDTH_CSS_VALUES = ["100%", "100%", "100%"] as const;
+/** Browser-local content width caps (100% zoom friendly; still bounded by viewport). */
+const WORKSPACE_WIDTH_CSS_VALUES = ["1440px", "1480px", "1680px"] as const;
 const DASHBOARD_SHELL_EVENT = "subidha:dashboard-shell";
 
 function sidebarCollapsedKey(sessionId: number | null, role: NavigationRole) {
@@ -496,17 +492,17 @@ function UserDropdown({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="inline-flex h-8.5 items-center gap-1.5 rounded-lg border border-[var(--topbar-border)] bg-[linear-gradient(180deg,color-mix(in_oklab,var(--topbar-control)_96%,white_4%),color-mix(in_oklab,var(--topbar-control)_84%,var(--surface-muted)_16%))] px-2 pr-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.82),0_14px_34px_-30px_rgba(15,23,42,0.5)] transition hover:border-border hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/35"
+        className="inline-flex h-11 items-center gap-2 rounded-xl border border-[var(--topbar-border)] bg-[linear-gradient(180deg,color-mix(in_oklab,var(--topbar-control)_96%,white_4%),color-mix(in_oklab,var(--topbar-control)_84%,var(--surface-muted)_16%))] px-2.5 pr-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.82),0_14px_34px_-30px_rgba(15,23,42,0.5)] transition hover:border-border hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sidebar-ring)]/35"
         aria-expanded={isOpen}
         aria-haspopup="menu"
         aria-label={`Open account menu for ${displayName}, ${formatRoleLabel(role)}`}
       >
-        <WorkspaceBrandMark size={26} variant="onLight" />
-        <span className="hidden min-w-0 text-left xl:block">
-          <span className="block max-w-[min(9rem,16vw)] truncate text-xs font-semibold text-foreground">{displayName}</span>
-          <span className="block text-[10px] text-muted-foreground">{formatRoleLabel(role)}</span>
+        <WorkspaceBrandMark size={32} variant="onLight" />
+        <span className="hidden min-w-0 text-left sm:block">
+          <span className="block max-w-[min(12rem,28vw)] truncate text-sm font-semibold text-foreground">{displayName}</span>
+          <span className="block text-xs text-muted-foreground">{formatRoleLabel(role)}</span>
         </span>
-        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+        <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
       </button>
 
       {isOpen ? (
@@ -1393,7 +1389,7 @@ function AdminDockTopbarButton() {
         }
       }}
       className={cn(
-        "inline-flex h-8.5 shrink-0 items-center gap-1 rounded-lg border px-2 text-xs font-semibold transition cursor-pointer",
+        "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold transition cursor-pointer",
         count > 0
           ? "border-primary/60 bg-primary/15 text-primary hover:bg-primary/25 shadow-sm"
           : "border-[var(--topbar-border)] bg-[var(--topbar-control)] text-foreground hover:bg-muted/50"
@@ -1402,7 +1398,7 @@ function AdminDockTopbarButton() {
       title="Admin Workspace Dock (Alt+W) — Multi-window multitasking"
     >
       <LayoutGrid className="h-3.5 w-3.5 text-primary shrink-0" />
-      <span className="hidden xl:inline">Workspace</span>
+      <span className="hidden md:inline">Workspace</span>
       {count > 0 && (
         <span className="rounded-full bg-primary/20 px-1.5 py-0.2 text-[10px] font-bold text-primary">
           {count}
@@ -1454,13 +1450,13 @@ function Topbar({
     const crumbs = buildBreadcrumb(pathname);
     return (
       <PortalHeader>
-        <div className="flex h-[52px] items-center justify-between gap-2 px-3 sm:px-4 overflow-hidden">
+        <div className="flex h-[52px] items-center gap-2 px-3 sm:px-4">
           {/* Left: mobile hamburger + breadcrumb */}
-          <div className="flex min-w-[120px] shrink-0 items-center gap-2">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
             <button
               type="button"
               onClick={onOpenSidebar}
-              className="inline-flex h-8.5 w-8.5 shrink-0 items-center justify-center rounded-lg border border-[var(--topbar-border)] bg-[var(--topbar-control)] text-foreground transition hover:bg-muted/50 md:hidden"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--topbar-border)] bg-[var(--topbar-control)] text-foreground transition hover:bg-muted/50 md:hidden"
               aria-label="Open menu"
               aria-expanded={mobileOpen}
               aria-controls="mobile-sidebar-nav"
@@ -1468,9 +1464,9 @@ function Topbar({
               <Menu className="h-4 w-4" />
             </button>
             {crumbs.length === 0 ? (
-              <span className="text-sm font-semibold text-foreground truncate max-w-[200px]">{title}</span>
+              <span className="text-sm font-semibold text-foreground">{title}</span>
             ) : (
-              <nav className="flex min-w-[100px] shrink-0 items-center gap-0.5 text-sm" aria-label="Breadcrumb">
+              <nav className="flex min-w-0 items-center gap-0.5 text-sm" aria-label="Breadcrumb">
                 {crumbs.map((crumb, i) => (
                   <Fragment key={`${crumb.label}-${i}`}>
                     {i > 0 && <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/40" aria-hidden />}
@@ -1478,8 +1474,8 @@ function Topbar({
                       className={cn(
                         "truncate",
                         i === crumbs.length - 1
-                          ? "font-semibold text-foreground max-w-[180px]"
-                          : "hidden text-muted-foreground sm:block max-w-[110px]"
+                          ? "font-semibold text-foreground"
+                          : "hidden text-muted-foreground sm:block"
                       )}
                     >
                       {crumb.label}
@@ -1494,33 +1490,34 @@ function Topbar({
           <button
             type="button"
             onClick={onOpenCommandPalette}
-            className="hidden h-8.5 items-center gap-2 rounded-lg border border-[var(--topbar-border)] bg-[color-mix(in_oklab,var(--topbar-control)_80%,var(--surface-muted)_20%)] px-2.5 text-xs text-muted-foreground transition hover:bg-muted/50 hover:text-foreground lg:flex w-36 xl:w-48 max-w-[200px] shrink"
+            className="hidden h-9 shrink-0 items-center gap-2 rounded-lg border border-[var(--topbar-border)] bg-[color-mix(in_oklab,var(--topbar-control)_80%,var(--surface-muted)_20%)] px-3 text-xs text-muted-foreground transition hover:bg-muted/50 hover:text-foreground lg:flex"
+            style={{ width: "260px" }}
             aria-label="Open command palette (Ctrl+K)"
             title="Command palette (Ctrl+K)"
             data-testid="command-palette-trigger"
           >
             <Search className="h-3.5 w-3.5 shrink-0" aria-hidden />
-            <span className="flex-1 text-left truncate">Search anything…</span>
-            <kbd className="shrink-0 rounded border border-border bg-[var(--surface-card-elevated)] px-1.5 py-0.5 text-[10px] font-medium hidden sm:inline">
+            <span className="flex-1 text-left">Search anything…</span>
+            <kbd className="shrink-0 rounded border border-border bg-[var(--surface-card-elevated)] px-1.5 py-0.5 text-[10px] font-medium">
               Ctrl K
             </kbd>
           </button>
 
           {/* Right: action bar */}
-          <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
+          <div className="flex shrink-0 items-center gap-1">
             {/* Search icon for ≤md */}
             <button
               type="button"
               onClick={onOpenCommandPalette}
-              className="inline-flex h-8.5 w-8.5 items-center justify-center rounded-lg border border-[var(--topbar-border)] bg-[var(--topbar-control)] text-foreground transition hover:bg-muted/50 lg:hidden"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--topbar-border)] bg-[var(--topbar-control)] text-foreground transition hover:bg-muted/50 lg:hidden"
               aria-label="Open command palette"
               data-testid="command-palette-trigger"
             >
               <Search className="h-4 w-4" />
             </button>
 
-            {/* Quick-create chips (only on ultra-wide screens 1536px+) */}
-            <div className="hidden items-center gap-1 2xl:flex">
+            {/* Quick-create chips (xl only) */}
+            <div className="hidden items-center gap-1 xl:flex">
               {validTopbarActions.map((action) =>
                 action.workflowId ? (
                   <button
@@ -1551,9 +1548,9 @@ function Topbar({
             <button
               type="button"
               onClick={onOpenQuickActions}
-              className="inline-flex h-8.5 shrink-0 items-center gap-1 rounded-lg border border-primary/80 bg-primary px-2 sm:px-2.5 text-xs font-semibold text-primary-foreground shadow-[0_10px_24px_-16px_color-mix(in_oklab,var(--primary)_55%,transparent)] transition hover:bg-[color-mix(in_oklab,var(--primary)_90%,black_10%)] cursor-pointer"
+              className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-primary/80 bg-primary px-2.5 text-xs font-semibold text-primary-foreground shadow-[0_10px_24px_-16px_color-mix(in_oklab,var(--primary)_55%,transparent)] transition hover:bg-[color-mix(in_oklab,var(--primary)_90%,black_10%)]"
               aria-label="Quick actions"
-              title="Quick actions (+ New)"
+              title="Quick actions"
             >
               <Plus className="h-3.5 w-3.5 shrink-0" />
               <span className="hidden sm:inline">New</span>
@@ -1563,16 +1560,15 @@ function Topbar({
             <button
               type="button"
               onClick={() => openAdminHelp()}
-              className="inline-flex h-8.5 shrink-0 items-center gap-1 rounded-lg border border-[var(--topbar-border)] bg-[var(--topbar-control)] px-2 sm:px-2.5 text-xs font-semibold text-foreground transition hover:border-primary/50 hover:bg-primary/10 hover:text-primary cursor-pointer"
+              className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-[var(--topbar-border)] bg-[var(--topbar-control)] px-2.5 text-xs font-semibold text-foreground transition hover:border-primary/50 hover:bg-primary/10 hover:text-primary cursor-pointer"
               aria-label="Workflow & Setup Guide (F1)"
               title="Workflow & Setup Guide (F1)"
             >
               <CircleHelp className="h-3.5 w-3.5 text-primary shrink-0" />
-              <span className="hidden xl:inline">Help</span>
+              <span className="hidden md:inline">Help</span>
             </button>
 
             <AdminDockTopbarButton />
-            <DesktopAppPill />
             <AdminOfflineControlCenter />
             <ThemeToggle variant="dashboard" />
             <NotificationBellDropdown role={role} />

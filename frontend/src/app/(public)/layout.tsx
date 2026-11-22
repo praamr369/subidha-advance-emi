@@ -27,7 +27,6 @@ import PublicBottomNav from "@/components/ui/public-bottom-nav";
 import { I18nProvider } from "@/components/i18n/I18nProvider";
 import DocumentLang from "@/components/public/DocumentLang";
 import PublicVisitorTracker from "@/components/public/PublicVisitorTracker";
-import DesktopPublicRedirect from "@/components/desktop/DesktopPublicRedirect";
 
 export default async function PublicLayout({ children }: { children: ReactNode }) {
   const locale = await getPublicLocale();
@@ -35,7 +34,6 @@ export default async function PublicLayout({ children }: { children: ReactNode }
 
   return (
     <I18nProvider locale={locale} dictionary={dict}>
-      <DesktopPublicRedirect />
       <DocumentLang locale={locale} />
       <PublicVisitorTracker />
       <div className="public-app flex min-h-screen flex-col pb-16 lg:pb-0">

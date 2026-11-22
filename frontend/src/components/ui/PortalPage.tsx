@@ -67,21 +67,21 @@ function StatTile({ stat, index }: { stat: PortalStat; index: number }) {
   return (
     <div
       key={`${stat.label}-${index}`}
-      className="portal-stat-tile rounded-xl border border-border bg-card px-3 py-2 sm:px-3.5 sm:py-2.5 shadow-2xs"
+      className="portal-stat-tile rounded-xl border border-border bg-card p-4"
     >
-      <div className="enterprise-eyebrow text-[10px] tracking-wider uppercase text-muted-foreground font-semibold">{stat.label}</div>
-      <div className="mt-1 flex items-baseline justify-between gap-2">
-        <div className={cn("enterprise-metric text-lg sm:text-xl font-bold tracking-tight", statToneClass(stat.tone))}>
+      <div className="enterprise-eyebrow">{stat.label}</div>
+      <div className="mt-2 flex items-baseline justify-between gap-2">
+        <div className={cn("enterprise-metric", statToneClass(stat.tone))}>
           {normalizeStatValue(stat.value)}
         </div>
         {delta ? (
-          <span className={cn("inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.2 text-[10px] font-semibold", deltaClass)}>
+          <span className={cn("inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-semibold", deltaClass)}>
             {arrow ? <span aria-hidden>{arrow}</span> : null}
             {normalizeStatValue(delta.value)}
           </span>
         ) : null}
       </div>
-      {stat.hint ? <div className="mt-0.5 text-[11px] text-muted-foreground truncate">{stat.hint}</div> : null}
+      {stat.hint ? <div className="mt-1 text-xs text-muted-foreground">{stat.hint}</div> : null}
     </div>
   );
 }
@@ -211,8 +211,8 @@ export default function PortalPage({
   return (
     <div
       className={cn(
-        "portal-page flex w-full min-w-0 max-w-none flex-col gap-[var(--workspace-gap,0.75rem)]",
-        isPopup ? "popup-workflow-page px-0 py-1" : "px-0 py-0",
+        "portal-page flex w-full min-w-0 max-w-none flex-col gap-[var(--workspace-gap)]",
+        isPopup ? "popup-workflow-page px-0 py-1 sm:px-0 sm:py-1 lg:px-0 lg:py-1" : "px-3 py-4 sm:px-4 sm:py-5 lg:px-6 lg:py-6 xl:px-8",
         className
       )}
       style={widthStyle}
@@ -353,7 +353,7 @@ export default function PortalPage({
       ) : (
         <section className="portal-page-header workspace-header-panel">
           <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-border/50 to-transparent" />
-          <div className="relative flex min-w-0 flex-col gap-3 p-3 sm:p-4">
+          <div className="relative flex min-w-0 flex-col gap-5 p-4 sm:p-6">
             {headerMode === "erp" ? (
               <>
                 <ERPPageHeader
@@ -423,22 +423,22 @@ export default function PortalPage({
               </>
             ) : (
               <>
-                <div className="flex min-w-0 flex-col md:flex-row md:items-start md:justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    {eyebrow ? <div className="enterprise-eyebrow text-[11px]">{eyebrow}</div> : null}
-                    <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1.5">
-                      <h1 className="enterprise-title text-xl sm:text-2xl block w-auto max-w-full break-words">{title}</h1>
+                <div className="flex min-w-0 flex-col gap-4">
+                  <div className="w-full min-w-0">
+                    {eyebrow ? <div className="enterprise-eyebrow">{eyebrow}</div> : null}
+                    <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+                      <h1 className="enterprise-title block w-full max-w-full break-words">{title}</h1>
 
                       {statusBadge ? (
                         <span
                           className={cn(
-                            "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold",
+                            "inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold",
                             getToneClassName(statusBadge.tone)
                           )}
                         >
                           {(() => {
                             const Icon = getToneIcon(statusBadge.tone);
-                            return <Icon className="h-3 w-3" />;
+                            return <Icon className="h-3.5 w-3.5" />;
                           })()}
                           {statusBadge.label}
                         </span>
@@ -448,17 +448,17 @@ export default function PortalPage({
                         <button
                           type="button"
                           onClick={() => openAdminHelp()}
-                          className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary hover:bg-primary/20 transition cursor-pointer"
+                          className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary hover:bg-primary/20 transition cursor-pointer"
                           title="Open Workflow & Setup Guide (F1)"
                         >
-                          <CircleHelp className="size-3" />
+                          <CircleHelp className="size-3.5" />
                           <span>Guide</span>
                         </button>
                       ) : null}
                     </div>
 
                     {subtitle ? (
-                      <p className="mt-1 max-w-3xl text-xs sm:text-sm leading-relaxed text-muted-foreground">
+                      <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground sm:text-base">
                         {subtitle}
                       </p>
                     ) : null}
@@ -466,7 +466,7 @@ export default function PortalPage({
                     {helperNote ? (
                       <div
                         className={cn(
-                          "mt-2 inline-flex max-w-3xl items-start rounded-lg border px-2.5 py-1 text-xs font-medium leading-relaxed",
+                          "mt-3 inline-flex max-w-4xl items-start rounded-xl border px-3 py-2 text-xs font-medium leading-6",
                           helperTone === "warning"
                             ? "chip-tone-warning"
                             : helperTone === "info"
@@ -480,14 +480,14 @@ export default function PortalPage({
                   </div>
 
                   {resolvedActions.length > 0 ? (
-                    <div className="portal-page-actions workspace-action-bar flex min-w-0 shrink-0 flex-wrap items-center gap-1.5 sm:justify-end">
+                    <div className="portal-page-actions workspace-action-bar flex min-w-0 w-full max-w-full flex-wrap items-center gap-2 p-2 sm:justify-end">
                       {resolvedActions.map((action, idx) =>
                         action.href ? (
                           <Link
                             key={`${action.href}-${action.label}-${idx}`}
                             href={action.href}
                             className={cn(
-                              "inline-flex h-8 sm:h-9 items-center rounded-lg border px-3 text-xs sm:text-sm font-semibold tracking-[0.01em] transition duration-200",
+                              "inline-flex h-10 items-center rounded-xl border px-4 text-sm font-semibold tracking-[0.01em] transition duration-200",
                               getActionClassName(action.variant)
                             )}
                           >
@@ -499,7 +499,7 @@ export default function PortalPage({
                             type="button"
                             onClick={action.onClick}
                             className={cn(
-                              "inline-flex h-8 sm:h-9 items-center rounded-lg border px-3 text-xs sm:text-sm font-semibold tracking-[0.01em] transition duration-200 cursor-pointer",
+                              "inline-flex h-10 items-center rounded-xl border px-4 text-sm font-semibold tracking-[0.01em] transition duration-200 cursor-pointer",
                               getActionClassName(action.variant)
                             )}
                           >
@@ -512,7 +512,7 @@ export default function PortalPage({
                 </div>
 
                 {stats.length > 0 ? (
-                  <div className="portal-page-stats workspace-kpi-band grid grid-cols-2 gap-2 sm:grid-cols-[repeat(auto-fit,minmax(min(100%,13rem),1fr))] p-0.5">
+                  <div className="portal-page-stats workspace-kpi-band grid grid-cols-1 gap-3 p-3 sm:grid-cols-[repeat(auto-fit,minmax(min(100%,16rem),1fr))]">
                     {stats.map((stat, index) => (
                       <StatTile key={`${stat.label}-${index}`} stat={stat} index={index} />
                     ))}

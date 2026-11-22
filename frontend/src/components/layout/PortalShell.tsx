@@ -28,10 +28,10 @@ export default function PortalShell({ sidebar, header, footer, children, classNa
           <main
             id="main-content"
             tabIndex={-1}
-            className={cn("portal-scroll-area min-w-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-behavior-x-contain", mainClassName)}
+            className={cn("portal-scroll-area min-w-0 flex-1 overflow-y-auto overflow-x-clip overscroll-behavior-x-contain", mainClassName)}
           >
-            <div className="workspace-shell-stage workspace-content-cap w-full min-w-0 px-2 py-2 sm:px-3 sm:py-3 lg:px-4 lg:py-3">
-              <div className="route-content-fade relative z-[1] min-w-0 w-full">{children}</div>
+            <div className="workspace-shell-stage workspace-content-cap w-full min-w-0 px-3 py-4 sm:px-4 sm:py-5 lg:px-6 lg:py-6 xl:px-8">
+              <div className="route-content-fade relative z-[1] min-w-0">{children}</div>
             </div>
           </main>
           {footer}

@@ -482,17 +482,17 @@ function StorefrontQRWidget() {
         type="button"
         onClick={() => setOpen(true)}
         aria-label="Expand storefront QR code"
-        className="group flex shrink-0 items-center justify-center gap-2.5 rounded-xl border border-border bg-card p-2.5 shadow-2xs transition hover:border-ring hover:shadow-sm sm:min-w-[170px] text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="group flex shrink-0 items-center justify-center gap-3 rounded-[1.5rem] border border-border bg-card p-4 shadow-sm transition hover:border-ring hover:shadow-md sm:min-w-[200px] text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
-        <div className="relative rounded-lg bg-white p-1.5 shadow-2xs transition-transform group-hover:scale-105">
-          <QRCode value={qrValue} size={48} />
-          <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/5 opacity-0 transition-opacity group-hover:opacity-100">
-            <Maximize2 className="h-4 w-4 text-black/70 drop-shadow-sm" />
+        <div className="relative rounded-xl bg-white p-2 shadow-sm transition-transform group-hover:scale-105">
+          <QRCode value={qrValue} size={64} />
+          <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/5 opacity-0 transition-opacity group-hover:opacity-100">
+            <Maximize2 className="h-5 w-5 text-black/70 drop-shadow-sm" />
           </div>
         </div>
-        <div className="text-xs">
+        <div className="text-sm">
           <p className="font-semibold text-foreground group-hover:text-primary transition-colors">Storefront QR</p>
-          <p className="text-[11px] text-muted-foreground">Click to expand &amp; print</p>
+          <p className="text-xs text-muted-foreground">Click to expand & print</p>
         </div>
       </button>
 
@@ -981,7 +981,9 @@ export default function AdminDashboardPage() {
   return (
     <ERPPageShell
       title="Admin Dashboard"
-      subtitle="Executive operating console for finance, collections, CRM, subscriptions, direct sales, inventory, and branches."
+      subtitle="Executive operating console for finance, collections, CRM, subscriptions (EMI / RENT / LEASE), direct sales, inventory, branches, staff, and governance."
+      helperNote="All sections below use live module data only. No operational KPI here is synthetic or detached from source modules."
+      helperTone="info"
       breadcrumbs={[{ label: "Admin" }]}
       actions={[
         {
@@ -1041,12 +1043,12 @@ export default function AdminDashboardPage() {
         tone: summary?.has_payment_adjustments ? "warning" : "info",
       }}
     >
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-        <div className="lg:col-span-3 space-y-4">
-        <div className="flex flex-col gap-3 md:flex-row">
-          <div className="flex-1 surface-panel-elevated flex flex-wrap items-end justify-between gap-3 rounded-xl border border-border bg-card p-3 shadow-2xs">
-          <label htmlFor="dashboard-branch-scope" className="min-w-[200px] flex-1 text-sm text-muted-foreground md:max-w-sm">
-            <span className="enterprise-eyebrow mb-1 block text-[11px]">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div className="lg:col-span-3 space-y-6">
+        <div className="flex flex-col gap-6 md:flex-row">
+          <div className="flex-1 surface-panel-elevated flex flex-wrap items-end justify-between gap-3 rounded-[1.5rem] border border-border bg-card p-4 shadow-sm">
+          <label htmlFor="dashboard-branch-scope" className="min-w-[240px] flex-1 text-sm text-muted-foreground md:max-w-sm">
+            <span className="enterprise-eyebrow mb-2 block">
               Branch scope
             </span>
             <select
@@ -1054,7 +1056,7 @@ export default function AdminDashboardPage() {
               value={selectedBranchId}
               onChange={(event) => setSelectedBranchId(event.target.value)}
               disabled={loading || refreshing}
-              className="h-9 w-full rounded-lg border border-border bg-card px-2.5 text-xs font-semibold text-foreground outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/35 disabled:cursor-not-allowed disabled:opacity-60"
+              className="h-11 w-full rounded-xl border border-border bg-card px-3 text-sm font-semibold text-foreground  outline-none transition focus:border-ring focus:ring-2 focus:ring-ring/35 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <option value="">All branches</option>
               {(branchOverview?.branches ?? []).map((branch) => (

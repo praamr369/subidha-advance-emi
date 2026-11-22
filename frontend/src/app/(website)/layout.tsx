@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import DesktopPublicRedirect from "@/components/desktop/DesktopPublicRedirect";
 
 /**
  * Layout for standalone public forms.
@@ -17,7 +16,6 @@ export const metadata: Metadata = {
 export default function WebsiteFormsLayout({ children }: { children: ReactNode }) {
   return (
     <main id="main-content" tabIndex={-1} className="min-h-screen">
-      <DesktopPublicRedirect />
       {children}
     </main>
   );

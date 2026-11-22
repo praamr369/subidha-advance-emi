@@ -25,8 +25,8 @@ export default function ThemeToggle({ variant = "dashboard", className }: ThemeT
     return (
       <div
         className={cn(
-          "shrink-0 rounded-lg border border-transparent",
-          variant === "dashboard" ? "h-8.5 w-[5.5rem]" : "h-10 w-[8.25rem]",
+          "shrink-0 rounded-xl border border-transparent",
+          variant === "dashboard" ? "h-11 w-[8.5rem]" : "h-10 w-[8.25rem]",
           className
         )}
         aria-hidden
@@ -43,7 +43,7 @@ export default function ThemeToggle({ variant = "dashboard", className }: ThemeT
     >
       <Icon
         className={cn(
-          "pointer-events-none absolute left-2 top-1/2 z-[1] h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground",
+          "pointer-events-none absolute left-2.5 top-1/2 z-[1] h-4 w-4 -translate-y-1/2 text-muted-foreground",
           variant === "public" && "left-2"
         )}
         aria-hidden
@@ -57,9 +57,9 @@ export default function ThemeToggle({ variant = "dashboard", className }: ThemeT
         value={theme}
         onChange={(event) => setTheme(event.target.value as ThemePreference)}
         className={cn(
-          "appearance-none rounded-lg border font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] outline-none transition focus-visible:ring-2 focus-visible:ring-[var(--ring)]/50 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]",
+          "appearance-none rounded-xl border font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] outline-none transition focus-visible:ring-2 focus-visible:ring-[var(--ring)]/50 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]",
           variant === "dashboard"
-            ? "h-8.5 border-[var(--topbar-border)] bg-[var(--topbar-control)] py-0 pl-7 pr-5 text-xs w-[5.5rem]"
+            ? "h-11 border-[var(--topbar-border)] bg-[var(--topbar-control)] py-0 pl-9 pr-8 text-sm"
             : "h-10 border-[var(--border)] bg-[color-mix(in_oklab,var(--surface-card-elevated)_90%,transparent)] py-0 pl-8 pr-7 text-xs",
           "cursor-pointer hover:bg-muted/50"
         )}

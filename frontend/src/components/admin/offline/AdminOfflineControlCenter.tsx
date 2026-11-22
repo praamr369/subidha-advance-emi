@@ -178,13 +178,12 @@ export default function AdminOfflineControlCenter() {
         ) : pendingCount > 0 ? (
           <>
             <ArrowDownToLine className="h-3.5 w-3.5 text-amber-500" />
-            <span>{pendingCount} Pending</span>
+            <span>{pendingCount} Pending Sync</span>
           </>
         ) : (
           <>
             <Wifi className="h-3.5 w-3.5 text-emerald-500" />
-            <span className="hidden sm:inline">Online</span>
-            <span className="text-[10px] text-muted-foreground hidden 2xl:inline">(Synced)</span>
+            <span className="hidden sm:inline">Online (Synced)</span>
           </>
         )}
       </button>

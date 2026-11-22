@@ -208,7 +208,6 @@ const nextConfig: NextConfig = {
   compress: true,
   poweredByHeader: false,
   experimental: {
-    agentUpgrade: "security",
     optimizePackageImports: [
       "lucide-react",
       "date-fns",
@@ -237,14 +236,6 @@ const nextConfig: NextConfig = {
   },
   async headers() {
     return [
-      // Service worker: never cache script so updates take effect immediately
-      {
-        source: "/sw.js",
-        headers: [
-          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
-          { key: "Content-Type", value: "application/javascript; charset=utf-8" },
-        ],
-      },
       // Public static images (banners, categories, hero) - immutable long-term cache
       {
         source: "/images/:path*",
