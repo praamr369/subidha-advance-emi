@@ -908,3 +908,58 @@ class AdminDeliveryEligibilityCheckView(APIView):
             "customer_name": subscription.customer.name,
             "product_name": subscription.product.name,
         })
+
+
+class AdminDeliveryVerifyKittingView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request, pk: int):
+        delivery = get_object_or_404(get_delivery_queryset(), pk=pk)
+        from deliveries.services.delivery_service import verify_delivery_kitting
+        items = request.data.get("items") or []
+        notes = (request.data.get("notes") or "").strip()
+        delivery = verify_delivery_kitting(
+            delivery=delivery,
+            verified_items=items,
+            performed_by=request.user,
+            notes=notes,
+        )
+        return Response({
+            "verified": True,
+            "kitting_checklist_verified": True,
+            "delivery": AdminSubscriptionDeliveryReadSerializer(delivery).data,
+        }, status=status.HTTP_200_OK)
+
+
+class AdminDirectSaleDeliveryVerifyKittingView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def post(self, request, case_id: int):
+        case = get_object_or_404(
+            ServiceDeskCase.objects.select_related("direct_sale"),
+            pk=case_id,
+            case_type=ServiceDeskCaseType.DIRECT_SALE_DELIVERY,
+        )
+        sale = case.direct_sale
+        sale.kitting_checklist_verified = True
+        sale.kitting_verified_at = timezone.now()
+        sale.kitting_verified_by = request.user
+        notes = (request.data.get("notes") or "").strip()
+        if notes:
+            sale.kitting_notes = notes
+        sale.save(update_fields=["kitting_checklist_verified", "kitting_verified_at", "kitting_verified_by", "kitting_notes", "updated_at"])
+
+        items = request.data.get("items") or []
+        for it in items:
+            l_id = it.get("line_id")
+            sn = (it.get("serial_number") or "").strip()
+            wn = int(it.get("warranty_months") or 0)
+            wc = (it.get("warranty_card_number") or "").strip()
+            if l_id:
+                sale.lines.filter(pk=l_id).update(serial_number=sn, warranty_months=wn, warranty_card_number=wc)
+
+        return Response({
+            "verified": True,
+            "kitting_checklist_verified": True,
+            "delivery": serialize_direct_sale_delivery_case(case),
+        }, status=status.HTTP_200_OK)

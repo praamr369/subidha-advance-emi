@@ -3522,6 +3522,32 @@ class ProductAdminViewSet(AdminOnlyModelViewSet):
             relationship.notes = str(request.data["notes"] or "").strip()
         if "is_price_included_in_parent" in request.data:
             relationship.is_price_included_in_parent = bool(request.data["is_price_included_in_parent"])
+        if "charge_mode" in request.data:
+            cm = str(request.data["charge_mode"] or "").strip().upper()
+            if cm in {"FREE", "CHARGEABLE"}:
+                relationship.charge_mode = cm
+        if "sale_price" in request.data:
+            from decimal import Decimal, InvalidOperation
+            try:
+                sp = Decimal(str(request.data["sale_price"]))
+                if sp >= Decimal("0.00"):
+                    relationship.sale_price = sp
+            except (InvalidOperation, TypeError):
+                pass
+        if "sourcing_type" in request.data:
+            st = str(request.data["sourcing_type"] or "").strip().upper()
+            if st in {"SUPPLIED_WITH_PARENT", "OUTSOURCED_SEPARATE", "INTERNAL_STOCK"}:
+                relationship.sourcing_type = st
+        if "sourcing_vendor" in request.data or "sourcing_vendor_id" in request.data:
+            v_id = request.data.get("sourcing_vendor_id") or request.data.get("sourcing_vendor")
+            try:
+                relationship.sourcing_vendor_id = int(v_id) if v_id else None
+            except (ValueError, TypeError):
+                relationship.sourcing_vendor_id = None
+        if "isolation_mode" in request.data:
+            im = str(request.data["isolation_mode"] or "").strip().upper()
+            if im in {"SHARED_POOL", "DEDICATED_KIT"}:
+                relationship.isolation_mode = im
         relationship.save()
         serializer = ProductRelationshipSerializer(relationship)
         return Response(serializer.data, status=status.HTTP_200_OK)

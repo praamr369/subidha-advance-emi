@@ -28,6 +28,12 @@ type SelectedAccessory = {
   unitOfMeasure: string;
   chargeMode: "FREE" | "CHARGEABLE";
   salePrice: string;
+  serialNumber?: string;
+  warrantyMonths?: number;
+  warrantyCardNumber?: string;
+  sourcingType?: string;
+  sourcingVendorName?: string;
+  isolationMode?: string;
 };
 
 type SelectedService = {
@@ -61,6 +67,10 @@ export default function AccessorySelectionPanel({ productId, onConfirm, onCancel
   const [accSelection, setAccSelection] = useState<Record<number, number | null>>({});
   // For each service option link_id: included or not
   const [svcSelection, setSvcSelection] = useState<Record<number, boolean>>({});
+  // Serial and warranty tracking
+  const [serials, setSerials] = useState<Record<number, string>>({});
+  const [warranties, setWarranties] = useState<Record<number, number>>({});
+  const [warrantyCards, setWarrantyCards] = useState<Record<number, string>>({});
 
   useEffect(() => {
     setTimeout(() => {
@@ -110,6 +120,12 @@ export default function AccessorySelectionPanel({ productId, onConfirm, onCancel
         unitOfMeasure: variant.unit_of_measure,
         chargeMode: opt.charge_mode,
         salePrice: opt.charge_mode === "CHARGEABLE" ? opt.sale_price || variant.base_price : "0.00",
+        serialNumber: serials[opt.link_id] || "",
+        warrantyMonths: warranties[opt.link_id] || 0,
+        warrantyCardNumber: warrantyCards[opt.link_id] || "",
+        sourcingType: opt.sourcing_type,
+        sourcingVendorName: opt.sourcing_vendor_name,
+        isolationMode: opt.isolation_mode,
       });
     }
 
@@ -168,6 +184,18 @@ export default function AccessorySelectionPanel({ productId, onConfirm, onCancel
                 selected={accSelection[opt.link_id] ?? null}
                 onChange={(variantId) =>
                   setAccSelection((prev) => ({ ...prev, [opt.link_id]: variantId }))
+                }
+                serialNumber={serials[opt.link_id] || ""}
+                onSerialNumberChange={(val) =>
+                  setSerials((prev) => ({ ...prev, [opt.link_id]: val }))
+                }
+                warrantyMonths={warranties[opt.link_id] || 0}
+                onWarrantyMonthsChange={(val) =>
+                  setWarranties((prev) => ({ ...prev, [opt.link_id]: val }))
+                }
+                warrantyCardNumber={warrantyCards[opt.link_id] || ""}
+                onWarrantyCardNumberChange={(val) =>
+                  setWarrantyCards((prev) => ({ ...prev, [opt.link_id]: val }))
                 }
               />
             ))}
@@ -234,9 +262,25 @@ type AccessoryOptionRowProps = {
   opt: BillingAccessoryOption;
   selected: number | null;
   onChange: (variantId: number | null) => void;
+  serialNumber?: string;
+  onSerialNumberChange?: (val: string) => void;
+  warrantyMonths?: number;
+  onWarrantyMonthsChange?: (val: number) => void;
+  warrantyCardNumber?: string;
+  onWarrantyCardNumberChange?: (val: string) => void;
 };
 
-function AccessoryOptionRow({ opt, selected, onChange }: AccessoryOptionRowProps) {
+function AccessoryOptionRow({
+  opt,
+  selected,
+  onChange,
+  serialNumber,
+  onSerialNumberChange,
+  warrantyMonths,
+  onWarrantyMonthsChange,
+  warrantyCardNumber,
+  onWarrantyCardNumberChange,
+}: AccessoryOptionRowProps) {
   const isGroup = opt.link_type === "group";
   const label = isGroup ? (opt.group_name ?? "Accessory Group") : (opt.variants[0]?.product_name ?? "Accessory");
   const sub = [opt.group_category, opt.group_subcategory].filter(Boolean).join(" › ");
@@ -248,6 +292,24 @@ function AccessoryOptionRow({ opt, selected, onChange }: AccessoryOptionRowProps
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-sm font-medium text-foreground">{label}</span>
             <ChargeBadge mode={opt.charge_mode} />
+            {opt.sourcing_type === "OUTSOURCED_SEPARATE" ? (
+              <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300">
+                🔄 Outsourced ({opt.sourcing_vendor_name || "Separate Vendor"})
+              </span>
+            ) : (
+              <span className="rounded-full bg-teal-500/15 px-2 py-0.5 text-[10px] font-semibold text-teal-700 dark:text-teal-300">
+                📦 Supplied with Parent
+              </span>
+            )}
+            {opt.isolation_mode === "DEDICATED_KIT" ? (
+              <span className="rounded-full bg-purple-500/15 px-2 py-0.5 text-[10px] font-semibold text-purple-700 dark:text-purple-300">
+                🔒 Dedicated Kit
+              </span>
+            ) : (
+              <span className="rounded-full bg-slate-500/15 px-2 py-0.5 text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                📦 Shared Pool
+              </span>
+            )}
             {opt.is_required && (
               <span className="rounded-full bg-destructive/15 px-2 py-0.5 text-[10px] font-semibold text-destructive">Required</span>
             )}
@@ -256,6 +318,12 @@ function AccessoryOptionRow({ opt, selected, onChange }: AccessoryOptionRowProps
           {opt.notes && <p className="text-xs text-muted-foreground italic mt-0.5">{opt.notes}</p>}
           {opt.charge_mode === "CHARGEABLE" && parseFloat(opt.sale_price) > 0 && (
             <p className="text-xs text-muted-foreground mt-0.5">Price: ₹{parseFloat(opt.sale_price).toFixed(2)}</p>
+          )}
+          {opt.low_stock_warning && opt.stock_alert_message && (
+            <div className="mt-1.5 rounded border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-900 flex items-center gap-1.5">
+              <span>⚠️</span>
+              <span>{opt.stock_alert_message}</span>
+            </div>
           )}
         </div>
       </div>
@@ -313,6 +381,44 @@ function AccessoryOptionRow({ opt, selected, onChange }: AccessoryOptionRowProps
             )}
           </span>
         </label>
+      )}
+
+      {/* Serial & Warranty inputs when selected */}
+      {selected !== null && (
+        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-dashed border-border mt-1">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] text-muted-foreground font-medium">Serial / IMEI #:</span>
+            <input
+              type="text"
+              placeholder="e.g. SN-89212"
+              value={serialNumber || ""}
+              onChange={(e) => onSerialNumberChange?.(e.target.value)}
+              className="h-6 w-32 rounded border border-border bg-background px-1.5 text-xs font-mono outline-none focus:border-ring"
+            />
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] text-muted-foreground font-medium">Warranty:</span>
+            <input
+              type="number"
+              min={0}
+              placeholder="Mo"
+              value={warrantyMonths || ""}
+              onChange={(e) => onWarrantyMonthsChange?.(Number(e.target.value) || 0)}
+              className="h-6 w-12 rounded border border-border bg-background px-1 text-xs font-mono text-center outline-none focus:border-ring"
+            />
+            <span className="text-[10px] text-muted-foreground">mos</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] text-muted-foreground font-medium">Card #:</span>
+            <input
+              type="text"
+              placeholder="Card #"
+              value={warrantyCardNumber || ""}
+              onChange={(e) => onWarrantyCardNumberChange?.(e.target.value)}
+              className="h-6 w-24 rounded border border-border bg-background px-1.5 text-xs font-mono outline-none focus:border-ring"
+            />
+          </div>
+        </div>
       )}
     </div>
   );

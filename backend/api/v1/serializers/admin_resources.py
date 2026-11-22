@@ -3126,6 +3126,10 @@ class ProductRelationshipSerializer(serializers.ModelSerializer):
         default=None
     )
     related_variant_name = serializers.CharField(source="related_variant.variant_name", read_only=True)
+    sourcing_vendor_name = serializers.CharField(source="sourcing_vendor.name", read_only=True)
+    sourcing_type_display = serializers.CharField(source="get_sourcing_type_display", read_only=True)
+    isolation_mode_display = serializers.CharField(source="get_isolation_mode_display", read_only=True)
+    is_supplied_with_parent = serializers.SerializerMethodField()
     
     parent_variant_sku = serializers.CharField(required=False, allow_null=True)
     related_variant_sku = serializers.CharField(required=False, allow_null=True)
@@ -3153,6 +3157,15 @@ class ProductRelationshipSerializer(serializers.ModelSerializer):
             "relationship_type",
             "quantity",
             "is_price_included_in_parent",
+            "charge_mode",
+            "sale_price",
+            "sourcing_type",
+            "sourcing_type_display",
+            "sourcing_vendor",
+            "sourcing_vendor_name",
+            "is_supplied_with_parent",
+            "isolation_mode",
+            "isolation_mode_display",
             "notes",
             "created_at",
             "updated_at",
@@ -3164,9 +3177,15 @@ class ProductRelationshipSerializer(serializers.ModelSerializer):
             "related_product_total_cost",
             "related_product_stock_qty",
             "related_product_stock_status",
+            "sourcing_vendor_name",
+            "sourcing_type_display",
+            "is_supplied_with_parent",
             "created_at",
             "updated_at",
         ]
+
+    def get_is_supplied_with_parent(self, obj):
+        return (getattr(obj, "sourcing_type", "") or "SUPPLIED_WITH_PARENT") == "SUPPLIED_WITH_PARENT"
 
     def get_related_product_unit_cost(self, obj):
         try:

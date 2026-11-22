@@ -125,12 +125,14 @@ def _render_contract_pdf(*, subscription, profile, contract_kind: str) -> bytes:
                 line("Specifications:", size=10)
                 for k, v in list(specs.items())[:10]:
                     line(f"  • {k}: {v}", size=9, lead=12)
-            accessories = ProductRelationship.objects.filter(
+            accessories = list(ProductRelationship.objects.filter(
                 product_id=product.id, relationship_type="ACCESSORY",
-            ).select_related("related_product").order_by("id")
-            if accessories.exists():
-                line("Included Accessories:", size=10)
-                for acc in accessories:
+            ).select_related("related_product").order_by("id"))
+            free_accs = [a for a in accessories if a.charge_mode == "FREE" or a.is_price_included_in_parent]
+            paid_accs = [a for a in accessories if a.charge_mode == "CHARGEABLE" and not a.is_price_included_in_parent]
+            if free_accs:
+                line("Included Accessories (Bundled / Free):", size=10)
+                for acc in free_accs:
                     rp = acc.related_product
                     parts = [rp.name]
                     if rp.product_code:
@@ -138,6 +140,16 @@ def _render_contract_pdf(*, subscription, profile, contract_kind: str) -> bytes:
                     if rp.sku:
                         parts.append(f"SKU: {rp.sku}")
                     parts.append(f"Qty: {acc.quantity:.0f}")
+                    line(f"  • {' | '.join(parts)}", size=9, lead=12)
+            if paid_accs:
+                line("Optional / Paid Add-on Accessories:", size=10)
+                for acc in paid_accs:
+                    rp = acc.related_product
+                    parts = [rp.name]
+                    if rp.product_code:
+                        parts.append(f"Code: {rp.product_code}")
+                    parts.append(f"Qty: {acc.quantity:.0f}")
+                    parts.append(f"Price: INR {acc.sale_price:.2f}")
                     line(f"  • {' | '.join(parts)}", size=9, lead=12)
     line(f"Reference No: {contract_no}", size=10)
     rule()

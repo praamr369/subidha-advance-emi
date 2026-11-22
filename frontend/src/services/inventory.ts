@@ -2236,6 +2236,17 @@ export type BillingAccessoryOption = {
   charge_mode: "FREE" | "CHARGEABLE";
   sale_price: string;
   is_default_included: boolean;
+  quantity?: string;
+  sourcing_type?: "SUPPLIED_WITH_PARENT" | "OUTSOURCED_SEPARATE" | "INTERNAL_STOCK";
+  sourcing_type_display?: string;
+  sourcing_vendor_id?: number | null;
+  sourcing_vendor_name?: string;
+  is_supplied_with_parent?: boolean;
+  accessory_inventory_item_id?: number;
+  accessory_product_id?: number;
+  accessory_name?: string;
+  accessory_code?: string;
+  accessory_sku?: string;
   notes: string;
   sort_order: number;
   variants: BillingAccessoryVariant[];
@@ -2677,6 +2688,7 @@ export async function postOpeningStockImport(file: File, date: string): Promise<
 }
 
 // ============================================================================
-export async function fetchBillingAccessoryOptions(productId: number): Promise<BillingAccessoryOptionsResponse> {
-  return apiFetch<BillingAccessoryOptionsResponse>(`/admin/inventory/finished-goods/${productId}/billing-accessories/`, { method: "GET" });
+export async function fetchBillingAccessoryOptions(productId: number, options?: { itemId?: number }): Promise<BillingAccessoryOptionsResponse> {
+  const query = options?.itemId ? `?item_id=${options.itemId}` : "";
+  return apiFetch<BillingAccessoryOptionsResponse>(`/admin/inventory/finished-goods/${productId || 0}/billing-accessories/${query}`, { method: "GET" });
 }

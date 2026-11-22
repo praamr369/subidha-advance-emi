@@ -150,7 +150,7 @@ def _serialize_product_row(product: Product, *, include_extended: bool) -> dict:
 
         accessories = (
             ProductRelationship.objects.filter(acc_q)
-            .select_related("related_product")
+            .select_related("related_product", "sourcing_vendor")
             .order_by("id")
         )
         payload["accessories"] = [
@@ -161,6 +161,12 @@ def _serialize_product_row(product: Product, *, include_extended: bool) -> dict:
                 "sku": rel.related_product.sku,
                 "quantity": str(rel.quantity),
                 "included_in_price": rel.is_price_included_in_parent,
+                "charge_mode": getattr(rel, "charge_mode", "FREE") or "FREE",
+                "sale_price": str(getattr(rel, "sale_price", Decimal("0.00")) or "0.00"),
+                "sourcing_type": getattr(rel, "sourcing_type", "SUPPLIED_WITH_PARENT") or "SUPPLIED_WITH_PARENT",
+                "sourcing_vendor_id": rel.sourcing_vendor_id,
+                "sourcing_vendor_name": rel.sourcing_vendor.name if getattr(rel, "sourcing_vendor", None) else "",
+                "is_supplied_with_parent": (getattr(rel, "sourcing_type", "") or "SUPPLIED_WITH_PARENT") == "SUPPLIED_WITH_PARENT",
             }
             for rel in accessories
         ]

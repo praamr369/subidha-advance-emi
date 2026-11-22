@@ -344,6 +344,15 @@ export type ProductRelationship = {
   relationship_type: ProductRelationshipType;
   quantity: string;
   is_price_included_in_parent: boolean;
+  charge_mode?: "FREE" | "CHARGEABLE";
+  sale_price?: string;
+  sourcing_type?: "SUPPLIED_WITH_PARENT" | "OUTSOURCED_SEPARATE" | "INTERNAL_STOCK";
+  sourcing_type_display?: string | null;
+  sourcing_vendor?: number | null;
+  sourcing_vendor_name?: string | null;
+  is_supplied_with_parent?: boolean;
+  isolation_mode?: "SHARED_POOL" | "DEDICATED_KIT";
+  isolation_mode_display?: string | null;
   notes: string;
   created_at: string;
   updated_at: string;
@@ -379,9 +388,16 @@ export async function addProductRelationship(
   relationshipType: ProductRelationshipType, 
   quantity: number = 1, 
   notes: string = "", 
-  isPriceIncluded: boolean = false,
+  isPriceIncluded: boolean = true,
   parentVariantSku?: string | null,
-  relatedVariantSku?: string | null
+  relatedVariantSku?: string | null,
+  options?: {
+    chargeMode?: "FREE" | "CHARGEABLE";
+    salePrice?: string | number;
+    sourcingType?: "SUPPLIED_WITH_PARENT" | "OUTSOURCED_SEPARATE" | "INTERNAL_STOCK";
+    sourcingVendorId?: number | null;
+    isolationMode?: "SHARED_POOL" | "DEDICATED_KIT";
+  }
 ): Promise<ProductRelationship> {
   return request<ProductRelationship>(`/admin/products/${productId}/add-related-product/`, {
     method: "POST",
@@ -390,7 +406,12 @@ export async function addProductRelationship(
       relationship_type: relationshipType, 
       quantity, 
       notes, 
-      is_price_included_in_parent: isPriceIncluded,
+      is_price_included_in_parent: options?.chargeMode ? options.chargeMode === "FREE" : isPriceIncluded,
+      charge_mode: options?.chargeMode || (isPriceIncluded ? "FREE" : "CHARGEABLE"),
+      sale_price: options?.salePrice || "0.00",
+      sourcing_type: options?.sourcingType || "SUPPLIED_WITH_PARENT",
+      sourcing_vendor: options?.sourcingVendorId || null,
+      isolation_mode: options?.isolationMode || "SHARED_POOL",
       parent_variant_sku: parentVariantSku,
       related_variant_sku: relatedVariantSku
     }),
@@ -405,7 +426,17 @@ export async function removeProductRelationship(productId: number | string, rela
 export async function updateProductRelationship(
   productId: number | string,
   relationshipId: number,
-  data: { quantity?: number; notes?: string; is_price_included_in_parent?: boolean }
+  data: {
+    quantity?: number;
+    notes?: string;
+    is_price_included_in_parent?: boolean;
+    charge_mode?: "FREE" | "CHARGEABLE";
+    sale_price?: string | number;
+    sourcing_type?: "SUPPLIED_WITH_PARENT" | "OUTSOURCED_SEPARATE" | "INTERNAL_STOCK";
+    sourcing_vendor?: number | null;
+    sourcing_vendor_id?: number | null;
+    isolation_mode?: "SHARED_POOL" | "DEDICATED_KIT";
+  }
 ): Promise<ProductRelationship> {
   return request<ProductRelationship>(`/admin/products/${productId}/update-related-product/${relationshipId}/`, {
     method: "PATCH",

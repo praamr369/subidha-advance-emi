@@ -647,6 +647,22 @@ class ProductRelationshipType(models.TextChoices):
     ADD_ON = "ADD_ON", "Add-on"
 
 
+class AccessoryChargeMode(models.TextChoices):
+    FREE = "FREE", "Free (Included in product price)"
+    CHARGEABLE = "CHARGEABLE", "Chargeable (Paid Add-on)"
+
+
+class SourcingType(models.TextChoices):
+    SUPPLIED_WITH_PARENT = "SUPPLIED_WITH_PARENT", "Supplied with Parent (Free / Bundled by primary vendor)"
+    OUTSOURCED_SEPARATE = "OUTSOURCED_SEPARATE", "Outsourced / Separate Vendor (Excluded from primary vendor)"
+    INTERNAL_STOCK = "INTERNAL_STOCK", "Internal Stock / In-house"
+
+
+class AccessoryStockIsolationMode(models.TextChoices):
+    SHARED_POOL = "SHARED_POOL", "Shared Stock Pool (Common Inventory)"
+    DEDICATED_KIT = "DEDICATED_KIT", "Dedicated Kit Reserve (Earmarked for Finished Good)"
+
+
 class InspectionStatus(models.TextChoices):
     PENDING = "PENDING", "Pending Inspection"
     IN_PROGRESS = "IN_PROGRESS", "In Progress"

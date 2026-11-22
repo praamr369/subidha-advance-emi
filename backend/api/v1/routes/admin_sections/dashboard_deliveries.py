@@ -25,6 +25,8 @@ from api.v1.views.admin_deliveries import AdminDirectSaleDeliveryMetadataView
 from api.v1.views.admin_deliveries import AdminDirectSaleDeliveryNoteView
 from api.v1.views.admin_deliveries import AdminDirectSaleDeliveryScheduleView
 from api.v1.views.admin_deliveries import AdminDeliveryEligibilityCheckView
+from api.v1.views.admin_deliveries import AdminDeliveryVerifyKittingView
+from api.v1.views.admin_deliveries import AdminDirectSaleDeliveryVerifyKittingView
 from api.v1.views.admin_navigation import AdminNavigationBadgesView
 
 urlpatterns = [
@@ -50,6 +52,7 @@ urlpatterns = [
     ),
     path("deliveries/<int:pk>/", AdminDeliveryDetailView.as_view()),
     path("deliveries/<int:pk>/pdf/", AdminDeliveryPdfView.as_view()),
+    path("deliveries/<int:pk>/verify-kitting/", AdminDeliveryVerifyKittingView.as_view()),
     path("deliveries/<int:pk>/transition/", AdminDeliveryTransitionView.as_view()),
     path("deliveries/<int:pk>/mark-delivered/", AdminDeliveryMarkDeliveredView.as_view()),
     path("deliveries/<int:pk>/resync-inventory/", AdminDeliveryResyncInventoryView.as_view()),
@@ -60,6 +63,7 @@ urlpatterns = [
     path("deliveries/<int:pk>/mark-returned/", AdminDeliveryMarkReturnedView.as_view()),
     path("deliveries/direct-sale-cases/<int:case_id>/schedule/", AdminDirectSaleDeliveryScheduleView.as_view()),
     path("deliveries/direct-sale-cases/<int:case_id>/", AdminDirectSaleDeliveryDetailView.as_view()),
+    path("deliveries/direct-sale-cases/<int:case_id>/verify-kitting/", AdminDirectSaleDeliveryVerifyKittingView.as_view()),
     path("deliveries/direct-sale-cases/<int:case_id>/metadata/", AdminDirectSaleDeliveryMetadataView.as_view()),
     path("deliveries/direct-sale-cases/<int:case_id>/dispatch/", AdminDirectSaleDeliveryDispatchView.as_view()),
     path(

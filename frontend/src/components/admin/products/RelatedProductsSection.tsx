@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Plus, Trash2, AlertCircle, Pencil, Copy } from "lucide-react";
+import { Plus, Trash2, AlertCircle, Pencil, Copy, Package, RefreshCw, DollarSign } from "lucide-react";
 import {
   getProductRelationships,
   addProductRelationship,
@@ -17,6 +17,7 @@ import {
   type ProductVariantCompact,
   RELATIONSHIP_TYPE_LABELS,
 } from "@/services/products";
+import { listVendorsLite, type VendorLite } from "@/services/inventory";
 
 interface RelatedProductsSectionProps {
   productId: number;
@@ -48,6 +49,12 @@ export default function RelatedProductsSection({
   const [relationshipType, setRelationshipType] = useState<ProductRelationshipType>("ACCESSORY");
   const [quantity, setQuantity] = useState("1");
   const [isPriceIncluded, setIsPriceIncluded] = useState(true);
+  const [chargeMode, setChargeMode] = useState<"FREE" | "CHARGEABLE">("FREE");
+  const [salePrice, setSalePrice] = useState("0.00");
+  const [sourcingType, setSourcingType] = useState<"SUPPLIED_WITH_PARENT" | "OUTSOURCED_SEPARATE" | "INTERNAL_STOCK">("SUPPLIED_WITH_PARENT");
+  const [sourcingVendorId, setSourcingVendorId] = useState<number | "">("");
+  const [isolationMode, setIsolationMode] = useState<"SHARED_POOL" | "DEDICATED_KIT">("SHARED_POOL");
+  const [vendors, setVendors] = useState<VendorLite[]>([]);
   const [notes, setNotes] = useState("");
   const [selectedParentVariantId, setSelectedParentVariantId] = useState<number | "">("");
   const [selectedRelatedVariantId, setSelectedRelatedVariantId] = useState<number | "">("");
@@ -66,6 +73,11 @@ export default function RelatedProductsSection({
   const [editName, setEditName] = useState("");
   const [editPrice, setEditPrice] = useState("");
   const [editQuantity, setEditQuantity] = useState("1");
+  const [editChargeMode, setEditChargeMode] = useState<"FREE" | "CHARGEABLE">("FREE");
+  const [editSalePrice, setEditSalePrice] = useState("0.00");
+  const [editSourcingType, setEditSourcingType] = useState<"SUPPLIED_WITH_PARENT" | "OUTSOURCED_SEPARATE" | "INTERNAL_STOCK">("SUPPLIED_WITH_PARENT");
+  const [editSourcingVendorId, setEditSourcingVendorId] = useState<number | "">("");
+  const [editIsolationMode, setEditIsolationMode] = useState<"SHARED_POOL" | "DEDICATED_KIT">("SHARED_POOL");
   const [savingEdit, setSavingEdit] = useState(false);
 
   // Remove state
@@ -77,6 +89,12 @@ export default function RelatedProductsSection({
   const [cloneResults, setCloneResults] = useState<ProductSearchResult[]>([]);
   const [cloning, setCloning] = useState(false);
   const [selectedTargets, setSelectedTargets] = useState<Set<number>>(new Set());
+
+  useEffect(() => {
+    listVendorsLite({ is_active: true, page_size: 200 })
+      .then((res) => setVendors(res.results || []))
+      .catch((err) => console.error("Failed to load vendors", err));
+  }, []);
 
   useEffect(() => {
     loadRelationshipsAndVariants();
@@ -145,6 +163,11 @@ export default function RelatedProductsSection({
     setSelectedProduct(null);
     setQuantity("1");
     setIsPriceIncluded(true);
+    setChargeMode("FREE");
+    setSalePrice("0.00");
+    setSourcingType("SUPPLIED_WITH_PARENT");
+    setSourcingVendorId("");
+    setIsolationMode("SHARED_POOL");
     setNotes("");
     setNewProdName("");
     setNewProdPrice("");
@@ -170,9 +193,16 @@ export default function RelatedProductsSection({
         relationshipType,
         Number(quantity) || 1,
         notes,
-        isPriceIncluded,
+        chargeMode === "FREE",
         parentSku,
-        relatedSku
+        relatedSku,
+        {
+          chargeMode,
+          salePrice: chargeMode === "CHARGEABLE" ? salePrice : "0.00",
+          sourcingType,
+          sourcingVendorId: sourcingType === "OUTSOURCED_SEPARATE" && sourcingVendorId !== "" ? Number(sourcingVendorId) : null,
+          isolationMode,
+        }
       );
       await loadRelationshipsAndVariants();
       resetForms();
@@ -211,8 +241,16 @@ export default function RelatedProductsSection({
         newProdItemType as ProductRelationshipType,
         Number(quantity) || 1,
         notes,
-        isPriceIncluded,
-        parentSku
+        chargeMode === "FREE",
+        parentSku,
+        undefined,
+        {
+          chargeMode,
+          salePrice: chargeMode === "CHARGEABLE" ? salePrice : "0.00",
+          sourcingType,
+          sourcingVendorId: sourcingType === "OUTSOURCED_SEPARATE" && sourcingVendorId !== "" ? Number(sourcingVendorId) : null,
+          isolationMode,
+        }
       );
       
       await loadRelationshipsAndVariants();
@@ -243,6 +281,11 @@ export default function RelatedProductsSection({
     setEditName(rel.related_product_name);
     setEditPrice(""); // Quick edit for name/code
     setEditQuantity(String(rel.quantity || "1"));
+    setEditChargeMode(rel.charge_mode || (rel.is_price_included_in_parent ? "FREE" : "CHARGEABLE"));
+    setEditSalePrice(rel.sale_price ? String(rel.sale_price) : "0.00");
+    setEditSourcingType(rel.sourcing_type || "SUPPLIED_WITH_PARENT");
+    setEditSourcingVendorId(rel.sourcing_vendor || "");
+    setEditIsolationMode(rel.isolation_mode || "SHARED_POOL");
   }
 
   async function saveEdit() {
@@ -257,11 +300,15 @@ export default function RelatedProductsSection({
         });
       }
       const newQty = Number(editQuantity);
-      if (!isNaN(newQty) && newQty > 0 && newQty !== Number(editingRel.quantity)) {
-        await updateProductRelationship(productId, editingRel.id, {
-          quantity: newQty,
-        });
-      }
+      await updateProductRelationship(productId, editingRel.id, {
+        quantity: !isNaN(newQty) && newQty > 0 ? newQty : Number(editingRel.quantity),
+        charge_mode: editChargeMode,
+        is_price_included_in_parent: editChargeMode === "FREE",
+        sale_price: editChargeMode === "CHARGEABLE" ? editSalePrice : "0.00",
+        sourcing_type: editSourcingType,
+        sourcing_vendor_id: editSourcingType === "OUTSOURCED_SEPARATE" && editSourcingVendorId !== "" ? Number(editSourcingVendorId) : null,
+        isolation_mode: editIsolationMode,
+      });
       await loadRelationshipsAndVariants();
       setEditingRel(null);
     } catch (err) {
@@ -369,10 +416,35 @@ export default function RelatedProductsSection({
                           {RELATIONSHIP_TYPE_LABELS[rel.relationship_type as ProductRelationshipType]}
                         </span>
                         <span className="text-muted-foreground font-mono">Qty: {rel.quantity}</span>
-                        {rel.is_price_included_in_parent ? (
-                          <span className="text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5 font-medium">Included in Base Price</span>
+                        {/* Customer Pricing Mode */}
+                        {(rel.charge_mode === "FREE" || rel.is_price_included_in_parent) ? (
+                          <span className="text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5 font-medium">
+                            ✨ Free / Included with Product
+                          </span>
                         ) : (
-                          <span className="text-orange-700 bg-orange-50 border border-orange-200 rounded px-1.5 py-0.5 font-medium">Extra Cost Add-on</span>
+                          <span className="text-blue-700 bg-blue-50 border border-blue-200 rounded px-1.5 py-0.5 font-medium">
+                            💰 Paid Add-on (₹{Number(rel.sale_price || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })})
+                          </span>
+                        )}
+                        {/* Vendor Sourcing Mode */}
+                        {rel.sourcing_type === "OUTSOURCED_SEPARATE" ? (
+                          <span className="text-amber-800 bg-amber-50 border border-amber-300 rounded px-1.5 py-0.5 font-medium">
+                            🔄 Outsourced: {rel.sourcing_vendor_name || "Separate Vendor"}
+                          </span>
+                        ) : (
+                          <span className="text-teal-800 bg-teal-50 border border-teal-200 rounded px-1.5 py-0.5 font-medium">
+                            📦 Supplied with Parent by Vendor
+                          </span>
+                        )}
+                        {/* Hybrid Stock Isolation Mode */}
+                        {rel.isolation_mode === "DEDICATED_KIT" ? (
+                          <span className="text-purple-800 bg-purple-50 border border-purple-200 rounded px-1.5 py-0.5 font-medium">
+                            🔒 Dedicated Kit Reserve
+                          </span>
+                        ) : (
+                          <span className="text-slate-700 bg-slate-100 border border-slate-200 rounded px-1.5 py-0.5 font-medium">
+                            📦 Shared Stock Pool
+                          </span>
                         )}
                         {/* Live Stock Badge */}
                         {rel.related_product_stock_status && (
@@ -449,6 +521,130 @@ export default function RelatedProductsSection({
                     New Base Price (optional)
                     <input type="number" step="0.01" value={editPrice} onChange={e => setEditPrice(e.target.value)} placeholder="Leave blank to keep existing" className="mt-1 h-9 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-ring" />
                  </label>
+               </div>
+
+               <div className="grid gap-4 md:grid-cols-2 pt-2 border-t border-border/60">
+                 <div>
+                   <label className="text-xs font-medium text-muted-foreground block mb-1">
+                     Customer Pricing (SFEMI / Direct Sale / Rent / Lease)
+                   </label>
+                   <div className="flex gap-2">
+                     <button
+                       type="button"
+                       onClick={() => setEditChargeMode("FREE")}
+                       className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-medium border transition-colors ${
+                         editChargeMode === "FREE"
+                           ? "bg-emerald-50 border-emerald-300 text-emerald-800 font-semibold"
+                           : "bg-background border-border text-muted-foreground hover:bg-muted"
+                       }`}
+                     >
+                       ✨ Free (Included)
+                     </button>
+                     <button
+                       type="button"
+                       onClick={() => setEditChargeMode("CHARGEABLE")}
+                       className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-medium border transition-colors ${
+                         editChargeMode === "CHARGEABLE"
+                           ? "bg-blue-50 border-blue-300 text-blue-800 font-semibold"
+                           : "bg-background border-border text-muted-foreground hover:bg-muted"
+                       }`}
+                     >
+                       💰 Paid Add-on
+                     </button>
+                   </div>
+                   {editChargeMode === "CHARGEABLE" && (
+                     <div className="mt-2">
+                       <label className="text-[11px] font-medium text-muted-foreground block mb-0.5">Add-on Sale Price (₹)</label>
+                       <input
+                         type="number"
+                         step="0.01"
+                         min="0"
+                         value={editSalePrice}
+                         onChange={(e) => setEditSalePrice(e.target.value)}
+                         className="h-8 w-full rounded-lg border border-border bg-background px-2.5 text-xs outline-none focus:border-ring font-mono"
+                         placeholder="e.g. 500.00"
+                       />
+                     </div>
+                   )}
+                 </div>
+
+                 <div>
+                   <label className="text-xs font-medium text-muted-foreground block mb-1">
+                     Supplier Sourcing (Purchases & Inventory)
+                   </label>
+                   <div className="flex gap-2">
+                     <button
+                       type="button"
+                       onClick={() => {
+                         setEditSourcingType("SUPPLIED_WITH_PARENT");
+                         setEditSourcingVendorId("");
+                       }}
+                       className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-medium border transition-colors ${
+                         editSourcingType === "SUPPLIED_WITH_PARENT"
+                           ? "bg-teal-50 border-teal-300 text-teal-800 font-semibold"
+                           : "bg-background border-border text-muted-foreground hover:bg-muted"
+                       }`}
+                     >
+                       📦 Supplied with Parent
+                     </button>
+                     <button
+                       type="button"
+                       onClick={() => setEditSourcingType("OUTSOURCED_SEPARATE")}
+                       className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-medium border transition-colors ${
+                         editSourcingType === "OUTSOURCED_SEPARATE"
+                           ? "bg-amber-50 border-amber-300 text-amber-800 font-semibold"
+                           : "bg-background border-border text-muted-foreground hover:bg-muted"
+                       }`}
+                     >
+                       🔄 Outsourced Vendor
+                     </button>
+                   </div>
+                   {editSourcingType === "OUTSOURCED_SEPARATE" && (
+                     <div className="mt-2">
+                       <label className="text-[11px] font-medium text-muted-foreground block mb-0.5">Select Outsourced Vendor</label>
+                       <select
+                         value={editSourcingVendorId}
+                         onChange={(e) => setEditSourcingVendorId(e.target.value === "" ? "" : Number(e.target.value))}
+                         className="h-8 w-full rounded-lg border border-border bg-background px-2.5 text-xs outline-none focus:border-ring"
+                       >
+                         <option value="">— Select Vendor —</option>
+                         {vendors.map((v) => (
+                           <option key={v.id} value={v.id}>{v.name}</option>
+                         ))}
+                       </select>
+                     </div>
+                   )}
+                 </div>
+
+                 <div>
+                   <label className="text-xs font-medium text-muted-foreground block mb-1">
+                     Inventory Valuation & Stock Mode (Hybrid Isolation)
+                   </label>
+                   <div className="flex gap-2">
+                     <button
+                       type="button"
+                       onClick={() => setEditIsolationMode("SHARED_POOL")}
+                       className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-medium border transition-colors ${
+                         editIsolationMode === "SHARED_POOL"
+                           ? "bg-slate-100 border-slate-300 text-slate-800 font-semibold dark:bg-slate-800 dark:text-slate-200"
+                           : "bg-background border-border text-muted-foreground hover:bg-muted"
+                       }`}
+                     >
+                       📦 Shared Stock Pool
+                     </button>
+                     <button
+                       type="button"
+                       onClick={() => setEditIsolationMode("DEDICATED_KIT")}
+                       className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-medium border transition-colors ${
+                         editIsolationMode === "DEDICATED_KIT"
+                           ? "bg-purple-50 border-purple-300 text-purple-800 font-semibold dark:bg-purple-900/30 dark:text-purple-300"
+                           : "bg-background border-border text-muted-foreground hover:bg-muted"
+                       }`}
+                     >
+                       🔒 Dedicated Kit Reserve
+                     </button>
+                   </div>
+                 </div>
                </div>
                <div className="flex gap-2 pt-2">
                   <button type="button" onClick={saveEdit} disabled={savingEdit} className="flex-1 inline-flex h-9 items-center justify-center rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground transition hover:opacity-95 disabled:opacity-60">
@@ -684,15 +880,135 @@ export default function RelatedProductsSection({
                     </label>
                   </div>
 
-                  <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground mt-3">
-                    <input
-                      type="checkbox"
-                      checked={isPriceIncluded}
-                      onChange={(e) => setIsPriceIncluded(e.target.checked)}
-                      className="rounded border-border"
-                    />
-                    Cost is already included in base product price
-                  </label>
+                  <div className="grid gap-4 md:grid-cols-2 pt-2 border-t border-border/60 mt-3">
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground block mb-1">
+                        Customer Pricing (SFEMI / Direct Sale / Rent / Lease)
+                      </label>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setChargeMode("FREE");
+                            setIsPriceIncluded(true);
+                          }}
+                          className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-medium border transition-colors ${
+                            chargeMode === "FREE"
+                              ? "bg-emerald-50 border-emerald-300 text-emerald-800 font-semibold"
+                              : "bg-background border-border text-muted-foreground hover:bg-muted"
+                          }`}
+                        >
+                          ✨ Free (Included)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setChargeMode("CHARGEABLE");
+                            setIsPriceIncluded(false);
+                          }}
+                          className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-medium border transition-colors ${
+                            chargeMode === "CHARGEABLE"
+                              ? "bg-blue-50 border-blue-300 text-blue-800 font-semibold"
+                              : "bg-background border-border text-muted-foreground hover:bg-muted"
+                          }`}
+                        >
+                          💰 Paid Add-on
+                        </button>
+                      </div>
+                      {chargeMode === "CHARGEABLE" && (
+                        <div className="mt-2">
+                          <label className="text-[11px] font-medium text-muted-foreground block mb-0.5">Add-on Sale Price (₹)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={salePrice}
+                            onChange={(e) => setSalePrice(e.target.value)}
+                            className="h-8 w-full rounded-lg border border-border bg-background px-2.5 text-xs outline-none focus:border-ring font-mono"
+                            placeholder="e.g. 500.00"
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground block mb-1">
+                        Supplier Sourcing (Purchases & Inventory)
+                      </label>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSourcingType("SUPPLIED_WITH_PARENT");
+                            setSourcingVendorId("");
+                          }}
+                          className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-medium border transition-colors ${
+                            sourcingType === "SUPPLIED_WITH_PARENT"
+                              ? "bg-teal-50 border-teal-300 text-teal-800 font-semibold"
+                              : "bg-background border-border text-muted-foreground hover:bg-muted"
+                          }`}
+                        >
+                          📦 Supplied with Parent
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSourcingType("OUTSOURCED_SEPARATE")}
+                          className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-medium border transition-colors ${
+                            sourcingType === "OUTSOURCED_SEPARATE"
+                              ? "bg-amber-50 border-amber-300 text-amber-800 font-semibold"
+                              : "bg-background border-border text-muted-foreground hover:bg-muted"
+                          }`}
+                        >
+                          🔄 Outsourced Vendor
+                        </button>
+                      </div>
+                      {sourcingType === "OUTSOURCED_SEPARATE" && (
+                        <div className="mt-2">
+                          <label className="text-[11px] font-medium text-muted-foreground block mb-0.5">Select Outsourced Vendor</label>
+                          <select
+                            value={sourcingVendorId}
+                            onChange={(e) => setSourcingVendorId(e.target.value === "" ? "" : Number(e.target.value))}
+                            className="h-8 w-full rounded-lg border border-border bg-background px-2.5 text-xs outline-none focus:border-ring"
+                          >
+                            <option value="">— Select Vendor —</option>
+                            {vendors.map((v) => (
+                              <option key={v.id} value={v.id}>{v.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground block mb-1">
+                        Inventory Valuation & Stock Mode (Hybrid Isolation)
+                      </label>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setIsolationMode("SHARED_POOL")}
+                          className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-medium border transition-colors ${
+                            isolationMode === "SHARED_POOL"
+                              ? "bg-slate-100 border-slate-300 text-slate-800 font-semibold dark:bg-slate-800 dark:text-slate-200"
+                              : "bg-background border-border text-muted-foreground hover:bg-muted"
+                          }`}
+                        >
+                          📦 Shared Stock Pool
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsolationMode("DEDICATED_KIT")}
+                          className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-medium border transition-colors ${
+                            isolationMode === "DEDICATED_KIT"
+                              ? "bg-purple-50 border-purple-300 text-purple-800 font-semibold dark:bg-purple-900/30 dark:text-purple-300"
+                              : "bg-background border-border text-muted-foreground hover:bg-muted"
+                          }`}
+                        >
+                          🔒 Dedicated Kit Reserve
+                        </button>
+                      </div>
+                    </div>
+                  </div>
 
                   <label className="text-xs font-medium text-muted-foreground block">
                     Notes (optional)
@@ -798,15 +1114,135 @@ export default function RelatedProductsSection({
                     className="mt-1 h-9 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-ring"
                   />
                 </label>
-                <label className="flex items-center gap-2 text-xs font-medium text-foreground mt-8">
-                  <input
-                    type="checkbox"
-                    checked={isPriceIncluded}
-                    onChange={(e) => setIsPriceIncluded(e.target.checked)}
-                    className="rounded border-border"
-                  />
-                  Cost is already included in base product price
-                </label>
+                <div className="grid gap-4 md:grid-cols-2 pt-2 border-t border-border/60 md:col-span-2">
+                  <div>
+                    <label className="text-xs font-medium text-foreground block mb-1">
+                      Customer Pricing (SFEMI / Direct Sale / Rent / Lease)
+                    </label>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setChargeMode("FREE");
+                          setIsPriceIncluded(true);
+                        }}
+                        className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-medium border transition-colors ${
+                          chargeMode === "FREE"
+                            ? "bg-emerald-50 border-emerald-300 text-emerald-800 font-semibold"
+                            : "bg-background border-border text-muted-foreground hover:bg-muted"
+                        }`}
+                      >
+                        ✨ Free (Included)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setChargeMode("CHARGEABLE");
+                          setIsPriceIncluded(false);
+                        }}
+                        className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-medium border transition-colors ${
+                          chargeMode === "CHARGEABLE"
+                            ? "bg-blue-50 border-blue-300 text-blue-800 font-semibold"
+                            : "bg-background border-border text-muted-foreground hover:bg-muted"
+                        }`}
+                      >
+                        💰 Paid Add-on
+                      </button>
+                    </div>
+                    {chargeMode === "CHARGEABLE" && (
+                      <div className="mt-2">
+                        <label className="text-[11px] font-medium text-muted-foreground block mb-0.5">Add-on Sale Price (₹)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={salePrice}
+                          onChange={(e) => setSalePrice(e.target.value)}
+                          className="h-8 w-full rounded-lg border border-border bg-background px-2.5 text-xs outline-none focus:border-ring font-mono"
+                          placeholder="e.g. 500.00"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-medium text-foreground block mb-1">
+                      Supplier Sourcing (Purchases & Inventory)
+                    </label>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSourcingType("SUPPLIED_WITH_PARENT");
+                          setSourcingVendorId("");
+                        }}
+                        className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-medium border transition-colors ${
+                          sourcingType === "SUPPLIED_WITH_PARENT"
+                            ? "bg-teal-50 border-teal-300 text-teal-800 font-semibold"
+                            : "bg-background border-border text-muted-foreground hover:bg-muted"
+                        }`}
+                      >
+                        📦 Supplied with Parent
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSourcingType("OUTSOURCED_SEPARATE")}
+                        className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-medium border transition-colors ${
+                          sourcingType === "OUTSOURCED_SEPARATE"
+                            ? "bg-amber-50 border-amber-300 text-amber-800 font-semibold"
+                            : "bg-background border-border text-muted-foreground hover:bg-muted"
+                        }`}
+                      >
+                        🔄 Outsourced Vendor
+                      </button>
+                    </div>
+                    {sourcingType === "OUTSOURCED_SEPARATE" && (
+                      <div className="mt-2">
+                        <label className="text-[11px] font-medium text-muted-foreground block mb-0.5">Select Outsourced Vendor</label>
+                        <select
+                          value={sourcingVendorId}
+                          onChange={(e) => setSourcingVendorId(e.target.value === "" ? "" : Number(e.target.value))}
+                          className="h-8 w-full rounded-lg border border-border bg-background px-2.5 text-xs outline-none focus:border-ring"
+                        >
+                          <option value="">— Select Vendor —</option>
+                          {vendors.map((v) => (
+                            <option key={v.id} value={v.id}>{v.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground block mb-1">
+                      Inventory Valuation & Stock Mode (Hybrid Isolation)
+                    </label>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setIsolationMode("SHARED_POOL")}
+                        className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-medium border transition-colors ${
+                          isolationMode === "SHARED_POOL"
+                            ? "bg-slate-100 border-slate-300 text-slate-800 font-semibold dark:bg-slate-800 dark:text-slate-200"
+                            : "bg-background border-border text-muted-foreground hover:bg-muted"
+                        }`}
+                      >
+                        📦 Shared Stock Pool
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsolationMode("DEDICATED_KIT")}
+                        className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-medium border transition-colors ${
+                          isolationMode === "DEDICATED_KIT"
+                            ? "bg-purple-50 border-purple-300 text-purple-800 font-semibold dark:bg-purple-900/30 dark:text-purple-300"
+                            : "bg-background border-border text-muted-foreground hover:bg-muted"
+                        }`}
+                      >
+                        🔒 Dedicated Kit Reserve
+                      </button>
+                    </div>
+                  </div>
+                </div>
                 <label className="text-xs font-medium text-foreground md:col-span-2">
                   Notes (optional)
                   <textarea

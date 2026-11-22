@@ -29,6 +29,30 @@ export type DeliveryBatchItem = {
   notes?: string;
 };
 
+export type DeliveryKittingItem = {
+  item_key: string;
+  is_parent: boolean;
+  product_id: number;
+  product_name: string;
+  product_code?: string;
+  quantity: number;
+  sourcing_type?: string;
+  sourcing_type_display?: string;
+  sourcing_vendor_name?: string;
+  charge_mode?: string;
+  charge_mode_display?: string;
+  sale_price?: string;
+  isolation_mode?: string;
+  isolation_mode_display?: string;
+  serial_number?: string;
+  warranty_months?: number;
+  warranty_card_number?: string;
+  verified?: boolean;
+  kitting_status?: string;
+  delivery_item_id?: number;
+  line_id?: number;
+};
+
 export type DeliveryItemProgress = {
   contract_item_id: number | null;
   product_id: number;
@@ -121,6 +145,11 @@ export type DeliveryRecord = {
   history_count?: number;
   inventory_stock_status?: "available" | "not available" | "reserved" | "purchase needed" | string;
   inventory_available_qty?: string | null;
+  kitting_checklist_verified?: boolean;
+  kitting_verified_at?: string | null;
+  kitting_verified_by_username?: string | null;
+  kitting_notes?: string | null;
+  kitting_checklist?: DeliveryKittingItem[];
   direct_sale_id?: number | null;
   sale_no?: string | null;
   invoice_document_no?: string | null;
@@ -952,6 +981,24 @@ export async function approveDirectSaleDeliveryPaymentException(
   payload: { reason: string; acknowledgement: boolean }
 ): Promise<DeliveryRecord> {
   return postDirectSaleCaseAction(`/admin/deliveries/direct-sale-cases/${caseId}/approve-payment-exception/`, payload);
+}
+
+export async function verifyDeliveryKitting(
+  id: number | string,
+  payload: { items?: any[]; notes?: string } = {},
+  isDirectSale = false
+): Promise<DeliveryRecord> {
+  const url = isDirectSale
+    ? `/admin/deliveries/direct-sale-cases/${id}/verify-kitting/`
+    : `/admin/deliveries/${id}/verify-kitting/`;
+  const response = await apiFetch<unknown>(url, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  const data = (response && typeof response === "object" && "delivery" in response)
+    ? (response as { delivery: unknown }).delivery
+    : response;
+  return normalizeDeliveryRecord(data);
 }
 
 export async function listCustomerDeliveries(params: {

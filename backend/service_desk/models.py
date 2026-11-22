@@ -487,6 +487,29 @@ class WarrantyClaim(ServiceDeskTimeStampedModel):
         choices=WarrantyType.choices,
         default=WarrantyType.MANUFACTURING,
     )
+    serial_number = models.CharField(max_length=80, blank=True, default="", db_index=True)
+    warranty_card_number = models.CharField(max_length=80, blank=True, default="")
+    is_accessory_claim = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="True if this claim is for an attached or outsourced accessory rather than the primary product.",
+    )
+    accessory_product = models.ForeignKey(
+        Product,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="accessory_warranty_claims",
+        help_text="Specific accessory item covered under claim if is_accessory_claim is True.",
+    )
+    sourcing_vendor = models.ForeignKey(
+        'accounting.Vendor',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="vendor_warranty_claims",
+        help_text="Third-party vendor providing warranty if this is an outsourced accessory.",
+    )
     warranty_start_date = models.DateField()
     warranty_end_date = models.DateField()
     is_in_warranty = models.BooleanField(default=True, db_index=True)

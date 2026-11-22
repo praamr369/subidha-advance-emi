@@ -63,6 +63,20 @@ class SubscriptionDelivery(TimeStampedModel):
         db_index=True,
         help_text="Sequential delivery batch number for partial or multi-item fulfillment.",
     )
+    kitting_checklist_verified = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="True when warehouse staff has inspected and verified all bundled & add-on accessories.",
+    )
+    kitting_verified_at = models.DateTimeField(null=True, blank=True)
+    kitting_verified_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="kitting_verified_deliveries",
+    )
+    kitting_notes = models.TextField(blank=True, default="")
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -216,6 +230,27 @@ class SubscriptionDeliveryItem(TimeStampedModel):
         null=True,
         blank=True,
         related_name="delivery_batch_items",
+    )
+    serial_number = models.CharField(max_length=80, blank=True, default="", db_index=True)
+    warranty_months = models.PositiveIntegerField(default=0, help_text="Warranty duration in months (0 for default/none)")
+    warranty_card_number = models.CharField(max_length=80, blank=True, default="")
+    is_accessory = models.BooleanField(default=False, db_index=True)
+    parent_product = models.ForeignKey(
+        'products_core.Product',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="accessory_delivery_items",
+    )
+    kitting_status = models.CharField(
+        max_length=30,
+        default="PENDING",
+        choices=[
+            ("PENDING", "Pending Verification"),
+            ("VERIFIED", "Verified / Packed"),
+            ("NOT_REQUIRED", "Not Required"),
+        ],
+        db_index=True,
     )
     notes = models.CharField(max_length=255, blank=True, default="")
 

@@ -1802,9 +1802,9 @@ class ServiceCatalogItem(InventoryTimeStampedModel):
 # Finished-Good ↔ Accessory links
 # ---------------------------------------------------------------------------
 
-class FGAccessoryChargeMode(models.TextChoices):
-    FREE = "FREE", "Free (Included)"
-    CHARGEABLE = "CHARGEABLE", "Chargeable"
+from subscriptions.enums import AccessoryChargeMode, SourcingType, AccessoryStockIsolationMode
+
+FGAccessoryChargeMode = AccessoryChargeMode
 
 
 class FinishedGoodAccessoryLink(InventoryTimeStampedModel):
@@ -1862,6 +1862,28 @@ class FinishedGoodAccessoryLink(InventoryTimeStampedModel):
         validators=[MinValueValidator(Decimal("0.001"))],
         help_text="Quantity of accessory per finished good unit.",
     )
+    sourcing_type = models.CharField(
+        max_length=30,
+        choices=SourcingType.choices,
+        default=SourcingType.SUPPLIED_WITH_PARENT,
+        db_index=True,
+        help_text="SUPPLIED_WITH_PARENT if supplied with parent; OUTSOURCED_SEPARATE if outsourced from another vendor.",
+    )
+    sourcing_vendor = models.ForeignKey(
+        Vendor,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="sourced_fg_accessory_links",
+        help_text="Outsourced vendor supplying this accessory if not supplied by the primary vendor.",
+    )
+    isolation_mode = models.CharField(
+        max_length=30,
+        choices=AccessoryStockIsolationMode.choices,
+        default=AccessoryStockIsolationMode.SHARED_POOL,
+        db_index=True,
+        help_text="Hybrid inventory mode: Shared pool with general stock, or dedicated kit reserve earmarked for finished goods.",
+    )
     sort_order = models.PositiveSmallIntegerField(default=1)
     notes = models.CharField(max_length=255, blank=True, default="")
 
@@ -1870,6 +1892,7 @@ class FinishedGoodAccessoryLink(InventoryTimeStampedModel):
         ordering = ["sort_order", "id"]
         indexes = [
             models.Index(fields=["finished_good", "charge_mode"]),
+            models.Index(fields=["finished_good", "sourcing_type"]),
         ]
 
     def clean(self):

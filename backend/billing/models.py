@@ -232,6 +232,20 @@ class DirectSale(BillingTimeStampedModel):
     delivery_snapshot_district = models.CharField(max_length=120, blank=True, default="")
     delivery_snapshot_state = models.CharField(max_length=120, blank=True, default="")
     delivery_snapshot_pincode = models.CharField(max_length=20, blank=True, default="")
+    kitting_checklist_verified = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="True when warehouse kitting checklist is verified prior to dispatch.",
+    )
+    kitting_verified_at = models.DateTimeField(null=True, blank=True)
+    kitting_verified_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="kitting_verified_direct_sales",
+    )
+    kitting_notes = models.TextField(blank=True, default="")
     idempotency_key = models.CharField(max_length=255, unique=True, null=True, blank=True, db_index=True)
     idempotency_payload_hash = models.CharField(max_length=64, blank=True, default="")
     tax_profile_snapshot = models.JSONField(null=True, blank=True)
@@ -370,6 +384,17 @@ class DirectSaleLine(BillingTimeStampedModel):
     sku_snapshot = models.CharField(max_length=60, blank=True, default="")
     unit_of_measure_snapshot = models.CharField(max_length=30, blank=True, default="")
     hsn_sac_code = models.CharField(max_length=40, blank=True, default="")
+    serial_number = models.CharField(max_length=80, blank=True, default="", db_index=True)
+    warranty_months = models.PositiveIntegerField(default=0, help_text="Warranty duration in months")
+    warranty_card_number = models.CharField(max_length=80, blank=True, default="")
+    is_accessory = models.BooleanField(default=False, db_index=True)
+    parent_line = models.ForeignKey(
+        'self',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="accessory_lines",
+    )
 
     class Meta:
         db_table = "billing_direct_sale_lines"

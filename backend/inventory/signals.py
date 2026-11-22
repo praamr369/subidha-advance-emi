@@ -103,16 +103,24 @@ def sync_product_relationship_to_fg_accessory(sender, instance, created, **kwarg
         except Exception:
             pass
         
-    charge_mode = 'FREE' if instance.is_price_included_in_parent else 'CHARGEABLE'
+    charge_mode = getattr(instance, 'charge_mode', None) or ('FREE' if instance.is_price_included_in_parent else 'CHARGEABLE')
+    from decimal import Decimal
+    sale_price = getattr(instance, 'sale_price', Decimal('0.00')) if charge_mode == 'CHARGEABLE' else Decimal('0.00')
+    sourcing_type = getattr(instance, 'sourcing_type', None) or 'SUPPLIED_WITH_PARENT'
+    sourcing_vendor_id = getattr(instance, 'sourcing_vendor_id', None)
+    isolation_mode = getattr(instance, 'isolation_mode', None) or 'SHARED_POOL'
     for fg in set(target_fgs):
         FinishedGoodAccessoryLink.objects.update_or_create(
             finished_good=fg,
             accessory=acc_item,
             defaults={
                 'charge_mode': charge_mode,
-                'sale_price': 0,
+                'sale_price': sale_price,
                 'is_default_included': True,
                 'quantity': instance.quantity if instance.quantity else 1,
+                'sourcing_type': sourcing_type,
+                'sourcing_vendor_id': sourcing_vendor_id,
+                'isolation_mode': isolation_mode,
                 'notes': instance.notes,
             }
         )

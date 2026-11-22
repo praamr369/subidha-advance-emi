@@ -26,6 +26,7 @@ import {
   transitionAdminDelivery,
   splitAdminDelivery,
   updateAdminDelivery,
+  verifyDeliveryKitting,
   type DeliveryRecord,
 } from "@/services/deliveries";
 import { getDeliveryHandoverLink, type HandoverLinkResponse } from "@/services/pod";
@@ -245,6 +246,55 @@ export default function AdminDeliveryDetailPage() {
       cancelled = true;
     };
   }, [postureCustomerId]);
+
+  const [kittingItems, setKittingItems] = useState<Record<string, { serial_number: string; warranty_months: number; warranty_card_number: string; verified: boolean }>>({});
+  const [kittingNotes, setKittingNotes] = useState("");
+  const [kittingBusy, setKittingBusy] = useState(false);
+
+  useEffect(() => {
+    if (delivery?.kitting_checklist) {
+      const initial: Record<string, { serial_number: string; warranty_months: number; warranty_card_number: string; verified: boolean }> = {};
+      delivery.kitting_checklist.forEach((item) => {
+        initial[item.item_key] = {
+          serial_number: item.serial_number || "",
+          warranty_months: item.warranty_months || 0,
+          warranty_card_number: item.warranty_card_number || "",
+          verified: Boolean(delivery.kitting_checklist_verified || item.verified),
+        };
+      });
+      setKittingItems(initial);
+      setKittingNotes(delivery.kitting_notes || "");
+    }
+  }, [delivery?.id, delivery?.kitting_checklist, delivery?.kitting_checklist_verified, delivery?.kitting_notes]);
+
+  async function handleVerifyKitting() {
+    if (!delivery || kittingBusy) return;
+    setKittingBusy(true);
+    try {
+      const isDirectSale = delivery.record_kind === "DIRECT_SALE_DELIVERY" || delivery.source_type === "DIRECT_SALE";
+      const idToVerify = isDirectSale ? (delivery.case_id || delivery.id) : delivery.id;
+      const itemsPayload = (delivery.kitting_checklist || []).map((item) => ({
+        ...item,
+        delivery_item_id: item.delivery_item_id,
+        line_id: item.line_id,
+        serial_number: kittingItems[item.item_key]?.serial_number || "",
+        warranty_months: kittingItems[item.item_key]?.warranty_months || 0,
+        warranty_card_number: kittingItems[item.item_key]?.warranty_card_number || "",
+        verified: kittingItems[item.item_key]?.verified ?? true,
+      }));
+      const updated = await verifyDeliveryKitting(idToVerify, {
+        items: itemsPayload,
+        notes: kittingNotes,
+      }, isDirectSale);
+      setDelivery(updated);
+      setMessage("Warehouse kitting & truck dispatch checklist successfully verified and approved.");
+      await loadPage();
+    } catch (err) {
+      setErrorState(toErrorMessage(err, "Failed to verify kitting checklist."));
+    } finally {
+      setKittingBusy(false);
+    }
+  }
 
   async function handleMetadataSave() {
     if (!delivery) return;
@@ -655,6 +705,209 @@ export default function AdminDeliveryDetailPage() {
                     ) : null}
                   </div>
                 )}
+              </div>
+            </SectionCard>
+
+            {/* Warehouse Kitting & Truck Dispatch Checklist */}
+            <SectionCard
+              title="🚚 Warehouse Kitting & Truck Dispatch Checklist"
+              description="Verify all primary finished goods, bundled accessories, and outsourced vendor add-ons before loading onto the delivery vehicle."
+            >
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-muted/30 p-3">
+                  <div className="flex items-center gap-2">
+                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                      delivery.kitting_checklist_verified
+                        ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300 border border-emerald-300"
+                        : "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 border border-amber-300"
+                    }`}>
+                      {delivery.kitting_checklist_verified ? "✅ Kit Verified & Inspected" : "⚠️ Kit Pending Verification"}
+                    </span>
+                    {delivery.kitting_verified_at && (
+                      <span className="text-xs text-muted-foreground">
+                        Verified {formatDateTime(delivery.kitting_verified_at)} {delivery.kitting_verified_by_username ? `by @${delivery.kitting_verified_by_username}` : ""}
+                      </span>
+                    )}
+                  </div>
+                  {delivery.kitting_notes && (
+                    <span className="text-xs italic text-muted-foreground">
+                      Note: {delivery.kitting_notes}
+                    </span>
+                  )}
+                </div>
+
+                {delivery.kitting_checklist && delivery.kitting_checklist.length > 0 ? (
+                  <div className="overflow-x-auto rounded-xl border border-border bg-card">
+                    <table className="w-full text-left text-xs">
+                      <thead className="border-b border-border bg-muted/60 text-muted-foreground font-semibold">
+                        <tr>
+                          <th className="p-3 w-12 text-center">Pack</th>
+                          <th className="p-3">Item / Component</th>
+                          <th className="p-3">Type & Sourcing</th>
+                          <th className="p-3">Customer Pricing</th>
+                          <th className="p-3">Stock Mode</th>
+                          <th className="p-3">Serial / IMEI #</th>
+                          <th className="p-3">Warranty</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {delivery.kitting_checklist.map((item) => {
+                          const state = kittingItems[item.item_key] || {
+                            serial_number: item.serial_number || "",
+                            warranty_months: item.warranty_months || 0,
+                            warranty_card_number: item.warranty_card_number || "",
+                            verified: Boolean(delivery.kitting_checklist_verified || item.verified),
+                          };
+                          return (
+                            <tr key={item.item_key} className="hover:bg-muted/30">
+                              <td className="p-3 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={state.verified}
+                                  onChange={(e) => {
+                                    setKittingItems((prev) => ({
+                                      ...prev,
+                                      [item.item_key]: {
+                                        ...state,
+                                        verified: e.target.checked,
+                                      },
+                                    }));
+                                  }}
+                                  className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                />
+                              </td>
+                              <td className="p-3">
+                                <div className="font-semibold text-foreground flex items-center gap-1.5">
+                                  {item.is_parent ? "⭐ " : "↳ "}
+                                  {item.product_name}
+                                </div>
+                                <div className="font-mono text-[11px] text-muted-foreground">
+                                  {item.product_code || "—"} · Qty: {item.quantity}
+                                </div>
+                              </td>
+                              <td className="p-3">
+                                {item.sourcing_type === "OUTSOURCED_SEPARATE" ? (
+                                  <span className="inline-flex rounded px-1.5 py-0.5 text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-300">
+                                    🔄 Outsourced ({item.sourcing_vendor_name || "Vendor"})
+                                  </span>
+                                ) : item.is_parent ? (
+                                  <span className="inline-flex rounded px-1.5 py-0.5 text-[10px] font-semibold bg-primary/10 text-primary">
+                                    Main Product
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex rounded px-1.5 py-0.5 text-[10px] font-semibold bg-teal-50 text-teal-800 border border-teal-200">
+                                    📦 Supplied with Parent
+                                  </span>
+                                )}
+                              </td>
+                              <td className="p-3">
+                                {item.charge_mode === "CHARGEABLE" ? (
+                                  <span className="font-semibold text-blue-700">
+                                    Paid Add-on {item.sale_price ? `(₹${item.sale_price})` : ""}
+                                  </span>
+                                ) : (
+                                  <span className="text-emerald-700 font-medium">
+                                    ✨ Free / Included
+                                  </span>
+                                )}
+                              </td>
+                              <td className="p-3">
+                                {item.isolation_mode === "DEDICATED_KIT" ? (
+                                  <span className="text-purple-700 font-medium text-[11px]">
+                                    🔒 Dedicated Kit
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-600 font-medium text-[11px]">
+                                    📦 Shared Pool
+                                  </span>
+                                )}
+                              </td>
+                              <td className="p-3">
+                                <input
+                                  type="text"
+                                  placeholder="e.g. SN-89212"
+                                  value={state.serial_number}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setKittingItems((prev) => ({
+                                      ...prev,
+                                      [item.item_key]: {
+                                        ...state,
+                                        serial_number: val,
+                                      },
+                                    }));
+                                  }}
+                                  className="h-7 w-32 rounded border border-border bg-background px-2 text-xs font-mono outline-none focus:border-ring"
+                                />
+                              </td>
+                              <td className="p-3">
+                                <div className="flex items-center gap-1.5">
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    max={120}
+                                    placeholder="Mo"
+                                    value={state.warranty_months || ""}
+                                    onChange={(e) => {
+                                      const val = Number(e.target.value) || 0;
+                                      setKittingItems((prev) => ({
+                                        ...prev,
+                                        [item.item_key]: {
+                                          ...state,
+                                          warranty_months: val,
+                                        },
+                                      }));
+                                    }}
+                                    className="h-7 w-14 rounded border border-border bg-background px-1.5 text-xs font-mono text-center outline-none focus:border-ring"
+                                  />
+                                  <span className="text-[11px] text-muted-foreground">mos</span>
+                                  <input
+                                    type="text"
+                                    placeholder="Card #"
+                                    value={state.warranty_card_number}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setKittingItems((prev) => ({
+                                        ...prev,
+                                        [item.item_key]: {
+                                          ...state,
+                                          warranty_card_number: val,
+                                        },
+                                      }));
+                                    }}
+                                    className="h-7 w-24 rounded border border-border bg-background px-1.5 text-xs font-mono outline-none focus:border-ring"
+                                  />
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
+                    No accessories attached to this delivery record. Parent product ready for standard dispatch.
+                  </div>
+                )}
+
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                  <input
+                    type="text"
+                    placeholder="Kitting inspection notes (e.g. Remote tested, stabilizer unboxed and inspected)…"
+                    value={kittingNotes}
+                    onChange={(e) => setKittingNotes(e.target.value)}
+                    className="h-9 flex-1 min-w-[220px] rounded-lg border border-border bg-background px-3 text-xs outline-none focus:border-ring"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleVerifyKitting}
+                    disabled={kittingBusy}
+                    className="inline-flex h-9 items-center justify-center rounded-lg bg-emerald-600 px-4 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-60 shadow-sm"
+                  >
+                    {kittingBusy ? "Verifying Kit…" : "✓ Verify & Approve Kit for Dispatch"}
+                  </button>
+                </div>
               </div>
             </SectionCard>
 

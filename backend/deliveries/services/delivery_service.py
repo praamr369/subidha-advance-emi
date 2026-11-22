@@ -1123,3 +1123,192 @@ def mark_subscription_delivery_returned(*, delivery, performed_by=None, notes=No
         performed_by=performed_by,
         notes=notes,
     )
+
+
+def get_delivery_kitting_checklist(delivery: SubscriptionDelivery) -> list[dict]:
+    """Compile a complete kitting checklist for warehouse truck dispatch.
+
+    Lists parent finished goods and all attached accessories (both Free/Bundled
+    and Chargeable/Outsourced) with serial numbers and vendor warranty information.
+    """
+    from products_core.models import ProductRelationship
+    from deliveries.models import SubscriptionDeliveryItem
+
+    checklist = []
+    seen_keys = set()
+
+    delivery_items = list(delivery.delivery_items.select_related("product").all())
+    if not delivery_items and delivery.subscription_id and delivery.subscription.product_id:
+        # Fallback to subscription product
+        p = delivery.subscription.product
+        key = f"fg_{p.id}_0"
+        checklist.append({
+            "item_key": key,
+            "is_parent": True,
+            "product_id": p.id,
+            "product_name": p.name,
+            "product_code": getattr(p, "product_code", "") or "",
+            "quantity": 1,
+            "sourcing_type": "FINISHED_GOOD",
+            "sourcing_type_display": "Finished Good (Main Unit)",
+            "sourcing_vendor_name": "",
+            "charge_mode": "BASE",
+            "charge_mode_display": "Main Product",
+            "isolation_mode": "N/A",
+            "serial_number": "",
+            "warranty_months": getattr(p, "warranty_months", 12) or 12,
+            "warranty_card_number": "",
+            "verified": delivery.kitting_checklist_verified,
+            "kitting_status": "VERIFIED" if delivery.kitting_checklist_verified else "PENDING",
+        })
+        seen_keys.add(key)
+        # Find accessories
+        rels = ProductRelationship.objects.filter(
+            product=p, relationship_type="ACCESSORY"
+        ).select_related("related_product", "sourcing_vendor")
+        for rel in rels:
+            acc = rel.related_product
+            acc_key = f"acc_{p.id}_{acc.id}"
+            if acc_key in seen_keys:
+                continue
+            seen_keys.add(acc_key)
+            checklist.append({
+                "item_key": acc_key,
+                "is_parent": False,
+                "parent_product_id": p.id,
+                "parent_product_name": p.name,
+                "product_id": acc.id,
+                "product_name": acc.name,
+                "product_code": getattr(acc, "product_code", "") or "",
+                "quantity": int(rel.quantity or 1),
+                "sourcing_type": rel.sourcing_type,
+                "sourcing_type_display": rel.get_sourcing_type_display(),
+                "sourcing_vendor_id": rel.sourcing_vendor_id,
+                "sourcing_vendor_name": rel.sourcing_vendor.name if rel.sourcing_vendor else "",
+                "charge_mode": rel.charge_mode,
+                "charge_mode_display": rel.get_charge_mode_display(),
+                "sale_price": str(rel.sale_price or "0.00"),
+                "isolation_mode": rel.isolation_mode,
+                "isolation_mode_display": rel.get_isolation_mode_display(),
+                "serial_number": "",
+                "warranty_months": 12 if rel.sourcing_type == "OUTSOURCED_SEPARATE" else 0,
+                "warranty_card_number": "",
+                "verified": delivery.kitting_checklist_verified,
+                "kitting_status": "VERIFIED" if delivery.kitting_checklist_verified else "PENDING",
+            })
+    else:
+        for d_item in delivery_items:
+            p = d_item.product
+            key = f"fg_{p.id}_{d_item.id}"
+            checklist.append({
+                "item_key": key,
+                "delivery_item_id": d_item.id,
+                "is_parent": not d_item.is_accessory,
+                "product_id": p.id,
+                "product_name": p.name,
+                "product_code": getattr(p, "product_code", "") or "",
+                "quantity": d_item.quantity,
+                "sourcing_type": "ACCESSORY" if d_item.is_accessory else "FINISHED_GOOD",
+                "sourcing_type_display": "Accessory Item" if d_item.is_accessory else "Finished Good (Main Unit)",
+                "sourcing_vendor_name": "",
+                "charge_mode": "CHARGEABLE" if d_item.is_accessory else "BASE",
+                "charge_mode_display": "Add-on" if d_item.is_accessory else "Main Product",
+                "isolation_mode": "N/A",
+                "serial_number": d_item.serial_number or "",
+                "warranty_months": d_item.warranty_months or (getattr(p, "warranty_months", 12) or 12),
+                "warranty_card_number": d_item.warranty_card_number or "",
+                "verified": delivery.kitting_checklist_verified or d_item.kitting_status == "VERIFIED",
+                "kitting_status": "VERIFIED" if (delivery.kitting_checklist_verified or d_item.kitting_status == "VERIFIED") else "PENDING",
+            })
+            seen_keys.add(key)
+            # Linked accessories for this item if it's a finished good
+            if not d_item.is_accessory:
+                rels = ProductRelationship.objects.filter(
+                    product=p, relationship_type="ACCESSORY"
+                ).select_related("related_product", "sourcing_vendor")
+                for rel in rels:
+                    acc = rel.related_product
+                    acc_key = f"acc_{p.id}_{acc.id}_{d_item.id}"
+                    if acc_key in seen_keys:
+                        continue
+                    seen_keys.add(acc_key)
+                    checklist.append({
+                        "item_key": acc_key,
+                        "is_parent": False,
+                        "parent_product_id": p.id,
+                        "parent_product_name": p.name,
+                        "product_id": acc.id,
+                        "product_name": acc.name,
+                        "product_code": getattr(acc, "product_code", "") or "",
+                        "quantity": int((rel.quantity or 1) * d_item.quantity),
+                        "sourcing_type": rel.sourcing_type,
+                        "sourcing_type_display": rel.get_sourcing_type_display(),
+                        "sourcing_vendor_id": rel.sourcing_vendor_id,
+                        "sourcing_vendor_name": rel.sourcing_vendor.name if rel.sourcing_vendor else "",
+                        "charge_mode": rel.charge_mode,
+                        "charge_mode_display": rel.get_charge_mode_display(),
+                        "sale_price": str(rel.sale_price or "0.00"),
+                        "isolation_mode": rel.isolation_mode,
+                        "isolation_mode_display": rel.get_isolation_mode_display(),
+                        "serial_number": "",
+                        "warranty_months": 12 if rel.sourcing_type == "OUTSOURCED_SEPARATE" else 0,
+                        "warranty_card_number": "",
+                        "verified": delivery.kitting_checklist_verified,
+                        "kitting_status": "VERIFIED" if delivery.kitting_checklist_verified else "PENDING",
+                    })
+
+    return checklist
+
+
+@transaction.atomic
+def verify_delivery_kitting(
+    *,
+    delivery: SubscriptionDelivery,
+    verified_items: list[dict] | None = None,
+    performed_by=None,
+    notes: str = "",
+) -> SubscriptionDelivery:
+    """Verify and approve the warehouse kitting & packing checklist before dispatch."""
+    from deliveries.models import SubscriptionDeliveryItem
+
+    delivery.kitting_checklist_verified = True
+    delivery.kitting_verified_at = timezone.now()
+    delivery.kitting_verified_by = performed_by
+    if notes:
+        delivery.kitting_notes = notes.strip()
+    delivery.save(update_fields=[
+        "kitting_checklist_verified",
+        "kitting_verified_at",
+        "kitting_verified_by",
+        "kitting_notes",
+        "updated_at",
+    ])
+
+    if verified_items:
+        for it in verified_items:
+            d_id = it.get("delivery_item_id")
+            sn = (it.get("serial_number") or "").strip()
+            wn = int(it.get("warranty_months") or 0)
+            wc = (it.get("warranty_card_number") or "").strip()
+            if d_id:
+                SubscriptionDeliveryItem.objects.filter(pk=d_id, delivery=delivery).update(
+                    serial_number=sn,
+                    warranty_months=wn,
+                    warranty_card_number=wc,
+                    kitting_status="VERIFIED",
+                )
+
+    log_audit(
+        action_type="DELIVERY_KITTING_VERIFIED",
+        performed_by=performed_by,
+        user=performed_by,
+        subscription=delivery.subscription,
+        delivery=delivery,
+        metadata={
+            "delivery_id": delivery.id,
+            "reference": delivery.delivery_reference,
+            "notes": notes,
+        },
+    )
+
+    return delivery

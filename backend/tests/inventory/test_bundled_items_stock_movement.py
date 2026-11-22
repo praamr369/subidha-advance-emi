@@ -596,3 +596,120 @@ class BundledItemsStockMovementTests(TestCase):
         call_command("resync_invoice_stock_movements", invoice_no="INV/FY2026-27/00002", stdout=out)
         self.assertIn("created 0 new", out.getvalue().lower())
         self.assertIn("existing", out.getvalue().lower())
+
+    def test_accessory_sourcing_and_pricing_setup_and_sync(self):
+        """Test ProductRelationship syncing charge_mode, sale_price, sourcing_type, and sourcing_vendor to FinishedGoodAccessoryLink."""
+        from accounting.models import Vendor
+        from subscriptions.enums import AccessoryChargeMode, SourcingType
+        from rest_framework.test import APIRequestFactory
+        from api.v1.views.admin_inventory_quick_create import AdminBillingAccessoryOptionsView
+
+        vendor_outsourced = Vendor.objects.create(name="Vendor B Accessories Ltd")
+
+        # 1. Product A (Finished Good)
+        ac_prod = create_product(
+            name="Air Conditioner Split 1.5T",
+            product_code="AC-SPLIT-15T",
+            base_price=Decimal("35000.00"),
+            published=True,
+        )
+        ac_inv = InventoryItem.objects.create(
+            product=ac_prod,
+            sku="AC-SPLIT-15T",
+            stock_item_type=InventoryItemType.FINISHED_GOOD,
+            default_stock_location=self.location,
+            stock_tracking_enabled=True,
+            standard_unit_cost=Decimal("22000.00"),
+        )
+
+        # 2. Accessory X (Copper Pipe - Supplied Free with Parent)
+        pipe_prod = create_product(
+            name="Copper Pipe 3m",
+            product_code="ACC-COPPER-3M",
+            base_price=Decimal("1200.00"),
+            published=True,
+        )
+        pipe_inv = InventoryItem.objects.create(
+            product=pipe_prod,
+            sku="ACC-COPPER-3M",
+            stock_item_type=InventoryItemType.ACCESSORY,
+            default_stock_location=self.location,
+            standard_unit_cost=Decimal("700.00"),
+        )
+
+        # 3. Accessory Z (Heavy Duty Bracket - Outsourced Paid)
+        bracket_prod = create_product(
+            name="Heavy Duty Wall Bracket",
+            product_code="ACC-BRACKET-HD",
+            base_price=Decimal("950.00"),
+            published=True,
+        )
+        bracket_inv = InventoryItem.objects.create(
+            product=bracket_prod,
+            sku="ACC-BRACKET-HD",
+            stock_item_type=InventoryItemType.ACCESSORY,
+            default_stock_location=self.location,
+            standard_unit_cost=Decimal("450.00"),
+        )
+
+        # Create ProductRelationships
+        rel_free = ProductRelationship.objects.create(
+            product=ac_prod,
+            related_product=pipe_prod,
+            relationship_type=ProductRelationshipType.ACCESSORY,
+            quantity=Decimal("1.00"),
+            charge_mode=AccessoryChargeMode.FREE,
+            sale_price=Decimal("0.00"),
+            sourcing_type=SourcingType.SUPPLIED_WITH_PARENT,
+        )
+
+        rel_paid = ProductRelationship.objects.create(
+            product=ac_prod,
+            related_product=bracket_prod,
+            relationship_type=ProductRelationshipType.ACCESSORY,
+            quantity=Decimal("1.00"),
+            charge_mode=AccessoryChargeMode.CHARGEABLE,
+            sale_price=Decimal("800.00"),
+            sourcing_type=SourcingType.OUTSOURCED_SEPARATE,
+            sourcing_vendor=vendor_outsourced,
+        )
+
+        # Verify FinishedGoodAccessoryLink sync via signals
+        link_free = FinishedGoodAccessoryLink.objects.get(finished_good=ac_inv, accessory=pipe_inv)
+        self.assertEqual(link_free.charge_mode, FGAccessoryChargeMode.FREE)
+        self.assertEqual(link_free.sourcing_type, SourcingType.SUPPLIED_WITH_PARENT)
+        self.assertIsNone(link_free.sourcing_vendor)
+
+        link_paid = FinishedGoodAccessoryLink.objects.get(finished_good=ac_inv, accessory=bracket_inv)
+        self.assertEqual(link_paid.charge_mode, FGAccessoryChargeMode.CHARGEABLE)
+        self.assertEqual(link_paid.sale_price, Decimal("800.00"))
+        self.assertEqual(link_paid.sourcing_type, SourcingType.OUTSOURCED_SEPARATE)
+        self.assertEqual(link_paid.sourcing_vendor, vendor_outsourced)
+
+        # Verify AdminBillingAccessoryOptionsView response
+        factory = APIRequestFactory()
+        request = factory.get(f"/api/v1/admin/inventory/finished-goods/{ac_prod.id}/billing-accessories/")
+        request.user = self.customer.user if hasattr(self.customer, 'user') and self.customer.user else None
+        view = AdminBillingAccessoryOptionsView.as_view()
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        admin_user = User.objects.create_superuser("admin_acc_test", "acc@test.com", "pass123", phone="9999988888")
+        from rest_framework.test import force_authenticate
+        force_authenticate(request, user=admin_user)
+
+        response = view(request, product_id=ac_prod.id)
+        self.assertEqual(response.status_code, 200)
+        options = response.data.get("accessory_options", [])
+        self.assertEqual(len(options), 2)
+
+        opt_pipe = next((o for o in options if o["link_id"] == link_free.id), None)
+        self.assertIsNotNone(opt_pipe)
+        self.assertTrue(opt_pipe["is_supplied_with_parent"])
+        self.assertEqual(opt_pipe["charge_mode"], "FREE")
+
+        opt_bracket = next((o for o in options if o["link_id"] == link_paid.id), None)
+        self.assertIsNotNone(opt_bracket)
+        self.assertFalse(opt_bracket["is_supplied_with_parent"])
+        self.assertEqual(opt_bracket["charge_mode"], "CHARGEABLE")
+        self.assertEqual(opt_bracket["sale_price"], "800.00")
+        self.assertEqual(opt_bracket["sourcing_vendor_name"], "Vendor B Accessories Ltd")

@@ -216,6 +216,32 @@ def serialize_direct_sale_delivery_case(case: ServiceDeskCase) -> dict:
         fallback_balance=balance,
     )
 
+    kitting_checklist = []
+    try:
+        for line in sale.lines.select_related("product").all():
+            kitting_checklist.append({
+                "item_key": f"dsl_{line.id}",
+                "line_id": line.id,
+                "is_parent": not line.is_accessory,
+                "product_id": line.product_id,
+                "product_name": line.product.name,
+                "product_code": getattr(line.product, "product_code", "") or "",
+                "quantity": int(line.quantity),
+                "sourcing_type": "ACCESSORY" if line.is_accessory else "FINISHED_GOOD",
+                "sourcing_type_display": "Accessory Item" if line.is_accessory else "Finished Good (Main Unit)",
+                "sourcing_vendor_name": "",
+                "charge_mode": "CHARGEABLE" if line.is_accessory else "BASE",
+                "charge_mode_display": "Add-on" if line.is_accessory else "Main Product",
+                "isolation_mode": "N/A",
+                "serial_number": line.serial_number or "",
+                "warranty_months": line.warranty_months or (getattr(line.product, "warranty_months", 12) or 12),
+                "warranty_card_number": line.warranty_card_number or "",
+                "verified": getattr(sale, "kitting_checklist_verified", False),
+                "kitting_status": "VERIFIED" if getattr(sale, "kitting_checklist_verified", False) else "PENDING",
+            })
+    except Exception:
+        pass
+
     return {
         "record_kind": "DIRECT_SALE_DELIVERY",
         "source_type": "DIRECT_SALE",
@@ -278,6 +304,10 @@ def serialize_direct_sale_delivery_case(case: ServiceDeskCase) -> dict:
         "is_actionable": bool(normal_delivery_pending),
         "inventory_stock_status": inventory_snapshot.get("status") if inventory_snapshot else None,
         "inventory_available_qty": inventory_snapshot.get("available") if inventory_snapshot else None,
+        "kitting_checklist_verified": getattr(sale, "kitting_checklist_verified", False),
+        "kitting_verified_at": getattr(sale, "kitting_verified_at", None),
+        "kitting_notes": getattr(sale, "kitting_notes", ""),
+        "kitting_checklist": kitting_checklist,
         "direct_sale_id": sale.id,
         "sale_number": sale.sale_no,
         "sale_no": sale.sale_no,

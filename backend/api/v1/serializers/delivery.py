@@ -74,6 +74,15 @@ class AdminSubscriptionDeliveryReadSerializer(_BaseSubscriptionDeliveryReadSeria
     batch_number = serializers.IntegerField(read_only=True)
     delivery_items = serializers.SerializerMethodField()
     delivery_progress = serializers.SerializerMethodField()
+    kitting_verified_by_username = serializers.CharField(source="kitting_verified_by.username", read_only=True, default=None)
+    kitting_checklist = serializers.SerializerMethodField()
+
+    def get_kitting_checklist(self, obj):
+        try:
+            from deliveries.services.delivery_service import get_delivery_kitting_checklist
+            return get_delivery_kitting_checklist(obj)
+        except Exception:
+            return []
 
     def get_delivery_items(self, obj):
         if not hasattr(obj, "delivery_items"):
@@ -176,6 +185,11 @@ class AdminSubscriptionDeliveryReadSerializer(_BaseSubscriptionDeliveryReadSeria
             "is_active_delivery",
             "inventory_stock_status",
             "inventory_available_qty",
+            "kitting_checklist_verified",
+            "kitting_verified_at",
+            "kitting_verified_by_username",
+            "kitting_notes",
+            "kitting_checklist",
             "delivery_items",
             "delivery_progress",
         )

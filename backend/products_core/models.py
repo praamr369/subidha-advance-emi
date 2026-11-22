@@ -466,6 +466,42 @@ class ProductRelationship(models.Model):
         default=True,
         help_text="If true, the cost is included in the parent's base price. If false, it acts as an extra add-on cost."
     )
+    charge_mode = models.CharField(
+        max_length=12,
+        choices=AccessoryChargeMode.choices,
+        default=AccessoryChargeMode.FREE,
+        db_index=True,
+        help_text="FREE if included with product price; CHARGEABLE if paid add-on.",
+    )
+    sale_price = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=MONEY_ZERO,
+        validators=[MinValueValidator(MONEY_ZERO)],
+        help_text="Charged price when charge_mode=CHARGEABLE; 0 when FREE.",
+    )
+    sourcing_type = models.CharField(
+        max_length=30,
+        choices=SourcingType.choices,
+        default=SourcingType.SUPPLIED_WITH_PARENT,
+        db_index=True,
+        help_text="SUPPLIED_WITH_PARENT if primary vendor supplies it; OUTSOURCED_SEPARATE if outsourced from another vendor.",
+    )
+    sourcing_vendor = models.ForeignKey(
+        "accounting.Vendor",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="sourced_product_relationships",
+        help_text="Outsourced vendor supplying this accessory if not supplied by the primary vendor.",
+    )
+    isolation_mode = models.CharField(
+        max_length=30,
+        choices=AccessoryStockIsolationMode.choices,
+        default=AccessoryStockIsolationMode.SHARED_POOL,
+        db_index=True,
+        help_text="Hybrid inventory mode: Shared pool with general stock, or dedicated kit reserve earmarked for finished goods.",
+    )
     notes = models.TextField(blank=True, default="")
     created_at = models.DateTimeField(db_index=True, default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True, db_index=True)
@@ -478,7 +514,23 @@ class ProductRelationship(models.Model):
             models.Index(fields=["product", "relationship_type"]),
             models.Index(fields=["related_product"]),
             models.Index(fields=["parent_variant"]),
+            models.Index(fields=["sourcing_type"]),
         ]
+
+    def save(self, *args, **kwargs):
+        # Two-way sync between legacy boolean and explicit charge_mode
+        if self.charge_mode == AccessoryChargeMode.FREE:
+            self.is_price_included_in_parent = True
+            self.sale_price = MONEY_ZERO
+        elif self.charge_mode == AccessoryChargeMode.CHARGEABLE:
+            self.is_price_included_in_parent = False
+        else:
+            if self.is_price_included_in_parent:
+                self.charge_mode = AccessoryChargeMode.FREE
+                self.sale_price = MONEY_ZERO
+            else:
+                self.charge_mode = AccessoryChargeMode.CHARGEABLE
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.product.name} → {self.related_product.name} ({self.relationship_type})"

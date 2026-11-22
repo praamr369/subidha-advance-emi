@@ -358,13 +358,25 @@ class AdminBillingAccessoryOptionsView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
     def get(self, request, product_id: int):
-        # Resolve product → inventory item
-        try:
-            inv_item = InventoryItem.objects.select_related("product").get(
+        # Resolve product or inventory item
+        inv_item = None
+        item_id = request.query_params.get("item_id")
+        if item_id:
+            try:
+                inv_item = InventoryItem.objects.select_related("product").filter(id=int(item_id)).first()
+            except (ValueError, TypeError):
+                pass
+        if not inv_item and product_id:
+            inv_item = InventoryItem.objects.select_related("product").filter(
                 product_id=product_id,
                 stock_item_type=InventoryItemType.FINISHED_GOOD,
-            )
-        except InventoryItem.DoesNotExist:
+            ).first()
+            if not inv_item:
+                inv_item = InventoryItem.objects.select_related("product").filter(
+                    product_id=product_id
+                ).first()
+
+        if not inv_item:
             return Response({"accessory_options": [], "service_options": [], "has_options": False})
 
         # Accessory links
@@ -374,6 +386,7 @@ class AdminBillingAccessoryOptionsView(APIView):
             .select_related(
                 "accessory__product",
                 "variant_group",
+                "sourcing_vendor",
             )
             .prefetch_related("variant_group__variants__product")
             .order_by("sort_order", "id")
@@ -381,6 +394,10 @@ class AdminBillingAccessoryOptionsView(APIView):
 
         accessory_options = []
         for link in links:
+            s_type = getattr(link, "sourcing_type", "SUPPLIED_WITH_PARENT") or "SUPPLIED_WITH_PARENT"
+            s_vendor_name = link.sourcing_vendor.name if getattr(link, "sourcing_vendor", None) else ""
+            is_supplied = (s_type == "SUPPLIED_WITH_PARENT")
+            iso_mode = getattr(link, "isolation_mode", "SHARED_POOL") or "SHARED_POOL"
             if link.variant_group_id:
                 # Group link: offer all active variants
                 variants = [
@@ -394,6 +411,7 @@ class AdminBillingAccessoryOptionsView(APIView):
                         "unit_of_measure": v.unit_of_measure,
                         "base_price": str(v.product.base_price),
                         "standard_unit_cost": str(v.standard_unit_cost or "0.00"),
+                        "purchase_unit_cost": str(v.purchase_unit_cost or v.standard_unit_cost or "0.00"),
                     }
                     for v in link.variant_group.variants.filter(
                         stock_item_type=InventoryItemType.ACCESSORY,
@@ -413,6 +431,15 @@ class AdminBillingAccessoryOptionsView(APIView):
                     "sale_price": str(link.sale_price),
                     "is_default_included": link.is_default_included,
                     "quantity": str(getattr(link, "quantity", None) or "1.000"),
+                    "sourcing_type": s_type,
+                    "sourcing_type_display": "Supplied with Parent" if is_supplied else ("Outsourced" if s_type == "OUTSOURCED_SEPARATE" else "Internal Stock"),
+                    "sourcing_vendor_id": link.sourcing_vendor_id,
+                    "sourcing_vendor_name": s_vendor_name,
+                    "is_supplied_with_parent": is_supplied,
+                    "isolation_mode": iso_mode,
+                    "isolation_mode_display": "Shared Pool" if iso_mode == "SHARED_POOL" else "Dedicated Kit Reserve",
+                    "low_stock_warning": bool(s_type == "OUTSOURCED_SEPARATE"),
+                    "stock_alert_message": f"Outsourced from {s_vendor_name}: Manual PO required if unstocked" if (s_type == "OUTSOURCED_SEPARATE") else "",
                     "notes": link.notes,
                     "sort_order": link.sort_order,
                     "variants": variants,
@@ -421,6 +448,14 @@ class AdminBillingAccessoryOptionsView(APIView):
             elif link.accessory_id:
                 # Single item link
                 acc = link.accessory
+                acc_stock = Decimal("0.000")
+                try:
+                    from inventory.services.demand_planning_service import stock_status_for_delivery
+                    stk = stock_status_for_delivery(product_id=acc.product_id)
+                    acc_stock = Decimal(str(stk.get("available", 0)))
+                except Exception:
+                    pass
+                is_low_stock = bool(s_type == "OUTSOURCED_SEPARATE" and acc_stock <= Decimal("0.000"))
                 accessory_options.append({
                     "link_id": link.id,
                     "link_type": "single",
@@ -434,6 +469,21 @@ class AdminBillingAccessoryOptionsView(APIView):
                     "sale_price": str(link.sale_price),
                     "is_default_included": link.is_default_included,
                     "quantity": str(getattr(link, "quantity", None) or "1.000"),
+                    "sourcing_type": s_type,
+                    "sourcing_type_display": "Supplied with Parent" if is_supplied else ("Outsourced" if s_type == "OUTSOURCED_SEPARATE" else "Internal Stock"),
+                    "sourcing_vendor_id": link.sourcing_vendor_id,
+                    "sourcing_vendor_name": s_vendor_name,
+                    "is_supplied_with_parent": is_supplied,
+                    "isolation_mode": iso_mode,
+                    "isolation_mode_display": "Shared Pool" if iso_mode == "SHARED_POOL" else "Dedicated Kit Reserve",
+                    "available_stock": str(acc_stock),
+                    "low_stock_warning": is_low_stock,
+                    "stock_alert_message": f"Outsourced from {s_vendor_name or 'vendor'}: Stock is {acc_stock} (Manual PO required)" if is_low_stock else "",
+                    "accessory_inventory_item_id": acc.id,
+                    "accessory_product_id": acc.product_id,
+                    "accessory_name": acc.product.name,
+                    "accessory_code": acc.product.product_code,
+                    "accessory_sku": acc.sku,
                     "notes": link.notes,
                     "sort_order": link.sort_order,
                     "variants": [
@@ -447,6 +497,7 @@ class AdminBillingAccessoryOptionsView(APIView):
                             "unit_of_measure": acc.unit_of_measure,
                             "base_price": str(acc.product.base_price),
                             "standard_unit_cost": str(acc.standard_unit_cost or "0.00"),
+                            "purchase_unit_cost": str(acc.purchase_unit_cost or acc.standard_unit_cost or "0.00"),
                         }
                     ],
                     "selected_variant_id": acc.id,
