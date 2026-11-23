@@ -45,6 +45,7 @@ import {
 } from "@/services/pim";
 import { getDocumentPrintSettings } from "@/services/business-setup";
 import { formatCurrency } from "@/lib/format";
+import { resolveApiMediaUrl } from "@/lib/media";
 
 export interface ProductCatalogShareModalProps {
   isOpen: boolean;
@@ -164,12 +165,20 @@ function resolveProductImageUrl(
 ): string | null {
   const normalize = (url: string | null | undefined): string | null => {
     if (!url || typeof url !== "string") return null;
-    const clean = url.trim();
+    let clean = url.trim();
     if (!clean) return null;
-    if (clean.startsWith("http://") || clean.startsWith("https://") || clean.startsWith("data:")) {
+    if (clean.startsWith("data:") || clean.startsWith("blob:") || clean.startsWith("http://") || clean.startsWith("https://")) {
       return clean;
     }
-    return `${origin}${clean.startsWith("/") ? "" : "/"}${clean}`;
+    const resolvedApi = resolveApiMediaUrl(clean);
+    if (resolvedApi) return resolvedApi;
+    if (!clean.startsWith("/")) {
+      clean = `/${clean}`;
+    }
+    if (!clean.startsWith("/media/") && !clean.startsWith("/brand/") && !clean.startsWith("/images/")) {
+      clean = `/media${clean}`;
+    }
+    return `${origin}${clean}`;
   };
 
   // 1. Direct p.image or p.image_url or source_product image
@@ -448,6 +457,10 @@ export default function ProductCatalogShareModal({
 
   // Executive Booklet Cover Page
   const [includeCoverPage, setIncludeCoverPage] = useState<boolean>(false);
+  // Full-Page Photo Plates Appendix (offline clickable links in PDF)
+  const [includePhotoPlates, setIncludePhotoPlates] = useState<boolean>(true);
+  // Master Table of Contents & Searchable Product Directory Index
+  const [includeIndexPage, setIncludeIndexPage] = useState<boolean>(true);
 
   // Product Scope: selected products vs all available products
   const [productScope, setProductScope] = useState<"selected" | "all_pim">(
@@ -1363,11 +1376,13 @@ export default function ProductCatalogShareModal({
         ? "print-cards-section"
         : "print-showcase-section";
     const bodyEl = document.getElementById(sectionId);
+    const platesEl = document.getElementById("print-photo-plates-section");
 
     const coverHtml = includeCoverPage && coverEl ? coverEl.outerHTML : "";
     const headerHtml = headerEl ? headerEl.innerHTML : "";
-    const indexHtml = indexEl ? indexEl.outerHTML : "";
+    const indexHtml = includeIndexPage && indexEl ? indexEl.outerHTML : "";
     const bodyHtml = bodyEl ? bodyEl.innerHTML : "";
+    const platesHtml = includePhotoPlates && platesEl ? platesEl.innerHTML : "";
     const footerHtml = footerEl ? footerEl.innerHTML : "";
 
     return `<!DOCTYPE html>
@@ -1498,9 +1513,12 @@ export default function ProductCatalogShareModal({
       gap: 16px;
     }
     .index-box {
-      margin-bottom: 12px;
-      page-break-inside: avoid;
-      break-inside: avoid;
+      margin-bottom: 14px;
+      page-break-after: always !important;
+      break-after: page !important;
+    }
+    .toc-product-row:nth-child(even) {
+      background-color: #f8fafc !important;
     }
     .footer-box {
       border-top: 2px solid #000000;
@@ -1725,6 +1743,17 @@ export default function ProductCatalogShareModal({
     .inline-flex { display: inline-flex !important; }
     .overflow-hidden { overflow: hidden !important; }
     .shadow-2xs { box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important; }
+    .plates-box { width: 100% !important; }
+    .photo-plate-item {
+      page-break-before: always !important;
+      break-before: page !important;
+      min-height: 250mm !important;
+      display: flex !important;
+      flex-direction: column !important;
+      justify-content: space-between !important;
+      padding: 6mm 4mm !important;
+      border-bottom: 1px dashed #cbd5e1 !important;
+    }
     button, input, textarea, [role="button"], .no-print {
       display: none !important;
     }
@@ -1736,15 +1765,77 @@ export default function ProductCatalogShareModal({
     <div class="header-box">${headerHtml}</div>
     ${indexHtml ? `<div class="index-box">${indexHtml}</div>` : ""}
     <div class="body-box">${bodyHtml}</div>
+    ${platesHtml ? `<div class="plates-box">${platesHtml}</div>` : ""}
     <div class="footer-box">${footerHtml}</div>
   </div>
   <script>
-    window.onload = function() {
+    function setupOfflineSearch() {
+      var searchInput = document.getElementById("offline-catalog-search");
+      if (!searchInput) return;
+      searchInput.addEventListener("input", function(e) {
+        var q = (e.target.value || "").toLowerCase().trim();
+        var rows = document.querySelectorAll("tr[id^='row-']");
+        var plates = document.querySelectorAll(".photo-plate-item");
+        var tocRows = document.querySelectorAll(".toc-product-row");
+        
+        rows.forEach(function(r) {
+          var text = (r.innerText || "").toLowerCase();
+          r.style.display = (!q || text.indexOf(q) !== -1) ? "" : "none";
+        });
+        plates.forEach(function(p) {
+          var text = (p.innerText || "").toLowerCase();
+          p.style.display = (!q || text.indexOf(q) !== -1) ? "flex" : "none";
+        });
+        tocRows.forEach(function(tr) {
+          var text = (tr.innerText || "").toLowerCase();
+          tr.style.display = (!q || text.indexOf(q) !== -1) ? "" : "none";
+        });
+      });
+    }
+
+    async function prepareAndPrint() {
+      setupOfflineSearch();
+      var images = Array.prototype.slice.call(document.images);
+      var imagePromises = images.map(function(img) {
+        if (img.complete && img.naturalHeight !== 0) {
+          return Promise.resolve();
+        }
+        return new Promise(function(resolve) {
+          var timer = setTimeout(function() {
+            resolve();
+          }, 2500);
+          img.onload = function() {
+            clearTimeout(timer);
+            resolve();
+          };
+          img.onerror = function() {
+            clearTimeout(timer);
+            if (img.src && img.src.indexOf("/media/") !== -1 && img.src.indexOf(":8000") === -1) {
+              img.src = img.src.replace(/:3000\\/media\\//, ":8000/media/").replace(/localhost\\/media\\//, "localhost:8000/media/");
+              img.onload = function() { resolve(); };
+              img.onerror = function() { resolve(); };
+            } else {
+              resolve();
+            }
+          };
+        });
+      });
+
+      try {
+        await Promise.all(imagePromises);
+      } catch (e) {}
+
       setTimeout(function() {
         window.focus();
         window.print();
-      }, 350);
-    };
+      }, 450);
+    }
+
+    if (document.readyState === "complete") {
+      prepareAndPrint();
+    } else {
+      window.addEventListener("load", prepareAndPrint);
+    }
   <\/script>
 </body>
 </html>`;
@@ -2017,6 +2108,7 @@ export default function ProductCatalogShareModal({
                 </button>
               ))}
             </div>
+
           </div>
 
           {/* Row 3: Schemes & Tenure Selectors */}
@@ -2421,6 +2513,12 @@ export default function ProductCatalogShareModal({
                                   alt={item.fullName}
                                   className="w-full h-full object-contain"
                                   loading="lazy"
+                                  onError={(e) => {
+                                    const currentSrc = (e.currentTarget as HTMLImageElement).src;
+                                    if (currentSrc.includes("/media/") && !currentSrc.includes(":8000")) {
+                                      (e.currentTarget as HTMLImageElement).src = currentSrc.replace(/:\d+\/media\//, ":8000/media/");
+                                    }
+                                  }}
                                 />
                                 {item.isChild && (
                                   <span className="absolute bottom-0 inset-x-0 bg-black/85 text-white text-[7px] font-bold text-center py-0.5 truncate px-1 uppercase tracking-tight">
@@ -2435,6 +2533,9 @@ export default function ProductCatalogShareModal({
                                 <span className="text-[7px] font-bold text-muted-foreground font-mono truncate max-w-[70px]">{item.sku}</span>
                               </div>
                             )}
+                            <span className="text-[8px] font-bold text-muted-foreground block text-center mt-0.5">
+                              Plate #{activeItems.findIndex((x) => x.id === item.id) + 1}
+                            </span>
                           </td>
                           <td className="px-3 py-2">
                             <div className="flex items-center gap-1.5 flex-wrap">
@@ -2876,6 +2977,30 @@ export default function ProductCatalogShareModal({
                         className="rounded border-border text-primary focus:ring-0"
                       />
                       <span className="font-medium">⭐ Include Executive Cover Page</span>
+                    </label>
+
+                    <label className="flex items-center gap-2 text-[11.5px] text-foreground cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={includePhotoPlates}
+                        onChange={(e) => setIncludePhotoPlates(e.target.checked)}
+                        className="rounded border-border text-primary focus:ring-0"
+                      />
+                      <span className="font-semibold text-primary">
+                        🖼️ Offline Full Photo Plates (Click products in PDF to view)
+                      </span>
+                    </label>
+
+                    <label className="flex items-center gap-2 text-[11.5px] text-foreground cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={includeIndexPage}
+                        onChange={(e) => setIncludeIndexPage(e.target.checked)}
+                        className="rounded border-border text-primary focus:ring-0"
+                      />
+                      <span className="font-semibold text-primary">
+                        📑 Master Table of Contents &amp; Searchable Directory Index
+                      </span>
                     </label>
 
                     <label className="flex items-center gap-2 text-[11.5px] text-foreground cursor-pointer select-none">
@@ -3407,6 +3532,132 @@ export default function ProductCatalogShareModal({
                     </div>
                   ))}
                 </div>
+
+                {/* Searchable Master Product Directory (Table of Contents) */}
+                <div className="pt-2.5 border-t-2 border-black space-y-2">
+                  <div className="flex items-center justify-between pb-1 flex-wrap gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm">📋</span>
+                      <div>
+                        <h3 className="text-[11px] font-black uppercase tracking-wider text-black">
+                          Master Product Directory &amp; Quick Jump Index ({activeItems.length} Products)
+                        </h3>
+                        <p className="text-[8.5px] text-gray-600">
+                          Searchable master index. Click any product name, SKU, or plate number to jump directly to its price row or full-page photo plate.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Interactive Live Search Bar for Screen / Offline HTML */}
+                    <div className="no-print flex items-center gap-2">
+                      <input
+                        id="offline-catalog-search"
+                        type="text"
+                        placeholder="🔍 Type to filter products, SKUs, sizes..."
+                        className="h-7 w-64 rounded-md border border-gray-400 bg-white px-2.5 text-[10.5px] font-medium text-black placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-black"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Print-only PDF Search Guide Notice */}
+                  <div className="hidden print:flex items-center justify-between p-1.5 rounded-lg border border-gray-400 bg-white text-[8px] text-gray-700">
+                    <span>
+                      🔍 <strong>Search in PDF:</strong> Press <strong className="font-mono text-black font-bold">Ctrl + F</strong> (or <strong className="font-mono text-black font-bold">⌘ + F</strong>) to instantly find any product, SKU, size, or material in this document.
+                    </span>
+                    <span className="font-mono font-bold text-gray-600">
+                      Indexed {activeItems.length} Items · Direct Offline Anchor Links
+                    </span>
+                  </div>
+
+                  {/* Dense, Clean, Searchable Table of Contents Grid */}
+                  <div className="overflow-x-auto rounded-lg border border-gray-300 bg-white">
+                    <table className="w-full text-left border-collapse text-[9px]">
+                      <thead className="bg-gray-100 border-b border-gray-300 text-gray-800 font-bold uppercase tracking-wider text-[8px]">
+                        <tr>
+                          <th className="px-2 py-1.5 w-14 text-center">Plate #</th>
+                          <th className="px-2 py-1.5">Product Title &amp; Configuration</th>
+                          <th className="px-2 py-1.5 w-28">SKU Code</th>
+                          <th className="px-2 py-1.5 w-32">Department</th>
+                          <th className="px-2 py-1.5 text-right w-24">Direct Sale</th>
+                          <th className="px-2 py-1.5 text-right w-24">SFEMI (15m)</th>
+                          <th className="px-2 py-1.5 text-center w-28">Quick Jump</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {activeItems.map((item, idx) => {
+                          const plateNumber = idx + 1;
+                          const price = item.basePrice;
+
+                          return (
+                            <tr
+                              key={`toc-${item.id}`}
+                              className="toc-product-row hover:bg-gray-50 transition"
+                            >
+                              <td className="px-2 py-1 text-center font-mono font-bold text-black whitespace-nowrap">
+                                <a
+                                  href={`#photo-plate-${item.id}`}
+                                  className="text-indigo-800 hover:underline inline-block px-1 py-0.2 rounded bg-indigo-50 border border-indigo-200"
+                                  title="Jump to Photo Plate in PDF"
+                                >
+                                  #{plateNumber}
+                                </a>
+                              </td>
+                              <td className="px-2 py-1 font-semibold text-gray-900">
+                                <a
+                                  href={`#row-${item.id}`}
+                                  className="hover:text-blue-700 hover:underline"
+                                  title="Jump to Price Table Row"
+                                >
+                                  {item.fullName}
+                                </a>
+                                {item.dimensions && (
+                                  <span className="text-[7.5px] text-gray-500 block">
+                                    📏 {item.dimensions}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-2 py-1 font-mono font-bold text-gray-700 whitespace-nowrap">
+                                <a
+                                  href={`#photo-plate-${item.id}`}
+                                  className="hover:text-indigo-800 hover:underline"
+                                  title="Jump to Photo Plate in PDF"
+                                >
+                                  {item.sku}
+                                </a>
+                              </td>
+                              <td className="px-2 py-1 text-gray-600 truncate max-w-[120px]">
+                                {item.category}
+                              </td>
+                              <td className="px-2 py-1 text-right font-black text-black whitespace-nowrap">
+                                {item.hasPrice ? formatCurrency(price) : "On Request"}
+                              </td>
+                              <td className="px-2 py-1 text-right font-bold text-emerald-800 whitespace-nowrap">
+                                {item.sfemiMonthly > 0 ? `₹${item.sfemiMonthly.toLocaleString("en-IN")}/mo` : "—"}
+                              </td>
+                              <td className="px-2 py-1 text-center whitespace-nowrap space-x-1.5">
+                                <a
+                                  href={`#row-${item.id}`}
+                                  className="font-bold text-blue-700 hover:underline"
+                                  title="Jump to Price Row"
+                                >
+                                  📊 Table
+                                </a>
+                                <span className="text-gray-300">·</span>
+                                <a
+                                  href={`#photo-plate-${item.id}`}
+                                  className="font-bold text-indigo-700 hover:underline"
+                                  title="Jump to Photo Plate"
+                                >
+                                  📸 Plate #{plateNumber}
+                                </a>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -3485,7 +3736,7 @@ export default function ProductCatalogShareModal({
                             const price = item.basePrice;
 
                             return (
-                              <tr key={item.id} className="break-inside-avoid">
+                              <tr key={item.id} id={`row-${item.id}`} className="break-inside-avoid">
                                 {showItemQrCodes && (
                                   <td className="px-2 py-2 align-middle text-center">
                                     <div className="flex flex-col items-center p-0.5 rounded bg-white border border-gray-300 w-11 shrink-0 mx-auto">
@@ -3508,29 +3759,61 @@ export default function ProductCatalogShareModal({
                                 )}
                         <td className="px-2 py-2 align-middle text-center">
                           {finalImg ? (
-                            <div className="w-20 h-20 rounded-lg border border-gray-300 bg-white p-1 flex items-center justify-center overflow-hidden shrink-0 mx-auto shadow-2xs relative">
-                              <img
-                                src={finalImg}
-                                alt={item.fullName}
-                                className="w-full h-full object-contain"
-                                loading="eager"
-                              />
-                              {item.isChild && (
-                                <span className="absolute bottom-0 inset-x-0 bg-black/85 text-white text-[6.5px] font-bold text-center py-0.5 truncate px-0.5 uppercase tracking-tight">
-                                  {item.name.replace(item.parentName || "", "").replace(/^[\s—–-]+/, "") || item.sku}
-                                </span>
-                              )}
-                            </div>
+                            <a
+                              href={`#photo-plate-${item.id}`}
+                              title="Click to view full photo plate in PDF"
+                              className="cursor-pointer group block"
+                            >
+                              <div className="w-20 h-20 rounded-lg border border-gray-300 bg-white p-1 flex items-center justify-center overflow-hidden shrink-0 mx-auto shadow-2xs relative group-hover:border-primary transition">
+                                <img
+                                  src={finalImg}
+                                  alt={item.fullName}
+                                  className="w-full h-full object-contain"
+                                  loading="eager"
+                                  onError={(e) => {
+                                    const currentSrc = (e.currentTarget as HTMLImageElement).src;
+                                    if (currentSrc.includes("/media/") && !currentSrc.includes(":8000")) {
+                                      (e.currentTarget as HTMLImageElement).src = currentSrc.replace(/:\d+\/media\//, ":8000/media/");
+                                    }
+                                  }}
+                                />
+                                {item.isChild && (
+                                  <span className="absolute bottom-0 inset-x-0 bg-black/85 text-white text-[6.5px] font-bold text-center py-0.5 truncate px-0.5 uppercase tracking-tight">
+                                    {item.name.replace(item.parentName || "", "").replace(/^[\s—–-]+/, "") || item.sku}
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[7px] text-blue-700 font-bold hover:underline block text-center mt-0.5">
+                                📸 Plate #{activeItems.findIndex((x) => x.id === item.id) + 1}
+                              </span>
+                            </a>
                           ) : (
-                            <div className="w-20 h-20 rounded-lg border border-gray-200 bg-gray-50 flex flex-col items-center justify-center text-center p-1 shrink-0 mx-auto">
-                              <span className="text-lg">{getCategoryIcon(item.categoryName, item.subcategoryName)}</span>
-                              <span className="text-[6.5px] text-gray-400 font-mono mt-0.5">No photo</span>
-                              <span className="text-[6.5px] font-bold text-gray-500 font-mono truncate max-w-[70px]">{item.sku}</span>
-                            </div>
+                            <a
+                              href={`#photo-plate-${item.id}`}
+                              title="Click to view full photo plate in PDF"
+                              className="cursor-pointer group block"
+                            >
+                              <div className="w-20 h-20 rounded-lg border border-gray-200 bg-gray-50 flex flex-col items-center justify-center text-center p-1 shrink-0 mx-auto">
+                                <span className="text-lg">{getCategoryIcon(item.categoryName, item.subcategoryName)}</span>
+                                <span className="text-[6.5px] text-gray-400 font-mono mt-0.5">No photo</span>
+                                <span className="text-[6.5px] font-bold text-gray-500 font-mono truncate max-w-[70px]">{item.sku}</span>
+                              </div>
+                              <span className="text-[7px] text-gray-500 font-mono block text-center mt-0.5">
+                                Plate #{activeItems.findIndex((x) => x.id === item.id) + 1}
+                              </span>
+                            </a>
                           )}
                         </td>
                         <td className="px-2 py-2 align-middle">
-                          <div className="font-extrabold text-black text-xs leading-snug">{item.fullName}</div>
+                          <div className="font-extrabold text-black text-xs leading-snug">
+                            <a
+                              href={`#photo-plate-${item.id}`}
+                              className="hover:text-primary transition"
+                              title="Click to view full photo plate in PDF"
+                            >
+                              {item.fullName}
+                            </a>
+                          </div>
                           <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
                             <span className="font-mono text-[8.5px] font-bold px-1.5 py-0.2 rounded bg-gray-100 text-gray-800 border border-gray-300">
                               SKU: {item.sku}
@@ -3538,6 +3821,13 @@ export default function ProductCatalogShareModal({
                             {item.brand && (
                               <span className="text-[8.5px] font-semibold text-gray-600">Brand: {item.brand}</span>
                             )}
+                            <a
+                              href={`#photo-plate-${item.id}`}
+                              className="text-[7.5px] font-bold text-indigo-700 hover:underline inline-flex items-center gap-0.5 ml-1"
+                              title="Click to view full photo plate in PDF"
+                            >
+                              📸 View Plate #{activeItems.findIndex((x) => x.id === item.id) + 1}
+                            </a>
                           </div>
                           <div className="text-[8.5px] text-gray-500 mt-0.5">{item.category}</div>
                           <div className="mt-0.5 text-[8px] font-semibold text-blue-800">
@@ -4042,6 +4332,211 @@ export default function ProductCatalogShareModal({
                   ))}
                 </div>
               ))}
+            </div>
+
+            {/* Full-Page Photo Plates Appendix (Offline Interactive PDF Links) */}
+            <div
+              id="print-photo-plates-section"
+              className="space-y-4"
+              style={{ display: includePhotoPlates ? "block" : "none" }}
+            >
+              {activeItems.map((item, idx) => {
+                const sItem = findServerItem(item.id);
+                const finalImg = sItem?.image_url || item.imageUrl;
+                const plateNumber = idx + 1;
+                const price = item.basePrice;
+
+                return (
+                  <div
+                    key={`plate-${item.id}`}
+                    id={`photo-plate-${item.id}`}
+                    className="photo-plate-item rounded-xl border border-gray-300 p-4 bg-white"
+                    style={{
+                      pageBreakBefore: "always",
+                      breakBefore: "page",
+                      minHeight: "260mm",
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    {/* Plate Top Navigation & Header */}
+                    <div className="border-b-2 border-black pb-2 flex items-center justify-between">
+                      <div>
+                        <span className="text-[9px] font-bold tracking-widest uppercase text-gray-500">
+                          {businessInfo.name} · Official Showroom Collection
+                        </span>
+                        <div className="text-[11px] font-black text-gray-800">
+                          {item.category}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className="inline-block bg-black text-white px-2.5 py-0.5 rounded font-mono text-[11px] font-bold tracking-wider">
+                          PHOTO PLATE #{plateNumber} / {activeItems.length}
+                        </span>
+                        <div>
+                          <a
+                            href={`#row-${item.id}`}
+                            className="text-[9.5px] font-bold text-blue-700 hover:underline block mt-0.5"
+                          >
+                            ↩ Back to Price Table (Row #{plateNumber})
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Plate Product Identity */}
+                    <div className="pt-2">
+                      <h2 className="text-lg font-black text-black leading-tight">
+                        {item.fullName}
+                      </h2>
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-gray-100 text-gray-900 border border-gray-400">
+                          SKU: {item.sku}
+                        </span>
+                        {item.brand && (
+                          <span className="text-xs font-semibold text-gray-700">
+                            Brand: {item.brand}
+                          </span>
+                        )}
+                        {item.currentStock > 0 ? (
+                          <span className="px-2 py-0.5 rounded-full font-bold text-emerald-800 bg-emerald-50 border border-emerald-300 text-[10px]">
+                            🟢 Ready in Stock ({item.currentStock} Units)
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full font-bold text-amber-800 bg-amber-50 border border-amber-300 text-[10px]">
+                            🟡 Built to Order / Workshop Handcrafted
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Large High-Resolution Center Image Canvas */}
+                    <div
+                      className="w-full my-auto rounded-2xl border-2 border-gray-300 bg-white p-3 flex items-center justify-center overflow-hidden shadow-xs relative"
+                      style={{ height: "135mm", maxHeight: "145mm" }}
+                    >
+                      {finalImg ? (
+                        <img
+                          src={finalImg}
+                          alt={item.fullName}
+                          className="w-full h-full object-contain"
+                          loading="eager"
+                          onError={(e) => {
+                            const currentSrc = (e.currentTarget as HTMLImageElement).src;
+                            if (currentSrc.includes("/media/") && !currentSrc.includes(":8000")) {
+                              (e.currentTarget as HTMLImageElement).src = currentSrc.replace(/:\d+\/media\//, ":8000/media/");
+                            }
+                          }}
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center text-center p-6 text-gray-400">
+                          <span className="text-6xl">{getCategoryIcon(item.categoryName, item.subcategoryName)}</span>
+                          <span className="text-sm font-bold mt-2 text-gray-700 uppercase tracking-wide">
+                            Official Showroom Product Blueprint
+                          </span>
+                          <span className="text-xs font-mono text-gray-500 mt-0.5">SKU: {item.sku}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Specifications & Dimensions Strip */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-2.5 rounded-xl border border-gray-300 bg-gray-50 text-[9.5px]">
+                      <div>
+                        <span className="font-bold text-gray-500 block uppercase text-[8px]">Dimensions &amp; Footprint:</span>
+                        <span className="font-semibold text-gray-900">{item.dimensions || "Standard Ergonomic Size"}</span>
+                      </div>
+                      <div>
+                        <span className="font-bold text-gray-500 block uppercase text-[8px]">Warranty Coverage:</span>
+                        <span className="font-semibold text-gray-900">{item.warranty || "Standard 12 Months Mfg Warranty"}</span>
+                      </div>
+                      <div>
+                        <span className="font-bold text-gray-500 block uppercase text-[8px]">Fulfillment Mode:</span>
+                        <span className="font-semibold text-gray-900">Showroom Inspection / Doorstep Delivery</span>
+                      </div>
+                      <div>
+                        <span className="font-bold text-gray-500 block uppercase text-[8px]">Origin &amp; Quality:</span>
+                        <span className="font-semibold text-gray-900">100% Genuine Certified Quality</span>
+                      </div>
+                    </div>
+
+                    {/* Commercial Rates Summary (Direct Sale, Rent, Lease, SFEMI) */}
+                    <div className="mt-2 p-2.5 rounded-xl border-2 border-black bg-white">
+                      <div className="text-[9px] font-bold uppercase tracking-wider text-gray-500 mb-1">
+                        Flexible Store Acquisition Schemes (Choose Direct Sale, Rent, Lease, or SFEMI)
+                      </div>
+                      <div className="grid grid-cols-4 gap-2 text-center divide-x divide-gray-300">
+                        <div className="px-1">
+                          <span className="text-[8px] font-bold text-gray-600 uppercase block">Direct Sale MRP</span>
+                          <span className="text-sm font-black text-black">
+                            {item.hasPrice ? formatCurrency(price) : "Custom Quote"}
+                          </span>
+                          <span className="text-[7.5px] text-gray-500 block">GST Inclusive</span>
+                        </div>
+
+                        <div className="px-1">
+                          <span className="text-[8px] font-bold text-blue-700 uppercase block">Rental Plan</span>
+                          <span className="text-xs font-black text-blue-900">
+                            {item.rentMonthly > 0 ? `₹${item.rentMonthly.toLocaleString("en-IN")}/mo` : "Available on Request"}
+                          </span>
+                          <span className="text-[7.5px] text-gray-500 block">
+                            {item.rentDeposit > 0 ? `Dep: ₹${item.rentDeposit.toLocaleString("en-IN")} (Refundable)` : "Zero Security Band"}
+                          </span>
+                        </div>
+
+                        <div className="px-1">
+                          <span className="text-[8px] font-bold text-purple-700 uppercase block">Leasing Plan</span>
+                          <span className="text-xs font-black text-purple-900">
+                            {item.leaseMonthly > 0 ? `₹${item.leaseMonthly.toLocaleString("en-IN")}/mo` : "Available on Request"}
+                          </span>
+                          <span className="text-[7.5px] text-gray-500 block">
+                            {item.leaseDeposit > 0 ? `Dep: ₹${item.leaseDeposit.toLocaleString("en-IN")} (Refundable)` : "Zero Security Band"}
+                          </span>
+                        </div>
+
+                        <div className="px-1">
+                          <span className="text-[8px] font-bold text-emerald-700 uppercase block">SFEMI (15m Promo)</span>
+                          <span className="text-xs font-black text-emerald-900">
+                            {item.sfemiMonthly > 0 ? `₹${item.sfemiMonthly.toLocaleString("en-IN")}/mo` : "Available on Request"}
+                          </span>
+                          <span className="text-[7.5px] text-emerald-800 font-semibold block">
+                            Remaining Future EMIs Waived
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Plate Footer: Micro QR & Brand Identity */}
+                    <div className="mt-2 pt-2 border-t border-gray-300 flex items-center justify-between text-[8px] text-gray-600">
+                      <div className="flex items-center gap-2">
+                        <div className="w-9 h-9 p-0.5 bg-white border border-gray-300 rounded shrink-0">
+                          <QRCode
+                            value={item.publicUrl}
+                            size={32}
+                            level="M"
+                            style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+                          />
+                        </div>
+                        <div>
+                          <div className="font-bold text-black">{businessInfo.name} · Official Catalog Plate #{plateNumber}</div>
+                          <div>📍 {businessInfo.address} · 📞 {businessInfo.phone}</div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <a
+                          href={`#row-${item.id}`}
+                          className="text-[9px] font-bold text-blue-700 hover:underline"
+                        >
+                          ↩ Back to Price Table (Row #{plateNumber})
+                        </a>
+                        <div className="text-[7.5px] text-gray-500 font-mono">
+                          {quotationNumber} · Valid till {validityEndDate}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
             {/* Print Footer */}

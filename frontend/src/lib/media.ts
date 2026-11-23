@@ -34,7 +34,7 @@ export function resolveApiMediaUrl(value?: string | null): string | null {
     return null;
   }
 
-  const trimmed = value.trim();
+  let trimmed = value.trim();
   if (!trimmed) {
     return null;
   }
@@ -46,6 +46,20 @@ export function resolveApiMediaUrl(value?: string | null): string | null {
     trimmed.startsWith("https://")
   ) {
     return trimmed;
+  }
+
+  // Ensure relative media paths have leading slash and proper /media/ prefix
+  if (!trimmed.startsWith("/")) {
+    trimmed = `/${trimmed}`;
+  }
+  if (
+    !trimmed.startsWith("/media/") &&
+    !trimmed.startsWith("/brand/") &&
+    !trimmed.startsWith("/images/") &&
+    !trimmed.startsWith("/_next/") &&
+    !trimmed.startsWith("/api/")
+  ) {
+    trimmed = `/media${trimmed}`;
   }
 
   try {

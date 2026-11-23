@@ -283,13 +283,25 @@ def generate_price_list_quote(
         # Resolve image URL with robust cascading fallbacks
         image_url = None
 
-        def _fmt_url(raw: str | None) -> str | None:
-            if not raw or not str(raw).strip():
+        def _fmt_url(raw: Any) -> str | None:
+            if not raw:
                 return None
-            s = str(raw).strip()
+            if hasattr(raw, "url"):
+                try:
+                    s = str(raw.url).strip()
+                except Exception:
+                    s = str(raw).strip()
+            else:
+                s = str(raw).strip()
+            if not s:
+                return None
             if s.startswith("http://") or s.startswith("https://") or s.startswith("data:"):
                 return s
-            return f"{origin}{'' if s.startswith('/') else '/'}{s}"
+            if not s.startswith("/"):
+                s = f"/{s}"
+            if not s.startswith("/media/") and not s.startswith("/brand/") and not s.startswith("/images/"):
+                s = f"/media{s}"
+            return f"{origin}{s}"
 
         # 1. Direct p.image
         if bool(getattr(p, "image", None)):

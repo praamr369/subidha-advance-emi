@@ -284,6 +284,16 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  async rewrites() {
+    const rawApiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api/v1";
+    const apiOrigin = rawApiUrl.replace(/\/api\/v1\/?$/, "");
+    return [
+      {
+        source: "/media/:path*",
+        destination: `${apiOrigin}/media/:path*`,
+      },
+    ];
+  },
   async redirects() {
     return ADMIN_PERMANENT_REDIRECTS.map(({ source, destination }) => ({
       source,
