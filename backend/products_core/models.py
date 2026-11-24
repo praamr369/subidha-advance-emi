@@ -281,7 +281,17 @@ class Product(TimeStampedModel):
             _inv_type = self.inventory_profile.stock_item_type
         except Exception:
             pass
-        _is_inventory_only = _inv_type in {"RAW_MATERIAL", "ACCESSORY"}
+        _is_inventory_only = _inv_type in {"RAW_MATERIAL", "ACCESSORY"} or self.item_type in {
+            ProductItemType.RAW_MATERIAL,
+            ProductItemType.ACCESSORY,
+        }
+        if self.item_type in {ProductItemType.ACCESSORY, ProductItemType.RAW_MATERIAL}:
+            if self.is_emi_enabled:
+                errors["is_emi_enabled"] = "Accessories and raw materials cannot be sold standalone on SFEMI (Advance EMI)."
+            if self.is_rent_enabled:
+                errors["is_rent_enabled"] = "Accessories and raw materials cannot be rented standalone."
+            if self.is_lease_enabled:
+                errors["is_lease_enabled"] = "Accessories and raw materials cannot be leased standalone."
         _is_new_product = self.pk is None
         if not _is_new_product and not _is_inventory_only and not any(
             [

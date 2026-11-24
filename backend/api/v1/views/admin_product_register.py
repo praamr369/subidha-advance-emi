@@ -24,13 +24,22 @@ def _normalize(value: Any) -> str:
     return str(value or "").strip()
 
 
-def _bool_param(value: str) -> bool | None:
-    normalized = value.strip().lower()
+def _bool_param(value: Any) -> bool | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    normalized = str(value).strip().lower()
     if normalized in {"true", "1", "yes", "active"}:
         return True
     if normalized in {"false", "0", "no", "inactive"}:
         return False
     return None
+
+
+def _to_bool(value: Any, default: bool = False) -> bool:
+    res = _bool_param(value)
+    return default if res is None else res
 
 
 def _has_image_q() -> Q:
@@ -248,13 +257,13 @@ class AdminProductCreateView(APIView):
             gst_rate = request.data.get("gst_rate")
             item_type = _normalize(request.data.get("item_type")) or "FINISHED_GOOD"
             stock_type = _normalize(request.data.get("stock_type")) or "STOCK_ITEM"
-            is_active = request.data.get("is_active", "true").lower() in {"true", "1", "yes"}
-            is_emi_enabled = request.data.get("is_emi_enabled", "false").lower() in {"true", "1", "yes"}
-            is_rent_enabled = request.data.get("is_rent_enabled", "false").lower() in {"true", "1", "yes"}
-            is_lease_enabled = request.data.get("is_lease_enabled", "false").lower() in {"true", "1", "yes"}
-            is_direct_sale_enabled = request.data.get("is_direct_sale_enabled", "true").lower() in {"true", "1", "yes"}
+            is_active = _to_bool(request.data.get("is_active"), default=True)
+            is_emi_enabled = _to_bool(request.data.get("is_emi_enabled"), default=False)
+            is_rent_enabled = _to_bool(request.data.get("is_rent_enabled"), default=False)
+            is_lease_enabled = _to_bool(request.data.get("is_lease_enabled"), default=False)
+            is_direct_sale_enabled = _to_bool(request.data.get("is_direct_sale_enabled"), default=True)
             plan_type_default = request.data.get("plan_type_default", "EMI")
-            warranty_enabled = request.data.get("warranty_enabled", "true").lower() in {"true", "1", "yes"}
+            warranty_enabled = _to_bool(request.data.get("warranty_enabled"), default=True)
             warranty_months_manufacturing = request.data.get("warranty_months_manufacturing")
             warranty_months_structural = request.data.get("warranty_months_structural")
             warranty_months_extended_max = request.data.get("warranty_months_extended_max")
@@ -262,7 +271,7 @@ class AdminProductCreateView(APIView):
             image = request.data.get("image")
             video = request.data.get("video")
             brand = _normalize(request.data.get("brand"))
-            has_variants = request.data.get("has_variants", "false").lower() in {"true", "1", "yes"}
+            has_variants = _to_bool(request.data.get("has_variants"), default=False)
             variants_json = request.data.get("variants", "[]")
 
             # Validate required fields
@@ -313,7 +322,9 @@ class AdminProductCreateView(APIView):
                 except:
                     pass
 
-            if base_specs and isinstance(base_specs, str):
+            if isinstance(base_specs, dict):
+                product_data["base_specs"] = base_specs
+            elif base_specs and isinstance(base_specs, str):
                 try:
                     product_data["base_specs"] = json.loads(base_specs)
                 except:
@@ -347,7 +358,12 @@ class AdminProductCreateView(APIView):
             # Create variants if provided
             if has_variants and variants_json:
                 try:
-                    variants_list = json.loads(variants_json)
+                    if isinstance(variants_json, list):
+                        variants_list = variants_json
+                    elif isinstance(variants_json, str):
+                        variants_list = json.loads(variants_json)
+                    else:
+                        variants_list = []
                     for variant_data in variants_list:
                         ProductVariant.objects.create(
                             product=product,

@@ -2,6 +2,7 @@ from decimal import Decimal
 from io import BytesIO
 from tempfile import TemporaryDirectory
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from rest_framework import status
@@ -10,6 +11,7 @@ from PIL import Image
 
 from inventory.models import InventoryItem
 from inventory.models import StockLedger
+from subscriptions.enums import ProductItemType
 from subscriptions.models import (
     Product,
     ProductCategoryMaster,
@@ -93,6 +95,13 @@ class AdminProductsApiTests(APITestCase):
                 "name": "Steel Side Rail",
                 "base_price": "1400.00",
                 "item_type": "ACCESSORY",
+                "is_active": True,
+                "is_emi_enabled": False,
+                "is_rent_enabled": False,
+                "is_lease_enabled": False,
+                "is_direct_sale_enabled": True,
+                "warranty_enabled": True,
+                "base_specs": {"material": "Steel"},
             },
             format="json",
         )
@@ -100,7 +109,42 @@ class AdminProductsApiTests(APITestCase):
         product = Product.objects.get(id=response.data["id"])
         self.assertEqual(product.name, "Steel Side Rail")
         self.assertEqual(product.item_type, "ACCESSORY")
+        self.assertTrue(product.is_active)
+        self.assertFalse(product.is_emi_enabled)
+        self.assertTrue(product.is_direct_sale_enabled)
+        self.assertEqual(product.base_specs, {"material": "Steel"})
         self.assertTrue(product.product_code.startswith("STEELSIDERAI-"))
+
+    def test_accessory_product_cannot_enable_standalone_emi_rent_lease(self):
+        # 1. Direct sale allowed for accessories
+        acc = Product(
+            product_code="ACC-RAIL-01",
+            name="Bed Rail",
+            item_type=ProductItemType.ACCESSORY,
+            base_price=Decimal("1200.00"),
+            is_direct_sale_enabled=True,
+            is_emi_enabled=False,
+            is_rent_enabled=False,
+            is_lease_enabled=False,
+        )
+        acc.full_clean()
+
+        # 2. Standalone EMI/SFEMI is blocked
+        acc.is_emi_enabled = True
+        with self.assertRaises(DjangoValidationError):
+            acc.full_clean()
+
+        # 3. Standalone Rent is blocked
+        acc.is_emi_enabled = False
+        acc.is_rent_enabled = True
+        with self.assertRaises(DjangoValidationError):
+            acc.full_clean()
+
+        # 4. Standalone Lease is blocked
+        acc.is_rent_enabled = False
+        acc.is_lease_enabled = True
+        with self.assertRaises(DjangoValidationError):
+            acc.full_clean()
 
     def test_admin_product_detail_returns_absolute_image_url(self):
         product = create_product(
