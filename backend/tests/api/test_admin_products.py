@@ -86,6 +86,22 @@ class AdminProductsApiTests(APITestCase):
             response.data["image"],
         )
 
+    def test_admin_product_create_accepts_json_payload_and_auto_generates_code(self):
+        response = self.client.post(
+            "/api/v1/admin/products/",
+            {
+                "name": "Steel Side Rail",
+                "base_price": "1400.00",
+                "item_type": "ACCESSORY",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        product = Product.objects.get(id=response.data["id"])
+        self.assertEqual(product.name, "Steel Side Rail")
+        self.assertEqual(product.item_type, "ACCESSORY")
+        self.assertTrue(product.product_code.startswith("STEELSIDERAI-"))
+
     def test_admin_product_detail_returns_absolute_image_url(self):
         product = create_product(
             name="Absolute Media Sofa",

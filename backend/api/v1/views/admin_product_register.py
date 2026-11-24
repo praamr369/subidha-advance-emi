@@ -5,7 +5,7 @@ from typing import Any
 
 from django.db.models import Count, Q, Sum
 from rest_framework import permissions, status
-from rest_framework.parsers import FormParser, MultiPartParser
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -224,7 +224,7 @@ class AdminProductRegisterView(APIView):
 
 class AdminProductCreateView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
-    parser_classes = (MultiPartParser, FormParser)
+    parser_classes = (MultiPartParser, FormParser, JSONParser)
 
     def get(self, request):
         """Keep the canonical admin products endpoint listable and creatable."""
@@ -266,10 +266,23 @@ class AdminProductCreateView(APIView):
             variants_json = request.data.get("variants", "[]")
 
             # Validate required fields
-            if not product_code:
-                return Response({"error": "product_code is required"}, status=status.HTTP_400_BAD_REQUEST)
             if not name:
                 return Response({"error": "name is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+            if not product_code:
+                from django.utils.text import slugify
+                base = slugify(name).upper().replace("-", "")[:12] or "PRODUCT"
+                existing_codes = set(
+                    Product.objects.filter(product_code__startswith=f"{base}-")
+                    .values_list("product_code", flat=True)
+                )
+                next_seq = 1
+                while f"{base}-{next_seq:04d}" in existing_codes:
+                    next_seq += 1
+                product_code = f"{base}-{next_seq:04d}"
+
+            if not sku:
+                sku = product_code
 
             # Create product
             product_data = {
