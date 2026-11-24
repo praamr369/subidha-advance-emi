@@ -18,6 +18,12 @@ class ProductCategoryMaster(TimeStampedModel):
     name = models.CharField(max_length=120, unique=True)
     description = models.TextField(blank=True, default="")
     is_active = models.BooleanField(default=True, db_index=True)
+    item_type = models.CharField(
+        max_length=20,
+        choices=ProductItemType.choices,
+        default=ProductItemType.FINISHED_GOOD,
+        db_index=True,
+    )
     # --- Additive public SEO fields (SEO-3). All optional / default-safe.
     # None of these change financial, inventory, or visibility logic for the
     # existing catalogue; they only supply canonical public metadata.

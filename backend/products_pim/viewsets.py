@@ -72,8 +72,15 @@ class AttributeOptionViewSet(viewsets.ModelViewSet):
 
 class ProductCategoryViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsAdmin]
-    queryset = ProductCategory.objects.filter(is_active=True).prefetch_related("subcategories", "attributes")
     serializer_class = ProductCategorySerializer
+
+    def get_queryset(self):
+        qs = ProductCategory.objects.filter(is_active=True).prefetch_related("subcategories", "attributes")
+        ptype = self.request.query_params.get("product_type")
+        if ptype:
+            from django.db.models import Q
+            qs = qs.filter(Q(product_type=ptype) | Q(product_type="ALL"))
+        return qs
 
     @action(detail=True, methods=["get"])
     def with_attributes(self, request, pk=None):

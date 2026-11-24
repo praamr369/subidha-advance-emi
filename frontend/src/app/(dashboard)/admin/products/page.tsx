@@ -369,9 +369,14 @@ function PimProductRow({
       </td>
 
       {/* Category */}
-      <td className="px-4 py-2.5 text-muted-foreground text-xs">
+      <td className="px-4 py-2.5 text-xs">
         {p.category_name ? (
-          <>{p.category_name}{p.subcategory_name ? ` / ${p.subcategory_name}` : ""}</>
+          <div className="flex flex-col">
+            <span className="font-medium text-foreground">{p.category_name}</span>
+            {p.subcategory_name ? (
+              <span className="text-[11px] text-muted-foreground font-normal">{p.subcategory_name}</span>
+            ) : null}
+          </div>
         ) : (
           <span className="text-muted-foreground/50 italic text-[11px]">—</span>
         )}
@@ -991,7 +996,7 @@ function PimPanel({
           />
         </div>
         <select
-          className="px-3 py-2 text-sm border rounded-xl bg-background"
+          className="px-3 py-2 text-sm border rounded-xl bg-background font-medium"
           value={pimCat}
           onChange={(e) => {
             setPimCat(e.target.value ? Number(e.target.value) : "");
@@ -999,7 +1004,45 @@ function PimPanel({
           }}
         >
           <option value="">All Categories</option>
-          {pimCategories.map((c) => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
+          {pimTypeFilter === "ALL" ? (
+            <>
+              {pimCategories.filter(c => c.product_type === "FINISHED_GOOD").length > 0 && (
+                <optgroup label="Finished Goods">
+                  {pimCategories.filter(c => c.product_type === "FINISHED_GOOD").map((c) => (
+                    <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
+                  ))}
+                </optgroup>
+              )}
+              {pimCategories.filter(c => c.product_type === "ACCESSORY").length > 0 && (
+                <optgroup label="Accessories">
+                  {pimCategories.filter(c => c.product_type === "ACCESSORY").map((c) => (
+                    <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
+                  ))}
+                </optgroup>
+              )}
+              {pimCategories.filter(c => c.product_type === "RAW_MATERIAL").length > 0 && (
+                <optgroup label="Raw Materials">
+                  {pimCategories.filter(c => c.product_type === "RAW_MATERIAL").map((c) => (
+                    <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
+                  ))}
+                </optgroup>
+              )}
+              {pimCategories.filter(c => c.product_type === "SERVICE").length > 0 && (
+                <optgroup label="Services">
+                  {pimCategories.filter(c => c.product_type === "SERVICE").map((c) => (
+                    <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
+                  ))}
+                </optgroup>
+              )}
+              {pimCategories.filter(c => !["FINISHED_GOOD", "ACCESSORY", "RAW_MATERIAL", "SERVICE"].includes(c.product_type || "")).map((c) => (
+                <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
+              ))}
+            </>
+          ) : (
+            pimCategories
+              .filter(c => c.product_type === pimTypeFilter || c.product_type === "ALL" || (!c.product_type && pimTypeFilter === "FINISHED_GOOD"))
+              .map((c) => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)
+          )}
         </select>
         {/* Stock Filter Pills */}
         <div className="flex items-center gap-1 rounded-xl border border-border bg-background p-1 text-xs font-medium">

@@ -336,6 +336,8 @@ export type ProductRelationship = {
   related_product_name: string;
   related_product_code: string;
   related_product_item_type: ProductItemType;
+  related_product_category?: string;
+  related_product_subcategory?: string;
   related_product_base_price?: string;
   related_product_stock_qty?: string;
   related_product_stock_status?: string;
@@ -362,6 +364,8 @@ export type ProductSearchResult = {
   id: number;
   product_code: string;
   name: string;
+  category?: string;
+  subcategory?: string;
   item_type: ProductItemType;
   stock_type: ProductStockType;
 };

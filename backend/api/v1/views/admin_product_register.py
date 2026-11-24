@@ -339,6 +339,16 @@ class AdminProductCreateView(APIView):
             if extended_warranty_cost_percentage:
                 product_data["extended_warranty_cost_percentage"] = Decimal(extended_warranty_cost_percentage)
 
+            if category:
+                from products_core.models import ProductCategoryMaster, ProductSubcategoryMaster
+                cat_master = ProductCategoryMaster.objects.filter(name__iexact=category).first()
+                if cat_master:
+                    product_data["category_master"] = cat_master
+                    if subcategory:
+                        subcat_master = ProductSubcategoryMaster.objects.filter(category=cat_master, name__iexact=subcategory).first()
+                        if subcat_master:
+                            product_data["subcategory_master"] = subcat_master
+
             if image:
                 product_data["image"] = image
 
@@ -347,13 +357,16 @@ class AdminProductCreateView(APIView):
 
             product = Product.objects.create(**product_data)
 
-            # Assign explicit PIM category if provided (signal auto-creates PimProduct)
-            if catalog_category:
-                from products_pim.models import PimProduct
-                pim_product = PimProduct.objects.filter(source_product=product).first()
-                if pim_product:
+            # Ensure PIM product is created/linked and assign category/subcategory
+            from products_pim.services.core import ensure_pim_product_for_product
+            pim_product = ensure_pim_product_for_product(product)
+            if pim_product:
+                fields_to_upd = []
+                if catalog_category:
                     pim_product.category_id = int(catalog_category)
-                    pim_product.save(update_fields=["category"])
+                    fields_to_upd.append("category")
+                if fields_to_upd:
+                    pim_product.save(update_fields=fields_to_upd)
 
             # Create variants if provided
             if has_variants and variants_json:

@@ -16,7 +16,7 @@ interface PimAttr {
   options: PimOption[];
 }
 interface PimSubcat { id: number; name: string; slug: string; display_order: number; attributes: PimAttr[] }
-interface PimCat { id: number; name: string; slug: string; icon: string; display_order: number; subcategories: PimSubcat[]; attributes: PimAttr[] }
+interface PimCat { id: number; name: string; slug: string; icon: string; product_type?: string; display_order: number; subcategories: PimSubcat[]; attributes: PimAttr[] }
 
 type Paginated<T> = { results?: T[]; count?: number } | T[];
 function unwrap<T>(r: Paginated<T>): T[] { return Array.isArray(r) ? r : (r.results ?? []); }
@@ -37,6 +37,7 @@ function CategoryForm({ initial, onSave, onCancel }: {
 }) {
   const [name, setName] = useState(initial?.name ?? "");
   const [icon, setIcon] = useState(initial?.icon ?? "📦");
+  const [productType, setProductType] = useState(initial?.product_type ?? "FINISHED_GOOD");
   const [order, setOrder] = useState(initial?.display_order ?? 0);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -45,23 +46,34 @@ function CategoryForm({ initial, onSave, onCancel }: {
     e.preventDefault();
     if (!name.trim()) { setErr("Name required"); return; }
     setSaving(true); setErr(null);
-    try { await onSave({ name: name.trim(), icon, display_order: order }); }
+    try { await onSave({ name: name.trim(), icon, product_type: productType, display_order: order }); }
     catch (ex: unknown) { setErr((ex as { message?: string })?.message ?? "Save failed"); }
     finally { setSaving(false); }
   }
 
   return (
-    <form onSubmit={submit} className="grid gap-3 sm:grid-cols-3 p-4 bg-muted/30 rounded-xl border">
-      <div className="flex gap-2">
+    <form onSubmit={submit} className="grid gap-3 sm:grid-cols-4 p-4 bg-muted/30 rounded-xl border">
+      <div className="flex gap-2 sm:col-span-2">
         <input className="w-14 rounded-lg border px-2 py-2 text-lg text-center bg-background" value={icon} onChange={e => setIcon(e.target.value)} placeholder="🏷️" maxLength={4} />
         <input required className="flex-1 rounded-lg border px-3 py-2 text-sm bg-background" placeholder="Category name" value={name} onChange={e => setName(e.target.value)} />
       </div>
       <div>
-        <input type="number" className="w-full rounded-lg border px-3 py-2 text-sm bg-background" placeholder="Display order" value={order} onChange={e => setOrder(Number(e.target.value))} />
+        <select
+          className="w-full rounded-lg border px-3 py-2 text-sm bg-background"
+          value={productType}
+          onChange={e => setProductType(e.target.value)}
+        >
+          <option value="FINISHED_GOOD">🛋️ Finished Good</option>
+          <option value="ACCESSORY">🔩 Accessory</option>
+          <option value="RAW_MATERIAL">🪵 Raw Material</option>
+          <option value="SERVICE">🛠️ Service</option>
+          <option value="ALL">📦 All Types</option>
+        </select>
       </div>
       <div className="flex gap-2 items-center">
+        <input type="number" className="w-20 rounded-lg border px-3 py-2 text-sm bg-background" placeholder="Order" value={order} onChange={e => setOrder(Number(e.target.value))} />
         <button type="submit" disabled={saving} className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground disabled:opacity-50">
-          <Save className="h-3.5 w-3.5" />{saving ? "Saving…" : "Save"}
+          <Save className="h-3.5 w-3.5" />{saving ? "…" : "Save"}
         </button>
         <button aria-label="Close" type="button" onClick={onCancel} className="rounded-lg border px-3 py-2 text-sm hover:bg-muted">
           <X className="h-3.5 w-3.5" />
@@ -470,6 +482,11 @@ export default function CategoryManageWorkbench({
                     <ChevronRight className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${expanded ? "rotate-90" : ""}`} />
                     <span className="text-lg">{cat.icon}</span>
                     <span className="font-semibold text-sm">{cat.name}</span>
+                    {cat.product_type && (
+                      <span className="ml-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-primary/10 text-primary uppercase">
+                        {cat.product_type.replace("_", " ")}
+                      </span>
+                    )}
                     <span className="ml-2 text-xs text-muted-foreground">
                       {cat.subcategories.length} subcats · {allAttrs.length} attributes
                     </span>

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -606,6 +606,15 @@ export default function PimProductForm({
 
   const [attrValues, setAttrValues] = useState<AttributeValues>({});
   const [variants, setVariants] = useState(product?.variants ?? []);
+
+  // Segregate categories matching the current product classification vs other categories
+  const primaryCategories = useMemo(() => {
+    return categories.filter(c => c.product_type === productType || c.product_type === "ALL" || (!c.product_type && productType === "FINISHED_GOOD"));
+  }, [categories, productType]);
+
+  const otherCategories = useMemo(() => {
+    return categories.filter(c => !(c.product_type === productType || c.product_type === "ALL" || (!c.product_type && productType === "FINISHED_GOOD")));
+  }, [categories, productType]);
 
   // Operator-controlled attribute locks
   const [lockedAttributes, setLockedAttributes] = useState<Set<number>>(new Set());
@@ -1737,6 +1746,14 @@ export default function PimProductForm({
                     setChannelDirectSale(true);
                     setChannelEmi(true);
                   }
+
+                  // Switch category to matching taxonomy if current category is incompatible
+                  const matchingCat = categories.find(c => c.product_type === newType);
+                  const currentCat = categories.find(c => c.id === categoryId);
+                  if (matchingCat && (!categoryId || (currentCat && currentCat.product_type && currentCat.product_type !== newType && currentCat.product_type !== "ALL"))) {
+                    setCategoryId(matchingCat.id);
+                    setSubcategoryId("");
+                  }
                 }}
                 className={cn(
                   "flex flex-col items-start gap-1 p-3 rounded-xl border text-left transition cursor-pointer",
@@ -2284,7 +2301,7 @@ export default function PimProductForm({
             <label className="block text-sm font-medium mb-1">Category *</label>
             <select id="f-category"
               required
-              className="w-full rounded-md border px-3 py-2 text-sm bg-background"
+              className="w-full rounded-md border px-3 py-2 text-sm bg-background font-medium"
               value={categoryId}
               onChange={(e) => {
                 setCategoryId(e.target.value ? Number(e.target.value) : "");
@@ -2293,9 +2310,20 @@ export default function PimProductForm({
               }}
             >
               <option value="">— Select Category —</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
-              ))}
+              {primaryCategories.length > 0 && (
+                <optgroup label={`${productType.replace("_", " ")} Categories`}>
+                  {primaryCategories.map((c: PimCategory) => (
+                    <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
+                  ))}
+                </optgroup>
+              )}
+              {otherCategories.length > 0 && (
+                <optgroup label="Other Categories">
+                  {otherCategories.map((c: PimCategory) => (
+                    <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
+                  ))}
+                </optgroup>
+              )}
             </select>
           </div>
           {subcategories.length > 0 && (

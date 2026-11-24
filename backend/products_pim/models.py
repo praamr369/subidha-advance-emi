@@ -15,10 +15,23 @@ class AttributeDataType(models.TextChoices):
 
 
 class ProductCategory(models.Model):
+    PRODUCT_TYPE_CHOICES = [
+        ("FINISHED_GOOD", "Finished Good"),
+        ("ACCESSORY", "Accessory"),
+        ("RAW_MATERIAL", "Raw Material"),
+        ("SERVICE", "Service"),
+        ("ALL", "All Types"),
+    ]
     name = models.CharField(max_length=100)
     slug = models.SlugField(unique=True)
     description = models.TextField(blank=True)
     icon = models.CharField(max_length=10, blank=True)
+    product_type = models.CharField(
+        max_length=20,
+        choices=PRODUCT_TYPE_CHOICES,
+        default="FINISHED_GOOD",
+        db_index=True,
+    )
     display_order = models.PositiveIntegerField(default=0)
     is_active = models.BooleanField(default=True)
 

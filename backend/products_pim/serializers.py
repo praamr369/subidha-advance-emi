@@ -104,7 +104,7 @@ class ProductCategorySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProductCategory
-        fields = ["id", "name", "slug", "icon", "display_order", "subcategories", "attributes"]
+        fields = ["id", "name", "slug", "icon", "product_type", "display_order", "subcategories", "attributes"]
         extra_kwargs = {"slug": {"required": False, "allow_blank": True}}
 
     def validate(self, attrs):

@@ -3105,6 +3105,8 @@ class ProductRelationshipSerializer(serializers.ModelSerializer):
     related_product_name = serializers.CharField(source="related_product.name", read_only=True)
     related_product_code = serializers.CharField(source="related_product.product_code", read_only=True)
     related_product_item_type = serializers.CharField(source="related_product.item_type", read_only=True)
+    related_product_category = serializers.CharField(source="related_product.category", read_only=True)
+    related_product_subcategory = serializers.CharField(source="related_product.subcategory", read_only=True)
     related_product_base_price = serializers.CharField(source="related_product.base_price", read_only=True)
     related_product_unit_cost = serializers.SerializerMethodField()
     related_product_total_cost = serializers.SerializerMethodField()
@@ -3149,6 +3151,8 @@ class ProductRelationshipSerializer(serializers.ModelSerializer):
             "related_product_name",
             "related_product_code",
             "related_product_item_type",
+            "related_product_category",
+            "related_product_subcategory",
             "related_product_base_price",
             "related_product_unit_cost",
             "related_product_total_cost",
@@ -3259,4 +3263,4 @@ class ProductRelationshipSerializer(serializers.ModelSerializer):
 class ProductSearchSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
-        fields = ["id", "product_code", "name", "item_type", "stock_type"]
+        fields = ["id", "product_code", "name", "category", "subcategory", "item_type", "stock_type"]

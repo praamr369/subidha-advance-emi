@@ -5,6 +5,7 @@ export interface PimCategory {
   name: string;
   slug: string;
   icon: string;
+  product_type?: "FINISHED_GOOD" | "ACCESSORY" | "RAW_MATERIAL" | "SERVICE" | "ALL";
   display_order: number;
   subcategories: PimSubcategory[];
   attributes: PimCategoryAttribute[];
@@ -414,8 +415,10 @@ function unwrap<T>(raw: PaginatedOrArray<T>): T[] {
 
 export const pimService = {
   // Categories
-  getCategories: (): Promise<PimCategory[]> =>
-    request<PaginatedOrArray<PimCategory>>(`${BASE}/categories/?page_size=200`).then(unwrap),
+  getCategories: (params?: { product_type?: string }): Promise<PimCategory[]> => {
+    const qs = params?.product_type ? `&product_type=${encodeURIComponent(params.product_type)}` : "";
+    return request<PaginatedOrArray<PimCategory>>(`${BASE}/categories/?page_size=200${qs}`).then(unwrap);
+  },
 
   getCategoryWithAttributes: (id: number): Promise<PimCategory> =>
     request<PimCategory>(`${BASE}/categories/${id}/with_attributes/`),

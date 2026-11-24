@@ -26,6 +26,48 @@ interface RelatedProductsSectionProps {
   lockedParentVariantSku?: string;
 }
 
+const ITEM_TYPE_DEFAULT_CATEGORIES: Record<string, { category: string; subcategories: string[] }> = {
+  ACCESSORY: {
+    category: "Accessories & Hardware",
+    subcategories: [
+      "Plywood & Boards",
+      "Bed Hardware & Side Rails",
+      "Legs, Caps & Buffers",
+      "Fasteners, Nuts & Bolts",
+      "Handles, Locks & Hinges",
+      "Foam, Cushions & Fabric",
+      "Mirrors & Glass Tops",
+    ],
+  },
+  RAW_MATERIAL: {
+    category: "Raw Materials & Lumber",
+    subcategories: [
+      "Steel Pipes & Tubes",
+      "Timber & Wood Planks",
+      "Sheet Metal & Mesh",
+      "Paints, Powder & Polish",
+      "Adhesives & Chemicals",
+    ],
+  },
+  SERVICE: {
+    category: "Services & Labor",
+    subcategories: [
+      "Installation & Assembly",
+      "Transport & Delivery",
+      "Maintenance & Repair",
+    ],
+  },
+  ADD_ON: {
+    category: "Accessories & Hardware",
+    subcategories: [
+      "Plywood & Boards",
+      "Bed Hardware & Side Rails",
+      "Foam, Cushions & Fabric",
+      "Mirrors & Glass Tops",
+    ],
+  },
+};
+
 export default function RelatedProductsSection({
   productId,
   saving,
@@ -66,6 +108,7 @@ export default function RelatedProductsSection({
   const [newProdName, setNewProdName] = useState("");
   const [newProdPrice, setNewProdPrice] = useState("");
   const [newProdItemType, setNewProdItemType] = useState<string>("ACCESSORY");
+  const [newProdSubcategory, setNewProdSubcategory] = useState<string>("Plywood & Boards");
   const [newProdParentVariantId, setNewProdParentVariantId] = useState<number | "">("");
 
   // Edit product state
@@ -172,6 +215,7 @@ export default function RelatedProductsSection({
     setNewProdName("");
     setNewProdPrice("");
     setNewProdItemType("ACCESSORY");
+    setNewProdSubcategory("Plywood & Boards");
     setRelationshipType("ACCESSORY");
     setCloneMode(false);
     setCloneSearch("");
@@ -218,10 +262,16 @@ export default function RelatedProductsSection({
     setAdding(true);
     setError(null);
     try {
+      const typeConfig = ITEM_TYPE_DEFAULT_CATEGORIES[newProdItemType];
+      const categoryName = typeConfig?.category || "Accessories & Hardware";
+      const subcategoryName = newProdSubcategory || typeConfig?.subcategories?.[0] || "";
+
       // 1. Create the product
       const newProduct = await createProduct({
         name: newProdName.trim(),
         base_price: newProdPrice.trim() || "0.00",
+        category: categoryName,
+        subcategory: subcategoryName,
         item_type: newProdItemType,
         stock_type: newProdItemType === "SERVICE" ? "NON_STOCK" : "STOCK_ITEM",
         is_active: true,
@@ -391,8 +441,13 @@ export default function RelatedProductsSection({
                   >
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-sm text-foreground">{rel.related_product_name}</div>
-                      <div className="text-xs text-muted-foreground mt-0.5">
-                        {rel.related_product_code} · {rel.related_product_item_type}
+                      <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1.5 flex-wrap">
+                        <span>{rel.related_product_code} · {rel.related_product_item_type}</span>
+                        {(rel.related_product_category || rel.related_product_subcategory) && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200 text-[11px] font-medium">
+                            {rel.related_product_category} {rel.related_product_subcategory ? `· ${rel.related_product_subcategory}` : ""}
+                          </span>
+                        )}
                       </div>
                       {(rel.parent_variant_name || rel.parent_variant_sku || rel.related_variant_name || rel.related_variant_sku) && (
                         <div className="flex items-center gap-1.5 mt-1.5 text-xs">
@@ -805,6 +860,11 @@ export default function RelatedProductsSection({
                       >
                         <span className="shrink-0 rounded border border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 font-mono text-[11px] font-bold text-slate-700 dark:text-slate-200">{product.product_code}</span>
                         <span className="flex-1 text-[13px] font-semibold text-slate-900 dark:text-slate-100">{product.name}</span>
+                        {(product.category || product.subcategory) && (
+                          <span className="shrink-0 rounded border border-purple-200 bg-purple-50 px-1.5 py-0.5 text-[10px] font-medium text-purple-700">
+                            {product.subcategory || product.category}
+                          </span>
+                        )}
                         <span className="shrink-0 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">{product.item_type}</span>
                       </button>
                     ))}
@@ -1072,13 +1132,30 @@ export default function RelatedProductsSection({
                   Item Type
                   <select
                     value={newProdItemType}
-                    onChange={(e) => setNewProdItemType(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setNewProdItemType(val);
+                      const def = ITEM_TYPE_DEFAULT_CATEGORIES[val]?.subcategories?.[0] || "";
+                      setNewProdSubcategory(def);
+                    }}
                     className="mt-1 h-9 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-ring"
                   >
                     <option value="ACCESSORY">Accessory</option>
                     <option value="RAW_MATERIAL">Raw Material</option>
                     <option value="SERVICE">Service</option>
                     <option value="ADD_ON">Add-on</option>
+                  </select>
+                </label>
+                <label className="text-xs font-medium text-foreground">
+                  Subcategory
+                  <select
+                    value={newProdSubcategory}
+                    onChange={(e) => setNewProdSubcategory(e.target.value)}
+                    className="mt-1 h-9 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-ring font-medium"
+                  >
+                    {(ITEM_TYPE_DEFAULT_CATEGORIES[newProdItemType]?.subcategories || []).map((sub) => (
+                      <option key={sub} value={sub}>{sub}</option>
+                    ))}
                   </select>
                 </label>
                 <label className="text-xs font-medium text-foreground">

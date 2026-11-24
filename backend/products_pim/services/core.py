@@ -14,6 +14,17 @@ from django.db import transaction
 
 def infer_product_type(product) -> str:
     """Infer the correct PIM product classification from product attributes and heuristics."""
+    # 0. Explicit classification on operational product or PIM product takes priority
+    explicit_type = (
+        getattr(product, "item_type", "")
+        or getattr(product, "product_type", "")
+        or ""
+    )
+    if explicit_type in ("FINISHED_GOOD", "ACCESSORY", "RAW_MATERIAL", "SERVICE"):
+        return explicit_type
+    if explicit_type == "ADD_ON":
+        return "ACCESSORY"
+
     code = (getattr(product, "product_code", "") or getattr(product, "code", "") or "").upper()
     name = (getattr(product, "name", "") or "").lower()
     category_val = getattr(product, "category", "") or ""
@@ -174,23 +185,37 @@ def ensure_pim_product_for_product(product) -> "object | None":
             by_code.save(update_fields=["product_type"])
         return by_code
 
-    # Otherwise create a fresh linked PIM record under the Unclassified catch-all.
-    unclassified, _ = ProductCategory.objects.get_or_create(
-        slug="unclassified",
-        defaults={"name": "Unclassified", "icon": "📦", "display_order": 999},
-    )
+    initial_type = infer_product_type(product)
+    if initial_type not in ("FINISHED_GOOD", "ACCESSORY", "RAW_MATERIAL", "SERVICE"):
+        initial_type = "FINISHED_GOOD"
+
+    # Otherwise create a fresh linked PIM record under appropriate or Unclassified catch-all.
     cat_map = {c.name.lower(): c for c in ProductCategory.objects.all()}
-    category = cat_map.get((product.category or "").strip().lower(), unclassified)
+    category = cat_map.get((product.category or "").strip().lower(), None)
+    if not category:
+        if initial_type == "ACCESSORY":
+            category = ProductCategory.objects.filter(product_type="ACCESSORY").first()
+        elif initial_type == "RAW_MATERIAL":
+            category = ProductCategory.objects.filter(product_type="RAW_MATERIAL").first()
+        elif initial_type == "SERVICE":
+            category = ProductCategory.objects.filter(product_type="SERVICE").first()
+        if not category:
+            unclassified, _ = ProductCategory.objects.get_or_create(
+                slug="unclassified",
+                defaults={"name": "Unclassified", "icon": "📦", "display_order": 999, "product_type": "ALL"},
+            )
+            category = unclassified
+
+    subcategory = None
+    if getattr(product, "subcategory", None):
+        from products_pim.models import ProductSubcategory
+        subcategory = ProductSubcategory.objects.filter(category=category, name__iexact=product.subcategory).first()
 
     # Determine parent if this is a variant
     parent_id = None
     if hasattr(product, 'pim_variant'):
         # Link to the PimProduct corresponding to the variant's parent Operational Product
         parent_id = product.pim_variant.product_id
-
-    initial_type = infer_product_type(product)
-    if initial_type not in ("FINISHED_GOOD", "ACCESSORY", "RAW_MATERIAL", "SERVICE"):
-        initial_type = "FINISHED_GOOD"
 
     # Keep operational product item_type in sync with inferred type if needed
     if getattr(product, "item_type", None) != initial_type and hasattr(product, "pk") and product.pk:
@@ -204,6 +229,7 @@ def ensure_pim_product_for_product(product) -> "object | None":
         base_price=product.base_price,
         description=getattr(product, "description", "") or "",
         category=category,
+        subcategory=subcategory,
         is_active=getattr(product, "is_active", True),
         is_published=False,
         parent_id=parent_id,
