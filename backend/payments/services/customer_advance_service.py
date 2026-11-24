@@ -86,10 +86,24 @@ class CustomerAdvanceService:
         customer = Customer.objects.get(pk=customer_id)
         resolved_branch_id, counter = cls._resolve_branch_and_counter(actor=collected_by, branch_id=branch_id, cash_counter_id=cash_counter_id)
         finance_account = FinancePostingService.resolve_operational_finance_account(finance_account_id=finance_account_id)
+        normalized_method = (method or "CASH").strip().upper()
+
+        from subscriptions.models import settlement_channel_for_method
+        from payments.services.payment_service import _fallback_finance_account_for_method
+        from accounting.models import FinanceAccountKind
+
+        channel = settlement_channel_for_method(normalized_method)
+        if channel == "BANK" and finance_account.kind == FinanceAccountKind.CASH:
+            fallback_fa = _fallback_finance_account_for_method(normalized_method)
+            if fallback_fa:
+                finance_account = fallback_fa
+        elif channel == "CASH" and finance_account.kind in {FinanceAccountKind.BANK, FinanceAccountKind.UPI}:
+            fallback_fa = _fallback_finance_account_for_method(normalized_method)
+            if fallback_fa:
+                finance_account = fallback_fa
+
         if resolved_branch_id and finance_account.branch_id and resolved_branch_id != finance_account.branch_id:
             raise ValueError("Selected finance account does not belong to the advance branch.")
-
-        normalized_method = (method or "CASH").strip().upper()
         normalized_reference = (reference_no or "").strip() or None
         normalized_idempotency = (idempotency_key or "").strip() or None
         if not normalized_reference and normalized_idempotency:

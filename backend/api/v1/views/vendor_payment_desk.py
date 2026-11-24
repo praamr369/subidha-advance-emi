@@ -11,6 +11,7 @@ from accounting.services.vendor_payment_desk_service import (
     build_vendor_payment_desk,
     pay_vendor_advance,
     pay_vendor_bills,
+    pay_vendor_outstanding,
 )
 from api.v1.permissions import IsAdmin
 
@@ -48,6 +49,29 @@ class AdminVendorPayBillsView(_VendorDeskView):
             result = pay_vendor_bills(
                 vendor_id=pk,
                 allocations=data.get("allocations") or [],
+                on_account_amount=data.get("on_account_amount"),
+                finance_account_id=data.get("finance_account_id"),
+                posted_by=request.user,
+                payment_date=data.get("payment_date"),
+                reference_no=data.get("reference_no") or "",
+                notes=data.get("notes") or "",
+            )
+        except ValidationError as exc:
+            return _error(exc)
+        return Response(result)
+
+
+class AdminVendorPayOutstandingView(_VendorDeskView):
+    """POST /api/v1/admin/vendors/<id>/payment-desk/pay-outstanding/"""
+
+    def post(self, request, pk):
+        if self._vendor(pk) is None:
+            return Response({"detail": "Vendor not found."}, status=status.HTTP_404_NOT_FOUND)
+        data = request.data
+        try:
+            result = pay_vendor_outstanding(
+                vendor_id=pk,
+                amount=data.get("amount"),
                 finance_account_id=data.get("finance_account_id"),
                 posted_by=request.user,
                 payment_date=data.get("payment_date"),

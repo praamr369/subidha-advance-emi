@@ -99,6 +99,9 @@ def build_vendor_payment_desk(vendor: Vendor) -> dict:
     bills.sort(key=lambda b: str(b["bill_date"] or ""), reverse=True)
 
     net = _net_outstanding(vendor)
+    payable = max(net, MONEY_ZERO)
+    open_bills_sum = sum((Decimal(b['outstanding']) for b in bills), MONEY_ZERO)
+    unallocated = max(payable - open_bills_sum, MONEY_ZERO)
     recent = (
         VendorSettlement.objects.filter(vendor=vendor)
         .exclude(status=VendorSettlementStatus.CANCELLED)
@@ -108,9 +111,10 @@ def build_vendor_payment_desk(vendor: Vendor) -> dict:
     return {
         "vendor_id": vendor.id,
         "net_outstanding": f"{net:.2f}",
-        "payable_now": f"{max(net, MONEY_ZERO):.2f}",
+        "payable_now": f"{payable:.2f}",
         "advance_balance": f"{advance_balance(vendor):.2f}",
-        "open_bills_total": f"{sum((Decimal(b['outstanding']) for b in bills), MONEY_ZERO):.2f}",
+        "open_bills_total": f"{open_bills_sum:.2f}",
+        "unallocated_outstanding": f"{unallocated:.2f}",
         "open_bills": bills,
         "finance_accounts": [
             {"id": fa.id, "name": fa.name, "kind": fa.kind} for fa in _payout_accounts()
@@ -153,7 +157,7 @@ def _date(value):
         raise ValidationError({"payment_date": "Use a YYYY-MM-DD date."})
 
 
-def _clean_allocations(vendor: Vendor, allocations) -> list[tuple[object, Decimal, bool]]:
+def _clean_allocations(vendor: Vendor, allocations, *, allow_empty: bool = False) -> list[tuple[object, Decimal, bool]]:
     rows = []
     seen = set()
     VendorBill = __import__("inventory.models", fromlist=["VendorBill"]).VendorBill
@@ -188,7 +192,7 @@ def _clean_allocations(vendor: Vendor, allocations) -> list[tuple[object, Decima
                 {"allocations": f"₹{amount:.2f} is more than bill {bill.bill_no}'s outstanding ₹{outstanding:.2f}."}
             )
         rows.append((bill, amount, is_legacy))
-    if not rows:
+    if not rows and not allow_empty:
         raise ValidationError({"allocations": "Enter an amount for at least one bill."})
     return rows
 
@@ -203,12 +207,28 @@ def _post(settlement: VendorSettlement, posted_by) -> VendorSettlement:
 
 @transaction.atomic
 def pay_vendor_bills(
-    *, vendor_id: int, allocations, finance_account_id, posted_by, payment_date=None, reference_no: str = "", notes: str = ""
+    *,
+    vendor_id: int,
+    allocations=None,
+    on_account_amount=None,
+    finance_account_id,
+    posted_by,
+    payment_date=None,
+    reference_no: str = "",
+    notes: str = "",
 ) -> dict:
     vendor = Vendor.objects.select_for_update().get(pk=vendor_id)
     account = _finance_account(finance_account_id)
-    rows = _clean_allocations(vendor, allocations)
-    total = sum((amount for _, amount, _ in rows), MONEY_ZERO)
+    on_account_q = _money(on_account_amount) if on_account_amount not in (None, "") else MONEY_ZERO
+    if on_account_q < MONEY_ZERO:
+        raise ValidationError({"amount": "On-account payment amount cannot be negative."})
+
+    rows = _clean_allocations(vendor, allocations, allow_empty=(on_account_q > MONEY_ZERO))
+    if not rows and on_account_q <= MONEY_ZERO:
+        raise ValidationError({"allocations": "Enter an amount for at least one bill or an on-account amount."})
+
+    bill_total = sum((amount for _, amount, _ in rows), MONEY_ZERO)
+    total = bill_total + on_account_q
     payable = max(_net_outstanding(vendor), MONEY_ZERO)
     if total > payable:
         advance = advance_balance(vendor)
@@ -257,11 +277,51 @@ def pay_vendor_bills(
                 "amount": f"{_money(settlement.amount):.2f}",
                 "journal_entry_no": getattr(settlement.posted_journal_entry, "entry_no", None)
             })
+
+    if on_account_q > MONEY_ZERO:
+        settlement = VendorSettlement.objects.create(
+            vendor=vendor,
+            settlement_date=when,
+            amount=on_account_q,
+            finance_account=account,
+            branch_id=account.branch_id,
+            reference_no=(reference_no or "").strip() or None,
+            notes=(notes or "").strip() or "On account / outstanding settlement from vendor desk.",
+        )
+        settlement = _post(settlement, posted_by)
+        posted.append({
+            "id": settlement.id, 
+            "settlement_no": settlement.settlement_no, 
+            "amount": f"{_money(settlement.amount):.2f}",
+            "journal_entry_no": getattr(settlement.posted_journal_entry, "entry_no", None)
+        })
+
     return {
         "paid_total": f"{total:.2f}",
         "settlements": posted,
         "desk": build_vendor_payment_desk(vendor),
     }
+
+
+@transaction.atomic
+def pay_vendor_outstanding(
+    *, vendor_id: int, amount, finance_account_id, posted_by, payment_date=None, reference_no: str = "", notes: str = ""
+) -> dict:
+    result = pay_vendor_bills(
+        vendor_id=vendor_id,
+        allocations=[],
+        on_account_amount=amount,
+        finance_account_id=finance_account_id,
+        posted_by=posted_by,
+        payment_date=payment_date,
+        reference_no=reference_no,
+        notes=notes or "Payment against old bills / outstanding (vendor desk).",
+    )
+    result["amount"] = result["paid_total"]
+    if result.get("settlements"):
+        result["settlement_no"] = result["settlements"][0]["settlement_no"]
+        result["journal_entry_no"] = result["settlements"][0].get("journal_entry_no")
+    return result
 
 
 @transaction.atomic

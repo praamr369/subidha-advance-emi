@@ -1139,6 +1139,20 @@ def create_manual_receipt(
     billing_invoice = BillingInvoice.objects.select_related("customer").filter(pk=billing_invoice_id).first() if billing_invoice_id else None
     direct_sale = DirectSale.objects.select_related("customer").filter(pk=direct_sale_id).first() if direct_sale_id else None
     payment = Payment.objects.select_related("customer").filter(pk=payment_id).first() if payment_id else None
+    if payment and payment.method:
+        from subscriptions.models import settlement_channel_for_method
+        from payments.services.payment_service import _fallback_finance_account_for_method
+        from accounting.models import FinanceAccountKind
+
+        channel = settlement_channel_for_method(payment.method)
+        if channel == "BANK" and finance_account.kind == FinanceAccountKind.CASH:
+            fallback_fa = _fallback_finance_account_for_method(payment.method)
+            if fallback_fa:
+                finance_account = fallback_fa
+        elif channel == "CASH" and finance_account.kind in {FinanceAccountKind.BANK, FinanceAccountKind.UPI}:
+            fallback_fa = _fallback_finance_account_for_method(payment.method)
+            if fallback_fa:
+                finance_account = fallback_fa
     resolved_source_type = source_type or BillingSourceType.MANUAL
     resolved_source_reference = (source_reference or "").strip()
     if billing_invoice is not None and billing_invoice.direct_sale_id and direct_sale is None:

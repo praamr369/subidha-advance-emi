@@ -90,6 +90,23 @@ def settle_legacy_receivable(
         .filter(pk=finance_account_id, is_active=True)
         .first()
     )
+    from subscriptions.models import settlement_channel_for_method
+    from payments.services.payment_service import _fallback_finance_account_for_method
+
+    normalized_method = (payment_method or "CASH").strip().upper()
+    channel = settlement_channel_for_method(normalized_method)
+    if finance_account:
+        if channel == "BANK" and finance_account.kind == FinanceAccountKind.CASH:
+            fallback_fa = _fallback_finance_account_for_method(normalized_method)
+            if fallback_fa:
+                finance_account = fallback_fa
+        elif channel == "CASH" and finance_account.kind in {FinanceAccountKind.BANK, FinanceAccountKind.UPI}:
+            fallback_fa = _fallback_finance_account_for_method(normalized_method)
+            if fallback_fa:
+                finance_account = fallback_fa
+    else:
+        finance_account = _fallback_finance_account_for_method(normalized_method)
+
     if finance_account is None:
         raise ValidationError({"finance_account_id": "Active finance account was not found."})
     if finance_account.chart_account_id is None:

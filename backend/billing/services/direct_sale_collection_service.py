@@ -216,6 +216,7 @@ def collect_direct_sale_payment(
     amount,
     collected_by,
     receipt_date=None,
+    payment_method: str | None = None,
     finance_account_id: int | None = None,
     branch_id: int | None = None,
     cash_counter_id: int | None = None,
@@ -306,6 +307,22 @@ def collect_direct_sale_payment(
         cash_counter_id=cash_counter_id,
         finance_account_id=finance_account_id,
     )
+
+    if payment_method:
+        from subscriptions.models import settlement_channel_for_method
+        from payments.services.payment_service import _fallback_finance_account_for_method
+        from accounting.models import FinanceAccountKind
+
+        normalized_method = payment_method.strip().upper()
+        channel = settlement_channel_for_method(normalized_method)
+        if channel == "BANK" and finance_account.kind == FinanceAccountKind.CASH:
+            fallback_fa = _fallback_finance_account_for_method(normalized_method)
+            if fallback_fa:
+                finance_account = fallback_fa
+        elif channel == "CASH" and finance_account.kind in {FinanceAccountKind.BANK, FinanceAccountKind.UPI}:
+            fallback_fa = _fallback_finance_account_for_method(normalized_method)
+            if fallback_fa:
+                finance_account = fallback_fa
 
     receipt = create_manual_receipt(
         receipt_date=receipt_date or timezone.localdate(),

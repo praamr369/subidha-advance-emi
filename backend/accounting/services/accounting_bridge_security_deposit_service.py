@@ -142,10 +142,26 @@ def _lines(row: RentLeaseDepositTransaction, event_key: str):
         warnings.append("Security deposit transaction_date is required.")
     if not row.customer_id or not row.subscription_id:
         warnings.append("Security deposit requires customer and subscription evidence.")
+
     finance_account = row.finance_account
     finance_blocker = _finance_account_blocker(row, finance_account)
     if finance_blocker:
         warnings.append(finance_blocker)
+    elif finance_account:
+        from subscriptions.models import settlement_channel_for_method
+        from payments.services.payment_service import _fallback_finance_account_for_method
+        from accounting.models import FinanceAccountKind
+
+        method = (row.payment_method or "").strip().upper() or "CASH"
+        channel = settlement_channel_for_method(method)
+        if channel == "BANK" and finance_account.kind == FinanceAccountKind.CASH:
+            fallback_fa = _fallback_finance_account_for_method(method)
+            if fallback_fa:
+                finance_account = fallback_fa
+        elif channel == "CASH" and finance_account.kind in {FinanceAccountKind.BANK, FinanceAccountKind.UPI}:
+            fallback_fa = _fallback_finance_account_for_method(method)
+            if fallback_fa:
+                finance_account = fallback_fa
     liability = _liability_account()
     if liability is None:
         warnings.append("SECURITY_DEPOSIT_LIABILITY posting profile/chart account is missing or inactive.")

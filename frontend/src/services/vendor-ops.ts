@@ -101,12 +101,13 @@ export type VendorPaymentDesk = {
   payable_now: string;
   advance_balance: string;
   open_bills_total: string;
+  unallocated_outstanding?: string;
   open_bills: VendorOpenBill[];
   finance_accounts: Array<{ id: number; name: string; kind: string }>;
   recent_payments: VendorDeskPayment[];
 };
 
-export type VendorBillAllocation = { purchase_bill_id: number; amount: string };
+export type VendorBillAllocation = { purchase_bill_id: number; amount: string; type?: string };
 
 export async function getVendorPaymentDesk(id: number): Promise<VendorPaymentDesk> {
   return apiFetch(`/admin/vendors/${id}/payment-desk/`, { cache: "no-store" });
@@ -115,7 +116,8 @@ export async function getVendorPaymentDesk(id: number): Promise<VendorPaymentDes
 export async function payVendorBills(
   id: number,
   input: {
-    allocations: VendorBillAllocation[];
+    allocations?: VendorBillAllocation[];
+    on_account_amount?: string;
     finance_account_id: number;
     payment_date?: string;
     reference_no?: string;
@@ -123,6 +125,22 @@ export async function payVendorBills(
   }
 ): Promise<{ paid_total: string; desk: VendorPaymentDesk }> {
   return apiFetch(`/admin/vendors/${id}/payment-desk/pay-bills/`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function payVendorOutstanding(
+  id: number,
+  input: {
+    amount: string;
+    finance_account_id: number;
+    payment_date?: string;
+    reference_no?: string;
+    notes?: string;
+  }
+): Promise<{ settlement_no: string; amount: string; desk: VendorPaymentDesk }> {
+  return apiFetch(`/admin/vendors/${id}/payment-desk/pay-outstanding/`, {
     method: "POST",
     body: JSON.stringify(input),
   });

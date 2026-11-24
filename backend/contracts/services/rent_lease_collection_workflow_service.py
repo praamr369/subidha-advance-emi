@@ -317,12 +317,34 @@ def collect_security_deposit_with_metadata(
 ) -> RentLeaseBillingDemand:
     if subscription.plan_type not in (PlanType.RENT, PlanType.LEASE):
         raise ValidationError("Security deposit collection is available only for RENT/LEASE subscriptions.")
-    if not finance_account_id:
-        raise ValidationError({"finance_account": "Finance account is required for deposit source evidence."})
 
-    ensure_security_deposit_demand(subscription=subscription, performed_by=performed_by)
     resolved_payment_method = _normal_method(payment_method)
     resolved_payment_date = _payment_date(payment_date)
+
+    from subscriptions.models import settlement_channel_for_method
+    from payments.services.payment_service import _fallback_finance_account_for_method
+    from accounting.models import FinanceAccount, FinanceAccountKind
+
+    channel = settlement_channel_for_method(resolved_payment_method)
+    if finance_account_id:
+        fa = FinanceAccount.objects.filter(pk=finance_account_id).first()
+        if fa:
+            if channel == "BANK" and fa.kind == FinanceAccountKind.CASH:
+                fallback_fa = _fallback_finance_account_for_method(resolved_payment_method)
+                if fallback_fa:
+                    finance_account_id = fallback_fa.id
+            elif channel == "CASH" and fa.kind in {FinanceAccountKind.BANK, FinanceAccountKind.UPI}:
+                fallback_fa = _fallback_finance_account_for_method(resolved_payment_method)
+                if fallback_fa:
+                    finance_account_id = fallback_fa.id
+    elif not finance_account_id:
+        fallback_fa = _fallback_finance_account_for_method(resolved_payment_method)
+        if fallback_fa:
+            finance_account_id = fallback_fa.id
+        else:
+            raise ValidationError({"finance_account": "Finance account is required for deposit source evidence."})
+
+    ensure_security_deposit_demand(subscription=subscription, performed_by=performed_by)
     amount_q = _money(amount)
     demand = RentLeaseBillingDemand.objects.select_for_update(of=("self",)).get(
         subscription=subscription,
@@ -456,8 +478,6 @@ def collect_rent_lease_monthly_demand(
 ) -> RentLeaseBillingDemand:
     if subscription.plan_type not in (PlanType.RENT, PlanType.LEASE):
         raise ValidationError("Rent/lease monthly demand collection is available only for RENT/LEASE subscriptions.")
-    if not finance_account_id:
-        raise ValidationError({"finance_account": "Finance account is required for rent/lease collection evidence."})
 
     amount_q = _money(amount)
     if amount_q <= MONEY_ZERO:
@@ -465,6 +485,29 @@ def collect_rent_lease_monthly_demand(
 
     normalized_payment_method = _normal_method(payment_method)
     resolved_payment_date = _payment_date(payment_date)
+
+    from subscriptions.models import settlement_channel_for_method
+    from payments.services.payment_service import _fallback_finance_account_for_method
+    from accounting.models import FinanceAccount, FinanceAccountKind
+
+    channel = settlement_channel_for_method(normalized_payment_method)
+    if finance_account_id:
+        fa = FinanceAccount.objects.filter(pk=finance_account_id).first()
+        if fa:
+            if channel == "BANK" and fa.kind == FinanceAccountKind.CASH:
+                fallback_fa = _fallback_finance_account_for_method(normalized_payment_method)
+                if fallback_fa:
+                    finance_account_id = fallback_fa.id
+            elif channel == "CASH" and fa.kind in {FinanceAccountKind.BANK, FinanceAccountKind.UPI}:
+                fallback_fa = _fallback_finance_account_for_method(normalized_payment_method)
+                if fallback_fa:
+                    finance_account_id = fallback_fa.id
+    elif not finance_account_id:
+        fallback_fa = _fallback_finance_account_for_method(normalized_payment_method)
+        if fallback_fa:
+            finance_account_id = fallback_fa.id
+        else:
+            raise ValidationError({"finance_account": "Finance account is required for rent/lease collection evidence."})
     existing = _find_existing_monthly_collection(
         subscription=subscription,
         amount_q=amount_q,

@@ -81,6 +81,21 @@ def _lines(row: CustomerAdvance, event_key: str):
     finance_blocker = _finance_account_blocker(row)
     if finance_blocker:
         warnings.append(finance_blocker)
+    elif finance_account:
+        from subscriptions.models import settlement_channel_for_method
+        from payments.services.payment_service import _fallback_finance_account_for_method
+        from accounting.models import FinanceAccountKind
+
+        method = (row.method or "").strip().upper() or "CASH"
+        channel = settlement_channel_for_method(method)
+        if channel == "BANK" and finance_account.kind == FinanceAccountKind.CASH:
+            fallback_fa = _fallback_finance_account_for_method(method)
+            if fallback_fa:
+                finance_account = fallback_fa
+        elif channel == "CASH" and finance_account.kind in {FinanceAccountKind.BANK, FinanceAccountKind.UPI}:
+            fallback_fa = _fallback_finance_account_for_method(method)
+            if fallback_fa:
+                finance_account = fallback_fa
     liability = base._customer_advance_account()
     if liability is None:
         warnings.append("CUSTOMER_ADVANCE_UNEARNED_REVENUE posting profile/chart account is missing or inactive.")

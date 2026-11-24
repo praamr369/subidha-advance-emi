@@ -56,6 +56,7 @@ from api.v1.views.vendor_ops import AdminVendorSourcingSuggestView
 from api.v1.views.vendor_payment_desk import AdminVendorAdvancePaymentView
 from api.v1.views.vendor_payment_desk import AdminVendorApplyAdvanceView
 from api.v1.views.vendor_payment_desk import AdminVendorPayBillsView
+from api.v1.views.vendor_payment_desk import AdminVendorPayOutstandingView
 from api.v1.views.vendor_payment_desk import AdminVendorPaymentDeskView
 
 urlpatterns = [
@@ -97,6 +98,7 @@ urlpatterns = [
     path("vendors/<int:pk>/outstanding/", AdminVendorOutstandingView.as_view()),
     path("vendors/<int:pk>/payment-desk/", AdminVendorPaymentDeskView.as_view()),
     path("vendors/<int:pk>/payment-desk/pay-bills/", AdminVendorPayBillsView.as_view()),
+    path("vendors/<int:pk>/payment-desk/pay-outstanding/", AdminVendorPayOutstandingView.as_view()),
     path("vendors/<int:pk>/payment-desk/advance/", AdminVendorAdvancePaymentView.as_view()),
     path("vendors/<int:pk>/payment-desk/apply-advance/", AdminVendorApplyAdvanceView.as_view()),
     path("opening-balances/customers/", AdminCustomerOpeningOutstandingView.as_view()),

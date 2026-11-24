@@ -30,6 +30,7 @@ export default function BillingCashBookPage() {
       fetchReport={getBillingCashBook}
       columns={columns}
       actions={[
+        { href: ROUTES.admin.accountingBooksBank, label: "Bank / UPI Book", variant: "secondary" },
         { href: ROUTES.admin.billingDailyBook, label: "Daily Book", variant: "secondary" },
         { href: ROUTES.admin.billingReceipts, label: "Receipts", variant: "secondary" },
         { href: ROUTES.admin.billingRegister, label: "Document Register", variant: "primary" },

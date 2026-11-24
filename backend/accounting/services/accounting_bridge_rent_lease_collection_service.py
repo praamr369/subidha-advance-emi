@@ -65,6 +65,21 @@ def _lines(row: RentLeaseCollection, event_key: str):
         warnings.append("Finance account is inactive for this rent/lease collection.")
     elif not finance_account.chart_account_id or not finance_account.chart_account.is_active:
         warnings.append("Finance account is not mapped to an active chart account for this rent/lease collection.")
+    elif finance_account:
+        from subscriptions.models import settlement_channel_for_method
+        from payments.services.payment_service import _fallback_finance_account_for_method
+        from accounting.models import FinanceAccountKind
+
+        method = (row.payment_method or "").strip().upper() or "CASH"
+        channel = settlement_channel_for_method(method)
+        if channel == "BANK" and finance_account.kind == FinanceAccountKind.CASH:
+            fallback_fa = _fallback_finance_account_for_method(method)
+            if fallback_fa:
+                finance_account = fallback_fa
+        elif channel == "CASH" and finance_account.kind in {FinanceAccountKind.BANK, FinanceAccountKind.UPI}:
+            fallback_fa = _fallback_finance_account_for_method(method)
+            if fallback_fa:
+                finance_account = fallback_fa
     receivable = base._customer_receivable_account()
     if receivable is None:
         warnings.append("CUSTOMER_RECEIVABLE posting profile/chart account is missing or inactive.")

@@ -605,6 +605,17 @@ def record_emi_payment(
         finance_account = FinancePostingService.resolve_operational_finance_account(
             finance_account_id=resolved_finance_account_id,
         )
+        from subscriptions.models import settlement_channel_for_method
+
+        channel = settlement_channel_for_method(method)
+        if channel == "BANK" and finance_account.kind == FinanceAccountKind.CASH:
+            fallback_fa = _fallback_finance_account_for_method(method)
+            if fallback_fa:
+                finance_account = fallback_fa
+        elif channel == "CASH" and finance_account.kind in {FinanceAccountKind.BANK, FinanceAccountKind.UPI}:
+            fallback_fa = _fallback_finance_account_for_method(method)
+            if fallback_fa:
+                finance_account = fallback_fa
     assert_finance_account_allowed_for_payment_collection(finance_account)
     finance_branch_id = getattr(finance_account, "branch_id", None)
     if branch and finance_branch_id and branch.id != finance_branch_id:

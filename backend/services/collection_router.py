@@ -74,6 +74,27 @@ def route_collection(
     source_type = (source_type or "").strip().upper()
     payment_method = (payment_method or "CASH").strip().upper()
 
+    from subscriptions.models import settlement_channel_for_method
+    from payments.services.payment_service import _fallback_finance_account_for_method
+    from accounting.models import FinanceAccount, FinanceAccountKind
+
+    channel = settlement_channel_for_method(payment_method)
+    if finance_account_id:
+        fa = FinanceAccount.objects.filter(pk=finance_account_id).first()
+        if fa:
+            if channel == "BANK" and fa.kind == FinanceAccountKind.CASH:
+                fallback_fa = _fallback_finance_account_for_method(payment_method)
+                if fallback_fa:
+                    finance_account_id = fallback_fa.id
+            elif channel == "CASH" and fa.kind in {FinanceAccountKind.BANK, FinanceAccountKind.UPI}:
+                fallback_fa = _fallback_finance_account_for_method(payment_method)
+                if fallback_fa:
+                    finance_account_id = fallback_fa.id
+    elif not finance_account_id:
+        fallback_fa = _fallback_finance_account_for_method(payment_method)
+        if fallback_fa:
+            finance_account_id = fallback_fa.id
+
     audit_kwargs = {}
     if contract_reference_id is not None:
         audit_kwargs["contract_reference_id"] = contract_reference_id
@@ -140,6 +161,7 @@ def route_collection(
             amount=amount,
             collected_by=collected_by,
             receipt_date=payment_date,
+            payment_method=payment_method,
             finance_account_id=finance_account_id,
             branch_id=branch_id,
             cash_counter_id=cash_counter_id,

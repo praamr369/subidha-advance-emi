@@ -21,6 +21,7 @@ from accounting.services.vendor_payment_desk_service import (
     build_vendor_payment_desk,
     pay_vendor_advance,
     pay_vendor_bills,
+    pay_vendor_outstanding,
 )
 from accounting.services.vendor_settlement_service import purchase_bill_outstanding
 from inventory.models import InventoryItem, InventoryItemType
@@ -158,4 +159,42 @@ class VendorPaymentDeskTests(TestCase):
                 vendor_id=self.vendor.id,
                 allocations=[{"purchase_bill_id": bill.id, "amount": "300.01"}],
                 performed_by=self.admin,
+            )
+
+    def test_pay_vendor_outstanding_posts_on_account_settlement(self):
+        # Create a bill so vendor has payable outstanding
+        bill = self._bill("VD-B6", "2000.00")
+        desk = build_vendor_payment_desk(self.vendor)
+        self.assertEqual(desk["payable_now"], "2000.00")
+
+        # Pay part of the outstanding without allocating to the bill
+        res = pay_vendor_outstanding(
+            vendor_id=self.vendor.id,
+            amount="800.00",
+            finance_account_id=self.cash.id,
+            posted_by=self.admin,
+            payment_date=DAY.isoformat(),
+            reference_no="UTR-ON-ACCT-1",
+            notes="General on-account settlement",
+        )
+        self.assertEqual(res["amount"], "800.00")
+        self.assertEqual(res["desk"]["payable_now"], "1200.00")
+        self.assertEqual(self._outstanding(), Decimal("1200.00"))
+
+        # Verify posted settlement exists and is marked on account (purchase_bill is None)
+        settlement = VendorSettlement.objects.filter(vendor=self.vendor, purchase_bill__isnull=True).first()
+        self.assertIsNotNone(settlement)
+        self.assertEqual(settlement.amount, Decimal("800.00"))
+        self.assertEqual(settlement.status, "POSTED")
+        self.assertFalse(settlement.is_advance)
+        self.assertIsNotNone(settlement.posted_journal_entry_id)
+
+    def test_pay_vendor_outstanding_cannot_exceed_payable(self):
+        self._bill("VD-B7", "500.00")
+        with self.assertRaises(ValidationError):
+            pay_vendor_outstanding(
+                vendor_id=self.vendor.id,
+                amount="500.01",
+                finance_account_id=self.cash.id,
+                posted_by=self.admin,
             )

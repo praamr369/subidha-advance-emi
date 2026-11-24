@@ -2427,12 +2427,14 @@ export async function listVendorBills(params?: {
   page_size?: number;
   status?: string;
   search?: string;
+  vendor?: number;
 }): Promise<PaginatedResponse<VendorBill>> {
   const q = new URLSearchParams();
   if (params?.page) q.set("page", String(params.page));
   if (params?.page_size) q.set("page_size", String(params.page_size));
   if (params?.status) q.set("status", params.status);
   if (params?.search) q.set("search", params.search);
+  if (params?.vendor) q.set("vendor", String(params.vendor));
   const url = q.toString() ? `/inventory/vendor-bills/?${q}` : "/inventory/vendor-bills/";
   return apiFetch<PaginatedResponse<VendorBill>>(url);
 }

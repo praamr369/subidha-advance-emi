@@ -508,9 +508,57 @@ def _log_sync_result(*, subscription: Subscription, amount, performed_by, result
     return asdict(result)
 
 
-def sync_rent_lease_monthly_income(*, subscription: Subscription, amount, performed_by=None, collection=None) -> dict:
+def _resolve_settlement_chart_account(
+    *,
+    mapping: RentLeaseAccountingAccountMapping,
+    finance_account: FinanceAccount | None = None,
+    payment_method: str | None = None,
+) -> ChartOfAccount:
+    from subscriptions.models import settlement_channel_for_method
+    from payments.services.payment_service import _fallback_finance_account_for_method
+
+    method = (payment_method or "").strip().upper() or "CASH"
+    channel = settlement_channel_for_method(method)
+
+    if finance_account and finance_account.is_active:
+        fa_kind = (finance_account.kind or "").strip().upper()
+        if (channel == "CASH" and fa_kind == FinanceAccountKind.CASH) or (
+            channel == "BANK" and fa_kind in {FinanceAccountKind.BANK, FinanceAccountKind.UPI}
+        ):
+            if finance_account.chart_account_id and finance_account.chart_account.is_active:
+                return finance_account.chart_account
+
+    fallback_fa = _fallback_finance_account_for_method(method)
+    if fallback_fa and fallback_fa.chart_account_id and fallback_fa.chart_account.is_active:
+        return fallback_fa.chart_account
+
+    if channel == "BANK":
+        bank_chart = ChartOfAccount.objects.filter(
+            system_code__in=["BANK_COLLECTION", "UPI_COLLECTION"], is_active=True
+        ).first()
+        if bank_chart:
+            return bank_chart
+
+    return mapping.settlement_finance_account.chart_account
+
+
+def sync_rent_lease_monthly_income(
+    *,
+    subscription: Subscription,
+    amount,
+    performed_by=None,
+    collection=None,
+    payment_method: str | None = None,
+    finance_account: FinanceAccount | None = None,
+) -> dict:
     mapping = ensure_premade_rent_lease_accounting_setup(performed_by=performed_by)
-    settlement_chart = mapping.settlement_finance_account.chart_account
+    resolved_method = payment_method or getattr(collection, "payment_method", None) or "CASH"
+    resolved_fa = finance_account or getattr(collection, "finance_account", None)
+    settlement_chart = _resolve_settlement_chart_account(
+        mapping=mapping,
+        finance_account=resolved_fa,
+        payment_method=resolved_method,
+    )
     income_account = _chart("LEASE_INCOME") if subscription.plan_type == PlanType.LEASE else mapping.monthly_income_account
     amount_q = _money(amount)
     # Key each journal to its own collection. The old (sub, today, amount) key
@@ -536,7 +584,15 @@ def sync_rent_lease_monthly_income(*, subscription: Subscription, amount, perfor
     return _log_sync_result(subscription=subscription, amount=amount_q, performed_by=performed_by, result=result, mapping=mapping)
 
 
-def sync_security_deposit_liability(*, subscription: Subscription, amount, performed_by=None) -> dict:
+def sync_security_deposit_liability(
+    *,
+    subscription: Subscription,
+    amount,
+    performed_by=None,
+    deposit_tx=None,
+    payment_method: str | None = None,
+    finance_account: FinanceAccount | None = None,
+) -> dict:
     mapping = ensure_premade_rent_lease_accounting_setup(performed_by=performed_by)
     amount_q = _money(amount)
     source_reference = _deposit_source_reference(
@@ -545,11 +601,18 @@ def sync_security_deposit_liability(*, subscription: Subscription, amount, perfo
         amount=amount_q,
         fallback_event="SECURITY_DEPOSIT_COLLECTED",
     )
+    resolved_method = payment_method or getattr(deposit_tx, "payment_method", None) or "CASH"
+    resolved_fa = finance_account or getattr(deposit_tx, "finance_account", None)
+    settlement_chart = _resolve_settlement_chart_account(
+        mapping=mapping,
+        finance_account=resolved_fa,
+        payment_method=resolved_method,
+    )
     result = _post_bridge_journal(
         subscription=subscription,
         event="SECURITY_DEPOSIT_COLLECTED",
         amount=amount_q,
-        debit_account=mapping.settlement_finance_account.chart_account,
+        debit_account=settlement_chart,
         credit_account=mapping.deposit_liability_account,
         performed_by=performed_by,
         source_reference=source_reference,
@@ -558,7 +621,15 @@ def sync_security_deposit_liability(*, subscription: Subscription, amount, perfo
     return _log_sync_result(subscription=subscription, amount=amount_q, performed_by=performed_by, result=result, mapping=mapping)
 
 
-def sync_deposit_refund_liability_reduction(*, subscription: Subscription, amount, performed_by=None) -> dict:
+def sync_deposit_refund_liability_reduction(
+    *,
+    subscription: Subscription,
+    amount,
+    performed_by=None,
+    deposit_tx=None,
+    payment_method: str | None = None,
+    finance_account: FinanceAccount | None = None,
+) -> dict:
     mapping = ensure_premade_rent_lease_accounting_setup(performed_by=performed_by)
     amount_q = _money(amount)
     source_reference = _deposit_source_reference(
@@ -567,12 +638,19 @@ def sync_deposit_refund_liability_reduction(*, subscription: Subscription, amoun
         amount=amount_q,
         fallback_event="SECURITY_DEPOSIT_REFUNDED",
     )
+    resolved_method = payment_method or getattr(deposit_tx, "payment_method", None) or "CASH"
+    resolved_fa = finance_account or getattr(deposit_tx, "finance_account", None)
+    settlement_chart = _resolve_settlement_chart_account(
+        mapping=mapping,
+        finance_account=resolved_fa,
+        payment_method=resolved_method,
+    )
     result = _post_bridge_journal(
         subscription=subscription,
         event="SECURITY_DEPOSIT_REFUNDED",
         amount=amount_q,
         debit_account=mapping.deposit_refund_account,
-        credit_account=mapping.settlement_finance_account.chart_account,
+        credit_account=settlement_chart,
         performed_by=performed_by,
         source_reference=source_reference,
         memo=f"Security deposit refund for {subscription.subscription_number or subscription.id}",

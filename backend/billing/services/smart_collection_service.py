@@ -200,9 +200,30 @@ def execute_smart_collection(
         result["idempotent_replay"] = True
         return result
 
-    if not finance_account_id:
-        raise ValidationError({"finance_account_id": "Finance account ID is required for execution."})
-        
+    from subscriptions.models import settlement_channel_for_method
+    from payments.services.payment_service import _fallback_finance_account_for_method
+    from accounting.models import FinanceAccount, FinanceAccountKind
+
+    normalized_method = (payment_method or "CASH").strip().upper()
+    channel = settlement_channel_for_method(normalized_method)
+    if finance_account_id:
+        fa = FinanceAccount.objects.filter(pk=finance_account_id).first()
+        if fa:
+            if channel == "BANK" and fa.kind == FinanceAccountKind.CASH:
+                fallback_fa = _fallback_finance_account_for_method(normalized_method)
+                if fallback_fa:
+                    finance_account_id = fallback_fa.id
+            elif channel == "CASH" and fa.kind in {FinanceAccountKind.BANK, FinanceAccountKind.UPI}:
+                fallback_fa = _fallback_finance_account_for_method(normalized_method)
+                if fallback_fa:
+                    finance_account_id = fallback_fa.id
+    elif not finance_account_id:
+        fallback_fa = _fallback_finance_account_for_method(normalized_method)
+        if fallback_fa:
+            finance_account_id = fallback_fa.id
+        else:
+            raise ValidationError({"finance_account_id": "Finance account ID is required for execution."})
+
     with transaction.atomic():
         # Re-plan under snapshot isolation implicitly, we rely on the locking of the underlying services
         # We will lock the CustomerAdvance, Emi, and DirectSale records that we touch.
@@ -277,6 +298,7 @@ def execute_smart_collection(
                     direct_sale_id=sale_id,
                     amount=alloc_amount,
                     collected_by=collected_by,
+                    payment_method=payment_method,
                     finance_account_id=finance_account_id,
                     branch_id=branch_id,
                     cash_counter_id=cash_counter_id,
