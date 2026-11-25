@@ -1932,6 +1932,19 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
     next_payment_is_overdue = serializers.SerializerMethodField()
     product_attributes = serializers.SerializerMethodField()
     contract_items = serializers.SerializerMethodField()
+    selected_accessories = serializers.SerializerMethodField()
+    is_bundle = serializers.SerializerMethodField()
+    bundle_items_count = serializers.SerializerMethodField()
+    accessories = serializers.ListField(
+        child=serializers.DictField(),
+        required=False,
+        write_only=True,
+    )
+    accessories_configured = serializers.BooleanField(
+        required=False,
+        write_only=True,
+        default=False,
+    )
     subscription_number = serializers.SerializerMethodField()
     contract_reference = serializers.SerializerMethodField()
 
@@ -2029,6 +2042,11 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
             "next_payment_is_overdue",
             "product_attributes",
             "contract_items",
+            "selected_accessories",
+            "is_bundle",
+            "bundle_items_count",
+            "accessories",
+            "accessories_configured",
         )
         read_only_fields = (
             "id",
@@ -2048,6 +2066,9 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
             "next_payment_is_overdue",
             "product_attributes",
             "contract_items",
+            "selected_accessories",
+            "is_bundle",
+            "bundle_items_count",
             "status",
             "terms_locked_at",
             "created_at",
@@ -2286,10 +2307,30 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
                 "monthly_amount": str(it.monthly_amount),
                 "security_deposit_percent": str(getattr(it, "security_deposit_percent", "20.00")),
                 "security_deposit_amount": str(it.security_deposit_amount),
+                "is_accessory": bool(getattr(it, "is_accessory", False)),
+                "parent_item": getattr(it, "parent_item_id", None),
+                "charge_mode": getattr(it, "charge_mode", "") or "",
                 "status": getattr(it, "status", "ACTIVE"),
             }
             for it in items
         ]
+
+    def get_selected_accessories(self, obj):
+        from contracts.services.subscription_service import (
+            get_subscription_selected_accessories,
+        )
+        return get_subscription_selected_accessories(obj)
+
+    def get_is_bundle(self, obj) -> bool:
+        if obj.plan_type in (PlanType.RENT, PlanType.LEASE):
+            return len(self.get_contract_items(obj)) > 1
+        return len(self.get_selected_accessories(obj)) > 0
+
+    def get_bundle_items_count(self, obj) -> int:
+        if obj.plan_type in (PlanType.RENT, PlanType.LEASE):
+            return len(self.get_contract_items(obj))
+        accs = self.get_selected_accessories(obj)
+        return (1 + len(accs)) if accs else 1
 
     def validate(self, attrs):
         instance = self.instance
@@ -2499,13 +2540,47 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
                 )
             validated_data["lucky_id"] = next_lucky
 
-        total_amount = q2(Decimal(product.base_price))
+        raw_accessories = validated_data.pop("accessories", None)
+        has_accessories_flag = validated_data.pop("accessories_configured", False)
+        accessories_configured = bool(has_accessories_flag or (raw_accessories is not None))
+
+        normalized_accessories = []
+        accessories_total = MONEY_ZERO
+        if plan_type == PlanType.EMI and (raw_accessories is not None or accessories_configured):
+            from contracts.services.subscription_service import (
+                build_emi_bundle_snapshots,
+                normalize_emi_selected_accessories,
+            )
+            try:
+                normalized_accessories, accessories_total = normalize_emi_selected_accessories(
+                    product,
+                    raw_accessories or [],
+                )
+            except DjangoValidationError as exc:
+                raise serializers.ValidationError(
+                    exc.message_dict or {"accessories": exc.messages}
+                )
+
+        total_amount = q2(Decimal(product.base_price) + accessories_total)
         monthly_amount = q2(total_amount / Decimal(tenure))
 
         validated_data["total_amount"] = total_amount
         validated_data["monthly_amount"] = monthly_amount
         validated_data["waived_amount"] = MONEY_ZERO
         validated_data.setdefault("status", SubscriptionStatus.ACTIVE)
+
+        if plan_type == PlanType.EMI:
+            from contracts.services.subscription_service import build_emi_bundle_snapshots
+            product_snapshot, pricing_snapshot = build_emi_bundle_snapshots(
+                product=product,
+                tenure_months=tenure,
+                total_amount=total_amount,
+                monthly_amount=monthly_amount,
+                selected_accessories=normalized_accessories,
+                accessories_configured=accessories_configured,
+            )
+            validated_data["product_snapshot"] = product_snapshot
+            validated_data["pricing_snapshot"] = pricing_snapshot
 
         try:
             subscription = Subscription(**validated_data)
@@ -2550,16 +2625,27 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
                 created_by=user,
             )
             
-            # Accessories
-            for acc_link in subscription.product.accessory_links.all():
-                if acc_link.is_default_included:
+            # Accessories: when operator explicitly configured bundle accessories, demand ONLY those;
+            # otherwise fall back to legacy ProductRelationship defaults.
+            if accessories_configured:
+                for acc in normalized_accessories:
                     upsert_subscription_demand_purchase_need(
                         subscription_id=subscription.id,
-                        product_id=acc_link.accessory_product_id,
-                        required_quantity=Decimal(str(acc_link.quantity)),
+                        product_id=acc["product_id"],
+                        required_quantity=Decimal(str(acc["quantity"])),
                         customer_id=subscription.customer_id,
                         created_by=user,
                     )
+            else:
+                for acc_link in subscription.product.accessory_links.all():
+                    if acc_link.is_default_included:
+                        upsert_subscription_demand_purchase_need(
+                            subscription_id=subscription.id,
+                            product_id=acc_link.accessory_product_id,
+                            required_quantity=Decimal(str(acc_link.quantity)),
+                            customer_id=subscription.customer_id,
+                            created_by=user,
+                        )
         except Exception:
             pass
 
@@ -2567,6 +2653,10 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def update(self, instance, validated_data):
+        raw_accessories = validated_data.pop("accessories", None)
+        has_acc_flag = "accessories_configured" in validated_data
+        acc_flag = validated_data.pop("accessories_configured", False)
+        accessories_changed = (raw_accessories is not None) or has_acc_flag
         product_changed = "product" in validated_data
         tenure_changed = "tenure_months" in validated_data
 
@@ -2574,7 +2664,7 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
         existing_waived = instance.emis.filter(status=EmiStatus.WAIVED).exists()
         existing_payments = instance.payments.exists()
 
-        if (product_changed or tenure_changed) and (
+        if (product_changed or tenure_changed or accessories_changed) and (
             existing_paid or existing_waived or existing_payments
         ):
             raise serializers.ValidationError(
@@ -2584,7 +2674,47 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
 
-        if product_changed or tenure_changed:
+        if instance.plan_type == PlanType.EMI and (
+            product_changed or tenure_changed or accessories_changed
+        ):
+            from contracts.services.subscription_service import (
+                build_emi_bundle_snapshots,
+                get_subscription_selected_accessories,
+                normalize_emi_selected_accessories,
+            )
+            if accessories_changed:
+                effective_raw_acc = raw_accessories if raw_accessories is not None else []
+                acc_configured = bool(acc_flag or (raw_accessories is not None))
+            else:
+                effective_raw_acc = get_subscription_selected_accessories(instance)
+                acc_configured = bool(
+                    (getattr(instance, "product_snapshot", None) or {}).get("accessories_configured")
+                    or effective_raw_acc
+                )
+            try:
+                normalized_accessories, accessories_total = normalize_emi_selected_accessories(
+                    instance.product,
+                    effective_raw_acc,
+                )
+            except DjangoValidationError as exc:
+                raise serializers.ValidationError(
+                    exc.message_dict or {"accessories": exc.messages}
+                )
+            instance.total_amount = q2(Decimal(instance.product.base_price) + accessories_total)
+            instance.monthly_amount = q2(
+                instance.total_amount / Decimal(instance.tenure_months)
+            )
+            product_snapshot, pricing_snapshot = build_emi_bundle_snapshots(
+                product=instance.product,
+                tenure_months=instance.tenure_months,
+                total_amount=instance.total_amount,
+                monthly_amount=instance.monthly_amount,
+                selected_accessories=normalized_accessories,
+                accessories_configured=acc_configured,
+            )
+            instance.product_snapshot = product_snapshot
+            instance.pricing_snapshot = pricing_snapshot
+        elif product_changed or tenure_changed:
             instance.total_amount = q2(Decimal(instance.product.base_price))
             instance.monthly_amount = q2(
                 instance.total_amount / Decimal(instance.tenure_months)
@@ -2598,7 +2728,9 @@ class SubscriptionAdminSerializer(serializers.ModelSerializer):
                 exc.message_dict or {"detail": exc.messages}
             )
 
-        if instance.plan_type == PlanType.EMI and (product_changed or tenure_changed):
+        if instance.plan_type == PlanType.EMI and (
+            product_changed or tenure_changed or accessories_changed
+        ):
             instance.emis.all().delete()
 
             emi_amounts = build_emi_amounts(
@@ -2680,6 +2812,9 @@ class SubscriptionAdminDetailSerializer(SubscriptionAdminSerializer):
                 "monthly_amount": str(it.monthly_amount),
                 "security_deposit_percent": str(getattr(it, "security_deposit_percent", "20.00")),
                 "security_deposit_amount": str(it.security_deposit_amount),
+                "is_accessory": bool(getattr(it, "is_accessory", False)),
+                "parent_item": getattr(it, "parent_item_id", None),
+                "charge_mode": getattr(it, "charge_mode", "") or "",
                 "status": getattr(it, "status", "ACTIVE"),
                 "product_snapshot": it.product_snapshot,
             }

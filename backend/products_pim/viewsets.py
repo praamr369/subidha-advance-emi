@@ -98,8 +98,11 @@ class ProductSubcategoryViewSet(viewsets.ModelViewSet):
         qs = ProductSubcategory.objects.filter(is_active=True).select_related("category").prefetch_related("attributes")
         request = cast(Request, self.request)
         category_id = request.query_params.get("category")
+        ptype = request.query_params.get("product_type")
         if category_id:
             qs = qs.filter(category_id=category_id)
+        if ptype:
+            qs = qs.filter(Q(category__product_type=ptype) | Q(category__product_type="ALL"))
         return qs
 
 
@@ -245,8 +248,16 @@ class PimProductViewSet(viewsets.ModelViewSet):
         old_type = instance.product_type
         old_code = instance.code
         old_name = instance.name
+        old_cat_id = instance.category_id
+        old_sub_id = instance.subcategory_id
         
         pim_product = serializer.save()
+
+        # Propagate category / subcategory change from blueprint to child PIM products that matched old category
+        if pim_product.category_id != old_cat_id or pim_product.subcategory_id != old_sub_id:
+            pim_product.child_pim_products.filter(
+                Q(category_id=old_cat_id) | Q(category__slug="unclassified")
+            ).update(category_id=pim_product.category_id, subcategory_id=pim_product.subcategory_id)
 
         # Synchronize product_type across operational source product, child PIM items, variants, and inventory items
         if pim_product.product_type != old_type or pim_product.product_type:

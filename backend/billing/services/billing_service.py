@@ -182,6 +182,10 @@ DIRECT_SALE_LINE_MODEL_FIELDS = {
     "sku_snapshot",
     "unit_of_measure_snapshot",
     "hsn_sac_code",
+    "serial_number",
+    "warranty_months",
+    "warranty_card_number",
+    "is_accessory",
 }
 
 
@@ -237,6 +241,11 @@ def _serialize_direct_sale_line_payloads(lines: list[dict]) -> list[dict]:
                 "sku_snapshot": inventory_sku,
                 "unit_of_measure_snapshot": str(unit_of_measure).strip().upper(),
                 "hsn_sac_code": hsn_sac_code,
+                "serial_number": (line.get("serial_number") or "").strip(),
+                "warranty_months": int(line.get("warranty_months") or 0),
+                "warranty_card_number": (line.get("warranty_card_number") or "").strip(),
+                "is_accessory": bool(line.get("is_accessory", False)),
+                "_parent_line_index": line.get("parent_line_index"),
                 "_create_purchase_requirement": bool(line.get("create_purchase_requirement")),
                 "_requirement_quantity": line.get("requirement_quantity"),
                 "_requirement_note": (line.get("requirement_note") or "").strip(),
@@ -285,15 +294,21 @@ def _replace_direct_sale_lines(*, sale: DirectSale, line_payloads: list[dict]):
     sale.lines.all().delete()
     if not line_payloads:
         return
-    DirectSaleLine.objects.bulk_create(
-        [
-            DirectSaleLine(
-                direct_sale=sale,
-                **{key: payload[key] for key in DIRECT_SALE_LINE_MODEL_FIELDS if key in payload},
-            )
-            for payload in line_payloads
-        ]
-    )
+    created_lines = []
+    for payload in line_payloads:
+        p_idx = payload.get("_parent_line_index")
+        parent_obj = (
+            created_lines[p_idx]
+            if isinstance(p_idx, int) and 0 <= p_idx < len(created_lines)
+            else None
+        )
+        obj = DirectSaleLine(
+            direct_sale=sale,
+            parent_line=parent_obj,
+            **{key: payload[key] for key in DIRECT_SALE_LINE_MODEL_FIELDS if key in payload},
+        )
+        obj.save()
+        created_lines.append(obj)
 
 
 def _sync_direct_sale_purchase_needs(*, sale: DirectSale, line_payloads: list[dict], actor):
@@ -542,6 +557,7 @@ def _assert_direct_sale_delivery_gate(invoice: BillingInvoice):
 @transaction.atomic
 def create_direct_sale(*, payload: dict, created_by):
     lines = payload.pop("lines", [])
+    accessories_configured = bool(payload.pop("accessories_configured", False))
     requested_tax_mode = payload.get("tax_mode")
     resolved_tax_mode = resolve_operational_tax_mode(requested_tax_mode=requested_tax_mode)
     payload["tax_mode"] = resolved_tax_mode
@@ -590,6 +606,10 @@ def create_direct_sale(*, payload: dict, created_by):
         if resolved_tax_mode == "NON_GST"
         else build_tax_profile_snapshot(on_date=sale_date),
     )
+    if accessories_configured or any(lp.get("is_accessory") for lp in line_payloads):
+        snap = dict(payload.get("tax_profile_snapshot") or {})
+        snap["accessories_configured"] = True
+        payload["tax_profile_snapshot"] = snap
     payload.update(totals)
     received_total = _money(payload.get("received_total"))
     payload["received_total"] = received_total
@@ -644,6 +664,7 @@ def update_direct_sale(*, direct_sale_id: int, payload: dict, updated_by):
         raise ValueError("Invoiced or archived direct sales cannot be edited.")
 
     lines = payload.pop("lines", None)
+    accessories_configured = bool(payload.pop("accessories_configured", False))
     requested_tax_mode = payload.get("tax_mode", sale.tax_mode)
     resolved_tax_mode = resolve_operational_tax_mode(requested_tax_mode=requested_tax_mode)
     payload["tax_mode"] = resolved_tax_mode
@@ -672,6 +693,10 @@ def update_direct_sale(*, direct_sale_id: int, payload: dict, updated_by):
                     "igst_amount": line.igst_amount,
                     "line_total": line.line_total,
                     "hsn_sac_code": line.hsn_sac_code,
+                    "serial_number": line.serial_number,
+                    "warranty_months": line.warranty_months,
+                    "warranty_card_number": line.warranty_card_number,
+                    "is_accessory": line.is_accessory,
                 }
                 for line in sale.lines.select_related("product", "inventory_item").all()
             ]
@@ -718,6 +743,10 @@ def update_direct_sale(*, direct_sale_id: int, payload: dict, updated_by):
             if resolved_tax_mode == "NON_GST"
             else build_tax_profile_snapshot(on_date=payload.get("sale_date", sale.sale_date))
         )
+    if accessories_configured or any(lp.get("is_accessory") for lp in line_payloads):
+        snap = dict(payload.get("tax_profile_snapshot") or {})
+        snap["accessories_configured"] = True
+        payload["tax_profile_snapshot"] = snap
     received_total = _money(payload.get("received_total", sale.received_total))
     payload["received_total"] = received_total
     payload["balance_total"] = totals["grand_total"] - received_total

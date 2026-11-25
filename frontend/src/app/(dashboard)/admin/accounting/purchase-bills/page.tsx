@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useRef, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
@@ -20,7 +20,9 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import { WorkspaceSection } from "@/components/ui/workspace";
 import { ROUTES } from "@/lib/routes";
 import VendorPayablesToggle from "@/components/vendors/VendorPayablesToggle";
-import type { InventoryItem, StockLocation, VendorBill } from "@/services/inventory";
+import AccessorySelectionPanel, { type AccessorySelectionResult } from "@/components/inventory/AccessorySelectionPanel";
+import SearchableItemSelect from "@/components/inventory/SearchableItemSelect";
+import type { InventoryItem, ParentVariantOption, StockLocation, VendorBill } from "@/services/inventory";
 import { listInventoryItems, listStockLocations, listVendorBills } from "@/services/inventory";
 import type {
   AccountingPurchaseBill,
@@ -102,182 +104,6 @@ function toLineForm(line: AccountingPurchaseBillLine): PurchaseLineForm {
   };
 }
 
-// ── Searchable Item Combobox ──────────────────────────────────────────────────
-interface ItemComboboxProps {
-  items: InventoryItem[];
-  value: string;
-  onChange: (itemId: string, item: InventoryItem | null) => void;
-  required?: boolean;
-}
-
-function ItemCombobox({ items, value, onChange, required }: ItemComboboxProps) {
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const [remoteResults, setRemoteResults] = useState<InventoryItem[]>([]);
-  const [searching, setSearching] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const listRef = useRef<HTMLDivElement>(null);
-
-  // Combine parent items and any remote search results (deduped by ID)
-  const allKnownItems = useMemo(() => {
-    const map = new Map<number, InventoryItem>();
-    for (const item of items) {
-      map.set(item.id, item);
-    }
-    for (const item of remoteResults) {
-      if (!map.has(item.id)) {
-        map.set(item.id, item);
-      }
-    }
-    return Array.from(map.values());
-  }, [items, remoteResults]);
-
-  const selectedItem = allKnownItems.find((it) => String(it.id) === value) ?? null;
-
-  useEffect(() => {
-    const q = query.trim();
-    if (!q || q.length < 2) {
-      setRemoteResults([]);
-      setSearching(false);
-      return;
-    }
-
-    const timer = setTimeout(async () => {
-      setSearching(true);
-      try {
-        const res = await listInventoryItems({
-          search: q,
-          is_active: 1,
-          stock_tracking_enabled: 1,
-          page_size: 50,
-        });
-        setRemoteResults(res.results || []);
-      } catch {
-        // Fallback gracefully
-      } finally {
-        setSearching(false);
-      }
-    }, 250);
-
-    return () => clearTimeout(timer);
-  }, [query]);
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return allKnownItems.slice(0, 80);
-    return allKnownItems
-      .filter(
-        (it) =>
-          (it.sku ?? "").toLowerCase().includes(q) ||
-          (it.product_name ?? "").toLowerCase().includes(q) ||
-          (it.product_code ?? "").toLowerCase().includes(q) ||
-          (it.stock_item_type ?? "").toLowerCase().includes(q)
-      )
-      .slice(0, 60);
-  }, [allKnownItems, query]);
-
-  function handleSelect(item: InventoryItem) {
-    onChange(String(item.id), item);
-    setOpen(false);
-    setQuery("");
-  }
-
-  function handleInputFocus() {
-    setOpen(true);
-    setQuery("");
-  }
-
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (
-        listRef.current &&
-        !listRef.current.contains(e.target as Node) &&
-        inputRef.current &&
-        !inputRef.current.contains(e.target as Node)
-      ) {
-        setOpen(false);
-        setQuery("");
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
-
-  const displayValue = open
-    ? query
-    : selectedItem
-    ? `${selectedItem.sku ?? selectedItem.product_code} · ${selectedItem.product_name ?? "—"}`
-    : "";
-
-  return (
-    <div className="relative">
-      <input
-        ref={inputRef}
-        type="text"
-        autoComplete="off"
-        placeholder={selectedItem ? undefined : "Search by SKU, name, or type…"}
-        className={accountingFieldClassName()}
-        value={displayValue}
-        onFocus={handleInputFocus}
-        onChange={(e) => {
-          setQuery(e.target.value);
-          setOpen(true);
-        }}
-      />
-      {required && (
-        <input
-          type="text"
-          className="sr-only"
-          tabIndex={-1}
-          value={value}
-          required
-          readOnly
-          aria-hidden="true"
-        />
-      )}
-      {open && (
-        <div
-          ref={listRef}
-          className="absolute z-50 mt-1 max-h-64 w-full overflow-y-auto rounded-xl border border-border bg-background shadow-lg"
-        >
-          {searching && (
-            <div className="flex items-center gap-2 border-b border-border/40 px-3 py-1.5 text-[10px] text-muted-foreground bg-muted/30">
-              <span className="h-2.5 w-2.5 animate-spin rounded-full border border-primary border-t-transparent" />
-              Searching catalog…
-            </div>
-          )}
-          {filtered.length === 0 ? (
-            <p className="px-4 py-3 text-xs text-muted-foreground">
-              {searching ? "Searching inventory catalog…" : query ? `No items found matching "${query}".` : "No items found."}
-            </p>
-          ) : (
-            filtered.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onMouseDown={() => handleSelect(item)}
-                className="flex w-full flex-col px-4 py-2.5 text-left hover:bg-muted/60 focus:bg-muted/60"
-              >
-                <span className="text-xs font-semibold text-foreground">
-                  {item.sku ?? item.product_code} · {item.product_name}
-                </span>
-                <span className="text-[10px] text-muted-foreground">
-                  {item.stock_item_type ?? "—"}
-                  {item.purchase_unit_cost
-                    ? ` · Last price: ${accountingMoney(item.purchase_unit_cost)}`
-                    : item.standard_unit_cost
-                    ? ` · Std cost: ${accountingMoney(item.standard_unit_cost)}`
-                    : ""}
-                </span>
-              </button>
-            ))
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function AccountingPurchaseBillsPage() {
   const [rows, setRows] = useState<AccountingPurchaseBill[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
@@ -291,6 +117,7 @@ export default function AccountingPurchaseBillsPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [activeTaxMode, setActiveTaxMode] = useState<BusinessTaxMode>("GST_UNREGISTERED");
+  const [openAccLineIdx, setOpenAccLineIdx] = useState<number | null>(null);
 
   const query = useQuery({
     queryKey: ["accounting", "purchase-bills"],
@@ -671,9 +498,10 @@ export default function AccountingPurchaseBillsPage() {
                     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
                       <div className="text-sm text-muted-foreground xl:col-span-2">
                         <span className="mb-1 block">Inventory item</span>
-                        <ItemCombobox
-                          items={inventoryItems}
+                        <SearchableItemSelect
+                          allItems={inventoryItems}
                           value={line.inventory_item}
+                          placeholder="Search product by name, code, SKU…"
                           onChange={(itemId, item) => {
                             if (item && !inventoryItems.some((it) => it.id === item.id)) {
                               setInventoryItems((prev) => [...prev, item]);
@@ -695,6 +523,11 @@ export default function AccountingPurchaseBillsPage() {
                                   : entry
                               ),
                             }));
+                            if (item?.stock_item_type === "FINISHED_GOOD") {
+                              setOpenAccLineIdx(index);
+                            } else if (openAccLineIdx === index) {
+                              setOpenAccLineIdx(null);
+                            }
                           }}
                           required
                         />
@@ -706,6 +539,15 @@ export default function AccountingPurchaseBillsPage() {
                         ) : selectedItem ? (
                           <p className="mt-1 text-[10px] text-muted-foreground">No previous purchase cost — enter manually.</p>
                         ) : null}
+                        {selectedItem?.stock_item_type === "FINISHED_GOOD" && (
+                          <button
+                            type="button"
+                            onClick={() => setOpenAccLineIdx(openAccLineIdx === index ? null : index)}
+                            className="mt-1.5 inline-flex items-center gap-1 rounded-lg border border-primary/30 bg-primary/5 px-2.5 py-1 text-[11px] font-semibold text-primary hover:bg-primary/10"
+                          >
+                            {openAccLineIdx === index ? "Hide Variants & Accessories" : "Select Variants & Vendor Accessories"}
+                          </button>
+                        )}
                       </div>
                       <label className="text-sm text-muted-foreground">
                         Quantity
@@ -797,6 +639,94 @@ export default function AccountingPurchaseBillsPage() {
                         </div>
                       </div>
                     </div>
+                    {openAccLineIdx === index && selectedItem && selectedItem.stock_item_type === "FINISHED_GOOD" && (
+                      <div className="mt-3 rounded-xl border border-primary/25 bg-muted/20 p-3">
+                        <AccessorySelectionPanel
+                          productId={selectedItem.product || 0}
+                          itemId={selectedItem.id}
+                          mode="purchase"
+                          compact
+                          parentQuantity={Math.max(1, Number(line.quantity || 1))}
+                          onSwitchParentVariant={(pv: ParentVariantOption) => {
+                            if (!inventoryItems.some((it) => it.id === pv.inventory_item_id)) {
+                              setInventoryItems((prev) => [
+                                ...prev,
+                                {
+                                  id: pv.inventory_item_id,
+                                  product: pv.product_id,
+                                  product_name: pv.name,
+                                  product_code: pv.product_code,
+                                  sku: pv.sku,
+                                  unit_of_measure: "PCS",
+                                  stock_item_type: "FINISHED_GOOD",
+                                  purchase_unit_cost: pv.purchase_unit_cost,
+                                  standard_unit_cost: pv.standard_unit_cost,
+                                } as unknown as InventoryItem,
+                              ]);
+                            }
+                            const nextCost = Number(pv.purchase_unit_cost || 0) > 0
+                              ? Number(pv.purchase_unit_cost).toFixed(2)
+                              : Number(pv.standard_unit_cost || 0).toFixed(2);
+                            setForm((current) => ({
+                              ...current,
+                              lines: current.lines.map((entry, entryIndex) =>
+                                entryIndex === index
+                                  ? {
+                                      ...entry,
+                                      inventory_item: String(pv.inventory_item_id),
+                                      unit_cost: nextCost,
+                                    }
+                                  : entry
+                              ),
+                            }));
+                          }}
+                          onConfirm={(res: AccessorySelectionResult) => {
+                            const newItemsToCache: InventoryItem[] = [];
+                            for (const acc of res.accessories) {
+                              if (!inventoryItems.some((it) => it.id === acc.inventoryItemId)) {
+                                newItemsToCache.push({
+                                  id: acc.inventoryItemId,
+                                  product: acc.productId,
+                                  product_name: acc.productName,
+                                  product_code: acc.productCode,
+                                  sku: acc.sku,
+                                  unit_of_measure: acc.unitOfMeasure,
+                                  stock_item_type: "ACCESSORY",
+                                  purchase_unit_cost: acc.unitCost,
+                                  standard_unit_cost: acc.unitCost,
+                                } as unknown as InventoryItem);
+                              }
+                            }
+                            if (newItemsToCache.length > 0) {
+                              setInventoryItems((prev) => [...prev, ...newItemsToCache]);
+                            }
+                            setForm((current) => {
+                              const nextLines = [...current.lines];
+                              for (const acc of res.accessories) {
+                                const accIdStr = String(acc.inventoryItemId);
+                                const existingIdx = nextLines.findIndex((l) => l.inventory_item === accIdStr);
+                                const desc = `${acc.variantLabel || acc.productName} (Accessory for ${selectedItem.sku || selectedItem.product_code || selectedItem.product_name})`;
+                                const newLine: PurchaseLineForm = {
+                                  inventory_item: accIdStr,
+                                  description: desc,
+                                  quantity: String(Number(acc.quantity || 1).toFixed(3)),
+                                  unit_cost: Number(acc.unitCost || 0).toFixed(2),
+                                  tax_amount: "0.00",
+                                };
+                                if (existingIdx >= 0) {
+                                  nextLines[existingIdx] = newLine;
+                                } else {
+                                  nextLines.push(newLine);
+                                }
+                              }
+                              return { ...current, lines: nextLines };
+                            });
+                            setOpenAccLineIdx(null);
+                          }}
+                          onCancel={() => setOpenAccLineIdx(null)}
+                        />
+                      </div>
+                    )}
                     {form.lines.length > 1 ? (
                       <div className="mt-3">
                         <button

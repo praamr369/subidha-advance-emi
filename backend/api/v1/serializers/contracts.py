@@ -18,7 +18,7 @@ from subscriptions.models import (
 class ContractItemInputSerializer(serializers.Serializer):
     product = serializers.PrimaryKeyRelatedField(
         queryset=Product.objects.filter(is_active=True).exclude(
-            inventory_profile__stock_item_type__in=["RAW_MATERIAL", "ACCESSORY"]
+            inventory_profile__stock_item_type="RAW_MATERIAL"
         )
     )
     quantity = serializers.IntegerField(min_value=1, default=1)
@@ -26,6 +26,26 @@ class ContractItemInputSerializer(serializers.Serializer):
     monthly_yield_percent = serializers.DecimalField(max_digits=5, decimal_places=2, required=False)
     security_deposit_percent = serializers.DecimalField(max_digits=5, decimal_places=2, required=False)
     security_deposit_amount = serializers.DecimalField(max_digits=12, decimal_places=2, required=False)
+    is_accessory = serializers.BooleanField(required=False, default=False)
+    parent_item_index = serializers.IntegerField(required=False, allow_null=True, min_value=0)
+    charge_mode = serializers.ChoiceField(
+        choices=["FREE", "CHARGEABLE", ""],
+        required=False,
+        default="",
+        allow_blank=True,
+    )
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        prod = attrs.get("product")
+        is_acc = bool(attrs.get("is_accessory"))
+        inv = getattr(prod, "inventory_profile", None) if prod else None
+        stock_type = getattr(inv, "stock_item_type", None) or getattr(prod, "item_type", None)
+        if not is_acc and stock_type in ("RAW_MATERIAL", "ACCESSORY"):
+            raise serializers.ValidationError(
+                {"product": f"'{getattr(prod, 'name', prod)}' is an accessory/raw material and must be attached as an accessory of a main product."}
+            )
+        return attrs
 
 
 class AdminRentContractCreateSerializer(serializers.Serializer):

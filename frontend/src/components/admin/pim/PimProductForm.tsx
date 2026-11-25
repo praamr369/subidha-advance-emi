@@ -698,7 +698,17 @@ export default function PimProductForm({
   };
 
   useEffect(() => {
-    pimService.getCategories().then(setCategories).catch(() => {});
+    pimService.getCategories().then((cats) => {
+      setCategories(cats);
+      if (!activeProductId) {
+        setCategoryId((prev) => {
+          if (prev) return prev;
+          const matched = cats.find((c) => c.product_type === defaultProductType)
+            ?? cats.find((c) => c.product_type === "ALL");
+          return matched ? matched.id : "";
+        });
+      }
+    }).catch(() => {});
     pimService.getAllAttributes().then((attrs) => {
       setAllAttributes(attrs);
       setAttributes((prev) =>
@@ -711,11 +721,14 @@ export default function PimProductForm({
         })
       );
     }).catch(() => {});
-  }, []);
+  }, [activeProductId, defaultProductType]);
 
   useEffect(() => {
-    if (!categoryId) { setSubcategories([]); return; }
-    pimService.getSubcategories(Number(categoryId)).then(setSubcategories).catch(() => {});
+    if (!categoryId) { setSubcategories([]); setSubcategoryId(""); return; }
+    pimService.getSubcategories(Number(categoryId)).then((subs) => {
+      setSubcategories(subs);
+      setSubcategoryId((prev) => (prev && subs.some((s) => s.id === Number(prev)) ? prev : ""));
+    }).catch(() => {});
   }, [categoryId]);
 
   useEffect(() => {
@@ -2295,7 +2308,46 @@ export default function PimProductForm({
 
       {/* Category */}
       <section className="rounded-lg border p-5 space-y-4">
-        <h3 className="font-semibold">Category</h3>
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <h3 className="font-semibold">Category &amp; Subcategory ({productType.replace("_", " ")})</h3>
+          <button
+            type="button"
+            onClick={() => setManageWorkbenchOpen(true)}
+            className="text-xs font-medium text-primary hover:underline"
+          >
+            + Define Categories / Subcategories
+          </button>
+        </div>
+        {(() => {
+          const currentCat = categories.find((c) => c.id === Number(categoryId));
+          const suggestedCat = categories.find((c) => c.product_type === productType);
+          const isMismatch =
+            Boolean(currentCat) &&
+            (currentCat?.slug === "unclassified" ||
+              (currentCat?.product_type &&
+                currentCat.product_type !== "ALL" &&
+                currentCat.product_type !== productType));
+          if (!isMismatch || !suggestedCat) return null;
+          return (
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 px-3 py-2 text-xs text-amber-900 dark:text-amber-200">
+              <span>
+                This item is classified as <strong>{productType.replace("_", " ")}</strong>, currently under{" "}
+                <strong>{currentCat?.name}</strong>. Map it to the matching PIM category:
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setCategoryId(suggestedCat.id);
+                  setSubcategoryId("");
+                  setAttrValues({});
+                }}
+                className="shrink-0 rounded-md bg-amber-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-amber-700"
+              >
+                Map to {suggestedCat.icon} {suggestedCat.name}
+              </button>
+            </div>
+          );
+        })()}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className="block text-sm font-medium mb-1">Category *</label>
@@ -2320,13 +2372,13 @@ export default function PimProductForm({
               {otherCategories.length > 0 && (
                 <optgroup label="Other Categories">
                   {otherCategories.map((c: PimCategory) => (
-                    <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
+                    <option key={c.id} value={c.id}>{c.icon} {c.name}{c.product_type ? ` (${c.product_type.replace("_", " ")})` : ""}</option>
                   ))}
                 </optgroup>
               )}
             </select>
           </div>
-          {subcategories.length > 0 && (
+          {categoryId && (
             <div>
               <label htmlFor="f-subcategory" className="block text-sm font-medium mb-1">Subcategory</label>
               <select id="f-subcategory"
@@ -2337,7 +2389,11 @@ export default function PimProductForm({
                   setAttrValues({});
                 }}
               >
-                <option value="">— All / No Subcategory —</option>
+                <option value="">
+                  {subcategories.length > 0
+                    ? "— All / Select Subcategory —"
+                    : "— No Subcategories defined yet (add via Manage) —"}
+                </option>
                 {subcategories.map((s) => (
                   <option key={s.id} value={s.id}>{s.name}</option>
                 ))}
@@ -2350,9 +2406,9 @@ export default function PimProductForm({
       {/* Pricing */}
       <section className="rounded-lg border p-5 space-y-4">
         <div>
-          <h3 className="font-semibold">Pricing</h3>
+          <h3 className="font-semibold">Pricing, Costing &amp; Margin</h3>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Base product is a blueprint — leave price at ₹0 if pricing is defined per variant SKU.
+            Base product is a blueprint — leave price at ₹0 if pricing is defined per variant SKU. Costing &amp; net margin automatically include attached accessories.
           </p>
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -2389,6 +2445,114 @@ export default function PimProductForm({
             </div>
           </div>
         </div>
+
+        {/* Live Product + Accessories Costing & Margin Breakdown */}
+        {(() => {
+          const cs = product?.costing_summary;
+          const prodCost = Number(costPrice || 0) > 0 ? Number(costPrice) : Number(cs?.product_cost || 0);
+          const accCost = Number(cs?.accessories_cost || 0);
+          const totalCost = prodCost + accCost;
+          const sellPrice = Number(basePrice || 0) > 0 ? Number(basePrice) : Number(cs?.selling_price || 0);
+          const netProfit = sellPrice - totalCost;
+          const marginPct = sellPrice > 0 ? (netProfit / sellPrice) * 100 : 0;
+
+          return (
+            <div className="space-y-3 rounded-xl border border-border/80 bg-muted/20 p-4">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Product &amp; Accessories Costing Summary
+                </span>
+                {cs && cs.accessories_count > 0 && (
+                  <span className="text-xs text-muted-foreground">
+                    {cs.accessories_count} attached item{cs.accessories_count !== 1 ? "s" : ""} (Included Acc: ₹{Number(cs.accessories_cost).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    {Number(cs.addons_cost) > 0 ? ` · Paid Add-ons Cost: ₹${Number(cs.addons_cost).toLocaleString("en-IN", { minimumFractionDigits: 2 })}` : ""})
+                  </span>
+                )}
+              </div>
+
+              {(sellPrice > 0 || totalCost > 0) && (
+                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
+                  <div className="rounded-lg border bg-background p-2.5">
+                    <div className="text-[11px] text-muted-foreground">Product Cost</div>
+                    <div className="text-sm font-semibold tabular-nums">₹{prodCost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
+                  </div>
+                  <div className="rounded-lg border bg-background p-2.5">
+                    <div className="text-[11px] text-muted-foreground">+ Accessories Cost</div>
+                    <div className="text-sm font-semibold tabular-nums">₹{accCost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
+                  </div>
+                  <div className="rounded-lg border bg-background p-2.5">
+                    <div className="text-[11px] text-muted-foreground">= Total Cost</div>
+                    <div className="text-sm font-bold tabular-nums">₹{totalCost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
+                  </div>
+                  <div className="rounded-lg border bg-background p-2.5">
+                    <div className="text-[11px] text-muted-foreground">Selling Price</div>
+                    <div className="text-sm font-bold tabular-nums text-primary">₹{sellPrice.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
+                  </div>
+                  <div className="rounded-lg border bg-background p-2.5">
+                    <div className="text-[11px] text-muted-foreground">Net Profit</div>
+                    <div className={`text-sm font-bold tabular-nums ${netProfit >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                      {netProfit >= 0 ? "+" : ""}₹{netProfit.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    </div>
+                  </div>
+                  <div className="rounded-lg border bg-background p-2.5">
+                    <div className="text-[11px] text-muted-foreground">Net % of Selling</div>
+                    <div className={`text-sm font-bold tabular-nums ${sellPrice <= 0 ? "text-muted-foreground" : marginPct >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                      {sellPrice > 0 ? `${marginPct.toFixed(2)}%` : "—"}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {variants.length > 0 && (
+                <div className="overflow-x-auto rounded-lg border bg-background">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b bg-muted/40 text-muted-foreground">
+                        <th className="px-3 py-2 text-left font-medium">Variant SKU</th>
+                        <th className="px-3 py-2 text-right font-medium">Product Cost</th>
+                        <th className="px-3 py-2 text-right font-medium">+ Acc. Cost</th>
+                        <th className="px-3 py-2 text-right font-medium">= Total Cost</th>
+                        <th className="px-3 py-2 text-right font-medium">Selling Price</th>
+                        <th className="px-3 py-2 text-right font-medium">Net Profit</th>
+                        <th className="px-3 py-2 text-right font-medium">Profit %</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {variants.map((v) => {
+                        const vcs = v.costing_summary;
+                        const vProdCost = vcs ? Number(vcs.product_cost) : Number(v.cost_price || 0);
+                        const vAccCost = vcs ? Number(vcs.accessories_cost) : 0;
+                        const vTotalCost = vcs ? Number(vcs.total_cost) : vProdCost;
+                        const vSell = Number(v.price || vcs?.selling_price || 0);
+                        const vNet = vSell - vTotalCost;
+                        const vPct = vSell > 0 ? (vNet / vSell) * 100 : 0;
+                        return (
+                          <tr key={v.id} className="hover:bg-muted/20">
+                            <td className="px-3 py-2 font-mono font-semibold">{v.sku}</td>
+                            <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">₹{vProdCost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+                            <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">₹{vAccCost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+                            <td className="px-3 py-2 text-right tabular-nums font-semibold">₹{vTotalCost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+                            <td className="px-3 py-2 text-right tabular-nums font-semibold text-primary">₹{vSell.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+                            <td className={`px-3 py-2 text-right tabular-nums font-semibold ${vNet >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                              {vNet >= 0 ? "+" : ""}₹{vNet.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                            </td>
+                            <td className="px-3 py-2 text-right tabular-nums font-semibold">
+                              {vSell > 0 ? (
+                                <span className={`rounded px-1.5 py-0.5 ${vPct >= 0 ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300" : "bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-300"}`}>
+                                  {vPct.toFixed(2)}%
+                                </span>
+                              ) : "—"}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </section>
 
       {/* Rent / Lease pricing — Only for Finished Goods */}

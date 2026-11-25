@@ -149,6 +149,12 @@ def sync_delivery_inventory_bridge(*, delivery, performed_by=None) -> dict:
     last_entry_id = None
     skipped_reasons: list[str] = []
 
+    has_explicit_acc_items = (
+        any(getattr(di, "is_accessory", False) for di in batch_items)
+        or (hasattr(subscription, "contract_items") and subscription.contract_items.filter(is_accessory=True).exists())
+        or bool((getattr(subscription, "product_snapshot", None) or {}).get("accessories_configured"))
+    )
+
     for product, qty in items_to_move:
         inventory_item = getattr(product, "inventory_profile", None)
         if inventory_item is None or not inventory_item.stock_tracking_enabled:
@@ -205,6 +211,8 @@ def sync_delivery_inventory_bridge(*, delivery, performed_by=None) -> dict:
             )
 
         # Also maintain bundled / attached accessories & raw materials (e.g. Commercial Plyboard for a Bed)
+        if has_explicit_acc_items:
+            continue
         processed_acc_ids = set()
 
         # Build candidate variant SKUs for this specific line item product

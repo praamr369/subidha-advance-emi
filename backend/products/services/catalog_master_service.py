@@ -244,22 +244,76 @@ class ProductCatalogOptions:
 
 def build_product_catalog_options() -> ProductCatalogOptions:
     from subscriptions.models import ProductItemType, ProductStockType
+    from products_pim.models import ProductCategory as PimCategory, ProductSubcategory as PimSubcategory
 
-    categories = [
-        {"id": row.id, "name": row.name}
-        for row in ProductCategoryMaster.objects.filter(is_active=True).order_by("name", "id")
-    ]
-    subcategories = [
-        {
+    pim_cats = list(
+        PimCategory.objects.filter(is_active=True)
+        .prefetch_related("subcategories")
+        .order_by("display_order", "name", "id")
+    )
+    pim_cat_by_name = {c.name.strip().lower(): c for c in pim_cats}
+
+    categories: list[dict[str, object]] = []
+    seen_cat_names: set[str] = set()
+
+    for row in ProductCategoryMaster.objects.filter(is_active=True).order_by("name", "id"):
+        key = row.name.strip().lower()
+        pim_match = pim_cat_by_name.get(key)
+        seen_cat_names.add(key)
+        categories.append({
+            "id": row.id,
+            "name": row.name,
+            "product_type": pim_match.product_type if pim_match else "ALL",
+            "pim_category_id": pim_match.id if pim_match else None,
+        })
+
+    # Include any active PIM categories missing from ProductCategoryMaster
+    for pim_cat in pim_cats:
+        key = pim_cat.name.strip().lower()
+        if key not in seen_cat_names:
+            seen_cat_names.add(key)
+            categories.append({
+                "id": -pim_cat.id,
+                "name": pim_cat.name,
+                "product_type": pim_cat.product_type or "FINISHED_GOOD",
+                "pim_category_id": pim_cat.id,
+            })
+
+    subcategories: list[dict[str, object]] = []
+    seen_sub_keys: set[tuple[str, str]] = set()
+    for row in (
+        ProductSubcategoryMaster.objects.select_related("category")
+        .filter(is_active=True)
+        .order_by("category__name", "name", "id")
+    ):
+        cat_key = row.category.name.strip().lower()
+        sub_key = (cat_key, row.name.strip().lower())
+        seen_sub_keys.add(sub_key)
+        pim_match = pim_cat_by_name.get(cat_key)
+        subcategories.append({
             "id": row.id,
             "name": row.name,
             "category_id": row.category_id,
             "category_name": row.category.name,
-        }
-        for row in ProductSubcategoryMaster.objects.select_related("category")
-        .filter(is_active=True)
-        .order_by("category__name", "name", "id")
-    ]
+            "product_type": pim_match.product_type if pim_match else "ALL",
+        })
+
+    # Merge any active PIM subcategories so all PIM-defined subcategories appear cleanly
+    for pim_sub in (
+        PimSubcategory.objects.select_related("category")
+        .filter(is_active=True, category__is_active=True)
+        .order_by("category__display_order", "display_order", "name", "id")
+    ):
+        sub_key = (pim_sub.category.name.strip().lower(), pim_sub.name.strip().lower())
+        if sub_key not in seen_sub_keys:
+            seen_sub_keys.add(sub_key)
+            subcategories.append({
+                "id": -pim_sub.id,
+                "name": pim_sub.name,
+                "category_id": -pim_sub.category_id,
+                "category_name": pim_sub.category.name,
+                "product_type": pim_sub.category.product_type or "FINISHED_GOOD",
+            })
     unit_masters = [
         {
             "id": row.id,

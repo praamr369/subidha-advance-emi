@@ -14,6 +14,7 @@ import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import { apiFetch } from "@/lib/api";
 import { ROUTES } from "@/lib/routes";
 import { getProductCatalogOptions, type ProductCatalogOptions } from "@/services/products";
+import { pimService, type PimCategory } from "@/services/pim";
 import { z } from "zod";
 
 type ProductType = "RAW_MATERIAL" | "ACCESSORY" | "SERVICE";
@@ -143,6 +144,7 @@ export default function RegisterSimpleTypeForm({ productType, productId }: Props
 
   // Core fields
   const [catalogOptions, setCatalogOptions] = useState<ProductCatalogOptions>({ categories: [], subcategories: [], unit_of_measure_masters: [], unit_of_measure_options: ["PCS"], item_type_choices: [], stock_type_choices: [] });
+  const [pimCategories, setPimCategories] = useState<PimCategory[]>([]);
   const [form, setForm] = useState<{
     product_code: string; name: string; description: string;
     base_price: string; cost_price: string; sku: string;
@@ -186,6 +188,15 @@ export default function RegisterSimpleTypeForm({ productType, productId }: Props
 
   useEffect(() => {
     getProductCatalogOptions().then(setCatalogOptions).catch(() => {});
+    pimService.getCategories({ product_type: productType }).then((cats) => {
+      setPimCategories(cats);
+      if (!isEdit) {
+        const primary = cats.find((c) => c.product_type === productType) ?? cats.find((c) => c.product_type === "ALL");
+        if (primary) {
+          setForm((prev) => (prev.category ? prev : { ...prev, category: primary.name }));
+        }
+      }
+    }).catch(() => {});
     if (isEdit && productId) {
       apiFetch<RegisterProduct>(`/api/v1/admin/products/${productId}/`)
         .then((p) => {
@@ -210,7 +221,7 @@ export default function RegisterSimpleTypeForm({ productType, productId }: Props
     } else {
       setLoading(false);
     }
-  }, [isEdit, productId, meta.unitOptions]);
+  }, [isEdit, productId, meta.unitOptions, productType]);
 
   const set = (field: string, value: unknown) =>
     setForm((f) => ({ ...f, [field]: value }));
@@ -367,32 +378,83 @@ export default function RegisterSimpleTypeForm({ productType, productId }: Props
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="f-category" className="block text-sm font-medium mb-1">Category</label>
-              <input id="f-category"
-                value={form.category}
-                onChange={(e) => set("category", e.target.value)}
-                list="category-options"
-                placeholder="Optional catalog category"
-                className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
-              />
-              <datalist id="category-options">
-                {catalogOptions.categories.map((item) => <option key={item.id} value={item.name} />)}
-              </datalist>
-            </div>
-            <div>
-              <label htmlFor="f-subcategory" className="block text-sm font-medium mb-1">Subcategory</label>
-              <input id="f-subcategory"
-                value={form.subcategory}
-                onChange={(e) => set("subcategory", e.target.value)}
-                list="subcategory-options"
-                placeholder="Optional catalog subcategory"
-                className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
-              />
-              <datalist id="subcategory-options">
-                {catalogOptions.subcategories.map((item) => <option key={item.id} value={item.name} />)}
-              </datalist>
-            </div>
+            {(() => {
+              const typeCats = pimCategories.length > 0
+                ? pimCategories
+                : catalogOptions.categories.filter(
+                    (c) => !c.product_type || c.product_type === productType || c.product_type === "ALL"
+                  );
+              const selectedPimCat = pimCategories.find(
+                (c) => c.name.trim().toLowerCase() === form.category.trim().toLowerCase()
+              );
+              const subList = selectedPimCat
+                ? selectedPimCat.subcategories.map((s) => ({ id: s.id, name: s.name }))
+                : catalogOptions.subcategories
+                    .filter(
+                      (s) =>
+                        !form.category ||
+                        s.category_name.trim().toLowerCase() === form.category.trim().toLowerCase()
+                    )
+                    .map((s) => ({ id: s.id, name: s.name }));
+              const hasCustomCat = Boolean(
+                form.category && !typeCats.some((c) => c.name.trim().toLowerCase() === form.category.trim().toLowerCase())
+              );
+              const hasCustomSub = Boolean(
+                form.subcategory && !subList.some((s) => s.name.trim().toLowerCase() === form.subcategory.trim().toLowerCase())
+              );
+              return (
+                <>
+                  <div>
+                    <label htmlFor="f-category" className="block text-sm font-medium mb-1">
+                      Category ({meta.label})
+                    </label>
+                    <select
+                      id="f-category"
+                      value={form.category}
+                      onChange={(e) => {
+                        set("category", e.target.value);
+                        set("subcategory", "");
+                      }}
+                      className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+                    >
+                      <option value="">— Select Category —</option>
+                      {typeCats.map((item) => (
+                        <option key={item.id} value={item.name}>
+                          {item.name}
+                        </option>
+                      ))}
+                      {hasCustomCat && <option value={form.category}>{form.category} (Legacy)</option>}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="f-subcategory" className="block text-sm font-medium mb-1">
+                      Subcategory
+                    </label>
+                    <select
+                      id="f-subcategory"
+                      value={form.subcategory}
+                      onChange={(e) => set("subcategory", e.target.value)}
+                      disabled={!form.category}
+                      className="w-full rounded-lg border bg-background px-3 py-2 text-sm disabled:opacity-60"
+                    >
+                      <option value="">
+                        {!form.category
+                          ? "— Select Category first —"
+                          : subList.length > 0
+                          ? "— Select Subcategory —"
+                          : "— No subcategories defined in PIM —"}
+                      </option>
+                      {subList.map((item) => (
+                        <option key={item.id} value={item.name}>
+                          {item.name}
+                        </option>
+                      ))}
+                      {hasCustomSub && <option value={form.subcategory}>{form.subcategory} (Legacy)</option>}
+                    </select>
+                  </div>
+                </>
+              );
+            })()}
           </div>
 
           <div>

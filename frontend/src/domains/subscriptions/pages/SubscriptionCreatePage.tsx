@@ -34,6 +34,8 @@ import QuickOpeningStockDrawer, {
   type QuickOpeningStockProduct,
   type StockPostedResult,
 } from "@/components/inventory/QuickOpeningStockDrawer";
+import AccessorySelectionPanel, { type AccessorySelectionResult } from "@/components/inventory/AccessorySelectionPanel";
+import { fetchBillingAccessoryOptions, type ParentVariantOption } from "@/services/inventory";
 
 type PlanType = "EMI" | "RENT" | "LEASE";
 type SubscriptionCreateVariant = "page" | "drawer";
@@ -81,6 +83,9 @@ export type ContractBasketItem = {
   monthly_yield_percent: string;
   security_deposit_percent: string;
   security_deposit_amount?: string;
+  is_accessory?: boolean;
+  parent_item_id?: string | null;
+  charge_mode?: "FREE" | "CHARGEABLE" | "";
 };
 
 function billingRowToProductOption(row: BillingProductSearchRow): ProductOption {
@@ -462,7 +467,13 @@ export default function SubscriptionCreatePage({
   const [customer, setCustomer] = useState<CustomerOption | null>(null);
   const [product, setProduct] = useState<ProductOption | null>(null);
   const [contractItems, setContractItems] = useState<ContractBasketItem[]>([]);
+  const [emiAccessoriesConfigured, setEmiAccessoriesConfigured] = useState(false);
   const [addingProduct, setAddingProduct] = useState(false);
+  const [contractAccPanel, setContractAccPanel] = useState<{
+    basketItemId: string;
+    productId: number;
+    parentQuantity: number;
+  } | null>(null);
   const [batch, setBatch] = useState<BatchOption | null>(null);
   const [luckyId, setLuckyId] = useState<LuckyIdOption | null>(null);
   const [partner, setPartner] = useState<PartnerOption | null>(null);
@@ -553,20 +564,29 @@ export default function SubscriptionCreatePage({
   }, []);
 
   function addProductToBasket(item: ProductOption) {
+    const newId = `item-${item.id}-${Date.now()}`;
+    let targetBasketId = newId;
+    let targetQty = 1;
+
     setContractItems((prev) => {
-      const existingIndex = prev.findIndex((p) => p.product.id === item.id);
+      const existingIndex = prev.findIndex((p) => !p.is_accessory && p.product.id === item.id);
       if (existingIndex >= 0) {
+        targetBasketId = prev[existingIndex].id;
+        targetQty = prev[existingIndex].quantity + 1;
         return prev.map((p, idx) =>
-          idx === existingIndex ? { ...p, quantity: p.quantity + 1 } : p
+          idx === existingIndex ? { ...p, quantity: targetQty } : p
         );
       }
       const newItem: ContractBasketItem = {
-        id: `item-${item.id}-${Date.now()}`,
+        id: newId,
         product: item,
         quantity: 1,
         unit_base_price: item.base_price || "0.00",
         monthly_yield_percent: yieldRatePercent || "5.00",
         security_deposit_percent: securityDepositPercent || "20.00",
+        is_accessory: false,
+        parent_item_id: null,
+        charge_mode: "",
       };
       return [...prev, newItem];
     });
@@ -574,11 +594,66 @@ export default function SubscriptionCreatePage({
       setProduct(item);
     }
     setAddingProduct(false);
+
+    void fetchBillingAccessoryOptions(item.id)
+      .then((res) => {
+        if (res && res.has_options) {
+          setContractAccPanel({
+            basketItemId: targetBasketId,
+            productId: item.id,
+            parentQuantity: targetQty,
+          });
+        }
+      })
+      .catch(() => {
+        // Ignore if no options
+      });
+  }
+
+  function handleContractAccessoryConfirm(result: AccessorySelectionResult) {
+    if (!contractAccPanel) return;
+    const parentBasketId = contractAccPanel.basketItemId;
+    setContractAccPanel(null);
+    if (isEmiPlan) {
+      setEmiAccessoriesConfigured(true);
+    }
+
+    setContractItems((prev) => {
+      const parentItem = prev.find((it) => it.id === parentBasketId);
+      const baseYield = parentItem?.monthly_yield_percent || yieldRatePercent || "5.00";
+      const baseDeposit = parentItem?.security_deposit_percent || securityDepositPercent || "20.00";
+
+      const accItems: ContractBasketItem[] = result.accessories.map((acc, idx) => ({
+        id: `acc-${acc.productId}-${Date.now()}-${idx}`,
+        product: {
+          id: acc.productId,
+          name: acc.variantLabel && acc.variantLabel !== acc.productName
+            ? `${acc.productName} (${acc.variantLabel})`
+            : acc.productName,
+          product_code: acc.sku || acc.productCode,
+          sku: acc.sku,
+          base_price: acc.salePrice,
+          unit_of_measure: acc.unitOfMeasure,
+        },
+        quantity: Math.max(1, Math.round(Number(acc.quantity || 1))),
+        unit_base_price: acc.chargeMode === "FREE" ? "0.00" : Number(acc.salePrice || 0).toFixed(2),
+        monthly_yield_percent: baseYield,
+        security_deposit_percent: baseDeposit,
+        is_accessory: true,
+        parent_item_id: parentBasketId,
+        charge_mode: acc.chargeMode,
+      }));
+
+      const cleaned = prev.filter((it) => it.parent_item_id !== parentBasketId);
+      const parentIdx = cleaned.findIndex((it) => it.id === parentBasketId);
+      const insertAt = parentIdx >= 0 ? parentIdx + 1 : cleaned.length;
+      return [...cleaned.slice(0, insertAt), ...accItems, ...cleaned.slice(insertAt)];
+    });
   }
 
   function removeProductFromBasket(id: string) {
     setContractItems((prev) => {
-      const next = prev.filter((it) => it.id !== id);
+      const next = prev.filter((it) => it.id !== id && it.parent_item_id !== id);
       if (next.length > 0) {
         setProduct(next[0].product);
       } else {
@@ -814,14 +889,14 @@ export default function SubscriptionCreatePage({
   }, [isEmiPlan, batch?.duration_months, manualTenureMonths]);
 
   const totalProductBaseValue = useMemo(() => {
-    if ((isRentPlan || isLeasePlan) && contractItems.length > 0) {
+    if (contractItems.length > 0) {
       return contractItems.reduce(
         (acc, it) => acc + it.quantity * (Number(it.unit_base_price) || 0),
         0
       );
     }
     return Number(product?.base_price ?? 0);
-  }, [isRentPlan, isLeasePlan, contractItems, product?.base_price]);
+  }, [contractItems, product?.base_price]);
 
   const monthlyAmount = useMemo(() => {
     if (!tenureMonths || tenureMonths <= 0) return "0.00";
@@ -1383,14 +1458,64 @@ export default function SubscriptionCreatePage({
         }
 
         if (pType === "EMI") {
+          const rawSelAcc = Array.isArray(data.selected_accessories)
+            ? (data.selected_accessories as Record<string, unknown>[])
+            : [];
+          const accTotal = rawSelAcc.reduce(
+            (sum, acc) => sum + (Number(acc.total_base_price || 0) || 0),
+            0
+          );
+          const inferredMainBase =
+            rawSelAcc.length > 0
+              ? Math.max(0, Number(data.total_amount || 0) - accTotal).toFixed(2)
+              : String(data.total_amount || "0.00");
+
           if (data.product) {
-            setProduct({
+            const emiMainProd: ProductOption = {
               id: Number(data.product),
               name: String(data.product_name || `Product #${data.product}`),
               product_code: String(data.product_code || ""),
-              base_price: String(data.total_amount || "0.00"),
+              base_price: inferredMainBase,
               is_emi_enabled: true,
-            });
+            };
+            setProduct(emiMainProd);
+            const mainBasketId = `emi-${emiMainProd.id}`;
+            const hydratedAccs: ContractBasketItem[] = rawSelAcc.map((acc, idx) => ({
+              id: `acc-${acc.product_id || idx}-${Date.now()}-${idx}`,
+              product: {
+                id: Number(acc.product_id),
+                name: String(acc.product_name || `Accessory #${acc.product_id}`),
+                product_code: String(acc.sku || acc.product_code || ""),
+                sku: String(acc.sku || ""),
+                base_price: String(acc.unit_base_price || "0.00"),
+              },
+              quantity: Math.max(1, Number(acc.quantity || 1)),
+              unit_base_price: String(acc.unit_base_price || "0.00"),
+              monthly_yield_percent: yieldRatePercent || "5.00",
+              security_deposit_percent: securityDepositPercent || "20.00",
+              is_accessory: true,
+              parent_item_id: mainBasketId,
+              charge_mode:
+                String(acc.charge_mode || "").toUpperCase() === "FREE" ||
+                String(acc.charge_mode || "").toUpperCase() === "INCLUDED"
+                  ? "FREE"
+                  : "CHARGEABLE",
+            }));
+            setContractItems([
+              {
+                id: mainBasketId,
+                product: emiMainProd,
+                quantity: 1,
+                unit_base_price: inferredMainBase,
+                monthly_yield_percent: yieldRatePercent || "5.00",
+                security_deposit_percent: securityDepositPercent || "20.00",
+                is_accessory: false,
+                parent_item_id: null,
+                charge_mode: "",
+              },
+              ...hydratedAccs,
+            ]);
+            setEmiAccessoriesConfigured(rawSelAcc.length > 0);
           }
           if (data.batch) {
             setBatch({
@@ -1411,7 +1536,7 @@ export default function SubscriptionCreatePage({
           // RENT or LEASE
           if (Array.isArray(data.contract_items) && data.contract_items.length > 0) {
             const items: ContractBasketItem[] = (data.contract_items as Record<string, unknown>[]).map((it, idx) => ({
-              id: `item-${it.id || it.product_id || idx}-${Date.now()}`,
+              id: it.id ? `item-${it.id}` : `item-${it.product_id || idx}-${Date.now()}`,
               product: {
                 id: Number(it.product_id || it.product),
                 name: String(it.product_name || `Product #${it.product_id}`),
@@ -1425,6 +1550,9 @@ export default function SubscriptionCreatePage({
               monthly_yield_percent: String(it.monthly_yield_percent || "5.00"),
               security_deposit_percent: String(it.security_deposit_percent || "20.00"),
               security_deposit_amount: it.security_deposit_amount ? String(it.security_deposit_amount) : undefined,
+              is_accessory: Boolean(it.is_accessory),
+              parent_item_id: it.parent_item ? `item-${it.parent_item}` : null,
+              charge_mode: (it.charge_mode as "FREE" | "CHARGEABLE" | "") || "",
             }));
             setContractItems(items);
             if (items.length > 0) {
@@ -1904,14 +2032,23 @@ export default function SubscriptionCreatePage({
 
         const itemsPayload =
           (isRentPlan || isLeasePlan) && contractItems.length > 0
-            ? contractItems.map((it) => ({
-                product: it.product.id,
-                quantity: it.quantity,
-                unit_base_price: it.unit_base_price,
-                monthly_yield_percent: it.monthly_yield_percent || yieldRatePercent,
-                security_deposit_percent: it.security_deposit_percent || securityDepositPercent,
-                security_deposit_amount: it.security_deposit_amount || undefined,
-              }))
+            ? contractItems.map((it) => {
+                const pIdx =
+                  it.is_accessory && it.parent_item_id
+                    ? contractItems.findIndex((cand) => cand.id === it.parent_item_id)
+                    : -1;
+                return {
+                  product: it.product.id,
+                  quantity: it.quantity,
+                  unit_base_price: it.unit_base_price,
+                  monthly_yield_percent: it.monthly_yield_percent || yieldRatePercent,
+                  security_deposit_percent: it.security_deposit_percent || securityDepositPercent,
+                  security_deposit_amount: it.security_deposit_amount || undefined,
+                  is_accessory: Boolean(it.is_accessory),
+                  parent_item_index: pIdx >= 0 ? pIdx : null,
+                  charge_mode: it.charge_mode || "",
+                };
+              })
             : undefined;
 
         const body: Record<string, unknown> = {
@@ -1924,8 +2061,19 @@ export default function SubscriptionCreatePage({
         };
 
         if (isEmiPlan) {
+          const emiAccessoriesPayload = contractItems
+            .filter((it) => it.is_accessory)
+            .map((it) => ({
+              product_id: it.product.id,
+              quantity: it.quantity,
+              unit_base_price: it.unit_base_price,
+              charge_mode: it.charge_mode || "PAID",
+            }));
           body.batch = batch?.id ?? null;
           body.lucky_id = luckyId?.id ?? null;
+          body.accessories = emiAccessoriesPayload;
+          body.accessories_configured =
+            emiAccessoriesConfigured || emiAccessoriesPayload.length > 0;
         } else {
           body.items = itemsPayload;
           body.security_deposit_percent = Number(effectiveDepositPercent) || depositPercentNumber;
@@ -1952,6 +2100,14 @@ export default function SubscriptionCreatePage({
           body: JSON.stringify(body),
         });
       } else if (isEmiPlan) {
+        const emiAccessoriesPayload = contractItems
+          .filter((it) => it.is_accessory)
+          .map((it) => ({
+            product_id: it.product.id,
+            quantity: it.quantity,
+            unit_base_price: it.unit_base_price,
+            charge_mode: it.charge_mode || "PAID",
+          }));
         const body: Record<string, unknown> = {
           customer: customer.id,
           product: product!.id,
@@ -1961,6 +2117,9 @@ export default function SubscriptionCreatePage({
           start_date: startDate,
           batch: batch?.id ?? null,
           lucky_id: luckyId?.id ?? null,
+          accessories: emiAccessoriesPayload,
+          accessories_configured:
+            emiAccessoriesConfigured || emiAccessoriesPayload.length > 0,
         };
 
         created = await apiFetch<CreatedSubscriptionResponse>("/admin/subscriptions/", {
@@ -1971,14 +2130,23 @@ export default function SubscriptionCreatePage({
         const primaryProd = contractItems.length > 0 ? contractItems[0].product : product!;
         const itemsPayload =
           contractItems.length > 0
-            ? contractItems.map((it) => ({
-                product: it.product.id,
-                quantity: it.quantity,
-                unit_base_price: it.unit_base_price,
-                monthly_yield_percent: it.monthly_yield_percent || yieldRatePercent,
-                security_deposit_percent: it.security_deposit_percent || securityDepositPercent,
-                security_deposit_amount: it.security_deposit_amount || undefined,
-              }))
+            ? contractItems.map((it) => {
+                const pIdx =
+                  it.is_accessory && it.parent_item_id
+                    ? contractItems.findIndex((cand) => cand.id === it.parent_item_id)
+                    : -1;
+                return {
+                  product: it.product.id,
+                  quantity: it.quantity,
+                  unit_base_price: it.unit_base_price,
+                  monthly_yield_percent: it.monthly_yield_percent || yieldRatePercent,
+                  security_deposit_percent: it.security_deposit_percent || securityDepositPercent,
+                  security_deposit_amount: it.security_deposit_amount || undefined,
+                  is_accessory: Boolean(it.is_accessory),
+                  parent_item_index: pIdx >= 0 ? pIdx : null,
+                  charge_mode: it.charge_mode || "",
+                };
+              })
             : undefined;
 
         const body: Record<string, unknown> = {
@@ -2010,14 +2178,23 @@ export default function SubscriptionCreatePage({
         const primaryProd = contractItems.length > 0 ? contractItems[0].product : product!;
         const itemsPayload =
           contractItems.length > 0
-            ? contractItems.map((it) => ({
-                product: it.product.id,
-                quantity: it.quantity,
-                unit_base_price: it.unit_base_price,
-                monthly_yield_percent: it.monthly_yield_percent || yieldRatePercent,
-                security_deposit_percent: it.security_deposit_percent || securityDepositPercent,
-                security_deposit_amount: it.security_deposit_amount || undefined,
-              }))
+            ? contractItems.map((it) => {
+                const pIdx =
+                  it.is_accessory && it.parent_item_id
+                    ? contractItems.findIndex((cand) => cand.id === it.parent_item_id)
+                    : -1;
+                return {
+                  product: it.product.id,
+                  quantity: it.quantity,
+                  unit_base_price: it.unit_base_price,
+                  monthly_yield_percent: it.monthly_yield_percent || yieldRatePercent,
+                  security_deposit_percent: it.security_deposit_percent || securityDepositPercent,
+                  security_deposit_amount: it.security_deposit_amount || undefined,
+                  is_accessory: Boolean(it.is_accessory),
+                  parent_item_index: pIdx >= 0 ? pIdx : null,
+                  charge_mode: it.charge_mode || "",
+                };
+              })
             : undefined;
 
         const body: Record<string, unknown> = {
@@ -2522,14 +2699,19 @@ export default function SubscriptionCreatePage({
                             return (
                               <tr key={itm.id} className="hover:bg-muted/20 transition-colors">
                                 <td className="px-3 py-2.5">
-                                  <div className="font-semibold text-foreground flex items-center gap-2">
+                                  <div className="font-semibold text-foreground flex items-center gap-2 flex-wrap">
+                                    {itm.is_accessory && (
+                                      <span className="inline-flex items-center rounded border border-purple-300 bg-purple-50 dark:border-purple-700 dark:bg-purple-950/50 px-1.5 py-0.5 text-[10px] font-bold text-purple-700 dark:text-purple-300">
+                                        ↳ Accessory{itm.charge_mode ? ` · ${itm.charge_mode}` : ""}
+                                      </span>
+                                    )}
                                     <span>{itm.product.name}</span>
-                                    {isRentPlan && !itm.product.is_rent_enabled && (
+                                    {!itm.is_accessory && isRentPlan && !itm.product.is_rent_enabled && (
                                       <span className="inline-flex items-center gap-1 rounded bg-amber-100 dark:bg-amber-950/40 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:text-amber-300">
                                         ⚠ Not Rent Enabled
                                       </span>
                                     )}
-                                    {isLeasePlan && !itm.product.is_lease_enabled && (
+                                    {!itm.is_accessory && isLeasePlan && !itm.product.is_lease_enabled && (
                                       <span className="inline-flex items-center gap-1 rounded bg-amber-100 dark:bg-amber-950/40 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:text-amber-300">
                                         ⚠ Not Lease Enabled
                                       </span>
@@ -2540,6 +2722,22 @@ export default function SubscriptionCreatePage({
                                       {itm.product.product_code || "—"}{" "}
                                       {itm.product.category ? `· ${itm.product.category}` : ""}
                                     </span>
+                                    {!itm.is_accessory && (
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setContractAccPanel({
+                                            basketItemId: itm.id,
+                                            productId: itm.product.id,
+                                            parentQuantity: itm.quantity,
+                                          })
+                                        }
+                                        className="inline-flex items-center gap-1 rounded border border-primary/30 bg-primary/5 px-1.5 py-0.5 text-[10px] font-semibold text-primary hover:bg-primary/15"
+                                        title="Select product variant & accessory variants for this contract item"
+                                      >
+                                        Variants &amp; Accessories
+                                      </button>
+                                    )}
                                     <span className="text-[10px] text-muted-foreground">
                                       Stock: <strong>{itm.product.available_qty ?? itm.product.on_hand_qty ?? "0"}</strong>
                                     </span>
@@ -2565,7 +2763,7 @@ export default function SubscriptionCreatePage({
                                       <PackagePlus className="h-3 w-3" />
                                       + Stock
                                     </button>
-                                    {((isRentPlan && !itm.product.is_rent_enabled) || (isLeasePlan && !itm.product.is_lease_enabled)) && (
+                                    {!itm.is_accessory && ((isRentPlan && !itm.product.is_rent_enabled) || (isLeasePlan && !itm.product.is_lease_enabled)) && (
                                       <a
                                         href={`/admin/products/${itm.product.id}/edit`}
                                         target="_blank"
@@ -2832,12 +3030,42 @@ export default function SubscriptionCreatePage({
                   onSelect={(item) => {
                     nextLuckyRequestToken();
                     setProduct(item);
+                    setEmiAccessoriesConfigured(false);
+                    const emiBasketId = `emi-${item.id}-${Date.now()}`;
+                    setContractItems([
+                      {
+                        id: emiBasketId,
+                        product: item,
+                        quantity: 1,
+                        unit_base_price: item.base_price || "0.00",
+                        monthly_yield_percent: yieldRatePercent || "5.00",
+                        security_deposit_percent: securityDepositPercent || "20.00",
+                        is_accessory: false,
+                        parent_item_id: null,
+                        charge_mode: "",
+                      },
+                    ]);
                     setError(null);
                     setSuccess(null);
+                    void fetchBillingAccessoryOptions(item.id)
+                      .then((res) => {
+                        if (res && res.has_options) {
+                          setContractAccPanel({
+                            basketItemId: emiBasketId,
+                            productId: item.id,
+                            parentQuantity: 1,
+                          });
+                        }
+                      })
+                      .catch(() => {
+                        // Ignore if no variant/accessory options
+                      });
                   }}
                   onClear={() => {
                     nextLuckyRequestToken();
                     setProduct(null);
+                    setContractItems([]);
+                    setEmiAccessoriesConfigured(false);
                     setBatch(null);
                     setLuckyId(null);
                     setBatchQuery("");
@@ -2847,6 +3075,95 @@ export default function SubscriptionCreatePage({
                     setAvailableLuckyCount(null);
                   }}
                 />
+                {product && (
+                  <div className="mt-2 rounded-xl border border-border bg-card/60 p-3 space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <div className="text-xs font-semibold text-foreground">
+                          SFEMI Variant &amp; Accessory Bundle
+                        </div>
+                        <div className="text-[11px] text-muted-foreground font-mono">
+                          Base Unit: {money(product.base_price)}
+                          {contractItems.some((it) => it.is_accessory) && (
+                            <> · Bundle Total: <strong className="text-foreground">{money(totalProductBaseValue)}</strong></>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const existingMain = contractItems.find((it) => !it.is_accessory);
+                          let mainId = existingMain?.id;
+                          if (!existingMain) {
+                            mainId = `emi-${product.id}-${Date.now()}`;
+                            setContractItems([
+                              {
+                                id: mainId,
+                                product,
+                                quantity: 1,
+                                unit_base_price: product.base_price || "0.00",
+                                monthly_yield_percent: yieldRatePercent || "5.00",
+                                security_deposit_percent: securityDepositPercent || "20.00",
+                                is_accessory: false,
+                                parent_item_id: null,
+                                charge_mode: "",
+                              },
+                            ]);
+                          }
+                          setContractAccPanel({
+                            basketItemId: mainId!,
+                            productId: product.id,
+                            parentQuantity: 1,
+                          });
+                        }}
+                        className="inline-flex items-center gap-1 rounded-lg border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors"
+                      >
+                        Variants &amp; Accessories
+                      </button>
+                    </div>
+                    {contractItems.some((it) => it.is_accessory) && (
+                      <div className="space-y-1 border-t border-border/60 pt-2">
+                        {contractItems
+                          .filter((it) => it.is_accessory)
+                          .map((acc) => {
+                            const lineTotal = acc.quantity * (Number(acc.unit_base_price) || 0);
+                            return (
+                              <div
+                                key={acc.id}
+                                className="flex items-center justify-between gap-2 rounded-lg border border-border/50 bg-background/70 px-2.5 py-1.5 text-xs"
+                              >
+                                <div className="min-w-0 flex items-center gap-1.5 flex-wrap">
+                                  <span className="inline-flex items-center rounded border border-purple-300 bg-purple-50 dark:border-purple-700 dark:bg-purple-950/50 px-1.5 py-0.5 text-[10px] font-bold text-purple-700 dark:text-purple-300">
+                                    ↳ {acc.charge_mode === "FREE" ? "Included" : "Add-on"}
+                                  </span>
+                                  <span className="font-medium text-foreground truncate">{acc.product.name}</span>
+                                  <span className="text-[11px] font-mono text-muted-foreground">
+                                    × {acc.quantity}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <span className="font-mono text-xs font-semibold text-foreground">
+                                    {acc.charge_mode === "FREE" ? "Included (₹0.00)" : money(lineTotal)}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEmiAccessoriesConfigured(true);
+                                      setContractItems((prev) => prev.filter((it) => it.id !== acc.id));
+                                    }}
+                                    className="rounded p-1 text-muted-foreground hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/30"
+                                    title="Remove accessory"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
             {isEmiPlan ? (
@@ -2891,8 +3208,13 @@ export default function SubscriptionCreatePage({
                       onClick={() => {
                         setPlanType(pt);
                         if (pt === "EMI") {
-                          if (contractItems.length > 1) {
-                            setContractItems(contractItems.slice(0, 1));
+                          const primary = contractItems.find((it) => !it.is_accessory) || contractItems[0];
+                          if (primary) {
+                            const attachedAccs = contractItems.filter(
+                              (it) => it.is_accessory && it.parent_item_id === primary.id
+                            );
+                            setProduct(primary.product);
+                            setContractItems([{ ...primary, quantity: 1 }, ...attachedAccs]);
                           }
                         } else {
                           nextLuckyRequestToken();
@@ -3483,12 +3805,14 @@ export default function SubscriptionCreatePage({
             />
             <DetailValue
               label={
-                isRentPlan || isLeasePlan
-                  ? `Attached Products (${contractItems.length || (product ? 1 : 0)})`
-                  : "Product"
+                contractItems.length > 1
+                  ? `Attached Products (${contractItems.length})`
+                  : isRentPlan || isLeasePlan
+                    ? `Attached Products (${contractItems.length || (product ? 1 : 0)})`
+                    : "Product"
               }
               value={
-                (isRentPlan || isLeasePlan) && contractItems.length > 0
+                contractItems.length > 0
                   ? contractItems
                       .map((c) => `${c.quantity}x ${c.product.name}`)
                       .join(", ")
@@ -3504,8 +3828,14 @@ export default function SubscriptionCreatePage({
               />
             ) : (
               <DetailValue
-                label="Enabled Modes"
-                value={productModes.length > 0 ? productModes.join(" / ") : "—"}
+                label={contractItems.some((it) => it.is_accessory) ? "Bundle Base Total" : "Enabled Modes"}
+                value={
+                  contractItems.some((it) => it.is_accessory)
+                    ? money(totalProductBaseValue)
+                    : productModes.length > 0
+                      ? productModes.join(" / ")
+                      : "—"
+                }
               />
             )}
             <DetailValue
@@ -4226,6 +4556,80 @@ export default function SubscriptionCreatePage({
             playScanBeep(true);
           }}
         />
+      )}
+
+      {/* Contract Variant & Accessory Selection Modal (Rent / Lease) */}
+      {contractAccPanel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setContractAccPanel(null)} />
+          <div className="relative z-10 w-full max-w-xl rounded-2xl border border-border bg-background shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between gap-4 border-b border-border px-5 py-4">
+              <h2 className="text-base font-semibold text-foreground">Contract Variants &amp; Accessories</h2>
+              <button
+                type="button"
+                onClick={() => setContractAccPanel(null)}
+                className="rounded p-1.5 text-muted-foreground hover:bg-muted"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="max-h-[70vh] overflow-y-auto p-5">
+              <AccessorySelectionPanel
+                productId={contractAccPanel.productId}
+                mode="contract"
+                parentQuantity={contractAccPanel.parentQuantity}
+                onSwitchParentVariant={(pv: ParentVariantOption) => {
+                  const targetBasketId = contractAccPanel.basketItemId;
+                  setContractItems((prev) =>
+                    prev.map((it) =>
+                      it.id === targetBasketId
+                        ? {
+                            ...it,
+                            product: {
+                              ...it.product,
+                              id: pv.product_id,
+                              name: pv.name,
+                              product_code: pv.product_code,
+                              sku: pv.sku,
+                              base_price: pv.base_price,
+                              available_qty: pv.available_stock,
+                              on_hand_qty: pv.available_stock,
+                              is_emi_enabled: pv.is_emi_enabled ?? it.product.is_emi_enabled,
+                              is_rent_enabled: pv.is_rent_enabled ?? it.product.is_rent_enabled,
+                              is_lease_enabled: pv.is_lease_enabled ?? it.product.is_lease_enabled,
+                            },
+                            unit_base_price: Number(pv.base_price || 0).toFixed(2),
+                          }
+                        : it
+                    )
+                  );
+                  if (isEmiPlan || contractItems[0]?.id === targetBasketId) {
+                    setProduct((curr) =>
+                      curr
+                        ? {
+                            ...curr,
+                            id: pv.product_id,
+                            name: pv.name,
+                            product_code: pv.product_code,
+                            sku: pv.sku,
+                            base_price: pv.base_price,
+                            available_qty: pv.available_stock,
+                            on_hand_qty: pv.available_stock,
+                            is_emi_enabled: pv.is_emi_enabled ?? curr.is_emi_enabled,
+                            is_rent_enabled: pv.is_rent_enabled ?? curr.is_rent_enabled,
+                            is_lease_enabled: pv.is_lease_enabled ?? curr.is_lease_enabled,
+                          }
+                        : curr
+                    );
+                  }
+                  setContractAccPanel((prev) => (prev ? { ...prev, productId: pv.product_id } : null));
+                }}
+                onConfirm={handleContractAccessoryConfirm}
+                onCancel={() => setContractAccPanel(null)}
+              />
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Quick Opening Stock Drawer */}

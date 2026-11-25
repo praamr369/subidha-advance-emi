@@ -86,3 +86,63 @@ class PimSlugUniquenessTests(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
         self.assertEqual(response.data["slug"], "colour")
+
+    def test_subcategory_product_type_filter_and_pim_core_category_mapping(self):
+        """Subcategory list filters by product_type, mismatched subcategory-category is rejected, and operational accessory syncs cleanly to PIM."""
+        from products.services.catalog_master_service import build_product_catalog_options
+        from products_core.models import Product
+        from products_pim.models import PimProduct
+        from products_pim.services.core import ensure_pim_product_for_product
+
+        acc_cat = ProductCategory.objects.create(name="Accessories & Hardware", product_type="ACCESSORY")
+        acc_sub = ProductSubcategory.objects.create(category=acc_cat, name="Plywood & Boards")
+        raw_cat = ProductCategory.objects.create(name="Raw Materials & Lumber", product_type="RAW_MATERIAL")
+        ProductSubcategory.objects.create(category=raw_cat, name="Timber & Wood Planks")
+
+        # Subcategory filter by product_type=ACCESSORY returns only accessory subcategories
+        res = self.client.get("/api/v1/pim/subcategories/?product_type=ACCESSORY")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        sub_names = [row["name"] for row in (res.data.get("results") if isinstance(res.data, dict) else res.data)]
+        self.assertIn("Plywood & Boards", sub_names)
+        self.assertNotIn("Timber & Wood Planks", sub_names)
+
+        # Creating/updating a PimProduct with mismatched category & subcategory rejects explicitly
+        bad = self.client.post(
+            "/api/v1/pim/products/",
+            {
+                "code": "ACC-MISMATCH-1",
+                "name": "Mismatched Acc",
+                "category": raw_cat.id,
+                "subcategory": acc_sub.id,
+                "base_price": "500.00",
+                "product_type": "ACCESSORY",
+            },
+            format="json",
+        )
+        self.assertEqual(bad.status_code, status.HTTP_400_BAD_REQUEST)
+
+        # Operational Accessory product syncs category & subcategory accurately into PIM
+        op_acc = Product.objects.create(
+            product_code="ACC-PLY-SYNC-1",
+            name="Commercial Ply Sync",
+            base_price="1200.00",
+            item_type="ACCESSORY",
+            is_emi_enabled=False,
+            is_direct_sale_enabled=True,
+            category="Accessories & Hardware",
+            subcategory="Plywood & Boards",
+        )
+        pim_acc = ensure_pim_product_for_product(op_acc)
+        self.assertIsNotNone(pim_acc)
+        self.assertEqual(pim_acc.product_type, "ACCESSORY")
+        self.assertEqual(pim_acc.category_id, acc_cat.id)
+        self.assertEqual(pim_acc.subcategory_id, acc_sub.id)
+
+        # Catalog options enrich categories and subcategories with product_type from PIM
+        opts = build_product_catalog_options()
+        acc_cat_opt = next((c for c in opts.categories if c["name"] == "Accessories & Hardware"), None)
+        self.assertIsNotNone(acc_cat_opt)
+        self.assertEqual(acc_cat_opt["product_type"], "ACCESSORY")
+        acc_sub_opt = next((s for s in opts.subcategories if s["name"] == "Plywood & Boards"), None)
+        self.assertIsNotNone(acc_sub_opt)
+        self.assertEqual(acc_sub_opt["product_type"], "ACCESSORY")

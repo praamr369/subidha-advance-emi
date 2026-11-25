@@ -94,14 +94,19 @@ def _normalize_contract_items(
         elif not prod:
             raise ValidationError({"items": f"Item {idx}: Product is required."})
 
-        if plan_type == PlanType.RENT and not getattr(prod, "is_rent_enabled", False):
-            raise ValidationError(
-                {"items": f"Product '{getattr(prod, 'name', prod)}' is not enabled for RENT contracts."}
-            )
-        elif plan_type == PlanType.LEASE and not getattr(prod, "is_lease_enabled", False):
-            raise ValidationError(
-                {"items": f"Product '{getattr(prod, 'name', prod)}' is not enabled for LEASE contracts."}
-            )
+        is_accessory = bool(it.get("is_accessory", False))
+        parent_item_index = it.get("parent_item_index")
+        charge_mode = str(it.get("charge_mode") or "").strip().upper()
+
+        if not is_accessory:
+            if plan_type == PlanType.RENT and not getattr(prod, "is_rent_enabled", False):
+                raise ValidationError(
+                    {"items": f"Product '{getattr(prod, 'name', prod)}' is not enabled for RENT contracts."}
+                )
+            elif plan_type == PlanType.LEASE and not getattr(prod, "is_lease_enabled", False):
+                raise ValidationError(
+                    {"items": f"Product '{getattr(prod, 'name', prod)}' is not enabled for LEASE contracts."}
+                )
 
         qty = int(it.get("quantity") or 1)
         if qty <= 0:
@@ -109,7 +114,7 @@ def _normalize_contract_items(
 
         unit_price = it.get("unit_base_price")
         if unit_price is None or str(unit_price).strip() == "":
-            unit_price = getattr(prod, "base_price", MONEY_ZERO)
+            unit_price = MONEY_ZERO if (is_accessory and charge_mode == "FREE") else getattr(prod, "base_price", MONEY_ZERO)
         unit_price_d = Decimal(str(unit_price)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
         if unit_price_d < Decimal("0.00"):
             raise ValidationError({"items": f"Item {idx}: Unit base price cannot be negative."})
@@ -153,6 +158,9 @@ def _normalize_contract_items(
                 "monthly_amount": monthly_amt,
                 "security_deposit_percent": deposit_pct_d,
                 "security_deposit_amount": deposit_amt_d,
+                "is_accessory": is_accessory,
+                "parent_item_index": parent_item_index,
+                "charge_mode": charge_mode,
             }
         )
 
@@ -249,6 +257,9 @@ def create_rent_contract(
             "monthly_amount": str(it["monthly_amount"]),
             "security_deposit_percent": str(it["security_deposit_percent"]),
             "security_deposit_amount": str(it["security_deposit_amount"]),
+            "is_accessory": bool(it.get("is_accessory", False)),
+            "parent_item_index": it.get("parent_item_index"),
+            "charge_mode": it.get("charge_mode", ""),
         }
         for it in normalized_items
     ]
@@ -308,8 +319,15 @@ def create_rent_contract(
     )
 
     # Persist contract items
+    created_rent_items = []
     for it in normalized_items:
-        ContractItem.objects.create(
+        p_idx = it.get("parent_item_index")
+        parent_obj = (
+            created_rent_items[p_idx]
+            if isinstance(p_idx, int) and 0 <= p_idx < len(created_rent_items)
+            else None
+        )
+        c_item = ContractItem.objects.create(
             subscription=subscription,
             product=it["product"],
             quantity=it["quantity"],
@@ -319,7 +337,11 @@ def create_rent_contract(
             monthly_amount=it["monthly_amount"],
             security_deposit_percent=it["security_deposit_percent"],
             security_deposit_amount=it["security_deposit_amount"],
+            is_accessory=bool(it.get("is_accessory", False)),
+            parent_item=parent_obj,
+            charge_mode=it.get("charge_mode", ""),
         )
+        created_rent_items.append(c_item)
 
     # Assign immutable contract number
     from contracts.services.contract_number_service import assign_subscription_number
@@ -498,6 +520,9 @@ def create_lease_contract(
             "monthly_amount": str(it["monthly_amount"]),
             "security_deposit_percent": str(it["security_deposit_percent"]),
             "security_deposit_amount": str(it["security_deposit_amount"]),
+            "is_accessory": bool(it.get("is_accessory", False)),
+            "parent_item_index": it.get("parent_item_index"),
+            "charge_mode": it.get("charge_mode", ""),
         }
         for it in normalized_items
     ]
@@ -559,8 +584,15 @@ def create_lease_contract(
     )
 
     # Persist contract items
+    created_rent_items = []
     for it in normalized_items:
-        ContractItem.objects.create(
+        p_idx = it.get("parent_item_index")
+        parent_obj = (
+            created_rent_items[p_idx]
+            if isinstance(p_idx, int) and 0 <= p_idx < len(created_rent_items)
+            else None
+        )
+        c_item = ContractItem.objects.create(
             subscription=subscription,
             product=it["product"],
             quantity=it["quantity"],
@@ -570,7 +602,11 @@ def create_lease_contract(
             monthly_amount=it["monthly_amount"],
             security_deposit_percent=it["security_deposit_percent"],
             security_deposit_amount=it["security_deposit_amount"],
+            is_accessory=bool(it.get("is_accessory", False)),
+            parent_item=parent_obj,
+            charge_mode=it.get("charge_mode", ""),
         )
+        created_rent_items.append(c_item)
 
     # Assign immutable contract number
     from contracts.services.contract_number_service import assign_subscription_number

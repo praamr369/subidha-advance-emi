@@ -75,6 +75,37 @@ export interface PimVariantAttributeValue {
   value_boolean: boolean | null;
 }
 
+export interface PimCostingAccessoryLine {
+  id: number;
+  name: string;
+  code: string;
+  relationship_type: string;
+  qty: string;
+  unit_cost: string;
+  total_cost: string;
+  charge_mode: "FREE" | "CHARGEABLE";
+  sale_price: string;
+  sourcing_type: string;
+}
+
+export interface PimCostingSummary {
+  product_cost: string;
+  accessories_cost: string;
+  addons_cost: string;
+  addons_selling_price: string;
+  all_accessories_cost: string;
+  total_cost: string;
+  selling_price: string;
+  net_profit: string;
+  profit_margin_percent: string;
+  with_addons_total_cost: string;
+  with_addons_selling_price: string;
+  with_addons_net_profit: string;
+  with_addons_margin_percent: string;
+  accessories_count: number;
+  accessories_breakdown: PimCostingAccessoryLine[];
+}
+
 export interface PimVariant {
   id: number;
   sku: string;
@@ -106,6 +137,7 @@ export interface PimVariant {
   effective_warranty_months_structural?: number;
   effective_warranty_months_extended_max?: number;
   effective_extended_warranty_cost_percentage?: string | number;
+  costing_summary?: PimCostingSummary;
 }
 
 export interface PimProduct {
@@ -117,7 +149,9 @@ export interface PimProduct {
   description: string;
   category: number;
   category_name: string;
+  category_product_type?: string | null;
   subcategory: number | null;
+  costing_summary?: PimCostingSummary;
   subcategory_name: string | null;
   image?: string | null;
   image_url?: string | null;

@@ -116,6 +116,7 @@ class BaseSubscriptionSerializer(serializers.ModelSerializer):
     last_payment_date = serializers.SerializerMethodField()
     next_due_date = serializers.SerializerMethodField()
     contract_items = serializers.SerializerMethodField()
+    selected_accessories = serializers.SerializerMethodField()
     security_deposit_paid = serializers.SerializerMethodField()
     security_deposit_pending = serializers.SerializerMethodField()
 
@@ -147,6 +148,7 @@ class BaseSubscriptionSerializer(serializers.ModelSerializer):
             "is_bundle",
             "bundle_items_count",
             "contract_items",
+            "selected_accessories",
             "batch",
             "batch_id",
             "batch_code",
@@ -256,6 +258,9 @@ class BaseSubscriptionSerializer(serializers.ModelSerializer):
                     "monthly_amount": str(it.monthly_amount),
                     "security_deposit_percent": str(getattr(it, "security_deposit_percent", "20.00")),
                     "security_deposit_amount": str(it.security_deposit_amount),
+                    "is_accessory": bool(getattr(it, "is_accessory", False)),
+                    "parent_item": getattr(it, "parent_item_id", None),
+                    "charge_mode": getattr(it, "charge_mode", "") or "",
                     "product_snapshot": it.product_snapshot,
                 }
                 for it in items
@@ -266,13 +271,22 @@ class BaseSubscriptionSerializer(serializers.ModelSerializer):
                 return snap_items
         return []
 
+    def get_selected_accessories(self, obj):
+        from contracts.services.subscription_service import (
+            get_subscription_selected_accessories,
+        )
+        return get_subscription_selected_accessories(obj)
+
     def get_is_bundle(self, obj) -> bool:
-        items = self.get_contract_items(obj)
-        return len(items) > 1
+        if obj.plan_type in (PlanType.RENT, PlanType.LEASE):
+            return len(self.get_contract_items(obj)) > 1
+        return len(self.get_selected_accessories(obj)) > 0
 
     def get_bundle_items_count(self, obj) -> int:
-        items = self.get_contract_items(obj)
-        return len(items)
+        if obj.plan_type in (PlanType.RENT, PlanType.LEASE):
+            return len(self.get_contract_items(obj))
+        accs = self.get_selected_accessories(obj)
+        return (1 + len(accs)) if accs else 1
 
     def get_product_image(self, obj):
         return serialize_media_url(

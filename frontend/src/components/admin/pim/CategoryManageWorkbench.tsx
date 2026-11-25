@@ -313,6 +313,7 @@ export default function CategoryManageWorkbench({
     initialSelectedCategoryId ? new Set([initialSelectedCategoryId]) : new Set()
   );
   const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState<"ALL" | "FINISHED_GOOD" | "ACCESSORY" | "RAW_MATERIAL" | "SERVICE">("ALL");
   const [lastSavedNotice, setLastSavedNotice] = useState<string | null>(null);
 
   // Forms state
@@ -395,9 +396,13 @@ export default function CategoryManageWorkbench({
   };
 
   const filteredCategories = useMemo(() => {
-    if (!search.trim()) return categories;
+    let base = categories;
+    if (typeFilter !== "ALL") {
+      base = base.filter(cat => cat.product_type === typeFilter || cat.product_type === "ALL");
+    }
+    if (!search.trim()) return base;
     const q = search.toLowerCase();
-    return categories.filter(cat =>
+    return base.filter(cat =>
       cat.name.toLowerCase().includes(q) ||
       cat.attributes.some(a => a.name.toLowerCase().includes(q)) ||
       cat.subcategories.some(s =>
@@ -405,10 +410,38 @@ export default function CategoryManageWorkbench({
         s.attributes.some(a => a.name.toLowerCase().includes(q))
       )
     );
-  }, [categories, search]);
+  }, [categories, search, typeFilter]);
 
   return (
     <div className={`space-y-4 ${className}`}>
+      {/* Product Type Filter Tabs */}
+      <div className="flex flex-wrap gap-1.5 rounded-xl border bg-muted/30 p-1.5 text-xs">
+        {([
+          { value: "ALL", label: "All Types" },
+          { value: "FINISHED_GOOD", label: "Finished Goods" },
+          { value: "ACCESSORY", label: "Accessories" },
+          { value: "RAW_MATERIAL", label: "Raw Materials" },
+          { value: "SERVICE", label: "Services" },
+        ] as const).map((t) => {
+          const count = t.value === "ALL"
+            ? categories.length
+            : categories.filter(c => c.product_type === t.value).length;
+          const active = typeFilter === t.value;
+          return (
+            <button
+              key={t.value}
+              type="button"
+              onClick={() => setTypeFilter(t.value)}
+              className={`rounded-lg px-2.5 py-1 font-medium transition-colors ${
+                active ? "bg-background text-foreground shadow-2xs font-semibold" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {t.label} <span className="ml-1 opacity-70 tabular-nums">({count})</span>
+            </button>
+          );
+        })}
+      </div>
+
       {/* Top action bar */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
@@ -447,7 +480,11 @@ export default function CategoryManageWorkbench({
       </div>
 
       {showNewCat && (
-        <CategoryForm onSave={(d) => saveCategory(d)} onCancel={() => setShowNewCat(false)} />
+        <CategoryForm
+          initial={typeFilter !== "ALL" ? { product_type: typeFilter } : undefined}
+          onSave={(d) => saveCategory(d)}
+          onCancel={() => setShowNewCat(false)}
+        />
       )}
 
       {loading && categories.length === 0 ? <ERPLoadingState label="Loading categories…" /> : null}

@@ -176,6 +176,7 @@ class ProductVariantSerializer(serializers.ModelSerializer):
     effective_warranty_months_structural = serializers.SerializerMethodField()
     effective_warranty_months_extended_max = serializers.SerializerMethodField()
     effective_extended_warranty_cost_percentage = serializers.SerializerMethodField()
+    costing_summary = serializers.SerializerMethodField()
 
     class Meta:
         model = ProductVariant
@@ -190,7 +191,13 @@ class ProductVariantSerializer(serializers.ModelSerializer):
             "effective_brand", "effective_warranty_enabled",
             "effective_warranty_months_manufacturing", "effective_warranty_months_structural",
             "effective_warranty_months_extended_max", "effective_extended_warranty_cost_percentage",
+            "costing_summary",
         ]
+
+    def get_costing_summary(self, obj):
+        from inventory.services.valuation_service import compute_product_costing_summary
+
+        return compute_product_costing_summary(variant=obj)
 
     def get_quantity_on_hand(self, obj):
         if obj.operational_product_id:
@@ -448,6 +455,7 @@ def resolve_pim_image_url(obj):
 
 class PimProductListSerializer(serializers.ModelSerializer):
     category_name = serializers.SerializerMethodField()
+    category_product_type = serializers.SerializerMethodField()
     subcategory_name = serializers.SerializerMethodField()
     attributes = ProductAttributeSerializer(many=True, read_only=True)
     variant_count = serializers.SerializerMethodField()
@@ -463,7 +471,7 @@ class PimProductListSerializer(serializers.ModelSerializer):
     class Meta:
         model = PimProduct
         fields = [
-            "id", "code", "brand", "name", "full_name", "category", "category_name",
+            "id", "code", "brand", "name", "full_name", "category", "category_name", "category_product_type",
             "subcategory", "subcategory_name", "base_price",
             "is_active", "is_published", "product_type", "variant_count",
             "parent_id", "parent_code", "parent_name", "parent_is_published", "child_count",
@@ -517,6 +525,10 @@ class PimProductListSerializer(serializers.ModelSerializer):
         cat = self._effective_category(obj)
         return cat.name if cat else None
 
+    def get_category_product_type(self, obj):
+        cat = self._effective_category(obj)
+        return cat.product_type if cat else None
+
     def get_subcategory_name(self, obj):
         sub = self._effective_subcategory(obj)
         return sub.name if sub else None
@@ -533,6 +545,7 @@ class PimProductListSerializer(serializers.ModelSerializer):
 
 class PimProductDetailSerializer(serializers.ModelSerializer):
     category_name = serializers.SerializerMethodField()
+    category_product_type = serializers.SerializerMethodField()
     subcategory_name = serializers.SerializerMethodField()
     attributes = ProductAttributeSerializer(many=True, read_only=True)
     variants = ProductVariantSerializer(many=True, read_only=True)
@@ -546,11 +559,12 @@ class PimProductDetailSerializer(serializers.ModelSerializer):
     variant_attribute_values = serializers.SerializerMethodField()
     current_stock_qty = serializers.SerializerMethodField()
     image = serializers.SerializerMethodField()
+    costing_summary = serializers.SerializerMethodField()
 
     class Meta:
         model = PimProduct
         fields = [
-            "id", "code", "brand", "name", "description", "category", "category_name",
+            "id", "code", "brand", "name", "description", "category", "category_name", "category_product_type",
             "subcategory", "subcategory_name", "base_price", "cost_price",
             "is_active", "is_published", "product_type", "locked_attributes",
             "ar_width_cm", "ar_depth_cm", "ar_height_cm",
@@ -562,7 +576,17 @@ class PimProductDetailSerializer(serializers.ModelSerializer):
             "is_emi_enabled", "is_rent_enabled", "is_lease_enabled", "is_direct_sale_enabled",
             "attributes", "variants", "variant_count",
             "inherited_attribute_values", "variant_attribute_values", "current_stock_qty", "image",
+            "costing_summary",
         ]
+
+    def get_costing_summary(self, obj):
+        from inventory.services.valuation_service import compute_product_costing_summary
+
+        return compute_product_costing_summary(pim_product=obj)
+
+    def get_category_product_type(self, obj):
+        cat = self._effective_category(obj)
+        return cat.product_type if cat else None
 
     def _effective_category(self, obj):
         cat = obj.category
@@ -582,6 +606,10 @@ class PimProductDetailSerializer(serializers.ModelSerializer):
     def get_category_name(self, obj):
         cat = self._effective_category(obj)
         return cat.name if cat else None
+
+    def get_category_product_type(self, obj):
+        cat = self._effective_category(obj)
+        return cat.product_type if cat else None
 
     def get_subcategory_name(self, obj):
         sub = self._effective_subcategory(obj)
@@ -635,6 +663,20 @@ class PimProductCreateUpdateSerializer(serializers.ModelSerializer):
             "warranty_enabled", "warranty_months_manufacturing", "warranty_months_structural",
             "warranty_months_extended_max", "extended_warranty_cost_percentage",
         ]
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        category = attrs.get("category", getattr(self.instance, "category", None))
+        has_explicit_sub = "subcategory" in attrs
+        subcategory = attrs.get("subcategory", getattr(self.instance, "subcategory", None))
+        if subcategory and category and subcategory.category_id != category.id:
+            if has_explicit_sub:
+                raise serializers.ValidationError({
+                    "subcategory": f"Subcategory '{subcategory.name}' belongs to '{subcategory.category.name}', not '{category.name}'."
+                })
+            # Category changed on PATCH without explicitly specifying a new subcategory: clear stale subcategory
+            attrs["subcategory"] = None
+        return attrs
 
     def _save_attributes(self, product, attrs_data):
         for attr_data in attrs_data:

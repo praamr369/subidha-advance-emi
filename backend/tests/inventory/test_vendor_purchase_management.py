@@ -113,6 +113,8 @@ class VendorPurchaseManagementTests(TestCase):
         )
         self.item.refresh_from_db()
         self.assertEqual(self.item.current_stock_quantity(), before_stock + Decimal("3.000"))
+        self.assertEqual(self.item.purchase_unit_cost, Decimal("500.00"))
+        self.assertEqual(self.item.stock_tracking_status, InventoryItem.StockTrackingStatus.STOCK_ACTIVE)
 
         bill = VendorBill.objects.create(
             bill_no="VB-20260430-001",
@@ -121,22 +123,25 @@ class VendorPurchaseManagementTests(TestCase):
             purchase_order=po,
             goods_receipt=receipt,
             finance_account=self.bank_account,
-            subtotal=Decimal("1500.00"),
+            subtotal=Decimal("1560.00"),
             tax_total=Decimal("270.00"),
-            grand_total=Decimal("1770.00"),
+            grand_total=Decimal("1830.00"),
         )
         VendorBillLine.objects.create(
             vendor_bill=bill,
             inventory_item=self.item,
-            description="RM purchase",
+            description="RM purchase updated cost",
             quantity=Decimal("3.000"),
-            unit_cost=Decimal("500.00"),
-            taxable_value=Decimal("1500.00"),
+            unit_cost=Decimal("520.00"),
+            taxable_value=Decimal("1560.00"),
             tax_amount=Decimal("270.00"),
-            line_total=Decimal("1770.00"),
+            line_total=Decimal("1830.00"),
         )
         bill, posted = post_vendor_bill(vendor_bill_id=bill.id, posted_by=self.admin)
         self.assertTrue(posted)
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.purchase_unit_cost, Decimal("520.00"))
+        self.assertEqual(self.item.stock_tracking_status, InventoryItem.StockTrackingStatus.STOCK_ACTIVE)
         self.assertEqual(bill.status, VendorBillStatus.POSTED)
         self.assertIsNotNone(bill.posted_journal_entry_id)
         debit_codes = {line.chart_account.system_code for line in bill.posted_journal_entry.lines.filter(debit_amount__gt=0)}

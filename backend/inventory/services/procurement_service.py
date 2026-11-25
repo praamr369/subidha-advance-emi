@@ -209,6 +209,11 @@ def post_goods_receipt(*, goods_receipt_id: int, posted_by=None):
         )
         created_count += 1 if created else 0
         existing_count += 0 if created else 1
+        from inventory.services.stock_service import sync_inventory_item_cost_on_receipt
+        line_cost = line.unit_cost
+        if (line_cost is None or Decimal(str(line_cost)) <= Decimal("0.00")) and line.purchase_order_line_id:
+            line_cost = line.purchase_order_line.unit_cost
+        sync_inventory_item_cost_on_receipt(line.inventory_item, line_cost)
 
     total_ordered = sum((line.quantity for line in receipt.purchase_order.lines.all()), Decimal("0.000"))
     total_received = sum(
@@ -398,6 +403,9 @@ def post_vendor_bill(*, vendor_bill_id: int, posted_by=None):
     if bill.purchase_order_id:
         bill.purchase_order.status = PurchaseOrderStatus.BILLED
         bill.purchase_order.save(update_fields=["status", "updated_at"])
+    from inventory.services.stock_service import sync_inventory_item_cost_on_receipt
+    for line in bill.lines.all():
+        sync_inventory_item_cost_on_receipt(line.inventory_item, line.unit_cost)
     log_inventory_event(
         action_type=AuditLog.ActionType.VENDOR_BILL_POSTED,
         instance=bill,

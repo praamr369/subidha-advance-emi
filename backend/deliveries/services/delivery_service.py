@@ -386,36 +386,80 @@ def get_subscription_item_delivery_progress(subscription: Subscription) -> dict:
                 "stock_status": stock_status,
             })
     elif subscription.product:
+        from contracts.services.subscription_service import get_subscription_selected_accessories
+        from products_core.models import Product
+
         p = subscription.product
-        ordered = 1
-        delivered = delivered_qty_by_prod.get(p.id, 0)
-        in_transit = in_transit_qty_by_prod.get(p.id, 0)
-        remaining = max(0, ordered - (delivered + in_transit))
-        try:
-            stock = stock_status_for_delivery(product_id=p.id)
-            available_quantity = int(Decimal(str(stock.get("available", 0))))
-            stock_status = stock.get("status") or "not available"
-        except Exception:
-            available_quantity = 0
-            stock_status = "not available"
+        single_items = [
+            {
+                "product": p,
+                "product_id": p.id,
+                "product_name": p.name,
+                "product_code": getattr(p, "product_code", "") or "",
+                "ordered": 1,
+                "is_accessory": False,
+                "parent_product_id": None,
+            }
+        ]
+        selected_accessories = get_subscription_selected_accessories(subscription)
+        if selected_accessories:
+            acc_qty_by_pid: dict[int, int] = {}
+            for acc in selected_accessories:
+                pid = int(acc["product_id"])
+                qty = max(1, int(acc.get("quantity") or 1))
+                acc_qty_by_pid[pid] = acc_qty_by_pid.get(pid, 0) + qty
+            acc_products = {
+                ap.id: ap for ap in Product.objects.filter(id__in=list(acc_qty_by_pid.keys()))
+            }
+            for acc_pid, acc_qty in acc_qty_by_pid.items():
+                ap = acc_products.get(acc_pid)
+                if not ap:
+                    continue
+                single_items.append(
+                    {
+                        "product": ap,
+                        "product_id": ap.id,
+                        "product_name": ap.name,
+                        "product_code": getattr(ap, "product_code", "") or "",
+                        "ordered": acc_qty,
+                        "is_accessory": True,
+                        "parent_product_id": p.id,
+                    }
+                )
 
-        total_ordered = ordered
-        total_delivered = delivered
-        total_in_transit = in_transit
-        total_remaining = remaining
+        for entry in single_items:
+            pid = entry["product_id"]
+            ordered = entry["ordered"]
+            delivered = delivered_qty_by_prod.get(pid, 0)
+            in_transit = in_transit_qty_by_prod.get(pid, 0)
+            remaining = max(0, ordered - (delivered + in_transit))
+            try:
+                stock = stock_status_for_delivery(product_id=pid)
+                available_quantity = int(Decimal(str(stock.get("available", 0))))
+                stock_status = stock.get("status") or "not available"
+            except Exception:
+                available_quantity = 0
+                stock_status = "not available"
 
-        item_rows.append({
-            "contract_item_id": None,
-            "product_id": p.id,
-            "product_name": p.name,
-            "product_code": getattr(p, "product_code", "") or "",
-            "ordered_quantity": ordered,
-            "delivered_quantity": delivered,
-            "in_transit_quantity": in_transit,
-            "remaining_quantity": remaining,
-            "available_quantity": max(0, available_quantity),
-            "stock_status": stock_status,
-        })
+            total_ordered += ordered
+            total_delivered += delivered
+            total_in_transit += in_transit
+            total_remaining += remaining
+
+            item_rows.append({
+                "contract_item_id": None,
+                "product_id": pid,
+                "product_name": entry["product_name"],
+                "product_code": entry["product_code"],
+                "is_accessory": entry["is_accessory"],
+                "parent_product_id": entry["parent_product_id"],
+                "ordered_quantity": ordered,
+                "delivered_quantity": delivered,
+                "in_transit_quantity": in_transit,
+                "remaining_quantity": remaining,
+                "available_quantity": max(0, available_quantity),
+                "stock_status": stock_status,
+            })
 
     if total_ordered > 0 and total_delivered >= total_ordered:
         fulfillment_status = FulfillmentStatus.DELIVERED
@@ -704,6 +748,8 @@ def create_subscription_delivery(
                 "product_id": p_id,
                 "quantity": qty,
                 "contract_item_id": it.get("contract_item_id") or matching.get("contract_item_id"),
+                "is_accessory": bool(matching.get("is_accessory", False)),
+                "parent_product_id": matching.get("parent_product_id"),
                 "notes": it.get("notes", "") or "",
             })
     else:
@@ -714,6 +760,8 @@ def create_subscription_delivery(
                     "product_id": r["product_id"],
                     "quantity": r["remaining_quantity"],
                     "contract_item_id": r.get("contract_item_id"),
+                    "is_accessory": bool(r.get("is_accessory", False)),
+                    "parent_product_id": r.get("parent_product_id"),
                     "notes": "",
                 })
 
@@ -781,12 +829,26 @@ def create_subscription_delivery(
     )
 
     from deliveries.models import SubscriptionDeliveryItem
+    from contracts.models import ContractItem
+    contract_item_map = {
+        ci.id: ci
+        for ci in ContractItem.objects.filter(
+            id__in=[it.get("contract_item_id") for it in target_items if it.get("contract_item_id")]
+        ).select_related("parent_item")
+    }
     for it in target_items:
+        ci = contract_item_map.get(it.get("contract_item_id"))
         SubscriptionDeliveryItem.objects.create(
             delivery=delivery,
             product_id=it["product_id"],
             quantity=it["quantity"],
             contract_item_id=it.get("contract_item_id"),
+            is_accessory=bool(getattr(ci, "is_accessory", False)) if ci else bool(it.get("is_accessory", False)),
+            parent_product_id=(
+                (ci.parent_item.product_id if (ci and ci.parent_item_id) else None)
+                if ci
+                else it.get("parent_product_id")
+            ),
             notes=it.get("notes", ""),
         )
 
@@ -1221,8 +1283,12 @@ def get_delivery_kitting_checklist(delivery: SubscriptionDelivery) -> list[dict]
                 "kitting_status": "VERIFIED" if (delivery.kitting_checklist_verified or d_item.kitting_status == "VERIFIED") else "PENDING",
             })
             seen_keys.add(key)
-            # Linked accessories for this item if it's a finished good
-            if not d_item.is_accessory:
+            # Linked accessories for this item if it's a finished good (only if explicit accessory items weren't configured)
+            sub_snapshot = getattr(delivery.subscription, "product_snapshot", None) or {}
+            has_explicit_acc = any(di.is_accessory for di in delivery_items) or bool(
+                sub_snapshot.get("accessories_configured")
+            )
+            if not d_item.is_accessory and not has_explicit_acc:
                 rels = ProductRelationship.objects.filter(
                     product=p, relationship_type="ACCESSORY"
                 ).select_related("related_product", "sourcing_vendor")

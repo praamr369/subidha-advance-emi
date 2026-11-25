@@ -344,7 +344,16 @@ def create_stock_ledger_entry(
 def post_invoice_stock_movements(*, invoice, posted_by=None) -> dict:
     created_count = 0
     existing_count = 0
-    for line in invoice.lines.select_related("inventory_item", "inventory_item__product").all():
+    invoice_lines = list(invoice.lines.select_related("inventory_item", "inventory_item__product").all())
+    explicit_line_inv_ids = {ln.inventory_item_id for ln in invoice_lines if ln.inventory_item_id}
+    direct_sale = getattr(invoice, "direct_sale", None)
+    has_explicit_accessory_selection = False
+    if direct_sale is not None:
+        snap = getattr(direct_sale, "tax_profile_snapshot", None) or {}
+        if snap.get("accessories_configured") or direct_sale.lines.filter(is_accessory=True).exists():
+            has_explicit_accessory_selection = True
+
+    for line in invoice_lines:
         if not line.inventory_item_id or not line.inventory_item.stock_tracking_enabled:
             continue
         _, created = create_stock_ledger_entry(
@@ -362,8 +371,11 @@ def post_invoice_stock_movements(*, invoice, posted_by=None) -> dict:
         created_count += 1 if created else 0
         existing_count += 0 if created else 1
 
+        if has_explicit_accessory_selection:
+            continue
+
         # Also maintain bundled / attached accessories & raw materials (e.g. Commercial Plyboard for a Bed)
-        processed_acc_ids = set()
+        processed_acc_ids = set(explicit_line_inv_ids)
 
         # 1. ProductRelationship (PIM catalog)
         product = line.inventory_item.product if line.inventory_item else line.product
@@ -412,7 +424,7 @@ def post_invoice_stock_movements(*, invoice, posted_by=None) -> dict:
             if not rel_inv and rel.related_product_id:
                 rel_inv = InventoryItem.objects.filter(product_id=rel.related_product_id).first()
 
-            if not rel_inv or not rel_inv.stock_tracking_enabled:
+            if not rel_inv or not rel_inv.stock_tracking_enabled or rel_inv.id in processed_acc_ids:
                 continue
             processed_acc_ids.add(rel_inv.id)
             bundled_qty = line.quantity * Decimal(str(rel.quantity or 1))
@@ -482,7 +494,17 @@ def post_invoice_stock_movements(*, invoice, posted_by=None) -> dict:
 def post_credit_note_stock_movements(*, note, posted_by=None) -> dict:
     created_count = 0
     existing_count = 0
-    for line in note.lines.select_related("inventory_item", "inventory_item__product").all():
+    note_lines = list(note.lines.select_related("inventory_item", "inventory_item__product").all())
+    explicit_note_inv_ids = {ln.inventory_item_id for ln in note_lines if ln.inventory_item_id}
+    orig_invoice = getattr(note, "original_invoice", None)
+    orig_sale = getattr(orig_invoice, "direct_sale", None) if orig_invoice else None
+    has_explicit_accessory_selection = False
+    if orig_sale is not None:
+        snap = getattr(orig_sale, "tax_profile_snapshot", None) or {}
+        if snap.get("accessories_configured") or orig_sale.lines.filter(is_accessory=True).exists():
+            has_explicit_accessory_selection = True
+
+    for line in note_lines:
         if not line.inventory_item_id or not line.inventory_item.stock_tracking_enabled:
             continue
         _, created = create_stock_ledger_entry(
@@ -500,8 +522,11 @@ def post_credit_note_stock_movements(*, note, posted_by=None) -> dict:
         created_count += 1 if created else 0
         existing_count += 0 if created else 1
 
+        if has_explicit_accessory_selection:
+            continue
+
         # Also return bundled / attached accessories & raw materials into stock
-        processed_acc_ids = set()
+        processed_acc_ids = set(explicit_note_inv_ids)
 
         # 1. ProductRelationship (PIM catalog)
         product = line.inventory_item.product if line.inventory_item else line.product
@@ -550,7 +575,7 @@ def post_credit_note_stock_movements(*, note, posted_by=None) -> dict:
             if not rel_inv and rel.related_product_id:
                 rel_inv = InventoryItem.objects.filter(product_id=rel.related_product_id).first()
 
-            if not rel_inv or not rel_inv.stock_tracking_enabled:
+            if not rel_inv or not rel_inv.stock_tracking_enabled or rel_inv.id in processed_acc_ids:
                 continue
             processed_acc_ids.add(rel_inv.id)
             bundled_qty = line.quantity * Decimal(str(rel.quantity or 1))
@@ -1001,6 +1026,23 @@ def post_stock_adjustment(*, stock_adjustment_id: int, posted_by):
     return adjustment, True
 
 
+def sync_inventory_item_cost_on_receipt(item: InventoryItem | None, unit_cost) -> None:
+    """Update last purchase unit cost (preserving positive existing cost on free ₹0 lines)
+    and transition stock tracking status to STOCK_ACTIVE."""
+    if item is None:
+        return
+    update_fields = []
+    if unit_cost is not None and (Decimal(str(unit_cost)) > Decimal("0.00") or item.purchase_unit_cost is None):
+        item.purchase_unit_cost = Decimal(str(unit_cost))
+        update_fields.append("purchase_unit_cost")
+    if item.stock_tracking_status != InventoryItem.StockTrackingStatus.STOCK_ACTIVE:
+        item.stock_tracking_status = InventoryItem.StockTrackingStatus.STOCK_ACTIVE
+        update_fields.append("stock_tracking_status")
+    if update_fields:
+        update_fields.append("updated_at")
+        item.save(update_fields=update_fields)
+
+
 @transaction.atomic
 def post_purchase_bill(*, purchase_bill_id: int, posted_by):
     purchase_bill = (
@@ -1036,19 +1078,7 @@ def post_purchase_bill(*, purchase_bill_id: int, posted_by):
         )
         created_count += 1 if created else 0
         existing_count += 0 if created else 1
-        # Update last purchase cost and refresh stock status on the inventory item
-        item = line.inventory_item
-        item_update_fields = []
-        if line.unit_cost is not None:
-            item.purchase_unit_cost = Decimal(str(line.unit_cost))
-            item_update_fields.append("purchase_unit_cost")
-        # Refresh stock tracking status: now that we have stock in, mark STOCK_ACTIVE
-        if item.stock_tracking_status != InventoryItem.StockTrackingStatus.STOCK_ACTIVE:
-            item.stock_tracking_status = InventoryItem.StockTrackingStatus.STOCK_ACTIVE
-            item_update_fields.append("stock_tracking_status")
-        if item_update_fields:
-            item_update_fields.append("updated_at")
-            item.save(update_fields=item_update_fields)
+        sync_inventory_item_cost_on_receipt(line.inventory_item, line.unit_cost)
 
     credit_account = (
         purchase_bill.finance_account.chart_account
@@ -1376,29 +1406,44 @@ def build_stock_ledger(
 
     num_pages = (total_count + page_size - 1) // page_size
 
-    results = [
-        {
-            "id": row.id,
-            "inventory_item_id": row.inventory_item_id,
-            "product_code": row.inventory_item.product.product_code,
-            "product_name": row.inventory_item.product.name,
-            "stock_item_type": row.inventory_item.stock_item_type,
-            "movement_type": row.movement_type,
-            "quantity_in": f"{row.quantity_in:.3f}",
-            "quantity_out": f"{row.quantity_out:.3f}",
-            "movement_date": row.movement_date.isoformat(),
-            "stock_location_id": row.stock_location_id,
-            "stock_location_code": getattr(row.stock_location, "code", None),
-            "stock_location_name": getattr(row.stock_location, "name", None),
-            "branch_id": getattr(row.stock_location, "branch_id", None),
-            "reference_model": row.reference_model,
-            "reference_id": row.reference_id,
-            "notes": row.notes,
-            "posted_by_username": getattr(row.posted_by, "username", None),
-            "posted_journal_entry_id": row.posted_journal_entry_id,
-        }
-        for row in paginated_queryset
-    ]
+    from inventory.services.valuation_service import compute_product_costing_summary
+
+    costing_cache = {}
+    results = []
+    for row in paginated_queryset:
+        inv_id = row.inventory_item_id
+        if inv_id not in costing_cache:
+            costing_cache[inv_id] = compute_product_costing_summary(inventory_item=row.inventory_item)
+        c = costing_cache[inv_id]
+        results.append(
+            {
+                "id": row.id,
+                "inventory_item_id": row.inventory_item_id,
+                "product_code": row.inventory_item.product.product_code,
+                "product_name": row.inventory_item.product.name,
+                "stock_item_type": row.inventory_item.stock_item_type,
+                "movement_type": row.movement_type,
+                "quantity_in": f"{row.quantity_in:.3f}",
+                "quantity_out": f"{row.quantity_out:.3f}",
+                "movement_date": row.movement_date.isoformat(),
+                "stock_location_id": row.stock_location_id,
+                "stock_location_code": getattr(row.stock_location, "code", None),
+                "stock_location_name": getattr(row.stock_location, "name", None),
+                "branch_id": getattr(row.stock_location, "branch_id", None),
+                "reference_model": row.reference_model,
+                "reference_id": row.reference_id,
+                "notes": row.notes,
+                "posted_by_username": getattr(row.posted_by, "username", None),
+                "posted_journal_entry_id": row.posted_journal_entry_id,
+                "product_cost": c["product_cost"],
+                "accessories_cost": c["accessories_cost"],
+                "all_accessories_cost": c["all_accessories_cost"],
+                "total_cost": c["total_cost"],
+                "selling_price": c["selling_price"],
+                "net_profit": c["net_profit"],
+                "profit_margin_percent": c["profit_margin_percent"],
+            }
+        )
 
     return {
         "count": total_count,

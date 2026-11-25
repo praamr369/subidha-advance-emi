@@ -62,6 +62,12 @@ export type DirectSaleLine = {
   sku_snapshot?: string;
   unit_of_measure_snapshot?: string;
   hsn_sac_code?: string;
+  serial_number?: string;
+  warranty_months?: number;
+  warranty_card_number?: string;
+  is_accessory?: boolean;
+  parent_line?: number | null;
+  parent_line_index?: number | null;
   create_purchase_requirement?: boolean;
   requirement_quantity?: string | null;
   requirement_note?: string;

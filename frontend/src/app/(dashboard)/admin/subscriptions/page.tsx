@@ -119,6 +119,16 @@ type SubscriptionRow = {
     security_deposit_amount?: string;
     status?: string;
   }>;
+  selected_accessories?: Array<{
+    product_id: number;
+    product_name: string;
+    product_code?: string;
+    sku?: string;
+    quantity: number;
+    unit_base_price?: string;
+    total_base_price?: string;
+    charge_mode?: string;
+  }>;
   emi_count?: number;
   paid_emi_count?: number;
   pending_emi_count?: number;
@@ -386,6 +396,9 @@ function normalizeSubscriptionRow(raw: Record<string, unknown>): SubscriptionRow
         ? (raw.product_attributes as Record<string, string>)
         : undefined,
     contract_items: Array.isArray(raw.contract_items) ? (raw.contract_items as any[]) : undefined,
+    selected_accessories: Array.isArray(raw.selected_accessories)
+      ? (raw.selected_accessories as any[])
+      : undefined,
     emi_count: toNumber(raw.emi_count),
     paid_emi_count: toNumber(raw.paid_emi_count),
     pending_emi_count: toNumber(raw.pending_emi_count),
@@ -1547,6 +1560,23 @@ export default function AdminSubscriptionsPage() {
                                   <span>{row.batch_code ? `Batch ${row.batch_code}` : "No Batch"}</span>
                                   {typeof row.lucky_number === "number" ? <span>· SFEMI ID #{row.lucky_number}</span> : null}
                                 </div>
+                                {row.selected_accessories && row.selected_accessories.length > 0 && (
+                                  <div className="mt-2 flex flex-wrap gap-1.5">
+                                    {row.selected_accessories.map((acc, accIdx) => (
+                                      <span
+                                        key={`${acc.product_id}-${accIdx}`}
+                                        className="inline-flex items-center gap-1 rounded border border-purple-300/70 bg-purple-50 px-1.5 py-0.5 text-[10px] font-medium text-purple-800 dark:border-purple-700/60 dark:bg-purple-950/40 dark:text-purple-200"
+                                      >
+                                        <span>↳ {acc.quantity}× {cleanProductTitle(acc.product_name)}</span>
+                                        {Number(acc.total_base_price || 0) > 0 ? (
+                                          <span className="font-mono">({formatRupee(acc.total_base_price)})</span>
+                                        ) : (
+                                          <span>(Included)</span>
+                                        )}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
                               </>
                             )}
                           </div>

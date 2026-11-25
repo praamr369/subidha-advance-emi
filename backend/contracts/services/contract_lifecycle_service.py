@@ -362,6 +362,17 @@ def modify_pre_activation_contract(
     if plan_type == PlanType.EMI:
         from lucky_plan.models import Batch
 
+        # Recompute totals for EMI (including any selected chargeable accessory variants)
+        from decimal import Decimal
+        from dateutil.relativedelta import relativedelta
+        from subscriptions.models import Emi, EmiStatus, LuckyId, LuckyIdStatus, Product
+        from api.v1.serializers.admin_resources import build_emi_amounts, q2
+        from contracts.services.subscription_service import (
+            build_emi_bundle_snapshots,
+            get_subscription_selected_accessories,
+            normalize_emi_selected_accessories,
+        )
+
         product_input = data.get("product")
         if product_input is not None:
             if isinstance(product_input, Product):
@@ -412,15 +423,28 @@ def modify_pre_activation_contract(
                         LuckyId.objects.filter(pk=subscription.lucky_id_id).update(status=LuckyIdStatus.AVAILABLE)
                     subscription.lucky_id = new_lucky
 
+        has_acc_payload = "accessories" in data or "accessories_configured" in data
+        if has_acc_payload:
+            raw_accessories = data.get("accessories") or []
+            acc_configured = bool(data.get("accessories_configured") or ("accessories" in data))
+        else:
+            existing_snapshot = getattr(subscription, "product_snapshot", None) or {}
+            raw_accessories = get_subscription_selected_accessories(subscription)
+            acc_configured = bool(existing_snapshot.get("accessories_configured") or raw_accessories)
+
+        normalized_accessories, accessories_total = normalize_emi_selected_accessories(
+            subscription.product,
+            raw_accessories,
+        )
+
         # Recompute totals for EMI
-        total_amount = q2(Decimal(str(subscription.product.base_price)))
+        total_amount = q2(Decimal(str(subscription.product.base_price)) + accessories_total)
         monthly_amount = q2(total_amount / Decimal(subscription.tenure_months))
         subscription.total_amount = total_amount
         subscription.monthly_amount = monthly_amount
         subscription.plan_type = PlanType.EMI
 
         # Recompute draft EMI schedule
-        from api.v1.serializers.admin_resources import build_emi_amounts
         emi_amounts = build_emi_amounts(total_amount=total_amount, tenure_months=subscription.tenure_months)
         existing_emis = list(subscription.emis.order_by("month_no", "id"))
 
@@ -432,7 +456,7 @@ def modify_pre_activation_contract(
                 emi_row.due_date = due_date
                 emi_row.amount = amount
                 emi_row.status = EmiStatus.PENDING
-                emi_row.save(update_fields=["month_no", "due_date", "amount", "status", "updated_at"])
+                emi_row.save(update_fields=["month_no", "due_date", "amount", "status"])
             else:
                 Emi.objects.create(
                     subscription=subscription,
@@ -444,20 +468,18 @@ def modify_pre_activation_contract(
         if len(existing_emis) > len(emi_amounts):
             for excess_emi in existing_emis[len(emi_amounts):]:
                 excess_emi.status = EmiStatus.CANCELLED
-                excess_emi.save(update_fields=["status", "updated_at"])
+                excess_emi.save(update_fields=["status"])
 
-        subscription.product_snapshot = {
-            "product_id": subscription.product.id,
-            "product_code": getattr(subscription.product, "product_code", ""),
-            "name": getattr(subscription.product, "name", ""),
-            "base_price": str(subscription.product.base_price),
-        }
-        subscription.pricing_snapshot = {
-            "plan_type": PlanType.EMI,
-            "tenure_months": subscription.tenure_months,
-            "monthly_amount": str(monthly_amount),
-            "total_amount": str(total_amount),
-        }
+        product_snapshot, pricing_snapshot = build_emi_bundle_snapshots(
+            product=subscription.product,
+            tenure_months=subscription.tenure_months,
+            total_amount=total_amount,
+            monthly_amount=monthly_amount,
+            selected_accessories=normalized_accessories,
+            accessories_configured=acc_configured,
+        )
+        subscription.product_snapshot = product_snapshot
+        subscription.pricing_snapshot = pricing_snapshot
 
     else:
         # PlanType.RENT or PlanType.LEASE
@@ -545,6 +567,9 @@ def modify_pre_activation_contract(
                 "monthly_amount": str(it["monthly_amount"]),
                 "security_deposit_percent": str(it["security_deposit_percent"]),
                 "security_deposit_amount": str(it["security_deposit_amount"]),
+                "is_accessory": bool(it.get("is_accessory", False)),
+                "parent_item_index": it.get("parent_item_index"),
+                "charge_mode": it.get("charge_mode", ""),
             }
             for it in normalized_items
         ]
@@ -574,7 +599,14 @@ def modify_pre_activation_contract(
 
         # Synchronize ContractItem rows
         existing_items = list(subscription.contract_items.order_by("id"))
+        synced_items = []
         for idx, it in enumerate(normalized_items):
+            p_idx = it.get("parent_item_index")
+            parent_obj = (
+                synced_items[p_idx]
+                if isinstance(p_idx, int) and 0 <= p_idx < len(synced_items)
+                else None
+            )
             if idx < len(existing_items):
                 c_item = existing_items[idx]
                 c_item.product = it["product"]
@@ -585,10 +617,14 @@ def modify_pre_activation_contract(
                 c_item.monthly_amount = it["monthly_amount"]
                 c_item.security_deposit_percent = it["security_deposit_percent"]
                 c_item.security_deposit_amount = it["security_deposit_amount"]
+                c_item.is_accessory = bool(it.get("is_accessory", False))
+                c_item.parent_item = parent_obj
+                c_item.charge_mode = it.get("charge_mode", "")
                 c_item.status = "ACTIVE"
                 c_item.save()
+                synced_items.append(c_item)
             else:
-                ContractItem.objects.create(
+                c_item = ContractItem.objects.create(
                     subscription=subscription,
                     product=it["product"],
                     quantity=it["quantity"],
@@ -598,8 +634,12 @@ def modify_pre_activation_contract(
                     monthly_amount=it["monthly_amount"],
                     security_deposit_percent=it["security_deposit_percent"],
                     security_deposit_amount=it["security_deposit_amount"],
+                    is_accessory=bool(it.get("is_accessory", False)),
+                    parent_item=parent_obj,
+                    charge_mode=it.get("charge_mode", ""),
                     status="ACTIVE",
                 )
+                synced_items.append(c_item)
         if len(existing_items) > len(normalized_items):
             for excess_item in existing_items[len(normalized_items):]:
                 excess_item.status = "CLOSED"

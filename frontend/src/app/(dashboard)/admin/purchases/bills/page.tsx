@@ -16,19 +16,19 @@ import { useWorkflowLauncher } from "@/components/workflows/WorkflowProvider";
 import { buildAdminPurchaseBillPrintRoute } from "@/lib/route-builders";
 import { ROUTES } from "@/lib/routes";
 import SearchableItemSelect from "@/components/inventory/SearchableItemSelect";
+import AccessorySelectionPanel, { type AccessorySelectionResult } from "@/components/inventory/AccessorySelectionPanel";
 import VendorPayablesToggle from "@/components/vendors/VendorPayablesToggle";
 import {
   createVendorBill,
-  fetchBillingAccessoryOptions,
   listGoodsReceipts,
   listInventoryItems,
   listVendorBills,
   listVendorsLite,
   listStockLocations,
   postVendorBill,
-  type BillingAccessoryOptionsResponse,
   type GoodsReceipt,
   type InventoryItem,
+  type ParentVariantOption,
   type VendorBill,
   type VendorBillLine,
   type VendorLite,
@@ -92,64 +92,10 @@ function CreateBillForm({ vendors, receipts, items, locations, onSaved, onCancel
   const [stockLocationId, setStockLocationId] = useState("");
   const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<VendorBillLine[]>([EmptyLine()]);
-  const [lineAccessories, setLineAccessories] = useState<Record<number, BillingAccessoryOptionsResponse>>({});
-  const [fetchingAccs, setFetchingAccs] = useState<Record<number, boolean>>({});
+  const [openAccLineIdx, setOpenAccLineIdx] = useState<number | null>(null);
+  const [lineItemsMap, setLineItemsMap] = useState<Record<number, InventoryItem>>({});
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-
-  const loadAccessoriesForLine = useCallback(async (lineIdx: number, item: InventoryItem) => {
-    if (!item || item.stock_item_type !== "FINISHED_GOOD") return;
-    setFetchingAccs((prev) => ({ ...prev, [lineIdx]: true }));
-    try {
-      const res = await fetchBillingAccessoryOptions(item.product || 0, { itemId: item.id });
-      if (res && res.accessory_options?.length > 0) {
-        setLineAccessories((prev) => ({ ...prev, [lineIdx]: res }));
-      }
-    } catch {
-      // ignore
-    } finally {
-      setFetchingAccs((prev) => ({ ...prev, [lineIdx]: false }));
-    }
-  }, []);
-
-  function autoIncludeSuppliedAccessories(lineIdx: number) {
-    const parentLine = lines[lineIdx];
-    const accData = lineAccessories[lineIdx];
-    if (!parentLine || !accData) return;
-
-    const supplied = accData.accessory_options.filter((o) => o.is_supplied_with_parent);
-    if (!supplied.length) return;
-
-    const parentQty = Math.max(1, parseFloat(parentLine.quantity) || 1);
-    const newLinesToAdd: Array<{
-      inventory_item: number;
-      description: string;
-      quantity: string;
-      unit_cost: string;
-      tax_amount: string;
-    }> = [];
-
-    for (const opt of supplied) {
-      const targetItemId = opt.accessory_inventory_item_id || opt.selected_variant_id;
-      if (!targetItemId) continue;
-      const exists = lines.some((l) => l.inventory_item === targetItemId);
-      if (exists) continue;
-
-      const accQty = Math.max(1, parseFloat(opt.quantity || "1") || 1);
-      const accName = opt.accessory_name || opt.variants[0]?.product_name || opt.group_name || "Supplied Accessory";
-      newLinesToAdd.push({
-        inventory_item: targetItemId,
-        description: `${accName} (Included with ${parentLine.description || "Parent Item"})`,
-        quantity: String(parentQty * accQty),
-        unit_cost: "0.00",
-        tax_amount: "0.00",
-      });
-    }
-
-    if (newLinesToAdd.length > 0) {
-      setLines((prev) => [...prev, ...newLinesToAdd]);
-    }
-  }
 
   const vendorReceipts = receipts.filter(
     (r) => !vendorId || String(r.vendor_name) === vendors.find((v) => String(v.id) === vendorId)?.name
@@ -289,7 +235,10 @@ function CreateBillForm({ vendors, receipts, items, locations, onSaved, onCancel
                       unit_cost: shouldFillCost ? String(autoCost) : line.unit_cost,
                     });
                     if (it) {
-                      void loadAccessoriesForLine(i, it);
+                      setLineItemsMap((prev) => ({ ...prev, [itemId]: it }));
+                      if (it.stock_item_type === "FINISHED_GOOD") {
+                        setOpenAccLineIdx(i);
+                      }
                     }
                   }}
                 />
@@ -299,69 +248,77 @@ function CreateBillForm({ vendors, receipts, items, locations, onSaved, onCancel
                 <button type="button" onClick={() => removeLine(i)} disabled={lines.length === 1} className="h-9 w-8 rounded-lg border border-border text-muted-foreground hover:bg-muted disabled:opacity-30">✕</button>
               </div>
 
-              {/* Accessory Breakdown & Auto-inclusion */}
-              {lineAccessories[i]?.accessory_options && lineAccessories[i].accessory_options.length > 0 && (
-                <div className="rounded-xl border border-border/80 bg-muted/40 p-3 text-xs space-y-2 ml-1 mr-8">
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-foreground flex items-center gap-1.5">
-                        📦 Sourced Product Accessories ({lineAccessories[i].accessory_options.length})
-                      </span>
-                      <span className="rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 px-2 py-0.5 text-[10px] font-medium border border-emerald-300">
-                        {lineAccessories[i].accessory_options.filter(a => a.is_supplied_with_parent).length} Supplied with Parent
-                      </span>
-                      {lineAccessories[i].accessory_options.filter(a => !a.is_supplied_with_parent).length > 0 && (
-                        <span className="rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 px-2 py-0.5 text-[10px] font-medium border border-amber-300">
-                          {lineAccessories[i].accessory_options.filter(a => !a.is_supplied_with_parent).length} Outsourced
-                        </span>
-                      )}
-                    </div>
-                    {lineAccessories[i].accessory_options.some(a => a.is_supplied_with_parent) && (
-                      <button
-                        type="button"
-                        onClick={() => autoIncludeSuppliedAccessories(i)}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 text-[11px] font-medium shadow-sm transition-colors"
-                        title="Auto-add supplied accessories to this bill with ₹0 unit cost so they get booked into inventory"
-                      >
-                        + Auto-Include Supplied Accessories (₹0 / Stocked)
-                      </button>
+              {(() => {
+                const invId = Number(line.inventory_item || 0);
+                const resolvedItem = invId ? (lineItemsMap[invId] || items.find((it) => it.id === invId)) : undefined;
+                if (!resolvedItem || resolvedItem.stock_item_type !== "FINISHED_GOOD") return null;
+                return (
+                  <div className="ml-1 mr-8 space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => setOpenAccLineIdx(openAccLineIdx === i ? null : i)}
+                      className="inline-flex items-center gap-1 rounded-lg border border-primary/30 bg-primary/5 px-2.5 py-1 text-[11px] font-semibold text-primary hover:bg-primary/10"
+                    >
+                      {openAccLineIdx === i ? "Hide Variants & Accessories" : "Select Variants & Vendor Accessories"}
+                    </button>
+                    {openAccLineIdx === i && (
+                      <div className="rounded-xl border border-primary/25 bg-muted/30 p-3">
+                        <AccessorySelectionPanel
+                          productId={resolvedItem.product || 0}
+                          itemId={resolvedItem.id}
+                          mode="purchase"
+                          compact
+                          parentQuantity={Math.max(1, Number(line.quantity || 1))}
+                          onSwitchParentVariant={(pv: ParentVariantOption) => {
+                            const nextCost = Number(pv.purchase_unit_cost || 0) > 0
+                              ? Number(pv.purchase_unit_cost).toFixed(2)
+                              : Number(pv.standard_unit_cost || 0).toFixed(2);
+                            setLine(i, {
+                              inventory_item: pv.inventory_item_id,
+                              description: pv.name,
+                              unit_cost: nextCost,
+                            });
+                            setLineItemsMap((prev) => ({
+                              ...prev,
+                              [pv.inventory_item_id]: {
+                                id: pv.inventory_item_id,
+                                product: pv.product_id,
+                                product_name: pv.name,
+                                product_code: pv.product_code,
+                                sku: pv.sku,
+                                unit_of_measure: "PCS",
+                                stock_item_type: "FINISHED_GOOD",
+                                purchase_unit_cost: pv.purchase_unit_cost,
+                                standard_unit_cost: pv.standard_unit_cost,
+                              } as unknown as InventoryItem,
+                            }));
+                          }}
+                          onConfirm={(res: AccessorySelectionResult) => {
+                            setLines((prev) => {
+                              const next = [...prev];
+                              for (const acc of res.accessories) {
+                                const newLine: VendorBillLine = {
+                                  inventory_item: acc.inventoryItemId,
+                                  description: `${acc.variantLabel || acc.productName} (Accessory for ${resolvedItem.product_name || resolvedItem.sku || ""})`,
+                                  quantity: String(acc.quantity || 1),
+                                  unit_cost: Number(acc.unitCost || 0).toFixed(2),
+                                  tax_amount: "0.00",
+                                };
+                                const existingIdx = next.findIndex((l) => l.inventory_item === acc.inventoryItemId);
+                                if (existingIdx >= 0) next[existingIdx] = newLine;
+                                else next.push(newLine);
+                              }
+                              return next;
+                            });
+                            setOpenAccLineIdx(null);
+                          }}
+                          onCancel={() => setOpenAccLineIdx(null)}
+                        />
+                      </div>
                     )}
                   </div>
-
-                  <div className="grid gap-1.5 md:grid-cols-2">
-                    {lineAccessories[i].accessory_options.map((acc, accIdx) => {
-                      const isSupplied = acc.is_supplied_with_parent;
-                      const name = acc.accessory_name || acc.variants[0]?.product_name || acc.group_name || `Accessory #${acc.link_id}`;
-                      return (
-                        <div
-                          key={accIdx}
-                          className={`flex items-center justify-between p-2 rounded-lg border text-[11px] ${
-                            isSupplied
-                              ? "bg-emerald-50/60 border-emerald-200 text-emerald-950 dark:bg-emerald-950/20 dark:border-emerald-800 dark:text-emerald-200"
-                              : "bg-amber-50/60 border-amber-200 text-amber-950 dark:bg-amber-950/20 dark:border-amber-800 dark:text-amber-200"
-                          }`}
-                        >
-                          <div className="flex-1 min-w-0 pr-2">
-                            <span className="font-semibold">{name}</span>
-                            <span className="text-muted-foreground ml-1 font-mono">({acc.quantity || 1} {acc.variants[0]?.unit_of_measure || "PCS"})</span>
-                          </div>
-                          <div>
-                            {isSupplied ? (
-                              <span className="inline-block px-1.5 py-0.5 rounded bg-emerald-200/70 text-emerald-900 font-medium text-[10px]">
-                                ✓ Supplied Free
-                              </span>
-                            ) : (
-                              <span className="inline-block px-1.5 py-0.5 rounded bg-amber-200/70 text-amber-900 font-medium text-[10px]" title={`Outsourced to ${acc.sourcing_vendor_name || 'separate vendor'} - Excluded from this bill`}>
-                                ⚠️ Outsourced {acc.sourcing_vendor_name ? `(${acc.sourcing_vendor_name})` : ""}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+                );
+              })()}
             </div>
           ))}
         </div>

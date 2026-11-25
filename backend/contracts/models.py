@@ -659,6 +659,15 @@ class ContractItem(TimeStampedModel):
         validators=[MinValueValidator(MONEY_ZERO)],
     )
     product_snapshot = models.JSONField(null=True, blank=True)
+    is_accessory = models.BooleanField(default=False, db_index=True)
+    parent_item = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="accessory_items",
+    )
+    charge_mode = models.CharField(max_length=12, blank=True, default="")
     status = models.CharField(
         max_length=20,
         choices=[
@@ -705,7 +714,7 @@ class ContractItem(TimeStampedModel):
         if self.subscription_id and self.subscription.plan_type not in (PlanType.RENT, PlanType.LEASE):
             errors["subscription"] = "Contract items can only be attached to RENT or LEASE contracts."
 
-        if self.subscription_id and self.product_id:
+        if self.subscription_id and self.product_id and not getattr(self, "is_accessory", False):
             if self.subscription.plan_type == PlanType.RENT and not getattr(self.product, "is_rent_enabled", False):
                 errors["product"] = f"Product '{getattr(self.product, 'name', self.product_id)}' is not enabled for RENT contracts."
             elif self.subscription.plan_type == PlanType.LEASE and not getattr(self.product, "is_lease_enabled", False):

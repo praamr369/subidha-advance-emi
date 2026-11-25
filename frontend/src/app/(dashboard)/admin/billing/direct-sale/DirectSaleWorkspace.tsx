@@ -44,6 +44,7 @@ import {
 } from "@/services/direct-sale-workspace";
 import { recheckStockNeed } from "@/services/inventory-ops";
 import AccessorySelectionPanel, { type AccessorySelectionResult } from "@/components/inventory/AccessorySelectionPanel";
+import type { ParentVariantOption } from "@/services/inventory";
 import DirectSaleSignatureModal from "@/components/billing/DirectSaleSignatureModal";
 import DynamicUpiQrModal from "@/components/payments/DynamicUpiQrModal";
 import SearchCombobox, { SearchComboboxRow, CodeBadge } from "@/components/ui/SearchCombobox";
@@ -87,6 +88,12 @@ type DraftLine = {
   create_requirement: boolean;
   requirement_quantity: string;
   requirement_note: string;
+  is_accessory?: boolean;
+  parent_line_id?: string | null;
+  serial_number?: string;
+  warranty_months?: number;
+  warranty_card_number?: string;
+  accessories_configured?: boolean;
 };
 
 type FormState = {
@@ -154,6 +161,12 @@ function makeLine(): DraftLine {
     create_requirement: false,
     requirement_quantity: "1.000",
     requirement_note: "",
+    is_accessory: false,
+    parent_line_id: null,
+    serial_number: "",
+    warranty_months: 0,
+    warranty_card_number: "",
+    accessories_configured: false,
   };
 }
 
@@ -224,11 +237,15 @@ function calculateLine(line: DraftLine, taxMode: "GST" | "NON_GST"): LineTotals 
   };
 }
 
-function buildLinePayload(line: DraftLine, taxMode: "GST" | "NON_GST"): DirectSaleLine {
+function buildLinePayload(line: DraftLine, taxMode: "GST" | "NON_GST", allLines?: DraftLine[]): DirectSaleLine {
   const totals = calculateLine(line, taxMode);
   const gstRate = taxMode === "GST" ? Math.max(toNumber(line.gst_rate), 0) : 0;
   const cgst = taxMode === "GST" ? totals.tax / 2 : 0;
   const sgst = taxMode === "GST" ? totals.tax / 2 : 0;
+  const parentLineIndex =
+    line.is_accessory && line.parent_line_id && allLines
+      ? allLines.findIndex((candidate) => candidate.id === line.parent_line_id)
+      : -1;
   return {
     product: Number(line.product_id),
     inventory_item: line.inventory_item_id ? Number(line.inventory_item_id) : null,
@@ -243,6 +260,11 @@ function buildLinePayload(line: DraftLine, taxMode: "GST" | "NON_GST"): DirectSa
     igst_amount: "0.00",
     line_total: toDecimal(totals.lineTotal),
     hsn_sac_code: "",
+    serial_number: line.serial_number || "",
+    warranty_months: line.warranty_months || 0,
+    warranty_card_number: line.warranty_card_number || "",
+    is_accessory: Boolean(line.is_accessory),
+    parent_line_index: parentLineIndex >= 0 ? parentLineIndex : null,
     create_purchase_requirement: line.create_requirement,
     requirement_quantity: line.create_requirement
       ? quantity(Math.max(toNumber(line.requirement_quantity), 0))
@@ -417,7 +439,12 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
     product: QuickOpeningStockProduct | null;
   }>({ open: false, targetLineId: null, product: null });
   const lastActiveLineRef = useRef<string | null>(null);
-  const [accessoryPanel, setAccessoryPanel] = useState<{ productId: number; lineId: string } | null>(null);
+  const [accessoryPanel, setAccessoryPanel] = useState<{
+    productId: number;
+    itemId?: number;
+    lineId: string;
+    parentQuantity?: number;
+  } | null>(null);
   const lineSearchTimers = useRef<Record<string, number>>({});
   const customerSearchTimer = useRef<number | null>(null);
   const createAttemptKey = useRef<string | null>(null);
@@ -1212,12 +1239,16 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
       requirement_quantity: needsRequirement ? shortage : "1.000",
       requirement_note: needsRequirement ? "Auto-flagged: stock insufficient at time of sale" : "",
     });
-    // Open accessory panel whenever this product has related accessories/services
-    if (product.accessories && product.accessories.length > 0) {
-      setAccessoryPanel({ productId: product.id, lineId });
-    } else if (product.stock_item_type === "FINISHED_GOOD") {
-      // Still open for finished goods even if accessories aren't cached in search results
-      setAccessoryPanel({ productId: product.id, lineId });
+    const currentLine = lines.find((l) => l.id === lineId);
+    const parentQty = Math.max(1, Number(currentLine?.quantity || 1));
+    // Open accessory panel whenever this product has related accessories/services or is a finished good
+    if ((product.accessories && product.accessories.length > 0) || product.stock_item_type === "FINISHED_GOOD") {
+      setAccessoryPanel({
+        productId: product.id,
+        itemId: product.inventory_item_id || undefined,
+        lineId,
+        parentQuantity: parentQty,
+      });
     }
   }
 
@@ -1417,48 +1448,63 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
 
   function handleAccessoryConfirm(result: AccessorySelectionResult) {
     if (!accessoryPanel) return;
+    const parentLineId = accessoryPanel.lineId;
     setAccessoryPanel(null);
-    // Add each selected accessory/service as an additional draft line
-    for (const acc of result.accessories) {
-      setLines((prev) => [
-        ...prev,
-        {
-          ...makeLine(),
-          product_id: String(acc.productId),
-          inventory_item_id: String(acc.inventoryItemId || ""),
-          description: acc.variantLabel || acc.productName,
-          unit_price: acc.chargeMode === "CHARGEABLE" ? Number(acc.salePrice || 0).toFixed(2) : "0.00",
-          product_search: `${acc.productCode} - ${acc.productName}`,
-          product_loading: false,
-          product_results: [],
-          product_error: null,
-          selected_product: null,
-          // Auto flag for requirement if free accessory since we don't have full inventory status here yet
-          create_requirement: true,
-          requirement_quantity: "1.000",
-          requirement_note: "Auto-flagged from accessory panel",
-        },
-      ]);
-    }
-    for (const svc of result.services) {
-      setLines((prev) => [
-        ...prev,
-        {
-          ...makeLine(),
-          product_id: "",
-          description: svc.serviceName,
-          unit_price: svc.chargeMode === "CHARGEABLE" ? Number(svc.salePrice || 0).toFixed(2) : "0.00",
-          gst_rate: svc.taxRatePercent || "0",
-          product_search: `${svc.serviceCode} - ${svc.serviceName}`,
-          product_loading: false,
-          product_results: [],
-          product_error: null,
-          selected_product: null,
-          create_requirement: false,
-          requirement_quantity: "1.000",
-        },
-      ]);
-    }
+
+    const newAccLines: DraftLine[] = result.accessories.map((acc) => ({
+      ...makeLine(),
+      product_id: String(acc.productId),
+      inventory_item_id: String(acc.inventoryItemId || ""),
+      description: acc.variantLabel && acc.variantLabel !== acc.productName
+        ? `${acc.productName} (${acc.variantLabel})`
+        : acc.productName,
+      quantity: quantity(Math.max(0.001, Number(acc.quantity || 1))),
+      unit_price: acc.chargeMode === "CHARGEABLE" ? Number(acc.salePrice || 0).toFixed(2) : "0.00",
+      product_search: `${acc.sku || acc.productCode} - ${acc.productName}`,
+      product_loading: false,
+      product_results: [],
+      product_error: null,
+      selected_product: null,
+      is_accessory: true,
+      parent_line_id: parentLineId,
+      serial_number: acc.serialNumber || "",
+      warranty_months: acc.warrantyMonths || 0,
+      warranty_card_number: acc.warrantyCardNumber || "",
+      create_requirement: false,
+      requirement_quantity: "1.000",
+      requirement_note: "",
+    }));
+
+    const newSvcLines: DraftLine[] = result.services.map((svc) => ({
+      ...makeLine(),
+      product_id: "",
+      description: svc.serviceName,
+      unit_price: svc.chargeMode === "CHARGEABLE" ? Number(svc.salePrice || 0).toFixed(2) : "0.00",
+      gst_rate: svc.taxRatePercent || "0",
+      product_search: `${svc.serviceCode} - ${svc.serviceName}`,
+      product_loading: false,
+      product_results: [],
+      product_error: null,
+      selected_product: null,
+      is_accessory: false,
+      parent_line_id: parentLineId,
+      create_requirement: false,
+      requirement_quantity: "1.000",
+    }));
+
+    setLines((prev) => {
+      const cleaned = prev
+        .filter((l) => l.parent_line_id !== parentLineId)
+        .map((l) => (l.id === parentLineId ? { ...l, accessories_configured: true } : l));
+      const parentIdx = cleaned.findIndex((l) => l.id === parentLineId);
+      const insertAt = parentIdx >= 0 ? parentIdx + 1 : cleaned.length;
+      return [
+        ...cleaned.slice(0, insertAt),
+        ...newAccLines,
+        ...newSvcLines,
+        ...cleaned.slice(insertAt),
+      ];
+    });
   }
 
   function validateForm(): { errors: string[]; customerMode: string | null } {
@@ -1569,7 +1615,8 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
       balance_total: toDecimal(totals.balance),
       notes: finalNotes,
       terms: finalTerms,
-      lines: lines.map((line) => buildLinePayload(line, form.tax_mode)),
+      accessories_configured: lines.some((l) => Boolean(l.accessories_configured || l.is_accessory)),
+      lines: lines.map((line) => buildLinePayload(line, form.tax_mode, lines)),
     };
 
     if (mode === "EXISTING") {
@@ -2545,6 +2592,23 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
                                         >
                                           Edit PIM
                                         </button>
+                                        {line.selected_product.stock_item_type === "FINISHED_GOOD" && (
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              setAccessoryPanel({
+                                                productId: line.selected_product!.id,
+                                                itemId: line.inventory_item_id ? Number(line.inventory_item_id) : undefined,
+                                                lineId: line.id,
+                                                parentQuantity: Math.max(1, Number(line.quantity || 1)),
+                                              })
+                                            }
+                                            className="inline-flex items-center gap-1 rounded border border-primary/40 bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary hover:bg-primary/20"
+                                            title="Choose product variant, accessory variants, and add-on pricing"
+                                          >
+                                            Variants &amp; Accessories
+                                          </button>
+                                        )}
                                       </div>
                                     </div>
                                     <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-0.5 text-[12px] text-slate-600 dark:text-slate-300">
@@ -3492,6 +3556,27 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
             <div className="max-h-[70vh] overflow-y-auto p-5">
               <AccessorySelectionPanel
                 productId={accessoryPanel.productId}
+                itemId={accessoryPanel.itemId}
+                mode="sale"
+                parentQuantity={accessoryPanel.parentQuantity ?? 1}
+                onSwitchParentVariant={(pv: ParentVariantOption) => {
+                  updateLine(accessoryPanel.lineId, {
+                    product_id: String(pv.product_id),
+                    inventory_item_id: String(pv.inventory_item_id),
+                    description: pv.name,
+                    unit_price: Number(pv.base_price || 0).toFixed(2),
+                    product_search: `${pv.sku || pv.product_code} - ${pv.name}`,
+                  });
+                  setAccessoryPanel((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          productId: pv.product_id,
+                          itemId: pv.inventory_item_id,
+                        }
+                      : null
+                  );
+                }}
                 onConfirm={handleAccessoryConfirm}
                 onCancel={() => setAccessoryPanel(null)}
               />

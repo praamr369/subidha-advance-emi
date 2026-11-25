@@ -234,11 +234,23 @@ type ContractItemRecord = {
   security_deposit_amount: string;
 };
 
+type SelectedAccessoryRecord = {
+  product_id: number;
+  product_name: string;
+  product_code?: string;
+  sku?: string;
+  quantity: number;
+  unit_base_price: string;
+  total_base_price: string;
+  charge_mode?: string;
+};
+
 type SubscriptionDetailRecord = {
   id: number;
   subscription_number?: string;
   contract_reference?: string;
   contract_items?: ContractItemRecord[];
+  selected_accessories?: SelectedAccessoryRecord[];
   customer_id: number | null;
   customer_name: string;
   customer_phone: string;
@@ -729,6 +741,16 @@ function normalizeSubscriptionDetail(
       monthly_yield_percent: String(it.monthly_yield_percent ?? "5.00"),
       monthly_amount: String(it.monthly_amount ?? "0.00"),
       security_deposit_amount: String(it.security_deposit_amount ?? "0.00"),
+    })),
+    selected_accessories: toArray<Record<string, unknown>>(raw.selected_accessories).map((acc) => ({
+      product_id: Number(acc.product_id),
+      product_name: String(acc.product_name || "Accessory"),
+      product_code: acc.product_code ? String(acc.product_code) : undefined,
+      sku: acc.sku ? String(acc.sku) : undefined,
+      quantity: Number(acc.quantity || 1),
+      unit_base_price: String(acc.unit_base_price ?? "0.00"),
+      total_base_price: String(acc.total_base_price ?? "0.00"),
+      charge_mode: acc.charge_mode ? String(acc.charge_mode) : undefined,
     })),
     rent_lease_demands: toArray<Record<string, unknown>>(raw.rent_lease_demands).map(normalizeRentLeaseDemandRow),
     rent_lease_collections: toArray<Record<string, unknown>>(raw.rent_lease_collections).map(
@@ -1561,6 +1583,54 @@ export default function AdminSubscriptionDetailPage() {
                             <td className="px-3 py-2.5 font-mono text-muted-foreground">
                               ₹{Number(itm.security_deposit_amount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                               {itm.security_deposit_percent ? ` (${itm.security_deposit_percent}%)` : ""}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </DetailPanel>
+              ) : null}
+
+              {isEmiSubscription &&
+              subscription.selected_accessories &&
+              subscription.selected_accessories.length > 0 ? (
+                <DetailPanel
+                  title={`SFEMI Attached Bundle Accessories (${subscription.selected_accessories.length})`}
+                  description="Selected variant accessories bundled with this SFEMI Advance EMI contract."
+                  className="rounded-[28px]"
+                >
+                  <div className="overflow-x-auto rounded-xl border border-border bg-card/60">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-border bg-muted/40 font-medium text-muted-foreground">
+                          <th className="px-3 py-2.5">Accessory Variant</th>
+                          <th className="px-3 py-2.5">Qty</th>
+                          <th className="px-3 py-2.5">Unit Price</th>
+                          <th className="px-3 py-2.5">Line Total</th>
+                          <th className="px-3 py-2.5">Billing</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {subscription.selected_accessories.map((acc, idx) => (
+                          <tr key={`${acc.product_id}-${idx}`} className="hover:bg-muted/20 transition-colors">
+                            <td className="px-3 py-2.5">
+                              <div className="font-semibold text-foreground">{acc.product_name}</div>
+                              <div className="mt-1 text-[11px] text-muted-foreground font-mono">
+                                {acc.sku || acc.product_code || "—"}
+                              </div>
+                            </td>
+                            <td className="px-3 py-2.5 font-semibold">{acc.quantity}</td>
+                            <td className="px-3 py-2.5 font-mono">
+                              ₹{Number(acc.unit_base_price).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                            </td>
+                            <td className="px-3 py-2.5 font-semibold font-mono text-foreground">
+                              ₹{Number(acc.total_base_price).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <span className="inline-flex rounded border border-border px-1.5 py-0.5 text-[10px] font-semibold">
+                                {Number(acc.total_base_price || 0) > 0 ? "Add-on" : "Included"}
+                              </span>
                             </td>
                           </tr>
                         ))}

@@ -22,6 +22,7 @@ import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { ROUTES } from "@/lib/routes";
 import { apiFetch } from "@/lib/api";
+import { pimService, type PimCategory } from "@/services/pim";
 import QRCode from "react-qr-code";
 import {
   listAccessories,
@@ -132,6 +133,7 @@ export default function AccessoriesPage() {
   // Variant groups and FG references for selection
   const [variantGroups, setVariantGroups] = useState<AccessoryVariantGroup[]>([]);
   const [finishedGoods, setFinishedGoods] = useState<FinishedGoodRow[]>([]);
+  const [pimAccessoryCategories, setPimAccessoryCategories] = useState<PimCategory[]>([]);
 
   // Filters
   const [search, setSearch] = useState("");
@@ -190,15 +192,21 @@ export default function AccessoriesPage() {
     }
   }, [search, page]);
 
-  // Load variant groups & finished goods for dropdowns
+  // Load variant groups, finished goods, and PIM accessory categories for dropdowns
   const loadLookups = useCallback(async () => {
     try {
-      const [vgRes, fgRes] = await Promise.all([
+      const [vgRes, fgRes, catRes] = await Promise.all([
         listAccessoryVariantGroups({ page_size: 100 }),
         listFinishedGoods({ page_size: 100 }),
+        pimService.getCategories({ product_type: "ACCESSORY" }).catch(() => [] as PimCategory[]),
       ]);
       setVariantGroups(vgRes.results ?? []);
       setFinishedGoods(fgRes.results ?? []);
+      setPimAccessoryCategories(catRes);
+      const primary = catRes.find((c) => c.product_type === "ACCESSORY") ?? catRes[0];
+      if (primary) {
+        setCf((f) => (f.category ? f : { ...f, category: primary.name }));
+      }
     } catch {
       // Non-fatal fallback
     }
@@ -520,27 +528,58 @@ export default function AccessoriesPage() {
                 />
               </div>
 
-              <div>
-                <label htmlFor="f-category" className="mb-1 block text-xs font-medium text-muted-foreground">Category</label>
-                <input
-                  id="f-category"
-                  value={cf.category}
-                  onChange={(e) => setCf((f) => ({ ...f, category: e.target.value }))}
-                  placeholder="Bed Accessory, Hardware…"
-                  className={INP}
-                />
-              </div>
+              {(() => {
+                const selectedCat = pimAccessoryCategories.find(
+                  (c) => c.name.trim().toLowerCase() === cf.category.trim().toLowerCase()
+                );
+                const subOpts = selectedCat?.subcategories ?? [];
+                return (
+                  <>
+                    <div>
+                      <label htmlFor="f-category" className="mb-1 block text-xs font-medium text-muted-foreground">Category (PIM)</label>
+                      <select
+                        id="f-category"
+                        value={cf.category}
+                        onChange={(e) => setCf((f) => ({ ...f, category: e.target.value, subcategory: "" }))}
+                        className={SEL}
+                      >
+                        <option value="">— Select Category —</option>
+                        {pimAccessoryCategories.map((c) => (
+                          <option key={c.id} value={c.name}>{c.name}</option>
+                        ))}
+                        {cf.category && !pimAccessoryCategories.some((c) => c.name.trim().toLowerCase() === cf.category.trim().toLowerCase()) && (
+                          <option value={cf.category}>{cf.category}</option>
+                        )}
+                      </select>
+                    </div>
 
-              <div className="sm:col-span-3">
-                <label htmlFor="f-subcategory" className="mb-1 block text-xs font-medium text-muted-foreground">Subcategory</label>
-                <input
-                  id="f-subcategory"
-                  value={cf.subcategory}
-                  onChange={(e) => setCf((f) => ({ ...f, subcategory: e.target.value }))}
-                  placeholder="Optional, e.g. Rails, Headboards"
-                  className={INP}
-                />
-              </div>
+                    <div className="sm:col-span-3">
+                      <label htmlFor="f-subcategory" className="mb-1 block text-xs font-medium text-muted-foreground">Subcategory (PIM)</label>
+                      <select
+                        id="f-subcategory"
+                        value={cf.subcategory}
+                        onChange={(e) => setCf((f) => ({ ...f, subcategory: e.target.value }))}
+                        disabled={!cf.category}
+                        className={SEL}
+                      >
+                        <option value="">
+                          {!cf.category
+                            ? "— Select Category first —"
+                            : subOpts.length > 0
+                            ? "— Select Subcategory —"
+                            : "— No subcategories defined —"}
+                        </option>
+                        {subOpts.map((s) => (
+                          <option key={s.id} value={s.name}>{s.name}</option>
+                        ))}
+                        {cf.subcategory && !subOpts.some((s) => s.name.trim().toLowerCase() === cf.subcategory.trim().toLowerCase()) && (
+                          <option value={cf.subcategory}>{cf.subcategory}</option>
+                        )}
+                      </select>
+                    </div>
+                  </>
+                );
+              })()}
 
               {createErr && (
                 <div className="sm:col-span-3 rounded-lg bg-destructive/10 border border-destructive/30 px-3 py-2 text-sm text-destructive flex gap-2 items-start">
@@ -723,14 +762,51 @@ export default function AccessoriesPage() {
                           <label htmlFor="f-reorder-level" className="mb-1 block text-xs font-medium text-muted-foreground">Reorder Level</label>
                           <input id="f-reorder-level" type="number" min="0" step="0.001" value={ef.reorder_level_qty} onChange={(e) => setEf((f) => f ? { ...f, reorder_level_qty: e.target.value } : f)} className={INP} />
                         </div>
-                        <div>
-                          <label htmlFor="f-category-2" className="mb-1 block text-xs font-medium text-muted-foreground">Category</label>
-                          <input id="f-category-2" value={ef.category} onChange={(e) => setEf((f) => f ? { ...f, category: e.target.value } : f)} className={INP} />
-                        </div>
-                        <div>
-                          <label htmlFor="f-subcategory-2" className="mb-1 block text-xs font-medium text-muted-foreground">Subcategory</label>
-                          <input id="f-subcategory-2" value={ef.subcategory} onChange={(e) => setEf((f) => f ? { ...f, subcategory: e.target.value } : f)} className={INP} />
-                        </div>
+                        {(() => {
+                          const editCat = pimAccessoryCategories.find(
+                            (c) => c.name.trim().toLowerCase() === ef.category.trim().toLowerCase()
+                          );
+                          const editSubs = editCat?.subcategories ?? [];
+                          return (
+                            <>
+                              <div>
+                                <label htmlFor="f-category-2" className="mb-1 block text-xs font-medium text-muted-foreground">Category (PIM)</label>
+                                <select
+                                  id="f-category-2"
+                                  value={ef.category}
+                                  onChange={(e) => setEf((f) => f ? { ...f, category: e.target.value, subcategory: "" } : f)}
+                                  className={SEL}
+                                >
+                                  <option value="">— Select Category —</option>
+                                  {pimAccessoryCategories.map((c) => (
+                                    <option key={c.id} value={c.name}>{c.name}</option>
+                                  ))}
+                                  {ef.category && !pimAccessoryCategories.some((c) => c.name.trim().toLowerCase() === ef.category.trim().toLowerCase()) && (
+                                    <option value={ef.category}>{ef.category}</option>
+                                  )}
+                                </select>
+                              </div>
+                              <div>
+                                <label htmlFor="f-subcategory-2" className="mb-1 block text-xs font-medium text-muted-foreground">Subcategory (PIM)</label>
+                                <select
+                                  id="f-subcategory-2"
+                                  value={ef.subcategory}
+                                  onChange={(e) => setEf((f) => f ? { ...f, subcategory: e.target.value } : f)}
+                                  disabled={!ef.category}
+                                  className={SEL}
+                                >
+                                  <option value="">{!ef.category ? "— Select Category first —" : "— Select Subcategory —"}</option>
+                                  {editSubs.map((s) => (
+                                    <option key={s.id} value={s.name}>{s.name}</option>
+                                  ))}
+                                  {ef.subcategory && !editSubs.some((s) => s.name.trim().toLowerCase() === ef.subcategory.trim().toLowerCase()) && (
+                                    <option value={ef.subcategory}>{ef.subcategory}</option>
+                                  )}
+                                </select>
+                              </div>
+                            </>
+                          );
+                        })()}
                         <div>
                           <label htmlFor="f-barcode" className="mb-1 block text-xs font-medium text-muted-foreground">Barcode</label>
                           <input id="f-barcode" value={ef.barcode} onChange={(e) => setEf((f) => f ? { ...f, barcode: e.target.value } : f)} placeholder="Leave blank to clear" className={INP + " font-mono"} />

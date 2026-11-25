@@ -244,6 +244,7 @@ class StockLedgerSerializer(serializers.ModelSerializer):
     posted_by_username = serializers.CharField(source="posted_by.username", read_only=True)
     stock_location_code = serializers.CharField(source="stock_location.code", read_only=True)
     stock_location_name = serializers.CharField(source="stock_location.name", read_only=True)
+    costing_summary = serializers.SerializerMethodField()
 
     class Meta:
         model = StockLedger
@@ -266,10 +267,16 @@ class StockLedgerSerializer(serializers.ModelSerializer):
             "posted_by",
             "posted_by_username",
             "posted_journal_entry",
+            "costing_summary",
             "created_at",
             "updated_at",
         ]
         read_only_fields = fields
+
+    def get_costing_summary(self, obj):
+        from inventory.services.valuation_service import compute_product_costing_summary
+
+        return compute_product_costing_summary(inventory_item=obj.inventory_item)
 
 
 class StockAdjustmentLineSerializer(serializers.ModelSerializer):

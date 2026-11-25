@@ -307,9 +307,53 @@ export default function AdminProductEditPage() {
                 <label className="text-sm text-muted-foreground">Unit<input className={fieldClass()} value={unit} onChange={(event) => setUnit(event.target.value)} list="unit-options" /><datalist id="unit-options">{catalogOptions.unit_of_measure_options.map((item) => <option key={item} value={item} />)}</datalist></label>
               </FormCard>
 
-              <FormCard title="Category / Master data" description="Catalog fields improve shop search, public display, and future purchase planning.">
-                <label className="text-sm text-muted-foreground">Category<input className={fieldClass()} value={category} onChange={(event) => setCategory(event.target.value)} list="category-options" /><datalist id="category-options">{catalogOptions.categories.map((item) => <option key={item.id} value={item.name} />)}</datalist></label>
-                <label className="text-sm text-muted-foreground">Subcategory<input className={fieldClass()} value={subcategory} onChange={(event) => setSubcategory(event.target.value)} list="subcategory-options" /><datalist id="subcategory-options">{catalogOptions.subcategories.map((item) => <option key={item.id} value={item.name} />)}</datalist></label>
+              <FormCard title="Category / Master data" description="Categories and subcategories are mapped from PIM based on item type.">
+                {(() => {
+                  const normType = itemType === "ADD_ON" ? "ACCESSORY" : itemType;
+                  const typeCats = catalogOptions.categories.filter(
+                    (c) => !c.product_type || c.product_type === normType || c.product_type === "ALL"
+                  );
+                  const otherCats = catalogOptions.categories.filter(
+                    (c) => c.product_type && c.product_type !== normType && c.product_type !== "ALL"
+                  );
+                  const filteredSubs = catalogOptions.subcategories.filter(
+                    (s) =>
+                      (!category || s.category_name.trim().toLowerCase() === category.trim().toLowerCase()) &&
+                      (!s.product_type || s.product_type === normType || s.product_type === "ALL" || Boolean(category))
+                  );
+                  return (
+                    <>
+                      <label className="text-sm text-muted-foreground">
+                        Category
+                        <input
+                          className={fieldClass()}
+                          value={category}
+                          onChange={(event) => {
+                            setCategory(event.target.value);
+                            setSubcategory("");
+                          }}
+                          list="category-options"
+                        />
+                        <datalist id="category-options">
+                          {typeCats.map((item) => <option key={item.id} value={item.name} />)}
+                          {otherCats.map((item) => <option key={item.id} value={item.name} />)}
+                        </datalist>
+                      </label>
+                      <label className="text-sm text-muted-foreground">
+                        Subcategory
+                        <input
+                          className={fieldClass()}
+                          value={subcategory}
+                          onChange={(event) => setSubcategory(event.target.value)}
+                          list="subcategory-options"
+                        />
+                        <datalist id="subcategory-options">
+                          {filteredSubs.map((item) => <option key={item.id} value={item.name} />)}
+                        </datalist>
+                      </label>
+                    </>
+                  );
+                })()}
                 <label className="text-sm text-muted-foreground md:col-span-2">Description<textarea className={areaClass()} value={description} onChange={(event) => setDescription(event.target.value)} /></label>
                 <div className="md:col-span-2">
                   <SmartSuggestField
@@ -382,6 +426,7 @@ export default function AdminProductEditPage() {
                 categoryText={category}
                 subcategoryText={subcategory}
                 basePrice={basePrice}
+                productType={itemType}
               />
             </div>
 

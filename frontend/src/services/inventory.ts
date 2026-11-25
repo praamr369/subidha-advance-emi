@@ -326,6 +326,10 @@ export type StockLedgerKPIS = {
   total_outbound: string;
   net_change: string;
   period: string;
+  page_total_cost?: string;
+  page_total_selling?: string;
+  page_net_profit?: string;
+  page_margin_percent?: string;
 };
 
 export type StockLedgerResult = {
@@ -344,6 +348,17 @@ export type StockLedgerResult = {
   reference_id: number | string | null;
   notes: string;
   created_at: string | null;
+  product_cost?: string;
+  accessories_cost?: string;
+  all_accessories_cost?: string;
+  total_cost?: string;
+  selling_price?: string;
+  net_profit?: string;
+  profit_margin_percent?: string;
+  accessories_count?: number;
+  movement_total_cost?: string;
+  movement_selling_value?: string;
+  movement_net_profit?: string;
 };
 
 export type StockLedgerListResponse = {
@@ -2222,6 +2237,28 @@ export type BillingAccessoryVariant = {
   unit_of_measure: string;
   base_price: string;
   standard_unit_cost: string;
+  purchase_unit_cost?: string;
+  available_stock?: string;
+  physical_stock?: string;
+};
+
+export type ParentVariantOption = {
+  inventory_item_id: number;
+  product_id: number;
+  product_code: string;
+  name: string;
+  variant_label: string;
+  sku: string;
+  base_price: string;
+  standard_unit_cost: string;
+  purchase_unit_cost: string;
+  available_stock: string;
+  attributes?: Record<string, string>;
+  is_current?: boolean;
+  is_emi_enabled?: boolean;
+  is_rent_enabled?: boolean;
+  is_lease_enabled?: boolean;
+  is_direct_sale_enabled?: boolean;
 };
 
 export type BillingAccessoryOption = {
@@ -2242,6 +2279,11 @@ export type BillingAccessoryOption = {
   sourcing_vendor_id?: number | null;
   sourcing_vendor_name?: string;
   is_supplied_with_parent?: boolean;
+  isolation_mode?: "SHARED_POOL" | "DEDICATED_KIT";
+  isolation_mode_display?: string;
+  low_stock_warning?: boolean;
+  stock_alert_message?: string;
+  available_stock?: string;
   accessory_inventory_item_id?: number;
   accessory_product_id?: number;
   accessory_name?: string;
@@ -2270,6 +2312,10 @@ export type BillingServiceOption = {
 };
 
 export type BillingAccessoryOptionsResponse = {
+  product_id?: number;
+  inventory_item_id?: number;
+  product_name?: string;
+  parent_variants?: ParentVariantOption[];
   accessory_options: BillingAccessoryOption[];
   service_options: BillingServiceOption[];
   has_options: boolean;

@@ -1360,6 +1360,73 @@ function VariantEditModal({
           />
         </div>
       </div>
+
+      {(() => {
+        const cs = variant.costing_summary;
+        const prodCost = Number(state.cost_price || 0) > 0 ? Number(state.cost_price) : Number(cs?.product_cost || 0);
+        const accCost = Number(cs?.accessories_cost || 0);
+        const totalCost = prodCost + accCost;
+        const sellPrice = Number(state.price || cs?.selling_price || 0);
+        const netProfit = sellPrice - totalCost;
+        const marginPct = sellPrice > 0 ? (netProfit / sellPrice) * 100 : 0;
+        const addonsCost = Number(cs?.addons_cost || 0);
+        const addonsSale = Number(cs?.addons_selling_price || 0);
+        return (
+          <div className="rounded-lg border border-border/80 bg-muted/25 p-3 space-y-2">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Costing, Accessories &amp; Net Margin
+              </span>
+              {cs && cs.accessories_count > 0 && (
+                <span className="text-[11px] text-muted-foreground">
+                  Includes {cs.accessories_count} attached item{cs.accessories_count !== 1 ? "s" : ""}
+                </span>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-6 text-xs">
+              <div className="rounded border bg-background px-2.5 py-1.5">
+                <div className="text-[10px] text-muted-foreground">Product Cost</div>
+                <div className="font-semibold tabular-nums">{formatRupee(prodCost)}</div>
+              </div>
+              <div className="rounded border bg-background px-2.5 py-1.5">
+                <div className="text-[10px] text-muted-foreground">+ Included Acc.</div>
+                <div className="font-semibold tabular-nums">{formatRupee(accCost)}</div>
+              </div>
+              <div className="rounded border bg-background px-2.5 py-1.5">
+                <div className="text-[10px] text-muted-foreground">= Total Cost</div>
+                <div className="font-bold tabular-nums">{formatRupee(totalCost)}</div>
+              </div>
+              <div className="rounded border bg-background px-2.5 py-1.5">
+                <div className="text-[10px] text-muted-foreground">Selling Price</div>
+                <div className="font-bold tabular-nums text-primary">{formatRupee(sellPrice)}</div>
+              </div>
+              <div className="rounded border bg-background px-2.5 py-1.5">
+                <div className="text-[10px] text-muted-foreground">Net Profit</div>
+                <div className={`font-bold tabular-nums ${netProfit >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                  {netProfit >= 0 ? "+" : ""}{formatRupee(netProfit)}
+                </div>
+              </div>
+              <div className="rounded border bg-background px-2.5 py-1.5">
+                <div className="text-[10px] text-muted-foreground">Profit % (Selling)</div>
+                <div className={`font-bold tabular-nums ${sellPrice <= 0 ? "text-muted-foreground" : marginPct >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                  {sellPrice > 0 ? `${marginPct.toFixed(2)}%` : "—"}
+                </div>
+              </div>
+            </div>
+            {(addonsCost > 0 || addonsSale > 0) && (
+              <div className="text-[11px] text-muted-foreground flex flex-wrap gap-3 pt-1">
+                <span>Optional Paid Add-ons Cost: <strong className="text-foreground">{formatRupee(addonsCost)}</strong></span>
+                <span>Add-on Sale Price: <strong className="text-foreground">+{formatRupee(addonsSale)}</strong></span>
+                {cs && (
+                  <span>
+                    Combined Margin: <strong className="text-emerald-700 dark:text-emerald-400">{formatRupee(Number(cs.with_addons_net_profit))} ({Number(cs.with_addons_margin_percent).toFixed(2)}%)</strong>
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })()}
     </div>
   )}
 
@@ -2420,7 +2487,10 @@ export default function VariantManager({
                     <th className="px-3 py-2.5 w-12 text-center text-muted-foreground">Img</th>
                     <th className="px-3 py-2.5 text-left font-medium text-muted-foreground cursor-pointer select-none" onClick={() => toggleSort("sku")}>SKU{sortIcon("sku")}</th>
                     <th className="px-3 py-2.5 text-left font-medium text-muted-foreground">Attributes</th>
-                    <th className="px-3 py-2.5 text-right font-medium text-muted-foreground cursor-pointer select-none" onClick={() => toggleSort("price")}>Price{sortIcon("price")}</th>
+                    <th className="px-3 py-2.5 text-right font-medium text-muted-foreground cursor-pointer select-none" onClick={() => toggleSort("price")}>Selling Price{sortIcon("price")}</th>
+                    <th className="px-3 py-2.5 text-right font-medium text-muted-foreground">Cost (Prod + Acc)</th>
+                    <th className="px-3 py-2.5 text-right font-medium text-muted-foreground">Net Profit</th>
+                    <th className="px-3 py-2.5 text-right font-medium text-muted-foreground">Margin %</th>
                     <th className="px-3 py-2.5 text-right font-medium text-muted-foreground cursor-pointer select-none" onClick={() => toggleSort("quantity_on_hand")}>Stock{sortIcon("quantity_on_hand")}</th>
                     <th className="px-3 py-2.5 text-center font-medium text-muted-foreground w-20">Active</th>
                     <th className="px-3 py-2.5 text-center font-medium text-muted-foreground w-20">Public</th>
@@ -2531,10 +2601,64 @@ export default function VariantManager({
                             <button type="button" onClick={() => setEditingPrice(null)} className="text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" /></button>
                           </div>
                         ) : (
-                          <button className="tabular-nums hover:underline" onClick={() => { setEditingPrice(v.id); setPriceVal(v.price); }}>
+                          <button className="tabular-nums hover:underline font-medium" onClick={() => { setEditingPrice(v.id); setPriceVal(v.price); }}>
                             {formatRupee(Number(v.price))}
                           </button>
                         )}
+                      </td>
+                      {/* Cost (Product + Accessories) */}
+                      <td className="px-3 py-2 text-right text-xs tabular-nums">
+                        {(() => {
+                          const cs = v.costing_summary;
+                          const prodCost = cs ? Number(cs.product_cost || 0) : Number(v.cost_price || 0);
+                          const accCost = cs ? Number(cs.accessories_cost || 0) : 0;
+                          const totalCost = cs ? Number(cs.total_cost || 0) : prodCost;
+                          return (
+                            <div>
+                              <div className="font-semibold text-foreground">{formatRupee(totalCost)}</div>
+                              {(prodCost > 0 || accCost > 0) && (
+                                <div className="text-[10px] text-muted-foreground">
+                                  {formatRupee(prodCost)}{accCost > 0 ? ` + ${formatRupee(accCost)} acc` : ""}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </td>
+                      {/* Net Profit */}
+                      <td className="px-3 py-2 text-right text-xs tabular-nums">
+                        {(() => {
+                          const cs = v.costing_summary;
+                          const sell = Number(v.price || 0);
+                          const totalCost = cs ? Number(cs.total_cost || 0) : Number(v.cost_price || 0);
+                          const net = sell - totalCost;
+                          return (
+                            <span className={`font-semibold ${net >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                              {net >= 0 ? "+" : ""}{formatRupee(net)}
+                            </span>
+                          );
+                        })()}
+                      </td>
+                      {/* Margin % of Selling Price */}
+                      <td className="px-3 py-2 text-right text-xs tabular-nums">
+                        {(() => {
+                          const cs = v.costing_summary;
+                          const sell = Number(v.price || 0);
+                          const totalCost = cs ? Number(cs.total_cost || 0) : Number(v.cost_price || 0);
+                          const net = sell - totalCost;
+                          const pct = sell > 0 ? (net / sell) * 100 : 0;
+                          return sell > 0 ? (
+                            <span className={`inline-flex rounded px-1.5 py-0.5 text-[11px] font-semibold ${
+                              pct >= 0
+                                ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300"
+                                : "bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-300"
+                            }`}>
+                              {pct.toFixed(1)}%
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          );
+                        })()}
                       </td>
                       {/* Stock inline edit */}
                       <td className="px-3 py-2 text-right">

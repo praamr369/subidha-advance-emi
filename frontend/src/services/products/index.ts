@@ -122,8 +122,8 @@ export type ProductRegisterPage = {
 };
 
 export type ProductCatalogOptions = {
-  categories: { id: number; name: string; description?: string; is_active?: boolean }[];
-  subcategories: { id: number; name: string; category_id: number; category_name: string; description?: string; is_active?: boolean }[];
+  categories: { id: number; name: string; product_type?: string; pim_category_id?: number | null; description?: string; is_active?: boolean }[];
+  subcategories: { id: number; name: string; category_id: number; category_name: string; product_type?: string; description?: string; is_active?: boolean }[];
   unit_of_measure_masters: { id: number; code: string; name: string }[];
   unit_of_measure_options: string[];
   item_type_choices: { value: string; label: string }[];

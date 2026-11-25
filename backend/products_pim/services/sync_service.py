@@ -280,19 +280,36 @@ class PIMSyncService:
         if pim_product.category:
             core_product.category = pim_product.category.name
             try:
-                cat = ProductCategoryMaster.objects.filter(name=pim_product.category.name).first()
-                if cat:
-                    core_product.category_master = cat
+                cat = ProductCategoryMaster.objects.filter(name__iexact=pim_product.category.name).first()
+                if not cat:
+                    cat, _ = ProductCategoryMaster.objects.get_or_create(
+                        name=pim_product.category.name,
+                        defaults={"is_active": True},
+                    )
+                core_product.category_master = cat
             except Exception:
-                pass
-        if pim_product.subcategory:
-            core_product.subcategory = pim_product.subcategory.name
-            try:
-                subcat = ProductSubcategoryMaster.objects.filter(name=pim_product.subcategory.name).first()
-                if subcat:
+                cat = None
+            if pim_product.subcategory:
+                core_product.subcategory = pim_product.subcategory.name
+                try:
+                    subcat = ProductSubcategoryMaster.objects.filter(
+                        name__iexact=pim_product.subcategory.name,
+                        **({"category": cat} if cat else {}),
+                    ).first()
+                    if not subcat and cat is not None:
+                        subcat, _ = ProductSubcategoryMaster.objects.get_or_create(
+                            category=cat,
+                            name=pim_product.subcategory.name,
+                            defaults={"is_active": True},
+                        )
                     core_product.subcategory_master = subcat
-            except Exception:
-                pass
+                except Exception:
+                    pass
+            else:
+                core_product.subcategory = ""
+                core_product.subcategory_master = None
+        elif pim_product.subcategory:
+            core_product.subcategory = pim_product.subcategory.name
 
         core_product.save()
 

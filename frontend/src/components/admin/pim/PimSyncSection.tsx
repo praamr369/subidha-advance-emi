@@ -20,6 +20,8 @@ interface Props {
   /** Free-text subcategory name from subscription product (e.g. "Beds") */
   subcategoryText: string;
   basePrice: string;
+  /** Product item_type to filter & sync matching PIM category taxonomy */
+  productType?: string;
 }
 
 function buildAttrPayload(attrs: PimCategoryAttribute[], values: AttributeValues) {
@@ -46,7 +48,7 @@ export interface PimSyncSectionHandle {
   save: () => Promise<boolean>;
 }
 
-const PimSyncSection = forwardRef<PimSyncSectionHandle, Props>(function PimSyncSection({ productCode, productName, categoryText, subcategoryText, basePrice }: Props, ref) {
+const PimSyncSection = forwardRef<PimSyncSectionHandle, Props>(function PimSyncSection({ productCode, productName, categoryText, subcategoryText, basePrice, productType }: Props, ref) {
   const [allCategories, setAllCategories] = useState<PimCategory[]>([]);
   const [subcategories, setSubcategories] = useState<PimSubcategory[]>([]);
   const [attributes, setAttributes] = useState<PimCategoryAttribute[]>([]);
@@ -66,12 +68,23 @@ const PimSyncSection = forwardRef<PimSyncSectionHandle, Props>(function PimSyncS
     pimService.getCategories().then(setAllCategories).catch(() => {});
   }, []);
 
-  // Auto-match category when categoryText or allCategories changes
+  // Auto-match category when categoryText, productType, or allCategories changes
   useEffect(() => {
-    if (!allCategories.length || !categoryText) return;
-    const idx = matchByName(allCategories, categoryText);
-    if (idx >= 0) setSelectedCatId(allCategories[idx].id);
-  }, [allCategories, categoryText]);
+    if (!allCategories.length) return;
+    if (categoryText) {
+      const normalizedType = productType === "ADD_ON" ? "ACCESSORY" : productType;
+      const typeScoped = normalizedType
+        ? allCategories.filter((c) => c.product_type === normalizedType || c.product_type === "ALL")
+        : allCategories;
+      const idxScoped = matchByName(typeScoped, categoryText);
+      if (idxScoped >= 0) {
+        setSelectedCatId(typeScoped[idxScoped].id);
+        return;
+      }
+      const idx = matchByName(allCategories, categoryText);
+      if (idx >= 0) setSelectedCatId(allCategories[idx].id);
+    }
+  }, [allCategories, categoryText, productType]);
 
   // Load subcategories and category-level attributes when category changes
   useEffect(() => {
@@ -163,12 +176,19 @@ const PimSyncSection = forwardRef<PimSyncSectionHandle, Props>(function PimSyncS
     setStatus("saving");
     setMsg(null);
     try {
+      const normalizedType: "FINISHED_GOOD" | "RAW_MATERIAL" | "ACCESSORY" | "SERVICE" | undefined =
+        productType === "ACCESSORY" || productType === "RAW_MATERIAL" || productType === "SERVICE" || productType === "FINISHED_GOOD"
+          ? productType
+          : productType === "ADD_ON"
+          ? "ACCESSORY"
+          : undefined;
       const payload = {
         code: productCode,
         name: productName,
         category: Number(selectedCatId),
         subcategory: selectedSubId ? Number(selectedSubId) : null,
         base_price: basePrice || "0",
+        ...(normalizedType ? { product_type: normalizedType } : {}),
         is_active: true,
         is_published: false,
         locked_attributes: Array.from(lockedAttributes),
@@ -269,9 +289,29 @@ const PimSyncSection = forwardRef<PimSyncSectionHandle, Props>(function PimSyncS
                 }}
               >
                 <option value="">— Select PIM Category —</option>
-                {allCategories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
-                ))}
+                {(() => {
+                  const normalizedType = productType === "ADD_ON" ? "ACCESSORY" : productType;
+                  const matching = normalizedType
+                    ? allCategories.filter((c) => c.product_type === normalizedType || c.product_type === "ALL")
+                    : allCategories;
+                  const others = normalizedType
+                    ? allCategories.filter((c) => !(c.product_type === normalizedType || c.product_type === "ALL"))
+                    : [];
+                  return (
+                    <>
+                      {matching.map((c) => (
+                        <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
+                      ))}
+                      {others.length > 0 && (
+                        <optgroup label="Other Product Types">
+                          {others.map((c) => (
+                            <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
+                          ))}
+                        </optgroup>
+                      )}
+                    </>
+                  );
+                })()}
               </select>
               {!selectedCatId && categoryText && (
                 <p className="mt-1 text-xs text-amber-600">No match found for "{categoryText}" — please select manually.</p>

@@ -9,6 +9,7 @@ import ERPPageShell from "@/components/erp/ERPPageShell";
 import ERPSectionShell from "@/components/erp/ERPSectionShell";
 import ProcurementConfirmDialog from "@/components/procurement/ProcurementConfirmDialog";
 import SearchableItemSelect from "@/components/inventory/SearchableItemSelect";
+import AccessorySelectionPanel, { type AccessorySelectionResult } from "@/components/inventory/AccessorySelectionPanel";
 import { ROUTES } from "@/lib/routes";
 import {
   createGoodsReceipt,
@@ -19,6 +20,7 @@ import {
   type GoodsReceipt,
   type GoodsReceiptLine,
   type InventoryItem,
+  type ParentVariantOption,
   type PurchaseOrder,
 } from "@/services/inventory";
 
@@ -49,6 +51,8 @@ function CreateGRForm({ purchaseOrders, items, onSaved, onCancel }: CreateGRForm
   const [receiptDate, setReceiptDate] = useState(today);
   const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<GoodsReceiptLine[]>([{ inventory_item: 0, quantity_received: "1" }]);
+  const [openAccLineIdx, setOpenAccLineIdx] = useState<number | null>(null);
+  const [lineItemsMap, setLineItemsMap] = useState<Record<number, InventoryItem>>({});
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -138,43 +142,120 @@ function CreateGRForm({ purchaseOrders, items, onSaved, onCancel }: CreateGRForm
         </div>
         {errors.lines ? <p className="mb-1 text-[10px] text-red-600">{errors.lines}</p> : null}
         <div className="space-y-2">
-          {lines.map((line, i) => (
-            <div key={i} className="grid grid-cols-[1fr_100px_90px_32px] gap-2 items-center">
-              <SearchableItemSelect
-                value={line.inventory_item}
-                initialLabel={line.inventory_item_product_name}
-                allItems={items}
-                placeholder="Search product by name, code, SKU…"
-                onChange={(val, it) => {
-                  const itemId = Number(val) || 0;
-                  setLine(i, {
-                    inventory_item: itemId,
-                    inventory_item_sku: it?.sku || line.inventory_item_sku,
-                    inventory_item_product_name: it?.product_name || line.inventory_item_product_name,
-                  });
-                }}
-              />
-              <input
-                type="number"
-                min="0.001"
-                step="0.001"
-                placeholder="Qty received"
-                value={line.quantity_received}
-                onChange={(e) => setLine(i, { quantity_received: e.target.value })}
-                className={inputCls}
-              />
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="Unit cost"
-                value={line.unit_cost ?? ""}
-                onChange={(e) => setLine(i, { unit_cost: e.target.value })}
-                className={inputCls}
-              />
-              <button type="button" onClick={() => removeLine(i)} disabled={lines.length === 1} className="h-9 w-8 rounded-lg border border-border text-muted-foreground hover:bg-muted disabled:opacity-30">✕</button>
-            </div>
-          ))}
+          {lines.map((line, i) => {
+            const resolvedItem = lineItemsMap[line.inventory_item] || items.find((it) => it.id === line.inventory_item);
+            return (
+              <div key={i} className="space-y-1.5">
+                <div className="grid grid-cols-[1fr_100px_90px_32px] gap-2 items-center">
+                  <SearchableItemSelect
+                    value={line.inventory_item}
+                    initialLabel={line.inventory_item_product_name}
+                    allItems={items}
+                    placeholder="Search product by name, code, SKU…"
+                    onChange={(val, it) => {
+                      const itemId = Number(val) || 0;
+                      setLine(i, {
+                        inventory_item: itemId,
+                        inventory_item_sku: it?.sku || line.inventory_item_sku,
+                        inventory_item_product_name: it?.product_name || line.inventory_item_product_name,
+                      });
+                      if (it) {
+                        setLineItemsMap((prev) => ({ ...prev, [itemId]: it }));
+                        if (it.stock_item_type === "FINISHED_GOOD") setOpenAccLineIdx(i);
+                      }
+                    }}
+                  />
+                  <input
+                    type="number"
+                    min="0.001"
+                    step="0.001"
+                    placeholder="Qty received"
+                    value={line.quantity_received}
+                    onChange={(e) => setLine(i, { quantity_received: e.target.value })}
+                    className={inputCls}
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="Unit cost"
+                    value={line.unit_cost ?? ""}
+                    onChange={(e) => setLine(i, { unit_cost: e.target.value })}
+                    className={inputCls}
+                  />
+                  <button type="button" onClick={() => removeLine(i)} disabled={lines.length === 1} className="h-9 w-8 rounded-lg border border-border text-muted-foreground hover:bg-muted disabled:opacity-30">✕</button>
+                </div>
+                {resolvedItem?.stock_item_type === "FINISHED_GOOD" && (
+                  <div className="ml-1 mr-8 space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => setOpenAccLineIdx(openAccLineIdx === i ? null : i)}
+                      className="inline-flex items-center gap-1 rounded-lg border border-primary/30 bg-primary/5 px-2.5 py-1 text-[11px] font-semibold text-primary hover:bg-primary/10"
+                    >
+                      {openAccLineIdx === i ? "Hide Variants & Accessories" : "Select Variants & Vendor Accessories"}
+                    </button>
+                    {openAccLineIdx === i && (
+                      <div className="rounded-xl border border-primary/25 bg-muted/30 p-3">
+                        <AccessorySelectionPanel
+                          productId={resolvedItem.product || 0}
+                          itemId={resolvedItem.id}
+                          mode="purchase"
+                          compact
+                          parentQuantity={Math.max(1, Number(line.quantity_received || 1))}
+                          onSwitchParentVariant={(pv: ParentVariantOption) => {
+                            const nextCost = Number(pv.purchase_unit_cost || 0) > 0
+                              ? Number(pv.purchase_unit_cost).toFixed(2)
+                              : Number(pv.standard_unit_cost || 0).toFixed(2);
+                            setLine(i, {
+                              inventory_item: pv.inventory_item_id,
+                              inventory_item_sku: pv.sku,
+                              inventory_item_product_name: pv.name,
+                              unit_cost: nextCost,
+                            });
+                            setLineItemsMap((prev) => ({
+                              ...prev,
+                              [pv.inventory_item_id]: {
+                                id: pv.inventory_item_id,
+                                product: pv.product_id,
+                                product_name: pv.name,
+                                product_code: pv.product_code,
+                                sku: pv.sku,
+                                unit_of_measure: "PCS",
+                                stock_item_type: "FINISHED_GOOD",
+                                purchase_unit_cost: pv.purchase_unit_cost,
+                                standard_unit_cost: pv.standard_unit_cost,
+                              } as unknown as InventoryItem,
+                            }));
+                          }}
+                          onConfirm={(res: AccessorySelectionResult) => {
+                            setLines((prev) => {
+                              const next = [...prev];
+                              for (const acc of res.accessories) {
+                                const newLine: GoodsReceiptLine = {
+                                  inventory_item: acc.inventoryItemId,
+                                  inventory_item_sku: acc.sku,
+                                  inventory_item_product_name: acc.variantLabel || acc.productName,
+                                  quantity_received: String(acc.quantity || 1),
+                                  unit_cost: Number(acc.unitCost || 0).toFixed(2),
+                                  notes: `Accessory for ${resolvedItem.product_name || resolvedItem.sku || ""}`,
+                                };
+                                const existingIdx = next.findIndex((l) => l.inventory_item === acc.inventoryItemId);
+                                if (existingIdx >= 0) next[existingIdx] = newLine;
+                                else next.push(newLine);
+                              }
+                              return next;
+                            });
+                            setOpenAccLineIdx(null);
+                          }}
+                          onCancel={() => setOpenAccLineIdx(null)}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
         <p className="mt-1 text-[10px] text-muted-foreground">Columns: Item · Qty Received · Unit Cost</p>
       </div>

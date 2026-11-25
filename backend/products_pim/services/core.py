@@ -133,17 +133,55 @@ def infer_product_type(product) -> str:
     return "FINISHED_GOOD"
 
 
+def _resolve_pim_category_and_subcategory(product, initial_type: str):
+    """Resolve matching PIM ProductCategory and ProductSubcategory from an operational product."""
+    from products_pim.models import ProductCategory, ProductSubcategory
+
+    cat_name = (getattr(product, "category", None) or "").strip()
+    sub_name = (getattr(product, "subcategory", None) or "").strip()
+
+    category = None
+    if cat_name:
+        # Prefer category matching both name and product_type (or ALL)
+        category = ProductCategory.objects.filter(
+            name__iexact=cat_name,
+            product_type__in=[initial_type, "ALL"],
+            is_active=True,
+        ).first()
+        if not category:
+            category = ProductCategory.objects.filter(name__iexact=cat_name, is_active=True).first()
+
+    if not category:
+        if initial_type in ("ACCESSORY", "RAW_MATERIAL", "SERVICE", "FINISHED_GOOD"):
+            category = ProductCategory.objects.filter(
+                product_type=initial_type, is_active=True
+            ).order_by("display_order", "id").first()
+        if not category:
+            category, _ = ProductCategory.objects.get_or_create(
+                slug="unclassified",
+                defaults={"name": "Unclassified", "icon": "📦", "display_order": 999, "product_type": "ALL"},
+            )
+
+    subcategory = None
+    if sub_name and category:
+        subcategory = ProductSubcategory.objects.filter(
+            category=category, name__iexact=sub_name, is_active=True
+        ).first()
+
+    return category, subcategory
+
+
 def ensure_pim_product_for_product(product) -> "object | None":
     """Return the PimProduct for an operational product, creating and linking one
     if it does not exist yet. Idempotent and safe to call on every save.
     """
-    from products_pim.models import PimProduct, ProductCategory
+    from products_pim.models import PimProduct
 
     if not getattr(product, "product_code", ""):
         return None
 
     # Already linked? Update it to keep it in sync.
-    existing = PimProduct.objects.filter(source_product=product).first()
+    existing = PimProduct.objects.filter(source_product=product).select_related("category", "subcategory").first()
     if existing is not None:
         needs_save = False
         fields_to_update = []
@@ -160,14 +198,48 @@ def ensure_pim_product_for_product(product) -> "object | None":
             needs_save = True
             fields_to_update.append("base_price")
 
-        # Classification: only set if unset; never overwrite existing PIM classification with heuristics
+        explicit_item_type = (getattr(product, "item_type", None) or "").strip().upper()
         if not existing.product_type:
             existing.product_type = infer_product_type(product)
             needs_save = True
             fields_to_update.append("product_type")
+        elif explicit_item_type in ("FINISHED_GOOD", "ACCESSORY", "RAW_MATERIAL", "SERVICE") and existing.product_type != explicit_item_type:
+            existing.product_type = explicit_item_type
+            needs_save = True
+            fields_to_update.append("product_type")
+
+        target_type = existing.product_type or "FINISHED_GOOD"
+        cat_text = (getattr(product, "category", None) or "").strip()
+        sub_text = (getattr(product, "subcategory", None) or "").strip()
+        if existing.category and existing.category.slug == "unclassified":
+            resolved_cat, resolved_sub = _resolve_pim_category_and_subcategory(product, target_type)
+            if resolved_cat and resolved_cat.id != existing.category_id:
+                existing.category = resolved_cat
+                existing.subcategory = resolved_sub
+                needs_save = True
+                fields_to_update.extend(["category", "subcategory"])
+        elif cat_text:
+            resolved_cat, resolved_sub = _resolve_pim_category_and_subcategory(product, target_type)
+            if resolved_cat and resolved_cat.slug != "unclassified" and (
+                resolved_cat.id != existing.category_id
+                or (resolved_sub and resolved_sub.id != existing.subcategory_id)
+            ):
+                existing.category = resolved_cat
+                existing.subcategory = resolved_sub
+                needs_save = True
+                fields_to_update.extend(["category", "subcategory"])
+        elif sub_text and existing.category_id and not existing.subcategory_id:
+            from products_pim.models import ProductSubcategory
+            resolved_sub = ProductSubcategory.objects.filter(
+                category_id=existing.category_id, name__iexact=sub_text, is_active=True
+            ).first()
+            if resolved_sub:
+                existing.subcategory = resolved_sub
+                needs_save = True
+                fields_to_update.append("subcategory")
 
         if needs_save:
-            existing.save(update_fields=fields_to_update)
+            existing.save(update_fields=list(dict.fromkeys(fields_to_update)))
         return existing
 
     # Link an existing PIM record that matches by code but predates the FK.
@@ -189,27 +261,7 @@ def ensure_pim_product_for_product(product) -> "object | None":
     if initial_type not in ("FINISHED_GOOD", "ACCESSORY", "RAW_MATERIAL", "SERVICE"):
         initial_type = "FINISHED_GOOD"
 
-    # Otherwise create a fresh linked PIM record under appropriate or Unclassified catch-all.
-    cat_map = {c.name.lower(): c for c in ProductCategory.objects.all()}
-    category = cat_map.get((product.category or "").strip().lower(), None)
-    if not category:
-        if initial_type == "ACCESSORY":
-            category = ProductCategory.objects.filter(product_type="ACCESSORY").first()
-        elif initial_type == "RAW_MATERIAL":
-            category = ProductCategory.objects.filter(product_type="RAW_MATERIAL").first()
-        elif initial_type == "SERVICE":
-            category = ProductCategory.objects.filter(product_type="SERVICE").first()
-        if not category:
-            unclassified, _ = ProductCategory.objects.get_or_create(
-                slug="unclassified",
-                defaults={"name": "Unclassified", "icon": "📦", "display_order": 999, "product_type": "ALL"},
-            )
-            category = unclassified
-
-    subcategory = None
-    if getattr(product, "subcategory", None):
-        from products_pim.models import ProductSubcategory
-        subcategory = ProductSubcategory.objects.filter(category=category, name__iexact=product.subcategory).first()
+    category, subcategory = _resolve_pim_category_and_subcategory(product, initial_type)
 
     # Determine parent if this is a variant
     parent_id = None

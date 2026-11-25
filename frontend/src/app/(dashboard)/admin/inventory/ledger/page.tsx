@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Download, ChevronLeft, ChevronRight, Loader2, RefreshCw, CheckCircle2, AlertCircle } from "lucide-react";
 
-import { accountingDate, accountingErrorMessage } from "@/components/accounting/shared";
+import { accountingDate, accountingErrorMessage, accountingMoney } from "@/components/accounting/shared";
 import ERPPageShell from "@/components/erp/ERPPageShell";
 import { ROUTES } from "@/lib/routes";
 import { resyncAllInvoicesStock } from "@/services/direct-sale-workspace";
@@ -252,30 +252,56 @@ export default function StockLedgerPage() {
 
         {/* KPI Summary Strip */}
         {data?.summary && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="rounded-lg border bg-card p-4">
-              <div className="text-xs text-muted-foreground mb-1">Total Inbound</div>
-              <div className="text-lg font-semibold text-green-600">
-                +{parseFloat(data.summary.total_inbound).toFixed(0)}
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="rounded-lg border bg-card p-4">
+                <div className="text-xs text-muted-foreground mb-1">Total Inbound</div>
+                <div className="text-lg font-semibold text-green-600">
+                  +{parseFloat(data.summary.total_inbound).toFixed(0)}
+                </div>
+              </div>
+              <div className="rounded-lg border bg-card p-4">
+                <div className="text-xs text-muted-foreground mb-1">Total Outbound</div>
+                <div className="text-lg font-semibold text-red-600">
+                  −{parseFloat(data.summary.total_outbound).toFixed(0)}
+                </div>
+              </div>
+              <div className="rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950/30 p-4">
+                <div className="text-xs text-muted-foreground mb-1">Net Change</div>
+                <div className="text-lg font-semibold text-blue-700 dark:text-blue-400">
+                  {parseFloat(data.summary.net_change) >= 0 ? "+" : ""}
+                  {parseFloat(data.summary.net_change).toFixed(0)}
+                </div>
+              </div>
+              <div className="rounded-lg border bg-card p-4">
+                <div className="text-xs text-muted-foreground mb-1">Period</div>
+                <div className="text-sm font-semibold text-foreground">{data.summary.period}</div>
               </div>
             </div>
-            <div className="rounded-lg border bg-card p-4">
-              <div className="text-xs text-muted-foreground mb-1">Total Outbound</div>
-              <div className="text-lg font-semibold text-red-600">
-                −{parseFloat(data.summary.total_outbound).toFixed(0)}
+            {(data.summary.page_total_cost || data.summary.page_total_selling) && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="rounded-lg border bg-card p-3.5">
+                  <div className="text-xs text-muted-foreground mb-0.5">Total Cost (Prod + Acc)</div>
+                  <div className="text-base font-bold tabular-nums">{accountingMoney(data.summary.page_total_cost || "0")}</div>
+                </div>
+                <div className="rounded-lg border bg-card p-3.5">
+                  <div className="text-xs text-muted-foreground mb-0.5">Total Selling Value</div>
+                  <div className="text-base font-bold tabular-nums text-primary">{accountingMoney(data.summary.page_total_selling || "0")}</div>
+                </div>
+                <div className="rounded-lg border bg-card p-3.5">
+                  <div className="text-xs text-muted-foreground mb-0.5">Net Profit (Selling − Cost)</div>
+                  <div className={`text-base font-bold tabular-nums ${Number(data.summary.page_net_profit || 0) >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                    {Number(data.summary.page_net_profit || 0) >= 0 ? "+" : ""}{accountingMoney(data.summary.page_net_profit || "0")}
+                  </div>
+                </div>
+                <div className="rounded-lg border bg-card p-3.5">
+                  <div className="text-xs text-muted-foreground mb-0.5">Net Margin % of Selling</div>
+                  <div className={`text-base font-bold tabular-nums ${Number(data.summary.page_margin_percent || 0) >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                    {Number(data.summary.page_margin_percent || 0).toFixed(2)}%
+                  </div>
+                </div>
               </div>
-            </div>
-            <div className="rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950/30 p-4">
-              <div className="text-xs text-muted-foreground mb-1">Net Change</div>
-              <div className="text-lg font-semibold text-blue-700 dark:text-blue-400">
-                {parseFloat(data.summary.net_change) >= 0 ? "+" : ""}
-                {parseFloat(data.summary.net_change).toFixed(0)}
-              </div>
-            </div>
-            <div className="rounded-lg border bg-card p-4">
-              <div className="text-xs text-muted-foreground mb-1">Period</div>
-              <div className="text-sm font-semibold text-foreground">{data.summary.period}</div>
-            </div>
+            )}
           </div>
         )}
 
@@ -349,13 +375,23 @@ export default function StockLedgerPage() {
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">SKU</th>
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Movement</th>
                     <th className="px-4 py-3 text-right font-medium text-muted-foreground">Qty</th>
+                    <th className="px-4 py-3 text-right font-medium text-muted-foreground">Prod Cost</th>
+                    <th className="px-4 py-3 text-right font-medium text-muted-foreground">Acc Cost</th>
+                    <th className="px-4 py-3 text-right font-medium text-muted-foreground">Total Cost</th>
+                    <th className="px-4 py-3 text-right font-medium text-muted-foreground">Selling Price</th>
+                    <th className="px-4 py-3 text-right font-medium text-muted-foreground">Net Profit</th>
+                    <th className="px-4 py-3 text-right font-medium text-muted-foreground">Margin %</th>
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Location</th>
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Reference</th>
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Notes</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {rows.map((row) => (
+                  {rows.map((row) => {
+                    const netVal = Number(row.net_profit ?? 0);
+                    const marginPct = Number(row.profit_margin_percent ?? 0);
+                    const sellingVal = Number(row.selling_price ?? 0);
+                    return (
                     <tr key={row.id} className="hover:bg-muted/30 transition-colors">
                       <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
                         {row.movement_date ? accountingDate(row.movement_date) : "—"}
@@ -364,7 +400,7 @@ export default function StockLedgerPage() {
                         <div className="font-medium">{row.product_name || "—"}</div>
                         <div className="text-xs text-muted-foreground">{row.product_code}</div>
                       </td>
-                      <td className="px-4 py-3 text-muted-foreground">{row.sku || "—"}</td>
+                      <td className="px-4 py-3 text-muted-foreground font-mono text-xs">{row.sku || "—"}</td>
                       <td className="px-4 py-3">
                         <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium">
                           {row.movement_type}
@@ -372,6 +408,34 @@ export default function StockLedgerPage() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         <QtyCell row={row} />
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums text-xs text-muted-foreground">
+                        {accountingMoney(row.product_cost || "0")}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums text-xs text-muted-foreground">
+                        {Number(row.accessories_cost || 0) > 0
+                          ? accountingMoney(row.accessories_cost || "0")
+                          : "₹0.00"}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums text-xs font-semibold">
+                        {accountingMoney(row.total_cost || "0")}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums text-xs font-semibold text-primary">
+                        {accountingMoney(row.selling_price || "0")}
+                      </td>
+                      <td className={`px-4 py-3 text-right tabular-nums text-xs font-semibold ${netVal >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                        {netVal >= 0 ? "+" : ""}{accountingMoney(row.net_profit || "0")}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums text-xs font-semibold">
+                        {sellingVal > 0 ? (
+                          <span className={`inline-flex rounded px-1.5 py-0.5 text-[11px] ${
+                            marginPct >= 0
+                              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300"
+                              : "bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-300"
+                          }`}>
+                            {marginPct.toFixed(2)}%
+                          </span>
+                        ) : "—"}
                       </td>
                       <td className="px-4 py-3 text-muted-foreground">{row.stock_location || "—"}</td>
                       <td className="px-4 py-3">
@@ -390,7 +454,8 @@ export default function StockLedgerPage() {
                         {row.notes || "—"}
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

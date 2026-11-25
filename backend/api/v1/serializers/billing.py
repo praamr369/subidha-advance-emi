@@ -191,6 +191,7 @@ class DirectSaleLineSerializer(serializers.ModelSerializer):
         allow_null=True,
     )
     requirement_note = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    parent_line_index = serializers.IntegerField(write_only=True, required=False, allow_null=True, min_value=0)
 
     class Meta:
         model = DirectSaleLine
@@ -214,6 +215,12 @@ class DirectSaleLineSerializer(serializers.ModelSerializer):
             "sku_snapshot",
             "unit_of_measure_snapshot",
             "hsn_sac_code",
+            "serial_number",
+            "warranty_months",
+            "warranty_card_number",
+            "is_accessory",
+            "parent_line",
+            "parent_line_index",
             "bundled_items",
             "create_purchase_requirement",
             "requirement_quantity",
@@ -223,6 +230,7 @@ class DirectSaleLineSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             "id",
+            "parent_line",
             "product_code_snapshot",
             "sku_snapshot",
             "unit_of_measure_snapshot",
@@ -427,6 +435,7 @@ class DirectSaleSerializer(serializers.ModelSerializer):
         write_only=True,
     )
     terms = serializers.CharField(required=False, allow_blank=True)
+    accessories_configured = serializers.BooleanField(required=False, write_only=True, default=False)
 
     class Meta:
         model = DirectSale
@@ -525,6 +534,7 @@ class DirectSaleSerializer(serializers.ModelSerializer):
             "new_customer_gstin",
             "new_customer_type",
             "terms",
+            "accessories_configured",
             "authorized_signature",
             "authorized_signed_at",
             "customer_signature",

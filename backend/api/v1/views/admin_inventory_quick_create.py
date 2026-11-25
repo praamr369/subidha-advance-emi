@@ -238,6 +238,12 @@ class AdminQuickCreateAccessoryView(APIView):
         )
         inv_item.save()
 
+        try:
+            from products_pim.services.core import ensure_pim_product_for_product
+            ensure_pim_product_for_product(product)
+        except Exception:
+            pass
+
         return Response({
             "product_id": product.id,
             "product_code": product.product_code,
@@ -295,6 +301,12 @@ class AdminQuickCreateRawMaterialView(APIView):
         )
         inv_item.save()
 
+        try:
+            from products_pim.services.core import ensure_pim_product_for_product
+            ensure_pim_product_for_product(product)
+        except Exception:
+            pass
+
         return Response({
             "product_id": product.id,
             "product_code": product.product_code,
@@ -337,6 +349,12 @@ class AdminQuickCreateServiceView(APIView):
         )
         product.save()
 
+        try:
+            from products_pim.services.core import ensure_pim_product_for_product
+            ensure_pim_product_for_product(product)
+        except Exception:
+            pass
+
         return Response({
             "product_id": product.id,
             "product_code": product.product_code,
@@ -350,10 +368,146 @@ class AdminQuickCreateServiceView(APIView):
 # Called with a product_id to get all accessory groups + services for that FG
 # ---------------------------------------------------------------------------
 
+def _serialize_variant_item(v: InventoryItem) -> dict:
+    try:
+        avail = v.available_qty()
+        phys = v.current_stock_quantity()
+    except Exception:
+        avail = QUANTITY_ZERO
+        phys = QUANTITY_ZERO
+    return {
+        "id": v.id,
+        "product_id": v.product_id,
+        "product_name": v.product.name,
+        "product_code": v.product.product_code,
+        "variant_label": v.variant_label or v.product.name,
+        "sku": v.sku,
+        "unit_of_measure": v.unit_of_measure,
+        "base_price": str(v.product.base_price),
+        "standard_unit_cost": str(v.standard_unit_cost or "0.00"),
+        "purchase_unit_cost": str(v.purchase_unit_cost or v.standard_unit_cost or "0.00"),
+        "available_stock": f"{avail:.3f}",
+        "physical_stock": f"{phys:.3f}",
+    }
+
+
+def _collect_accessory_variants(acc: InventoryItem) -> list[dict]:
+    """Collect active sibling variants for an accessory (via AccessoryVariantGroup or PIM ProductVariant)."""
+    seen_ids: set[int] = set()
+    variants: list[dict] = []
+
+    def _add(item: InventoryItem):
+        if item and item.is_active and item.id not in seen_ids:
+            seen_ids.add(item.id)
+            variants.append(_serialize_variant_item(item))
+
+    if acc.variant_group_id:
+        for v in (
+            acc.variant_group.variants.filter(
+                stock_item_type=InventoryItemType.ACCESSORY,
+                is_active=True,
+            )
+            .select_related("product")
+            .order_by("variant_label", "product__name")
+        ):
+            _add(v)
+
+    try:
+        from products_pim.models import ProductVariant as PimVariant
+
+        pim_prod = None
+        if getattr(acc, "product", None):
+            pv = PimVariant.objects.filter(operational_product_id=acc.product_id).select_related("product").first()
+            if pv and pv.product_id:
+                pim_prod = pv.product
+            elif hasattr(acc.product, "pim"):
+                pim_prod = acc.product.pim
+        if pim_prod:
+            sibling_op_ids = list(
+                PimVariant.objects.filter(product=pim_prod, is_active=True, operational_product_id__isnull=False)
+                .values_list("operational_product_id", flat=True)
+            )
+            if sibling_op_ids:
+                for sib in (
+                    InventoryItem.objects.filter(product_id__in=sibling_op_ids, is_active=True)
+                    .select_related("product")
+                    .order_by("product__name", "id")
+                ):
+                    _add(sib)
+    except Exception:
+        pass
+
+    if acc.id not in seen_ids:
+        _add(acc)
+    return variants
+
+
+def _collect_parent_fg_variants(inv_item: InventoryItem) -> list[dict]:
+    """Return sibling PIM variants for the parent finished good so operators can compare prices/costs and switch."""
+    results: list[dict] = []
+    if not inv_item or not inv_item.product_id:
+        return results
+    try:
+        from products_pim.models import ProductVariant as PimVariant
+
+        pim_prod = None
+        pv = PimVariant.objects.filter(operational_product_id=inv_item.product_id).select_related("product").first()
+        if pv and pv.product_id:
+            pim_prod = pv.product
+        elif hasattr(inv_item.product, "pim"):
+            pim_prod = inv_item.product.pim
+        if not pim_prod:
+            return results
+
+        sibling_pvs = list(
+            PimVariant.objects.filter(product=pim_prod, is_active=True, operational_product_id__isnull=False)
+            .select_related("operational_product", "operational_product__inventory_profile")
+            .prefetch_related("attribute_values__attribute")
+            .order_by("sku")
+        )
+        for spv in sibling_pvs:
+            op = spv.operational_product
+            sib_inv = getattr(op, "inventory_profile", None)
+            if not sib_inv or not sib_inv.is_active:
+                continue
+            attrs = {}
+            for av in spv.attribute_values.all():
+                val = av.value_text or (str(av.value_number) if av.value_number is not None else None)
+                if val is None and av.value_boolean is not None:
+                    val = "Yes" if av.value_boolean else "No"
+                if val is not None and val != "":
+                    attrs[av.attribute.name] = str(val)
+            try:
+                avail = sib_inv.available_qty()
+            except Exception:
+                avail = QUANTITY_ZERO
+            results.append({
+                "inventory_item_id": sib_inv.id,
+                "product_id": op.id,
+                "product_code": op.product_code,
+                "name": op.name,
+                "variant_label": spv.variant_name or op.name,
+                "sku": sib_inv.sku or spv.sku,
+                "base_price": str(op.base_price or "0.00"),
+                "standard_unit_cost": str(sib_inv.standard_unit_cost or "0.00"),
+                "purchase_unit_cost": str(sib_inv.purchase_unit_cost or sib_inv.standard_unit_cost or spv.cost_price or "0.00"),
+                "available_stock": f"{avail:.3f}",
+                "attributes": attrs,
+                "is_current": sib_inv.id == inv_item.id,
+                "is_emi_enabled": bool(getattr(op, "is_emi_enabled", False)),
+                "is_rent_enabled": bool(getattr(op, "is_rent_enabled", False)),
+                "is_lease_enabled": bool(getattr(op, "is_lease_enabled", False)),
+                "is_direct_sale_enabled": bool(getattr(op, "is_direct_sale_enabled", False)),
+            })
+    except Exception:
+        pass
+    return results
+
+
 class AdminBillingAccessoryOptionsView(APIView):
     """
     Returns the full accessory + service selection options for a finished good,
-    ready to render in the billing / contract workspace.
+    ready to render in the purchase / billing / contract workspace.
     """
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
@@ -377,10 +531,15 @@ class AdminBillingAccessoryOptionsView(APIView):
                 ).first()
 
         if not inv_item:
-            return Response({"accessory_options": [], "service_options": [], "has_options": False})
+            return Response({
+                "accessory_options": [],
+                "service_options": [],
+                "parent_variants": [],
+                "has_options": False,
+            })
 
         # Accessory links
-        links = (
+        links = list(
             FinishedGoodAccessoryLink.objects
             .filter(finished_good=inv_item)
             .select_related(
@@ -393,31 +552,22 @@ class AdminBillingAccessoryOptionsView(APIView):
         )
 
         accessory_options = []
+        seen_acc_product_ids: set[int] = set()
         for link in links:
             s_type = getattr(link, "sourcing_type", "SUPPLIED_WITH_PARENT") or "SUPPLIED_WITH_PARENT"
             s_vendor_name = link.sourcing_vendor.name if getattr(link, "sourcing_vendor", None) else ""
             is_supplied = (s_type == "SUPPLIED_WITH_PARENT")
             iso_mode = getattr(link, "isolation_mode", "SHARED_POOL") or "SHARED_POOL"
             if link.variant_group_id:
-                # Group link: offer all active variants
                 variants = [
-                    {
-                        "id": v.id,
-                        "product_id": v.product_id,
-                        "product_name": v.product.name,
-                        "product_code": v.product.product_code,
-                        "variant_label": v.variant_label or v.product.name,
-                        "sku": v.sku,
-                        "unit_of_measure": v.unit_of_measure,
-                        "base_price": str(v.product.base_price),
-                        "standard_unit_cost": str(v.standard_unit_cost or "0.00"),
-                        "purchase_unit_cost": str(v.purchase_unit_cost or v.standard_unit_cost or "0.00"),
-                    }
+                    _serialize_variant_item(v)
                     for v in link.variant_group.variants.filter(
                         stock_item_type=InventoryItemType.ACCESSORY,
                         is_active=True,
                     ).select_related("product").order_by("variant_label", "product__name")
                 ]
+                for v in variants:
+                    seen_acc_product_ids.add(v["product_id"])
                 accessory_options.append({
                     "link_id": link.id,
                     "link_type": "group",
@@ -446,8 +596,10 @@ class AdminBillingAccessoryOptionsView(APIView):
                     "selected_variant_id": variants[0]["id"] if variants else None,
                 })
             elif link.accessory_id:
-                # Single item link
                 acc = link.accessory
+                seen_acc_product_ids.add(acc.product_id)
+                variants = _collect_accessory_variants(acc)
+                is_multi_variant = len(variants) > 1
                 acc_stock = Decimal("0.000")
                 try:
                     from inventory.services.demand_planning_service import stock_status_for_delivery
@@ -458,13 +610,13 @@ class AdminBillingAccessoryOptionsView(APIView):
                 is_low_stock = bool(s_type == "OUTSOURCED_SEPARATE" and acc_stock <= Decimal("0.000"))
                 accessory_options.append({
                     "link_id": link.id,
-                    "link_type": "single",
-                    "group_id": None,
-                    "group_name": None,
-                    "group_code": None,
-                    "group_category": "",
-                    "group_subcategory": "",
-                    "is_required": False,
+                    "link_type": "group" if is_multi_variant else "single",
+                    "group_id": acc.variant_group_id,
+                    "group_name": acc.variant_group.name if acc.variant_group_id else (acc.product.name if is_multi_variant else None),
+                    "group_code": acc.variant_group.code if acc.variant_group_id else None,
+                    "group_category": acc.variant_group.category if acc.variant_group_id else (acc.product.category or ""),
+                    "group_subcategory": acc.variant_group.subcategory if acc.variant_group_id else (acc.product.subcategory or ""),
+                    "is_required": acc.variant_group.is_required if acc.variant_group_id else False,
                     "charge_mode": link.charge_mode,
                     "sale_price": str(link.sale_price),
                     "is_default_included": link.is_default_included,
@@ -486,22 +638,85 @@ class AdminBillingAccessoryOptionsView(APIView):
                     "accessory_sku": acc.sku,
                     "notes": link.notes,
                     "sort_order": link.sort_order,
-                    "variants": [
-                        {
-                            "id": acc.id,
-                            "product_id": acc.product_id,
-                            "product_name": acc.product.name,
-                            "product_code": acc.product.product_code,
-                            "variant_label": acc.variant_label or acc.product.name,
-                            "sku": acc.sku,
-                            "unit_of_measure": acc.unit_of_measure,
-                            "base_price": str(acc.product.base_price),
-                            "standard_unit_cost": str(acc.standard_unit_cost or "0.00"),
-                            "purchase_unit_cost": str(acc.purchase_unit_cost or acc.standard_unit_cost or "0.00"),
-                        }
-                    ],
+                    "variants": variants,
                     "selected_variant_id": acc.id,
                 })
+
+        # Fallback: include any ProductRelationship(relationship_type="ACCESSORY") not yet in FinishedGoodAccessoryLink
+        try:
+            from products_core.models import ProductRelationship
+
+            rel_q = Q(product_id=inv_item.product_id, parent_variant__isnull=True)
+            if inv_item.sku:
+                rel_q |= Q(parent_variant_sku=inv_item.sku)
+            try:
+                from products_pim.models import ProductVariant as PimVariant
+                pv = PimVariant.objects.filter(operational_product_id=inv_item.product_id).select_related("product").first()
+                if pv and pv.product and pv.product.source_product_id:
+                    rel_q |= Q(product_id=pv.product.source_product_id, parent_variant__isnull=True)
+            except Exception:
+                pass
+
+            pim_rels = (
+                ProductRelationship.objects.filter(rel_q, relationship_type="ACCESSORY")
+                .select_related("related_product", "sourcing_vendor")
+                .order_by("id")
+            )
+            for rel in pim_rels:
+                if rel.parent_variant_sku and inv_item.sku and rel.parent_variant_sku != inv_item.sku:
+                    continue
+                if not rel.related_product_id or rel.related_product_id in seen_acc_product_ids:
+                    continue
+                acc_item = None
+                if rel.related_variant_sku:
+                    acc_item = InventoryItem.objects.select_related("product", "variant_group").filter(sku=rel.related_variant_sku).first()
+                if not acc_item:
+                    acc_item = InventoryItem.objects.select_related("product", "variant_group").filter(product_id=rel.related_product_id).first()
+                if not acc_item:
+                    continue
+                seen_acc_product_ids.add(acc_item.product_id)
+                variants = _collect_accessory_variants(acc_item)
+                s_type = getattr(rel, "sourcing_type", "SUPPLIED_WITH_PARENT") or "SUPPLIED_WITH_PARENT"
+                s_vendor_name = rel.sourcing_vendor.name if getattr(rel, "sourcing_vendor", None) else ""
+                is_supplied = (s_type == "SUPPLIED_WITH_PARENT")
+                iso_mode = getattr(rel, "isolation_mode", "SHARED_POOL") or "SHARED_POOL"
+                c_mode = getattr(rel, "charge_mode", None) or ("FREE" if rel.is_price_included_in_parent else "CHARGEABLE")
+                s_price = getattr(rel, "sale_price", MONEY_ZERO) if c_mode == "CHARGEABLE" else MONEY_ZERO
+                is_multi_variant = len(variants) > 1
+                accessory_options.append({
+                    "link_id": -int(rel.id),
+                    "link_type": "group" if is_multi_variant else "single",
+                    "group_id": acc_item.variant_group_id,
+                    "group_name": acc_item.variant_group.name if acc_item.variant_group_id else (acc_item.product.name if is_multi_variant else None),
+                    "group_code": acc_item.variant_group.code if acc_item.variant_group_id else None,
+                    "group_category": acc_item.product.category or "",
+                    "group_subcategory": acc_item.product.subcategory or "",
+                    "is_required": False,
+                    "charge_mode": c_mode,
+                    "sale_price": str(s_price or "0.00"),
+                    "is_default_included": c_mode == "FREE",
+                    "quantity": str(rel.quantity or "1.000"),
+                    "sourcing_type": s_type,
+                    "sourcing_type_display": "Supplied with Parent" if is_supplied else ("Outsourced" if s_type == "OUTSOURCED_SEPARATE" else "Internal Stock"),
+                    "sourcing_vendor_id": rel.sourcing_vendor_id,
+                    "sourcing_vendor_name": s_vendor_name,
+                    "is_supplied_with_parent": is_supplied,
+                    "isolation_mode": iso_mode,
+                    "isolation_mode_display": "Shared Pool" if iso_mode == "SHARED_POOL" else "Dedicated Kit Reserve",
+                    "low_stock_warning": bool(s_type == "OUTSOURCED_SEPARATE"),
+                    "stock_alert_message": f"Outsourced from {s_vendor_name or 'vendor'}: Manual PO required if unstocked" if (s_type == "OUTSOURCED_SEPARATE") else "",
+                    "accessory_inventory_item_id": acc_item.id,
+                    "accessory_product_id": acc_item.product_id,
+                    "accessory_name": acc_item.product.name,
+                    "accessory_code": acc_item.product.product_code,
+                    "accessory_sku": acc_item.sku,
+                    "notes": rel.notes,
+                    "sort_order": 999,
+                    "variants": variants,
+                    "selected_variant_id": acc_item.id,
+                })
+        except Exception:
+            pass
 
         # Service links
         svc_links = (
@@ -529,13 +744,16 @@ class AdminBillingAccessoryOptionsView(APIView):
             for lnk in svc_links
         ]
 
+        parent_variants = _collect_parent_fg_variants(inv_item)
+
         return Response({
-            "product_id": product_id,
+            "product_id": inv_item.product_id or product_id,
             "inventory_item_id": inv_item.id,
             "product_name": inv_item.product.name,
+            "parent_variants": parent_variants,
             "accessory_options": accessory_options,
             "service_options": service_options,
-            "has_options": bool(accessory_options or service_options),
+            "has_options": bool(accessory_options or service_options or len(parent_variants) > 1),
         })
 
 
