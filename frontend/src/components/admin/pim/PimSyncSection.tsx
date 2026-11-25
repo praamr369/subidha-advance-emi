@@ -213,7 +213,7 @@ const PimSyncSection = forwardRef<PimSyncSectionHandle, Props>(function PimSyncS
       setStatus("error");
       return false;
     }
-  }, [selectedCatId, productCode, productName, selectedSubId, basePrice, attributes, attrValues, lockedAttributes, pimProduct, loadPimProduct]);
+  }, [selectedCatId, productCode, productName, selectedSubId, basePrice, attributes, attrValues, lockedAttributes, pimProduct, loadPimProduct, productType]);
 
   useImperativeHandle(ref, () => ({
     // Only auto-save when a PIM product is already linked — don't create one silently
