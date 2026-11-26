@@ -1008,11 +1008,17 @@ export default function SubscriptionCreatePage({
       if (contractItems.length > 0) {
         const effDep = Number(effectiveDepositPercent) || 0;
         if (effDep < 0 || effDep > 100) return false;
-        const anyDisabled = contractItems.some((it) =>
-          isRentPlan ? !it.product.is_rent_enabled : !it.product.is_lease_enabled
-        );
+        const anyDisabled = contractItems.some((it) => {
+          if (it.is_accessory || Boolean(it.parent_item_id)) return false;
+          return isRentPlan ? !it.product.is_rent_enabled : !it.product.is_lease_enabled;
+        });
         if (anyDisabled) return false;
         const anyInvalid = contractItems.some((it) => {
+          if (it.is_accessory || Boolean(it.parent_item_id)) {
+            if (it.charge_mode === "FREE" || Number(it.unit_base_price || 0) === 0) {
+              return false;
+            }
+          }
           const y = Number(it.monthly_yield_percent);
           const d = Number(it.security_deposit_percent);
           return isNaN(y) || y <= 0 || isNaN(d) || d < 0;
@@ -1066,11 +1072,17 @@ export default function SubscriptionCreatePage({
         );
       } else if (contractItems.length > 0) {
         contractItems.forEach((it) => {
-          if (isRentPlan && !it.product.is_rent_enabled) {
-            blockers.push(`"${it.product.name}" is not enabled for RENT.`);
+          const isAttachedAccessory = Boolean(it.is_accessory || it.parent_item_id);
+          if (!isAttachedAccessory) {
+            if (isRentPlan && !it.product.is_rent_enabled) {
+              blockers.push(`"${it.product.name}" is not enabled for RENT.`);
+            }
+            if (isLeasePlan && !it.product.is_lease_enabled) {
+              blockers.push(`"${it.product.name}" is not enabled for LEASE.`);
+            }
           }
-          if (isLeasePlan && !it.product.is_lease_enabled) {
-            blockers.push(`"${it.product.name}" is not enabled for LEASE.`);
+          if (isAttachedAccessory && (it.charge_mode === "FREE" || Number(it.unit_base_price || 0) === 0)) {
+            return;
           }
           const y = Number(it.monthly_yield_percent);
           if (isNaN(y) || y <= 0) {
@@ -1176,11 +1188,17 @@ export default function SubscriptionCreatePage({
     if (contractItems.length === 0 && !product) return false;
     if (!tenureMonths || tenureMonths <= 0) return false;
     if (contractItems.length > 0) {
-      const anyDisabled = contractItems.some((it) =>
-        isRentPlan ? !it.product.is_rent_enabled : !it.product.is_lease_enabled
-      );
+      const anyDisabled = contractItems.some((it) => {
+        if (it.is_accessory || Boolean(it.parent_item_id)) return false;
+        return isRentPlan ? !it.product.is_rent_enabled : !it.product.is_lease_enabled;
+      });
       if (anyDisabled) return false;
       const anyInvalid = contractItems.some((it) => {
+        if (it.is_accessory || Boolean(it.parent_item_id)) {
+          if (it.charge_mode === "FREE" || Number(it.unit_base_price || 0) === 0) {
+            return false;
+          }
+        }
         const y = Number(it.monthly_yield_percent);
         const d = Number(it.security_deposit_percent);
         return isNaN(y) || y <= 0 || isNaN(d) || d < 0;
@@ -2127,7 +2145,7 @@ export default function SubscriptionCreatePage({
           body: JSON.stringify(body),
         });
       } else if (isRentPlan) {
-        const primaryProd = contractItems.length > 0 ? contractItems[0].product : product!;
+        const primaryProd = contractItems.find((it) => !it.is_accessory && !it.parent_item_id)?.product || (contractItems.length > 0 ? contractItems[0].product : product!);
         const itemsPayload =
           contractItems.length > 0
             ? contractItems.map((it) => {
@@ -2142,7 +2160,7 @@ export default function SubscriptionCreatePage({
                   monthly_yield_percent: it.monthly_yield_percent || yieldRatePercent,
                   security_deposit_percent: it.security_deposit_percent || securityDepositPercent,
                   security_deposit_amount: it.security_deposit_amount || undefined,
-                  is_accessory: Boolean(it.is_accessory),
+                  is_accessory: Boolean(it.is_accessory || it.parent_item_id),
                   parent_item_index: pIdx >= 0 ? pIdx : null,
                   charge_mode: it.charge_mode || "",
                 };
@@ -2175,7 +2193,7 @@ export default function SubscriptionCreatePage({
           body: JSON.stringify(body),
         });
       } else {
-        const primaryProd = contractItems.length > 0 ? contractItems[0].product : product!;
+        const primaryProd = contractItems.find((it) => !it.is_accessory && !it.parent_item_id)?.product || (contractItems.length > 0 ? contractItems[0].product : product!);
         const itemsPayload =
           contractItems.length > 0
             ? contractItems.map((it) => {
@@ -2190,7 +2208,7 @@ export default function SubscriptionCreatePage({
                   monthly_yield_percent: it.monthly_yield_percent || yieldRatePercent,
                   security_deposit_percent: it.security_deposit_percent || securityDepositPercent,
                   security_deposit_amount: it.security_deposit_amount || undefined,
-                  is_accessory: Boolean(it.is_accessory),
+                  is_accessory: Boolean(it.is_accessory || it.parent_item_id),
                   parent_item_index: pIdx >= 0 ? pIdx : null,
                   charge_mode: it.charge_mode || "",
                 };

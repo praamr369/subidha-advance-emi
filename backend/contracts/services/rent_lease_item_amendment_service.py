@@ -209,10 +209,12 @@ def validate_item_actions_for_subscription(
             if not getattr(new_product, "is_active", True):
                 raise ValidationError(f"Action #{idx + 1}: Product '{new_product.name}' is inactive.")
 
-            if subscription.plan_type == PlanType.RENT and not getattr(new_product, "is_rent_enabled", False):
-                raise ValidationError(f"Action #{idx + 1}: Product '{new_product.name}' is not enabled for RENT.")
-            if subscription.plan_type == PlanType.LEASE and not getattr(new_product, "is_lease_enabled", False):
-                raise ValidationError(f"Action #{idx + 1}: Product '{new_product.name}' is not enabled for LEASE.")
+            is_acc = bool(act.get("is_accessory", getattr(target_item, "is_accessory", False)))
+            if not is_acc:
+                if subscription.plan_type == PlanType.RENT and not getattr(new_product, "is_rent_enabled", False):
+                    raise ValidationError(f"Action #{idx + 1}: Product '{new_product.name}' is not enabled for RENT.")
+                if subscription.plan_type == PlanType.LEASE and not getattr(new_product, "is_lease_enabled", False):
+                    raise ValidationError(f"Action #{idx + 1}: Product '{new_product.name}' is not enabled for LEASE.")
 
             new_qty = int(act.get("new_quantity") or target_item.quantity)
             if new_qty <= 0:
@@ -240,10 +242,12 @@ def validate_item_actions_for_subscription(
 
             if not getattr(product, "is_active", True):
                 raise ValidationError(f"Action #{idx + 1}: Product '{product.name}' is inactive.")
-            if subscription.plan_type == PlanType.RENT and not getattr(product, "is_rent_enabled", False):
-                raise ValidationError(f"Action #{idx + 1}: Product '{product.name}' is not enabled for RENT.")
-            if subscription.plan_type == PlanType.LEASE and not getattr(product, "is_lease_enabled", False):
-                raise ValidationError(f"Action #{idx + 1}: Product '{product.name}' is not enabled for LEASE.")
+            is_acc = bool(act.get("is_accessory", False))
+            if not is_acc:
+                if subscription.plan_type == PlanType.RENT and not getattr(product, "is_rent_enabled", False):
+                    raise ValidationError(f"Action #{idx + 1}: Product '{product.name}' is not enabled for RENT.")
+                if subscription.plan_type == PlanType.LEASE and not getattr(product, "is_lease_enabled", False):
+                    raise ValidationError(f"Action #{idx + 1}: Product '{product.name}' is not enabled for LEASE.")
 
             add_qty = int(act.get("quantity") or 1)
             if add_qty <= 0:
