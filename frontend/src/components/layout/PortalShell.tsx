@@ -23,7 +23,7 @@ export default function PortalShell({ sidebar, header, footer, children, classNa
     >
       <div className="flex h-full min-h-0">
         {sidebar ? <div className="hidden md:block">{sidebar}</div> : null}
-        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden relative">
           {header}
           <main
             id="main-content"

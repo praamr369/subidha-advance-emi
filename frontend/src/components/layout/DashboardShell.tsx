@@ -42,6 +42,8 @@ import {
   Menu,
   Package,
   PanelLeft,
+  Pin,
+  PinOff,
   Plus,
   Receipt,
   ReceiptText,
@@ -1408,6 +1410,38 @@ function AdminDockTopbarButton() {
   );
 }
 
+function AdminChromePinButton() {
+  const { isAutoHideChrome, toggleAutoHideChrome } = useAdminWorkspaceDock();
+
+  return (
+    <button
+      type="button"
+      onClick={toggleAutoHideChrome}
+      className={cn(
+        "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold transition cursor-pointer",
+        isAutoHideChrome
+          ? "border-primary/50 bg-primary/10 text-primary hover:bg-primary/20 shadow-sm"
+          : "border-[var(--topbar-border)] bg-[var(--topbar-control)] text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+      )}
+      title={
+        isAutoHideChrome
+          ? "Distraction-Free Auto-Hide Active (Alt+Z) — Bars hide until pointer hovers. Click to Pin"
+          : "Bars Pinned (Alt+Z) — Click to enable Distraction-Free Auto-Hide"
+      }
+      aria-label={isAutoHideChrome ? "Pin bars (Alt+Z)" : "Auto-hide bars (Alt+Z)"}
+    >
+      {isAutoHideChrome ? (
+        <PinOff className="h-3.5 w-3.5 shrink-0 text-primary" />
+      ) : (
+        <Pin className="h-3.5 w-3.5 shrink-0" />
+      )}
+      <span className="hidden xl:inline">
+        {isAutoHideChrome ? "Auto-Hide" : "Pinned"}
+      </span>
+    </button>
+  );
+}
+
 function Topbar({
   title,
   pathname,
@@ -1569,6 +1603,7 @@ function Topbar({
             </button>
 
             <AdminDockTopbarButton />
+            <AdminChromePinButton />
             <AdminOfflineControlCenter />
             <ThemeToggle variant="dashboard" />
             <NotificationBellDropdown role={role} />
@@ -1747,7 +1782,14 @@ export default function DashboardShell({ children }: DashboardShellProps) {
   const isDockedParam =
     searchParams?.get("workspace_docked") === "1" || searchParams?.get("docked") === "1";
   const isWorkspaceDocked = isDockedParam || isInFrame;
-  const { openInDock } = useAdminWorkspaceDock();
+  const {
+    openInDock,
+    isAutoHideChrome,
+    isTopBarVisible,
+    setIsTopBarVisible,
+    lockTopBar,
+  } = useAdminWorkspaceDock();
+  const adminHeaderRef = useRef<HTMLDivElement>(null);
 
   // Global Alt+Click Interceptor: Admin can Alt+Click any link to open directly in dock
   useEffect(() => {
@@ -1823,25 +1865,85 @@ export default function DashboardShell({ children }: DashboardShellProps) {
               </RoleSidebar>
             }
             header={
-              <Fragment>
-                <Topbar
-                  title={title}
-                  pathname={pathname}
-                  role={role}
-                  displayName={displayName}
-                  onOpenSidebar={openMobileMenu}
-                  onOpenCommandPalette={openCommandPalette}
-                  onOpenQuickActions={() => setQuickActionsOpen(true)}
-                  onLogout={logout}
-                  isLoggingOut={isLoggingOut}
-                  mobileOpen={mobileOpen}
-                />
-                <AdminWorkspaceMenubar
-                  role={role}
-                  onOpenCommandPalette={openCommandPalette}
-                  onOpenQuickActions={() => setQuickActionsOpen(true)}
-                />
-              </Fragment>
+              role === "ADMIN" ? (
+                <>
+                  {isAutoHideChrome && !isTopBarVisible && (
+                    <div
+                      onMouseEnter={() => {
+                        setIsTopBarVisible(true);
+                        lockTopBar(true);
+                      }}
+                      className="absolute top-0 inset-x-0 h-3 z-30 cursor-pointer group flex justify-center pointer-events-auto"
+                      title="Hover to reveal Top Bar (Alt+Z)"
+                    >
+                      <div className="w-16 h-1 rounded-full bg-primary/30 group-hover:bg-primary transition-all duration-200 mt-0.5 shadow-sm" />
+                    </div>
+                  )}
+                  <div
+                    ref={adminHeaderRef}
+                    onMouseEnter={() => {
+                      lockTopBar(true);
+                      setIsTopBarVisible(true);
+                    }}
+                    onMouseLeave={() => lockTopBar(false)}
+                    onFocus={() => lockTopBar(true)}
+                    onBlur={(e) => {
+                      if (!adminHeaderRef.current?.contains(e.relatedTarget as Node)) {
+                        lockTopBar(false);
+                      }
+                    }}
+                    className={cn(
+                      "transition-all duration-300 ease-out",
+                      isAutoHideChrome
+                        ? cn(
+                            "absolute top-0 inset-x-0 z-[135]",
+                            isTopBarVisible
+                              ? "translate-y-0 opacity-100 shadow-xl"
+                              : "-translate-y-full opacity-0 pointer-events-none"
+                          )
+                        : "relative z-30 translate-y-0 opacity-100 pointer-events-auto shadow-none"
+                    )}
+                  >
+                    <Topbar
+                      title={title}
+                      pathname={pathname}
+                      role={role}
+                      displayName={displayName}
+                      onOpenSidebar={openMobileMenu}
+                      onOpenCommandPalette={openCommandPalette}
+                      onOpenQuickActions={() => setQuickActionsOpen(true)}
+                      onLogout={logout}
+                      isLoggingOut={isLoggingOut}
+                      mobileOpen={mobileOpen}
+                    />
+                    <AdminWorkspaceMenubar
+                      role={role}
+                      onOpenCommandPalette={openCommandPalette}
+                      onOpenQuickActions={() => setQuickActionsOpen(true)}
+                    />
+                  </div>
+                </>
+              ) : (
+                <Fragment>
+                  <Topbar
+                    title={title}
+                    pathname={pathname}
+                    role={role}
+                    displayName={displayName}
+                    onOpenSidebar={openMobileMenu}
+                    onOpenCommandPalette={openCommandPalette}
+                    onOpenQuickActions={() => setQuickActionsOpen(true)}
+                    onLogout={logout}
+                    isLoggingOut={isLoggingOut}
+                    mobileOpen={mobileOpen}
+                  />
+                  <AdminWorkspaceMenubar
+                    role={role}
+                    onOpenCommandPalette={openCommandPalette}
+                    onOpenQuickActions={() => setQuickActionsOpen(true)}
+                  />
+                </Fragment>
+              )
             }
           >
             <>

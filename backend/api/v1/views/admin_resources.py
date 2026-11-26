@@ -265,7 +265,16 @@ class AdminOnlyModelViewSet(viewsets.ModelViewSet):
 
 
 class AdminOnlyCatalogMasterViewSet(AdminOnlyModelViewSet):
-    http_method_names = ["get", "post", "patch", "head", "options"]
+    http_method_names = ["get", "post", "patch", "delete", "head", "options"]
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            return super().destroy(request, *args, **kwargs)
+        except models.ProtectedError:
+            return Response(
+                {"detail": "Cannot delete this master record because products or records are linked to it. You can deactivate it instead."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
 
 # =====================================================
@@ -3683,9 +3692,51 @@ class ProductCategoryMasterViewSet(AdminOnlyCatalogMasterViewSet):
     def get_queryset(self):
         queryset = super().get_queryset()
         q = (self.request.query_params.get("q") or "").strip()
+        item_type = (self.request.query_params.get("item_type") or "").strip()
         if q:
             queryset = queryset.filter(Q(name__icontains=q) | Q(description__icontains=q))
+        if item_type:
+            queryset = queryset.filter(item_type=item_type)
         return queryset
+
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        self._sync_to_pim(instance)
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        self._sync_to_pim(instance)
+
+    def perform_destroy(self, instance):
+        name = instance.name
+        instance.delete()
+        try:
+            from products_pim.models import ProductCategory as PimCategory
+            PimCategory.objects.filter(name__iexact=name).delete()
+        except Exception:
+            pass
+
+    def _sync_to_pim(self, instance):
+        try:
+            from products_pim.models import ProductCategory as PimCategory
+            from django.utils.text import slugify
+            slug = instance.slug or slugify(instance.name)
+            pim_cat = PimCategory.objects.filter(slug=slug).first() or PimCategory.objects.filter(name__iexact=instance.name).first()
+            if not pim_cat:
+                PimCategory.objects.create(
+                    name=instance.name,
+                    slug=slug,
+                    product_type=instance.item_type or "FINISHED_GOOD",
+                    display_order=instance.sort_order or 0,
+                    is_active=instance.is_active,
+                )
+            else:
+                pim_cat.name = instance.name
+                pim_cat.product_type = instance.item_type or pim_cat.product_type
+                pim_cat.is_active = instance.is_active
+                pim_cat.save(update_fields=["name", "product_type", "is_active"])
+        except Exception:
+            pass
 
 
 class ProductSubcategoryMasterViewSet(AdminOnlyCatalogMasterViewSet):
@@ -3705,6 +3756,45 @@ class ProductSubcategoryMasterViewSet(AdminOnlyCatalogMasterViewSet):
         if category_id.isdigit():
             queryset = queryset.filter(category_id=int(category_id))
         return queryset
+
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        self._sync_to_pim_sub(instance)
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        self._sync_to_pim_sub(instance)
+
+    def perform_destroy(self, instance):
+        cat_name = instance.category.name
+        sub_name = instance.name
+        instance.delete()
+        try:
+            from products_pim.models import ProductSubcategory as PimSubcategory
+            PimSubcategory.objects.filter(category__name__iexact=cat_name, name__iexact=sub_name).delete()
+        except Exception:
+            pass
+
+    def _sync_to_pim_sub(self, instance):
+        try:
+            from products_pim.models import ProductCategory as PimCategory, ProductSubcategory as PimSubcategory
+            from django.utils.text import slugify
+            pim_cat = PimCategory.objects.filter(name__iexact=instance.category.name).first()
+            if pim_cat:
+                slug = slugify(instance.name)
+                pim_sub = PimSubcategory.objects.filter(category=pim_cat, name__iexact=instance.name).first()
+                if not pim_sub:
+                    PimSubcategory.objects.create(
+                        category=pim_cat,
+                        name=instance.name,
+                        slug=slug,
+                        display_order=0,
+                    )
+                else:
+                    pim_sub.name = instance.name
+                    pim_sub.save(update_fields=["name"])
+        except Exception:
+            pass
 
 
 class ProductUnitOfMeasureMasterViewSet(AdminOnlyCatalogMasterViewSet):

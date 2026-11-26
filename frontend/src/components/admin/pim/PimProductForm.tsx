@@ -723,13 +723,67 @@ export default function PimProductForm({
     }).catch(() => {});
   }, [activeProductId, defaultProductType]);
 
+  // Auto-align mismatched category (e.g. an ACCESSORY whose legacy category was Furniture or Unclassified)
+  useEffect(() => {
+    if (!categories.length || !productType) return;
+    if (categoryId) {
+      const currentCat = categories.find((c) => c.id === Number(categoryId));
+      if (currentCat) {
+        const isMismatched =
+          currentCat.slug === "unclassified" ||
+          (currentCat.product_type &&
+            currentCat.product_type !== "ALL" &&
+            currentCat.product_type !== productType);
+        if (isMismatched) {
+          const matchingCat = categories.find((c) => c.product_type === productType);
+          if (matchingCat) {
+            setCategoryId(matchingCat.id);
+            setSubcategoryId("");
+          }
+        }
+      }
+    } else {
+      const matchingCat = categories.find((c) => c.product_type === productType);
+      if (matchingCat) {
+        setCategoryId(matchingCat.id);
+        setSubcategoryId("");
+      }
+    }
+  }, [categories, productType, categoryId]);
+
   useEffect(() => {
     if (!categoryId) { setSubcategories([]); setSubcategoryId(""); return; }
     pimService.getSubcategories(Number(categoryId)).then((subs) => {
       setSubcategories(subs);
-      setSubcategoryId((prev) => (prev && subs.some((s) => s.id === Number(prev)) ? prev : ""));
+      setSubcategoryId((prev) => {
+        if (prev && subs.some((s) => s.id === Number(prev))) {
+          return prev;
+        }
+        // Auto-infer matching subcategory by keywords from product name/code
+        const targetText = `${name || product?.name || ""} ${code || product?.code || ""}`.toLowerCase();
+        const matched = subs.find((s) => {
+          const sName = s.name.toLowerCase();
+          if (sName.includes("plywood") && (targetText.includes("ply") || targetText.includes("board"))) return true;
+          if (sName.includes("side rail") && (targetText.includes("rail") || targetText.includes("siderai"))) return true;
+          if (sName.includes("leg") && (targetText.includes("leg") || targetText.includes("buffer") || targetText.includes("bush"))) return true;
+          if (sName.includes("fastener") && (targetText.includes("screw") || targetText.includes("bolt") || targetText.includes("nut"))) return true;
+          if (sName.includes("handle") && (targetText.includes("handle") || targetText.includes("lock") || targetText.includes("hinge"))) return true;
+          if (sName.includes("cushion") && (targetText.includes("foam") || targetText.includes("cushion") || targetText.includes("fabric"))) return true;
+          if (sName.includes("mirror") && (targetText.includes("mirror") || targetText.includes("glass"))) return true;
+          if (sName.includes("pipe") && (targetText.includes("pipe") || targetText.includes("tube"))) return true;
+          if (sName.includes("timber") && (targetText.includes("timber") || targetText.includes("wood") || targetText.includes("plank"))) return true;
+          if (sName.includes("sheet") && (targetText.includes("sheet") || targetText.includes("metal") || targetText.includes("mesh"))) return true;
+          if (sName.includes("paint") && (targetText.includes("paint") || targetText.includes("powder") || targetText.includes("polish"))) return true;
+          if (sName.includes("adhesive") && (targetText.includes("adhesive") || targetText.includes("glue") || targetText.includes("chemical") || targetText.includes("fevicol"))) return true;
+          if (sName.includes("install") && (targetText.includes("install") || targetText.includes("assembly") || targetText.includes("fitting"))) return true;
+          if (sName.includes("transport") && (targetText.includes("transport") || targetText.includes("delivery") || targetText.includes("shipping"))) return true;
+          if (sName.includes("repair") && (targetText.includes("repair") || targetText.includes("maintenance"))) return true;
+          return false;
+        });
+        return matched ? matched.id : "";
+      });
     }).catch(() => {});
-  }, [categoryId]);
+  }, [categoryId, name, code, product?.name, product?.code]);
 
   useEffect(() => {
     let active = true;
@@ -2363,7 +2417,7 @@ export default function PimProductForm({
             >
               <option value="">— Select Category —</option>
               {primaryCategories.length > 0 && (
-                <optgroup label={`${productType.replace("_", " ")} Categories`}>
+                <optgroup label={`${productType.replace("_", " ")} Categories (Recommended)`}>
                   {primaryCategories.map((c: PimCategory) => (
                     <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
                   ))}

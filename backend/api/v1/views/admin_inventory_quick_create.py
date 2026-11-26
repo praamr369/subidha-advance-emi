@@ -391,8 +391,33 @@ def _serialize_variant_item(v: InventoryItem) -> dict:
     }
 
 
-def _collect_accessory_variants(acc: InventoryItem) -> list[dict]:
-    """Collect active sibling variants for an accessory (via AccessoryVariantGroup or PIM ProductVariant)."""
+def _is_same_accessory_family(a: InventoryItem, b: InventoryItem) -> bool:
+    """Returns True if two accessories belong to the same variant family (e.g. both are Side Rails or both are Plyboards)."""
+    if not a or not b or a.id == b.id:
+        return False
+    if a.variant_group_id and b.variant_group_id and a.variant_group_id == b.variant_group_id:
+        return True
+    try:
+        from products_pim.models import PimProduct
+        p_a = PimProduct.objects.filter(operational_product_id=a.product_id).first()
+        p_b = PimProduct.objects.filter(operational_product_id=b.product_id).first()
+        if p_a and p_b:
+            if p_a.subcategory_id and p_b.subcategory_id and p_a.subcategory_id == p_b.subcategory_id:
+                return True
+    except Exception:
+        pass
+    name_a = (getattr(a.product, "name", "") or "").lower()
+    name_b = (getattr(b.product, "name", "") or "").lower()
+    keywords = ["plyboard", "plywood", "side rail", "rail", "buffer", "fastener", "hinge", "handle", "cushion", "mirror"]
+    for kw in keywords:
+        if kw in name_a and kw in name_b:
+            return True
+    return False
+
+
+def _collect_accessory_variants(acc: InventoryItem, sibling_acc_items: list[InventoryItem] | None = None) -> list[dict]:
+    """Collect active sibling variants for an accessory (via AccessoryVariantGroup, PIM ProductVariant,
+    co-linked accessories, matching subcategory, or name family)."""
     seen_ids: set[int] = set()
     variants: list[dict] = []
 
@@ -401,6 +426,10 @@ def _collect_accessory_variants(acc: InventoryItem) -> list[dict]:
             seen_ids.add(item.id)
             variants.append(_serialize_variant_item(item))
 
+    # Always ensure root accessory is included
+    _add(acc)
+
+    # 1. Direct AccessoryVariantGroup linkage
     if acc.variant_group_id:
         for v in (
             acc.variant_group.variants.filter(
@@ -412,6 +441,7 @@ def _collect_accessory_variants(acc: InventoryItem) -> list[dict]:
         ):
             _add(v)
 
+    # 2. Sibling PIM product variants
     try:
         from products_pim.models import ProductVariant as PimVariant
 
@@ -437,8 +467,69 @@ def _collect_accessory_variants(acc: InventoryItem) -> list[dict]:
     except Exception:
         pass
 
-    if acc.id not in seen_ids:
-        _add(acc)
+    # 3. Co-linked sibling accessories from the same parent finished good
+    if sibling_acc_items:
+        for sib in sibling_acc_items:
+            if sib and sib.id != acc.id and _is_same_accessory_family(acc, sib):
+                _add(sib)
+
+    # 4. If still single variant, discover sibling accessories in the catalog by subcategory or name family
+    if len(variants) <= 1:
+        try:
+            from products_pim.models import PimProduct
+
+            subcat_id = None
+            pim_acc = PimProduct.objects.filter(operational_product_id=acc.product_id).first()
+            if not pim_acc and getattr(acc, "product", None) and hasattr(acc.product, "pim"):
+                pim_acc = acc.product.pim
+            if pim_acc:
+                subcat_id = pim_acc.subcategory_id
+
+            if subcat_id:
+                sib_pim_op_ids = list(
+                    PimProduct.objects.filter(
+                        subcategory_id=subcat_id,
+                        product_type="ACCESSORY",
+                    )
+                    .exclude(operational_product_id__isnull=True)
+                    .values_list("operational_product_id", flat=True)
+                )
+                if sib_pim_op_ids:
+                    for sib in (
+                        InventoryItem.objects.filter(
+                            product_id__in=sib_pim_op_ids,
+                            is_active=True,
+                        )
+                        .select_related("product")
+                        .order_by("product__name", "id")
+                    ):
+                        _add(sib)
+
+            # Name prefix family fallback (e.g. "Commercial Plyboard", "Steel Side Rail", "Side Rail")
+            if len(variants) <= 1 and acc.product and acc.product.name:
+                name_clean = acc.product.name.strip()
+                words = name_clean.split()
+                prefixes = []
+                if len(words) >= 2:
+                    prefixes.append(" ".join(words[:2]))
+                if len(words) >= 1 and len(words[0]) >= 4:
+                    prefixes.append(words[0])
+                for pfx in prefixes:
+                    for sib in (
+                        InventoryItem.objects.filter(
+                            product__name__icontains=pfx,
+                            stock_item_type=InventoryItemType.ACCESSORY,
+                            is_active=True,
+                        )
+                        .select_related("product")
+                        .order_by("product__name", "id")
+                    ):
+                        _add(sib)
+                    if len(variants) > 1:
+                        break
+        except Exception:
+            pass
+
     return variants
 
 
@@ -553,6 +644,7 @@ class AdminBillingAccessoryOptionsView(APIView):
 
         accessory_options = []
         seen_acc_product_ids: set[int] = set()
+        all_linked_accessories = [link.accessory for link in links if link.accessory_id]
         for link in links:
             s_type = getattr(link, "sourcing_type", "SUPPLIED_WITH_PARENT") or "SUPPLIED_WITH_PARENT"
             s_vendor_name = link.sourcing_vendor.name if getattr(link, "sourcing_vendor", None) else ""
@@ -597,8 +689,18 @@ class AdminBillingAccessoryOptionsView(APIView):
                 })
             elif link.accessory_id:
                 acc = link.accessory
+                if acc.product_id in seen_acc_product_ids:
+                    continue
                 seen_acc_product_ids.add(acc.product_id)
-                variants = _collect_accessory_variants(acc)
+                variants = _collect_accessory_variants(acc, sibling_acc_items=all_linked_accessories)
+                for v_item in variants:
+                    seen_acc_product_ids.add(v_item["product_id"])
+                    # Check if another link defined a custom price or charge mode for this variant
+                    match_l = next((l for l in links if l.accessory_id and l.accessory.product_id == v_item["product_id"]), None)
+                    if match_l:
+                        v_item["charge_mode"] = match_l.charge_mode
+                        v_item["sale_price"] = str(match_l.sale_price)
+                        v_item["is_supplied_with_parent"] = (getattr(match_l, "sourcing_type", "") or "SUPPLIED_WITH_PARENT") == "SUPPLIED_WITH_PARENT"
                 is_multi_variant = len(variants) > 1
                 acc_stock = Decimal("0.000")
                 try:
@@ -608,11 +710,15 @@ class AdminBillingAccessoryOptionsView(APIView):
                 except Exception:
                     pass
                 is_low_stock = bool(s_type == "OUTSOURCED_SEPARATE" and acc_stock <= Decimal("0.000"))
+                # Resolve group name: use variant group name, or subcategory, or family name
+                group_name = None
+                if is_multi_variant:
+                    group_name = acc.variant_group.name if acc.variant_group_id else (acc.product.subcategory or acc.product.name)
                 accessory_options.append({
                     "link_id": link.id,
                     "link_type": "group" if is_multi_variant else "single",
                     "group_id": acc.variant_group_id,
-                    "group_name": acc.variant_group.name if acc.variant_group_id else (acc.product.name if is_multi_variant else None),
+                    "group_name": group_name,
                     "group_code": acc.variant_group.code if acc.variant_group_id else None,
                     "group_category": acc.variant_group.category if acc.variant_group_id else (acc.product.category or ""),
                     "group_subcategory": acc.variant_group.subcategory if acc.variant_group_id else (acc.product.subcategory or ""),
@@ -672,10 +778,30 @@ class AdminBillingAccessoryOptionsView(APIView):
                     acc_item = InventoryItem.objects.select_related("product", "variant_group").filter(sku=rel.related_variant_sku).first()
                 if not acc_item:
                     acc_item = InventoryItem.objects.select_related("product", "variant_group").filter(product_id=rel.related_product_id).first()
+                if not acc_item and rel.related_product:
+                    try:
+                        acc_item, _ = InventoryItem.objects.get_or_create(
+                            product=rel.related_product,
+                            defaults={
+                                "sku": rel.related_product.product_code or rel.related_variant_sku or f"ACC-{rel.related_product_id}",
+                                "stock_item_type": InventoryItemType.ACCESSORY,
+                                "is_active": True,
+                            },
+                        )
+                    except Exception:
+                        pass
                 if not acc_item:
                     continue
                 seen_acc_product_ids.add(acc_item.product_id)
                 variants = _collect_accessory_variants(acc_item)
+                for v_item in variants:
+                    seen_acc_product_ids.add(v_item["product_id"])
+                    # Check if matching sibling rel had specific price or charge mode
+                    match_rel = next((r for r in pim_rels if r.related_product_id == v_item["product_id"]), None)
+                    if match_rel:
+                        c_m = getattr(match_rel, "charge_mode", None) or ("FREE" if match_rel.is_price_included_in_parent else "CHARGEABLE")
+                        v_item["charge_mode"] = c_m
+                        v_item["sale_price"] = str(getattr(match_rel, "sale_price", MONEY_ZERO) if c_m == "CHARGEABLE" else MONEY_ZERO)
                 s_type = getattr(rel, "sourcing_type", "SUPPLIED_WITH_PARENT") or "SUPPLIED_WITH_PARENT"
                 s_vendor_name = rel.sourcing_vendor.name if getattr(rel, "sourcing_vendor", None) else ""
                 is_supplied = (s_type == "SUPPLIED_WITH_PARENT")
@@ -683,11 +809,14 @@ class AdminBillingAccessoryOptionsView(APIView):
                 c_mode = getattr(rel, "charge_mode", None) or ("FREE" if rel.is_price_included_in_parent else "CHARGEABLE")
                 s_price = getattr(rel, "sale_price", MONEY_ZERO) if c_mode == "CHARGEABLE" else MONEY_ZERO
                 is_multi_variant = len(variants) > 1
+                group_name = None
+                if is_multi_variant:
+                    group_name = acc_item.variant_group.name if acc_item.variant_group_id else (acc_item.product.subcategory or acc_item.product.name)
                 accessory_options.append({
                     "link_id": -int(rel.id),
                     "link_type": "group" if is_multi_variant else "single",
                     "group_id": acc_item.variant_group_id,
-                    "group_name": acc_item.variant_group.name if acc_item.variant_group_id else (acc_item.product.name if is_multi_variant else None),
+                    "group_name": group_name,
                     "group_code": acc_item.variant_group.code if acc_item.variant_group_id else None,
                     "group_category": acc_item.product.category or "",
                     "group_subcategory": acc_item.product.subcategory or "",

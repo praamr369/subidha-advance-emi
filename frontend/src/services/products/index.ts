@@ -135,12 +135,16 @@ export type ProductCategoryMasterRecord = {
   name: string;
   description?: string;
   is_active: boolean;
+  item_type?: "FINISHED_GOOD" | "ACCESSORY" | "RAW_MATERIAL" | "SERVICE" | ProductItemType | string;
+  slug?: string;
 };
 
 export type ProductSubcategoryMasterRecord = {
   id: number;
   category: number;
+  category_id?: number;
   category_name?: string;
+  category_item_type?: "FINISHED_GOOD" | "ACCESSORY" | "RAW_MATERIAL" | "SERVICE" | ProductItemType | string;
   name: string;
   description?: string;
   is_active: boolean;
@@ -266,8 +270,22 @@ export async function listProductCategoryMasters(): Promise<ProductCategoryMaste
   return toResultsArray<ProductCategoryMasterRecord>(payload);
 }
 
-export async function createProductCategoryMaster(payload: Pick<ProductCategoryMasterRecord, "name"> & Partial<Pick<ProductCategoryMasterRecord, "description" | "is_active">>): Promise<ProductCategoryMasterRecord> {
+export async function createProductCategoryMaster(
+  payload: Pick<ProductCategoryMasterRecord, "name"> &
+    Partial<Pick<ProductCategoryMasterRecord, "description" | "is_active" | "item_type">>
+): Promise<ProductCategoryMasterRecord> {
   return request<ProductCategoryMasterRecord>("/admin/product-categories/", { method: "POST", body: JSON.stringify(payload), retryCount: 0 });
+}
+
+export async function updateProductCategoryMaster(
+  id: number | string,
+  payload: Partial<Pick<ProductCategoryMasterRecord, "name" | "description" | "is_active" | "item_type">>
+): Promise<ProductCategoryMasterRecord> {
+  return request<ProductCategoryMasterRecord>(`/admin/product-categories/${id}/`, { method: "PATCH", body: JSON.stringify(payload), retryCount: 0 });
+}
+
+export async function deleteProductCategoryMaster(id: number | string): Promise<void> {
+  return request<void>(`/admin/product-categories/${id}/`, { method: "DELETE", retryCount: 0 });
 }
 
 export async function listProductSubcategoryMasters(params?: { category?: number | string }): Promise<ProductSubcategoryMasterRecord[]> {
@@ -278,8 +296,22 @@ export async function listProductSubcategoryMasters(params?: { category?: number
   return toResultsArray<ProductSubcategoryMasterRecord>(payload);
 }
 
-export async function createProductSubcategoryMaster(payload: Pick<ProductSubcategoryMasterRecord, "category" | "name"> & Partial<Pick<ProductSubcategoryMasterRecord, "description" | "is_active">>): Promise<ProductSubcategoryMasterRecord> {
+export async function createProductSubcategoryMaster(
+  payload: Pick<ProductSubcategoryMasterRecord, "category" | "name"> &
+    Partial<Pick<ProductSubcategoryMasterRecord, "description" | "is_active">>
+): Promise<ProductSubcategoryMasterRecord> {
   return request<ProductSubcategoryMasterRecord>("/admin/product-subcategories/", { method: "POST", body: JSON.stringify(payload), retryCount: 0 });
+}
+
+export async function updateProductSubcategoryMaster(
+  id: number | string,
+  payload: Partial<Pick<ProductSubcategoryMasterRecord, "category" | "name" | "description" | "is_active">>
+): Promise<ProductSubcategoryMasterRecord> {
+  return request<ProductSubcategoryMasterRecord>(`/admin/product-subcategories/${id}/`, { method: "PATCH", body: JSON.stringify(payload), retryCount: 0 });
+}
+
+export async function deleteProductSubcategoryMaster(id: number | string): Promise<void> {
+  return request<void>(`/admin/product-subcategories/${id}/`, { method: "DELETE", retryCount: 0 });
 }
 
 export async function listProductUnitMasters(): Promise<ProductUnitOfMeasureMasterRecord[]> {

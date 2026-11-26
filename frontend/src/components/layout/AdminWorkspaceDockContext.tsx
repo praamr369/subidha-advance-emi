@@ -57,10 +57,20 @@ export type AdminWorkspaceDockContextType = {
   isDockSupported: boolean;
   lastClosedWindow: { route: string; title: string; icon?: string } | null;
   reopenLastClosed: () => void;
+  isAutoHideChrome: boolean;
+  setIsAutoHideChrome: (val: boolean | ((prev: boolean) => boolean)) => void;
+  toggleAutoHideChrome: () => void;
+  isTopBarVisible: boolean;
+  setIsTopBarVisible: (visible: boolean) => void;
+  isBottomDockVisible: boolean;
+  setIsBottomDockVisible: (visible: boolean) => void;
+  lockTopBar: (locked: boolean) => void;
+  lockBottomDock: (locked: boolean) => void;
 };
 
 const MAX_DOCK_WINDOWS = 8;
 const STORAGE_KEY = "subidha:admin:workspace-dock:v1";
+const AUTO_HIDE_STORAGE_KEY = "subidha:admin:autohide-chrome:v1";
 
 export function sanitizeAdminRoute(input: string): string | null {
   if (!input) return null;
@@ -274,6 +284,128 @@ export function AdminWorkspaceDockProvider({
     icon?: string;
   } | null>(null);
   const maxZRef = useRef(100 + initialSession.windows.length);
+
+  // Distraction-Free Auto-Hide Chrome State
+  const [isAutoHideChrome, setIsAutoHideChromeState] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    try {
+      const stored = window.localStorage.getItem(AUTO_HIDE_STORAGE_KEY);
+      if (stored !== null) {
+        return stored === "true";
+      }
+    } catch {
+      // safe fallback
+    }
+    return true; // default distraction-free auto-hide as requested
+  });
+
+  const setIsAutoHideChrome = useCallback((valOrFn: boolean | ((prev: boolean) => boolean)) => {
+    setIsAutoHideChromeState((prev) => {
+      const next = typeof valOrFn === "function" ? valOrFn(prev) : valOrFn;
+      try {
+        window.localStorage.setItem(AUTO_HIDE_STORAGE_KEY, String(next));
+      } catch {
+        // storage fallback
+      }
+      return next;
+    });
+  }, []);
+
+  const toggleAutoHideChrome = useCallback(() => {
+    setIsAutoHideChrome((prev) => !prev);
+  }, [setIsAutoHideChrome]);
+
+  const [isTopBarVisible, setIsTopBarVisible] = useState(!isAutoHideChrome);
+  const [isBottomDockVisible, setIsBottomDockVisible] = useState(!isAutoHideChrome);
+  const topBarLockedRef = useRef(false);
+  const bottomDockLockedRef = useRef(false);
+
+  const lockTopBar = useCallback((locked: boolean) => {
+    topBarLockedRef.current = locked;
+    if (locked) setIsTopBarVisible(true);
+  }, []);
+
+  const lockBottomDock = useCallback((locked: boolean) => {
+    bottomDockLockedRef.current = locked;
+    if (locked) setIsBottomDockVisible(true);
+  }, []);
+
+  // Global Pointer tracking for reveal on hover
+  useEffect(() => {
+    if (!isAutoHideChrome) {
+      setIsTopBarVisible(true);
+      setIsBottomDockVisible(true);
+      return;
+    }
+
+    let topHideTimer: ReturnType<typeof setTimeout> | null = null;
+    let bottomHideTimer: ReturnType<typeof setTimeout> | null = null;
+
+    function handlePointerMove(e: PointerEvent) {
+      const y = e.clientY;
+      const windowHeight = window.innerHeight;
+
+      // Top trigger threshold (within 42px of top)
+      if (y <= 42) {
+        if (topHideTimer) {
+          clearTimeout(topHideTimer);
+          topHideTimer = null;
+        }
+        setIsTopBarVisible(true);
+      } else if (y > 90 && !topBarLockedRef.current) {
+        if (!topHideTimer) {
+          topHideTimer = setTimeout(() => {
+            if (!topBarLockedRef.current) {
+              setIsTopBarVisible(false);
+            }
+            topHideTimer = null;
+          }, 320);
+        }
+      }
+
+      // Bottom trigger threshold (within 36px of bottom)
+      if (y >= windowHeight - 36) {
+        if (bottomHideTimer) {
+          clearTimeout(bottomHideTimer);
+          bottomHideTimer = null;
+        }
+        setIsBottomDockVisible(true);
+      } else if (y < windowHeight - 70 && !bottomDockLockedRef.current) {
+        if (!bottomHideTimer) {
+          bottomHideTimer = setTimeout(() => {
+            if (!bottomDockLockedRef.current) {
+              setIsBottomDockVisible(false);
+            }
+            bottomHideTimer = null;
+          }, 320);
+        }
+      }
+    }
+
+    window.addEventListener("pointermove", handlePointerMove, { passive: true });
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      if (topHideTimer) clearTimeout(topHideTimer);
+      if (bottomHideTimer) clearTimeout(bottomHideTimer);
+    };
+  }, [isAutoHideChrome]);
+
+  // Alt + Z keyboard shortcut to toggle distraction-free auto-hide
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.altKey && e.key.toLowerCase() === "z") {
+        const target = e.target as HTMLElement | null;
+        const tag = target?.tagName.toLowerCase();
+        if (tag === "input" || tag === "textarea" || tag === "select" || target?.isContentEditable) {
+          return;
+        }
+        e.preventDefault();
+        toggleAutoHideChrome();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [toggleAutoHideChrome]);
 
   // Clean up on session logout (ignoring unrelated storage events)
   useEffect(() => {
@@ -584,6 +716,15 @@ export function AdminWorkspaceDockProvider({
       isDockSupported: effectiveDockSupported,
       lastClosedWindow,
       reopenLastClosed,
+      isAutoHideChrome,
+      setIsAutoHideChrome,
+      toggleAutoHideChrome,
+      isTopBarVisible,
+      setIsTopBarVisible,
+      isBottomDockVisible,
+      setIsBottomDockVisible,
+      lockTopBar,
+      lockBottomDock,
     }),
     [
       windows,
@@ -606,6 +747,15 @@ export function AdminWorkspaceDockProvider({
       effectiveDockSupported,
       lastClosedWindow,
       reopenLastClosed,
+      isAutoHideChrome,
+      setIsAutoHideChrome,
+      toggleAutoHideChrome,
+      isTopBarVisible,
+      setIsTopBarVisible,
+      isBottomDockVisible,
+      setIsBottomDockVisible,
+      lockTopBar,
+      lockBottomDock,
     ]
   );
 
@@ -641,6 +791,15 @@ export function useAdminWorkspaceDock() {
       isDockSupported: false,
       lastClosedWindow: null,
       reopenLastClosed: () => undefined,
+      isAutoHideChrome: false,
+      setIsAutoHideChrome: () => undefined,
+      toggleAutoHideChrome: () => undefined,
+      isTopBarVisible: true,
+      setIsTopBarVisible: () => undefined,
+      isBottomDockVisible: true,
+      setIsBottomDockVisible: () => undefined,
+      lockTopBar: () => undefined,
+      lockBottomDock: () => undefined,
     };
   }
   return context;

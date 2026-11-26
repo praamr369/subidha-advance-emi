@@ -30,6 +30,8 @@ import {
   Maximize2,
   Minimize2,
   Minus,
+  Pin,
+  PinOff,
   Plus,
   ReceiptText,
   RotateCw,
@@ -182,6 +184,11 @@ export default function AdminWorkspaceDock() {
     isDockSupported,
     lastClosedWindow,
     reopenLastClosed,
+    isAutoHideChrome,
+    toggleAutoHideChrome,
+    isBottomDockVisible,
+    setIsBottomDockVisible,
+    lockBottomDock,
   } = useAdminWorkspaceDock();
 
   const [menuOpen, setMenuOpen] = useState(false);
@@ -308,6 +315,7 @@ export default function AdminWorkspaceDock() {
       if (e.altKey && e.key.toLowerCase() === "w") {
         e.preventDefault();
         setMenuOpen((prev) => !prev);
+        setIsBottomDockVisible(true);
       }
       // Alt + D: Show Dashboard (minimize all)
       if (e.altKey && e.key.toLowerCase() === "d") {
@@ -752,9 +760,19 @@ export default function AdminWorkspaceDock() {
 
       {/* 2. DOCK TASKBAR STRIP (Bottom of Screen) */}
       <div
+        onMouseEnter={() => {
+          lockBottomDock(true);
+          setIsBottomDockVisible(true);
+        }}
+        onMouseLeave={() => lockBottomDock(false)}
         className={cn(
-          "fixed bottom-0 inset-x-0 z-[130] flex items-center justify-between border-t border-[var(--topbar-border)] bg-[linear-gradient(180deg,color-mix(in_oklab,var(--topbar-control)_95%,white_5%),color-mix(in_oklab,var(--topbar-control)_80%,var(--surface-muted)_20%))] px-2 shadow-lg select-none transition-all",
-          isDockCollapsed ? "h-6 opacity-75 hover:opacity-100" : "h-10"
+          "fixed bottom-0 inset-x-0 z-[130] flex items-center justify-between border-t border-[var(--topbar-border)] bg-[linear-gradient(180deg,color-mix(in_oklab,var(--topbar-control)_95%,white_5%),color-mix(in_oklab,var(--topbar-control)_80%,var(--surface-muted)_20%))] px-2 shadow-lg select-none transition-all duration-300 ease-out",
+          isDockCollapsed ? "h-6" : "h-10",
+          isAutoHideChrome
+            ? isBottomDockVisible || menuOpen
+              ? "translate-y-0 opacity-100 shadow-2xl"
+              : "translate-y-[calc(100%-3px)] opacity-60 hover:opacity-100 hover:translate-y-0"
+            : "translate-y-0 opacity-100"
         )}
       >
         {/* Left: Quick Launcher Button */}
@@ -1192,6 +1210,23 @@ export default function AdminWorkspaceDock() {
               </button>
             </>
           )}
+
+          {/* Distraction-Free Auto-Hide Toggle */}
+          <button
+            type="button"
+            onClick={toggleAutoHideChrome}
+            className={cn(
+              "p-1 rounded text-muted-foreground hover:bg-muted hover:text-foreground transition cursor-pointer",
+              isAutoHideChrome && "text-primary hover:text-primary"
+            )}
+            title={
+              isAutoHideChrome
+                ? "Distraction-Free Auto-Hide Active (Alt+Z) — Click to Pin Dock & Topbar"
+                : "Bars Pinned — Click to enable Distraction-Free Auto-Hide (Alt+Z)"
+            }
+          >
+            {isAutoHideChrome ? <PinOff className="size-3.5" /> : <Pin className="size-3.5" />}
+          </button>
 
           {/* Collapse/Expand Dock Strip */}
           <button

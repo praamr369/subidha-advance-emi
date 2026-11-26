@@ -28,14 +28,20 @@ def _normalize_sku(value: str | None) -> str | None:
     return normalized or None
 
 
-def _resolve_category(name: str) -> ProductCategoryMaster | None:
+def _resolve_category(name: str, item_type: str | None = None) -> ProductCategoryMaster | None:
     normalized = _clean_text(name)
     if not normalized:
         return None
     existing = ProductCategoryMaster.objects.filter(name__iexact=normalized).first()
     if existing:
         return existing
-    return ProductCategoryMaster.objects.create(name=normalized, is_active=True)
+    try:
+        from products_pim.models import ProductCategory as PimCategory
+        pim_cat = PimCategory.objects.filter(name__iexact=normalized).first()
+        resolved_type = item_type or (pim_cat.product_type if pim_cat and pim_cat.product_type != "ALL" else "FINISHED_GOOD")
+    except Exception:
+        resolved_type = item_type or "FINISHED_GOOD"
+    return ProductCategoryMaster.objects.create(name=normalized, item_type=resolved_type, is_active=True)
 
 
 def _resolve_subcategory(
@@ -260,10 +266,19 @@ def build_product_catalog_options() -> ProductCatalogOptions:
         key = row.name.strip().lower()
         pim_match = pim_cat_by_name.get(key)
         seen_cat_names.add(key)
+        if pim_match and pim_match.product_type and pim_match.product_type not in ("ALL", ""):
+            resolved_type = pim_match.product_type
+            if row.item_type != resolved_type:
+                row.item_type = resolved_type
+                row.save(update_fields=["item_type"])
+        else:
+            resolved_type = row.item_type or "FINISHED_GOOD"
         categories.append({
             "id": row.id,
             "name": row.name,
-            "product_type": pim_match.product_type if pim_match else "ALL",
+            "item_type": resolved_type,
+            "product_type": resolved_type,
+            "description": row.description or "",
             "pim_category_id": pim_match.id if pim_match else None,
         })
 
@@ -272,10 +287,20 @@ def build_product_catalog_options() -> ProductCatalogOptions:
         key = pim_cat.name.strip().lower()
         if key not in seen_cat_names:
             seen_cat_names.add(key)
+            master_cat, _ = ProductCategoryMaster.objects.get_or_create(
+                name=pim_cat.name.strip(),
+                defaults={
+                    "item_type": pim_cat.product_type or "FINISHED_GOOD",
+                    "description": pim_cat.description or "",
+                    "is_active": pim_cat.is_active,
+                },
+            )
             categories.append({
-                "id": -pim_cat.id,
-                "name": pim_cat.name,
-                "product_type": pim_cat.product_type or "FINISHED_GOOD",
+                "id": master_cat.id,
+                "name": master_cat.name,
+                "item_type": master_cat.item_type or pim_cat.product_type or "FINISHED_GOOD",
+                "product_type": master_cat.item_type or pim_cat.product_type or "FINISHED_GOOD",
+                "description": master_cat.description or "",
                 "pim_category_id": pim_cat.id,
             })
 
@@ -290,12 +315,16 @@ def build_product_catalog_options() -> ProductCatalogOptions:
         sub_key = (cat_key, row.name.strip().lower())
         seen_sub_keys.add(sub_key)
         pim_match = pim_cat_by_name.get(cat_key)
+        cat_type = row.category.item_type or (pim_match.product_type if pim_match else "FINISHED_GOOD")
         subcategories.append({
             "id": row.id,
-            "name": row.name,
+            "category": row.category_id,
             "category_id": row.category_id,
+            "name": row.name,
             "category_name": row.category.name,
-            "product_type": pim_match.product_type if pim_match else "ALL",
+            "category_item_type": cat_type,
+            "product_type": cat_type,
+            "description": row.description or "",
         })
 
     # Merge any active PIM subcategories so all PIM-defined subcategories appear cleanly
@@ -304,15 +333,36 @@ def build_product_catalog_options() -> ProductCatalogOptions:
         .filter(is_active=True, category__is_active=True)
         .order_by("category__display_order", "display_order", "name", "id")
     ):
-        sub_key = (pim_sub.category.name.strip().lower(), pim_sub.name.strip().lower())
+        cat_key = pim_sub.category.name.strip().lower()
+        sub_key = (cat_key, pim_sub.name.strip().lower())
         if sub_key not in seen_sub_keys:
             seen_sub_keys.add(sub_key)
+            parent_master = ProductCategoryMaster.objects.filter(name__iexact=pim_sub.category.name.strip()).first()
+            if parent_master:
+                master_sub, _ = ProductSubcategoryMaster.objects.get_or_create(
+                    category=parent_master,
+                    name=pim_sub.name.strip(),
+                    defaults={
+                        "description": pim_sub.description or "",
+                        "is_active": pim_sub.is_active,
+                    },
+                )
+                sub_id = master_sub.id
+                cat_id = parent_master.id
+            else:
+                sub_id = -pim_sub.id
+                cat_id = -pim_sub.category_id
+
+            cat_type = pim_sub.category.product_type or "FINISHED_GOOD"
             subcategories.append({
-                "id": -pim_sub.id,
+                "id": sub_id,
+                "category": cat_id,
+                "category_id": cat_id,
                 "name": pim_sub.name,
-                "category_id": -pim_sub.category_id,
                 "category_name": pim_sub.category.name,
-                "product_type": pim_sub.category.product_type or "FINISHED_GOOD",
+                "category_item_type": cat_type,
+                "product_type": cat_type,
+                "description": pim_sub.description or "",
             })
     unit_masters = [
         {

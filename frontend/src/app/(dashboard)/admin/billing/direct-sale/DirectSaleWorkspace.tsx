@@ -1464,7 +1464,27 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
       product_loading: false,
       product_results: [],
       product_error: null,
-      selected_product: null,
+      selected_product: {
+        id: acc.productId,
+        name: acc.productName,
+        product_code: acc.productCode,
+        sku: acc.sku,
+        base_price: acc.salePrice || "0.00",
+        sale_price: acc.salePrice || "0.00",
+        is_active: true,
+        stock_item_type: "ACCESSORY",
+        unit_of_measure: acc.unitOfMeasure || "PCS",
+        inventory_item_id: acc.inventoryItemId,
+        inventory_ready: true,
+        inventory_status: {
+          is_in_stock: true,
+          available: "10.000",
+          on_hand: "10.000",
+          reserved: "0.000",
+          incoming: "0.000",
+          requires_purchase: false,
+        },
+      },
       is_accessory: true,
       parent_line_id: parentLineId,
       serial_number: acc.serialNumber || "",
@@ -2353,9 +2373,23 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
 
                     <div className="mt-4 space-y-4">
                       {computedLines.map(({ line, totals: lineTotals }, index) => (
-                        <div key={line.id} className="rounded-lg border border-border bg-background p-4">
+                        <div
+                          key={line.id}
+                          className={`rounded-lg border p-4 transition-all ${
+                            line.is_accessory
+                              ? "border-purple-300 dark:border-purple-800 bg-purple-50/30 dark:bg-purple-950/20 ml-3 md:ml-6"
+                              : "border-border bg-background"
+                          }`}
+                        >
                           <div className="flex items-start justify-between gap-3">
-                            <div className="text-sm font-semibold text-foreground">Line {index + 1}</div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-semibold text-foreground">Line {index + 1}</span>
+                              {line.is_accessory && (
+                                <span className="rounded-full bg-purple-100 dark:bg-purple-900/60 border border-purple-300 dark:border-purple-700 px-2 py-0.5 text-[10px] font-bold text-purple-700 dark:text-purple-300">
+                                  Accessory / Add-on
+                                </span>
+                              )}
+                            </div>
                             <button
                               type="button"
                               onClick={() =>
@@ -2620,31 +2654,97 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
                                     </div>
                                   </div>
                                   {/* Attached accessories section */}
-                                  {line.selected_product.accessories && line.selected_product.accessories.length > 0 && (
-                                    <div className="border-t-2 border-green-300 dark:border-green-700">
-                                      <div className="flex items-center gap-2 bg-blue-100 dark:bg-blue-900 px-3 py-1.5 border-b border-blue-200 dark:border-blue-700">
-                                        <span className="text-[11px] font-bold text-blue-800 dark:text-blue-200 uppercase tracking-wide">
-                                          📦 Attached Accessories ({line.selected_product.accessories.length}) — verify below lines were added
-                                        </span>
-                                      </div>
-                                      <div className="divide-y divide-blue-100 dark:divide-blue-800 bg-blue-50 dark:bg-blue-950/60">
-                                        {line.selected_product.accessories.map((a) => (
-                                          <div key={a.id} className="flex items-center gap-2 px-3 py-1.5 text-[12px]">
-                                            <span className="font-mono text-[10px] font-bold text-blue-600 dark:text-blue-400 shrink-0 w-24 truncate">
-                                              {a.product_code || a.sku || `#${a.id}`}
-                                            </span>
-                                            <span className="flex-1 font-semibold text-slate-800 dark:text-slate-200 truncate">{a.name}</span>
-                                            <span className="shrink-0 text-slate-500 dark:text-slate-400">
-                                              Qty: <strong className="text-slate-700 dark:text-slate-200">{a.quantity}</strong>
-                                            </span>
-                                            <span className={`shrink-0 rounded px-2 py-0.5 text-[10px] font-bold ${a.included_in_price ? "bg-green-200 text-green-800 dark:bg-green-800 dark:text-green-100" : "bg-amber-200 text-amber-800 dark:bg-amber-800 dark:text-amber-100"}`}>
-                                              {a.included_in_price ? "Included in price" : "Separate charge"}
-                                            </span>
+                                  {(() => {
+                                    const linkedAccLines = lines.filter((l) => l.parent_line_id === line.id);
+                                    const defaultAccs = line.selected_product.accessories ?? [];
+                                    if (linkedAccLines.length === 0 && defaultAccs.length === 0) return null;
+
+                                    if (linkedAccLines.length > 0) {
+                                      return (
+                                        <div className="border-t-2 border-emerald-400 dark:border-emerald-600 overflow-hidden">
+                                          <div className="flex items-center justify-between gap-2 bg-emerald-100 dark:bg-emerald-950/70 px-3 py-2 border-b border-emerald-200 dark:border-emerald-800">
+                                            <div className="flex items-center gap-1.5">
+                                              <span className="text-[11px] font-bold text-emerald-900 dark:text-emerald-200 uppercase tracking-wide flex items-center gap-1">
+                                                <span className="text-emerald-600 font-extrabold text-sm">✓</span> {linkedAccLines.length} Accessory Variant{linkedAccLines.length > 1 ? "s" : ""} Added to Sale
+                                              </span>
+                                            </div>
+                                            <button
+                                              type="button"
+                                              onClick={() =>
+                                                setAccessoryPanel({
+                                                  productId: line.selected_product!.id,
+                                                  itemId: line.selected_product!.inventory_item_id ?? undefined,
+                                                  lineId: line.id,
+                                                  parentQuantity: Math.max(1, Number(line.quantity || 1)),
+                                                })
+                                              }
+                                              className="inline-flex items-center gap-1 rounded bg-emerald-700 hover:bg-emerald-800 text-white px-2.5 py-1 text-[11px] font-semibold transition-colors shadow-sm"
+                                            >
+                                              Change / Swap Variants
+                                            </button>
                                           </div>
-                                        ))}
+                                          <div className="divide-y divide-emerald-100 dark:divide-emerald-900 bg-emerald-50/40 dark:bg-emerald-950/30">
+                                            {linkedAccLines.map((accLine) => (
+                                              <div key={accLine.id} className="flex items-center gap-2 px-3 py-1.5 text-[12px]">
+                                                <span className="font-mono text-[10px] font-bold text-emerald-700 dark:text-emerald-400 shrink-0 w-28 truncate">
+                                                  {accLine.selected_product?.sku || accLine.selected_product?.product_code || accLine.product_search}
+                                                </span>
+                                                <span className="flex-1 font-semibold text-slate-800 dark:text-slate-200 truncate">
+                                                  {accLine.description}
+                                                </span>
+                                                <span className="shrink-0 text-slate-500 dark:text-slate-400">
+                                                  Qty: <strong className="text-slate-700 dark:text-slate-200">{accLine.quantity}</strong>
+                                                </span>
+                                                <span className={`shrink-0 rounded px-2 py-0.5 text-[10px] font-bold ${Number(accLine.unit_price) === 0 ? "bg-green-200 text-green-800 dark:bg-green-800 dark:text-green-100" : "bg-amber-200 text-amber-800 dark:bg-amber-800 dark:text-amber-100"}`}>
+                                                  {Number(accLine.unit_price) === 0 ? "Free / Included" : `+₹${Number(accLine.unit_price).toFixed(2)}`}
+                                                </span>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      );
+                                    }
+
+                                    return (
+                                      <div className="border-t-2 border-blue-300 dark:border-blue-700 overflow-hidden">
+                                        <div className="flex items-center justify-between gap-2 bg-blue-100 dark:bg-blue-950/70 px-3 py-2 border-b border-blue-200 dark:border-blue-800">
+                                          <span className="text-[11px] font-bold text-blue-900 dark:text-blue-200 uppercase tracking-wide">
+                                            📦 Attached Accessories ({defaultAccs.length})
+                                          </span>
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              setAccessoryPanel({
+                                                productId: line.selected_product!.id,
+                                                itemId: line.selected_product!.inventory_item_id ?? undefined,
+                                                lineId: line.id,
+                                                parentQuantity: Math.max(1, Number(line.quantity || 1)),
+                                              })
+                                            }
+                                            className="inline-flex items-center gap-1 rounded bg-blue-700 hover:bg-blue-800 text-white px-2.5 py-1 text-[11px] font-semibold transition-colors shadow-sm"
+                                          >
+                                            + Select & Add Variants to Bill
+                                          </button>
+                                        </div>
+                                        <div className="divide-y divide-blue-100 dark:divide-blue-900 bg-blue-50/40 dark:bg-blue-950/30">
+                                          {defaultAccs.map((a) => (
+                                            <div key={a.id} className="flex items-center gap-2 px-3 py-1.5 text-[12px]">
+                                              <span className="font-mono text-[10px] font-bold text-blue-600 dark:text-blue-400 shrink-0 w-24 truncate">
+                                                {a.product_code || a.sku || `#${a.id}`}
+                                              </span>
+                                              <span className="flex-1 font-semibold text-slate-800 dark:text-slate-200 truncate">{a.name}</span>
+                                              <span className="shrink-0 text-slate-500 dark:text-slate-400">
+                                                Qty: <strong className="text-slate-700 dark:text-slate-200">{a.quantity}</strong>
+                                              </span>
+                                              <span className={`shrink-0 rounded px-2 py-0.5 text-[10px] font-bold ${a.included_in_price ? "bg-green-200 text-green-800 dark:bg-green-800 dark:text-green-100" : "bg-amber-200 text-amber-800 dark:bg-amber-800 dark:text-amber-100"}`}>
+                                                {a.included_in_price ? "Included in price" : "Separate charge"}
+                                              </span>
+                                            </div>
+                                          ))}
+                                        </div>
                                       </div>
-                                    </div>
-                                  )}
+                                    );
+                                  })()}
                                 </div>
                               ) : null}
                             </div>
@@ -3560,12 +3660,42 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
                 mode="sale"
                 parentQuantity={accessoryPanel.parentQuantity ?? 1}
                 onSwitchParentVariant={(pv: ParentVariantOption) => {
+                  const currentLine = lines.find((l) => l.id === accessoryPanel.lineId);
                   updateLine(accessoryPanel.lineId, {
                     product_id: String(pv.product_id),
                     inventory_item_id: String(pv.inventory_item_id),
                     description: pv.name,
                     unit_price: Number(pv.base_price || 0).toFixed(2),
                     product_search: `${pv.sku || pv.product_code} - ${pv.name}`,
+                    selected_product: {
+                      ...(currentLine?.selected_product ?? {
+                        id: pv.product_id,
+                        name: pv.name,
+                        product_code: pv.product_code,
+                        sku: pv.sku,
+                        base_price: pv.base_price || "0.00",
+                        sale_price: pv.base_price || "0.00",
+                        is_active: true,
+                        stock_item_type: "FINISHED_GOOD",
+                        unit_of_measure: "PCS",
+                      }),
+                      id: pv.product_id,
+                      name: pv.name,
+                      product_code: pv.product_code,
+                      sku: pv.sku,
+                      base_price: pv.base_price || "0.00",
+                      sale_price: pv.base_price || "0.00",
+                      inventory_item_id: pv.inventory_item_id,
+                      current_stock_qty: String(pv.available_stock || "0"),
+                      inventory_status: {
+                        is_in_stock: Number(pv.available_stock || 0) > 0,
+                        available: String(pv.available_stock || "0.000"),
+                        on_hand: String(pv.available_stock || "0.000"),
+                        reserved: "0.000",
+                        incoming: "0.000",
+                        requires_purchase: Number(pv.available_stock || 0) <= 0,
+                      },
+                    },
                   });
                   setAccessoryPanel((prev) =>
                     prev

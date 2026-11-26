@@ -135,6 +135,10 @@ class PIMSyncService:
         core_product.extended_warranty_cost_percentage = effective_ext_cost
         if pim_product.product_type:
             core_product.item_type = pim_product.product_type
+            if pim_product.product_type in ("ACCESSORY", "RAW_MATERIAL"):
+                core_product.is_emi_enabled = False
+                core_product.is_rent_enabled = False
+                core_product.is_lease_enabled = False
 
         child_pim = PimProduct.objects.filter(code=variant.sku, parent_id=pim_product.id).first()
         if child_pim:
@@ -277,6 +281,10 @@ class PIMSyncService:
             core_product.description = pim_product.description
         if pim_product.product_type:
             core_product.item_type = pim_product.product_type
+            if pim_product.product_type in ("ACCESSORY", "RAW_MATERIAL"):
+                core_product.is_emi_enabled = False
+                core_product.is_rent_enabled = False
+                core_product.is_lease_enabled = False
         if pim_product.category:
             core_product.category = pim_product.category.name
             try:

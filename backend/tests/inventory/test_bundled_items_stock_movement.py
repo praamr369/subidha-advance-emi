@@ -850,11 +850,13 @@ class BundledItemsStockMovementTests(TestCase):
             default_stock_location=self.location, stock_tracking_enabled=True, delivery_stock_bridge_enabled=True,
             opening_stock_qty=Decimal("6.000"),
         )
-        # Ensure accessories have is_rent_enabled=False (typical accessory master)
+        # Ensure accessories have is_rent_enabled=False and is_emi_enabled=False (typical accessory master)
         self.ply_product.is_rent_enabled = False
-        self.ply_product.save(update_fields=["is_rent_enabled"])
+        self.ply_product.is_emi_enabled = False
+        self.ply_product.save(update_fields=["is_rent_enabled", "is_emi_enabled"])
         extra_acc_prod.is_rent_enabled = False
-        extra_acc_prod.save(update_fields=["is_rent_enabled"])
+        extra_acc_prod.is_emi_enabled = False
+        extra_acc_prod.save(update_fields=["is_rent_enabled", "is_emi_enabled"])
 
         # Validate serializer allows ACCESSORY when is_accessory=True
         ser = AdminRentContractCreateSerializer(data={

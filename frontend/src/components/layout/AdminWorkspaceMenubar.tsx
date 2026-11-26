@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { AppWindow, BookOpen, CircleHelp, MessageCircle, Settings, ShieldCheck } from "lucide-react";
+import { AppWindow, BookOpen, Check, CircleHelp, MessageCircle, Settings, ShieldCheck } from "lucide-react";
 
 import {
   Menubar,
@@ -40,6 +40,8 @@ export default function AdminWorkspaceMenubar({
     closeAll,
     lastClosedWindow,
     reopenLastClosed,
+    isAutoHideChrome,
+    toggleAutoHideChrome,
   } = useAdminWorkspaceDock();
 
   if (role !== "ADMIN") {
@@ -101,6 +103,16 @@ export default function AdminWorkspaceMenubar({
             </span>
           </MenubarItem>
           <MenubarItem onClick={() => onOpenQuickActions()}>Quick actions panel</MenubarItem>
+          <MenubarSeparator />
+          <MenubarItem onClick={() => toggleAutoHideChrome()} className="justify-between gap-8 cursor-pointer">
+            <span className="flex items-center gap-2">
+              {isAutoHideChrome && <Check className="size-3.5 text-primary" />}
+              <span>Distraction-Free Auto-Hide</span>
+            </span>
+            <span className="shrink-0 rounded border border-border bg-[var(--surface-card-elevated)] px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground font-mono">
+              Alt Z
+            </span>
+          </MenubarItem>
           <MenubarSeparator />
           <MenubarItem asChild>
             <Link href={ROUTES.admin.dashboard}>Dashboard overview</Link>

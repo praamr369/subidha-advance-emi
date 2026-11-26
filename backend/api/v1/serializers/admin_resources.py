@@ -1812,6 +1812,7 @@ class ProductCategoryMasterSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "name",
+            "item_type",
             "description",
             "is_active",
             # Additive public SEO fields (SEO-3) — all optional for admin editing.
@@ -1826,6 +1827,7 @@ class ProductCategoryMasterSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "created_at"]
         extra_kwargs = {
+            "item_type": {"required": False},
             "slug": {"required": False, "allow_blank": True},
             "public_title": {"required": False, "allow_blank": True},
             "seo_title": {"required": False, "allow_blank": True},
@@ -1836,6 +1838,7 @@ class ProductCategoryMasterSerializer(serializers.ModelSerializer):
 
 class ProductSubcategoryMasterSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source="category.name", read_only=True)
+    category_item_type = serializers.CharField(source="category.item_type", read_only=True)
 
     class Meta:
         model = ProductSubcategoryMaster
@@ -1843,12 +1846,13 @@ class ProductSubcategoryMasterSerializer(serializers.ModelSerializer):
             "id",
             "category",
             "category_name",
+            "category_item_type",
             "name",
             "description",
             "is_active",
             "created_at",
         ]
-        read_only_fields = ["id", "created_at", "category_name"]
+        read_only_fields = ["id", "created_at", "category_name", "category_item_type"]
 
 
 class ProductUnitOfMeasureMasterSerializer(serializers.ModelSerializer):

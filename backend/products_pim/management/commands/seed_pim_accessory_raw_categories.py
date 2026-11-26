@@ -1,4 +1,5 @@
 from django.core.management.base import BaseCommand
+from django.db.models import Q
 from django.utils.text import slugify
 from products_pim.models import ProductCategory, ProductSubcategory, PimProduct
 from products_core.models import ProductCategoryMaster, ProductSubcategoryMaster, Product
@@ -224,7 +225,9 @@ class Command(BaseCommand):
         core_rail_sub = ProductSubcategoryMaster.objects.filter(category=core_acc_cat, name="Bed Hardware & Side Rails").first()
 
         # Update Commercial Plyboard items
-        ply_pim = PimProduct.objects.filter(name__icontains="Commercial Plyboard")
+        ply_pim = PimProduct.objects.filter(
+            Q(name__icontains="Plyboard") | Q(name__icontains="Plywood") | Q(code__icontains="COMM-PLYB")
+        )
         for p in ply_pim:
             p.category = acc_cat
             p.subcategory = ply_sub
@@ -232,7 +235,9 @@ class Command(BaseCommand):
             p.save(update_fields=["category", "subcategory", "product_type"])
             self.stdout.write(f"  → Updated PIM accessory: {p.code} {p.name} -> Plywood & Boards")
 
-        ply_core = Product.objects.filter(name__icontains="Commercial Plyboard")
+        ply_core = Product.objects.filter(
+            Q(name__icontains="Plyboard") | Q(name__icontains="Plywood") | Q(product_code__icontains="COMM-PLYB")
+        )
         for p in ply_core:
             p.category = acc_cat.name
             p.subcategory = ply_sub.name if ply_sub else "Plywood & Boards"
@@ -242,8 +247,10 @@ class Command(BaseCommand):
             p.save(update_fields=["category", "subcategory", "category_master", "subcategory_master", "item_type"])
             self.stdout.write(f"  → Updated Core accessory: {p.product_code} {p.name} -> Plywood & Boards")
 
-        # Update Steel Side Rail items
-        rail_pim = PimProduct.objects.filter(name__icontains="Steel Side Rail")
+        # Update Side Rail items (both normal and hybrid)
+        rail_pim = PimProduct.objects.filter(
+            Q(name__icontains="Side Rail") | Q(code__icontains="SIDERAI")
+        )
         for p in rail_pim:
             p.category = acc_cat
             p.subcategory = rail_sub
@@ -251,7 +258,9 @@ class Command(BaseCommand):
             p.save(update_fields=["category", "subcategory", "product_type"])
             self.stdout.write(f"  → Updated PIM accessory: {p.code} {p.name} -> Bed Hardware & Side Rails")
 
-        rail_core = Product.objects.filter(name__icontains="Steel Side Rail")
+        rail_core = Product.objects.filter(
+            Q(name__icontains="Side Rail") | Q(product_code__icontains="SIDERAI")
+        )
         for p in rail_core:
             p.category = acc_cat.name
             p.subcategory = rail_sub.name if rail_sub else "Bed Hardware & Side Rails"
@@ -261,11 +270,79 @@ class Command(BaseCommand):
             p.save(update_fields=["category", "subcategory", "category_master", "subcategory_master", "item_type"])
             self.stdout.write(f"  → Updated Core accessory: {p.product_code} {p.name} -> Bed Hardware & Side Rails")
 
-        # Also reclassify any existing PIM products where product_type == "ACCESSORY" but category is Furniture
-        furniture_accs = PimProduct.objects.filter(product_type="ACCESSORY", category__name="Furniture")
-        for p in furniture_accs:
+        # Also reclassify any existing PIM products where product_type == "ACCESSORY" but category is not ACCESSORY
+        mismatched_accs = PimProduct.objects.filter(product_type="ACCESSORY").exclude(category__product_type="ACCESSORY")
+        for p in mismatched_accs:
             p.category = acc_cat
-            p.save(update_fields=["category"])
-            self.stdout.write(f"  → Reassigned {p.code} {p.name} from Furniture to Accessories & Hardware")
+            # Infer subcategory from name
+            p_name = p.name.lower()
+            if any(w in p_name for w in ("plywood", "plyboard", "board")):
+                p.subcategory = ply_sub
+            elif any(w in p_name for w in ("rail", "side rail", "hardware")):
+                p.subcategory = rail_sub
+            p.save(update_fields=["category", "subcategory"])
+            self.stdout.write(f"  → Reassigned {p.code} {p.name} to Accessories & Hardware ({getattr(p.subcategory, 'name', 'None')})")
 
-        self.stdout.write(self.style.SUCCESS("Successfully seeded categories, subcategories, and realigned products!"))
+        # Reclassify mismatched Raw Materials
+        raw_cat = ProductCategory.objects.filter(slug="raw-materials-lumber").first()
+        if raw_cat:
+            mismatched_raw = PimProduct.objects.filter(product_type="RAW_MATERIAL").exclude(category__product_type="RAW_MATERIAL")
+            for p in mismatched_raw:
+                p.category = raw_cat
+                p.save(update_fields=["category"])
+
+        # Reclassify mismatched Services
+        svc_cat = ProductCategory.objects.filter(slug="services-labor").first()
+        if svc_cat:
+            mismatched_svc = PimProduct.objects.filter(product_type="SERVICE").exclude(category__product_type="SERVICE")
+            for p in mismatched_svc:
+                p.category = svc_cat
+                p.save(update_fields=["category"])
+
+        # 5. Seed AccessoryVariantGroups and link InventoryItems
+        from inventory.models import AccessoryVariantGroup, InventoryItem, InventoryItemType
+        ply_group, _ = AccessoryVariantGroup.objects.get_or_create(
+            code="AVG-PLYWOOD",
+            defaults={
+                "name": "Commercial Plyboards",
+                "category": "Accessories & Hardware",
+                "subcategory": "Plywood & Boards",
+                "description": "Commercial plyboard sizing variants (78*36, 78*48, etc.)",
+                "is_required": False,
+                "is_active": True,
+            },
+        )
+        rail_group, _ = AccessoryVariantGroup.objects.get_or_create(
+            code="AVG-BED-SIDERAI",
+            defaults={
+                "name": "Bed Side Rails",
+                "category": "Accessories & Hardware",
+                "subcategory": "Bed Hardware & Side Rails",
+                "description": "Bed side rail variants (Steel Normal, Hybrid, etc.)",
+                "is_required": False,
+                "is_active": True,
+            },
+        )
+
+        # Wire inventory items into variant groups
+        ply_invs = InventoryItem.objects.filter(
+            Q(product__name__icontains="Plyboard") | Q(product__name__icontains="Plywood") | Q(sku__icontains="COMM-PLYB"),
+            stock_item_type=InventoryItemType.ACCESSORY,
+        )
+        for it in ply_invs:
+            if it.variant_group_id != ply_group.id:
+                it.variant_group = ply_group
+                it.save(update_fields=["variant_group"])
+                self.stdout.write(f"  → Linked InventoryItem {it.sku} to {ply_group.name}")
+
+        rail_invs = InventoryItem.objects.filter(
+            Q(product__name__icontains="Side Rail") | Q(sku__icontains="SIDERAI"),
+            stock_item_type=InventoryItemType.ACCESSORY,
+        )
+        for it in rail_invs:
+            if it.variant_group_id != rail_group.id:
+                it.variant_group = rail_group
+                it.save(update_fields=["variant_group"])
+                self.stdout.write(f"  → Linked InventoryItem {it.sku} to {rail_group.name}")
+
+        self.stdout.write(self.style.SUCCESS("Successfully seeded categories, subcategories, variant groups, and realigned products!"))

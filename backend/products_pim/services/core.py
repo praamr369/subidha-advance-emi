@@ -14,13 +14,13 @@ from django.db import transaction
 
 def infer_product_type(product) -> str:
     """Infer the correct PIM product classification from product attributes and heuristics."""
-    # 0. Explicit classification on operational product or PIM product takes priority
+    # 0. Explicit non-default classification takes immediate priority
     explicit_type = (
         getattr(product, "item_type", "")
         or getattr(product, "product_type", "")
         or ""
     )
-    if explicit_type in ("FINISHED_GOOD", "ACCESSORY", "RAW_MATERIAL", "SERVICE"):
+    if explicit_type in ("ACCESSORY", "RAW_MATERIAL", "SERVICE"):
         return explicit_type
     if explicit_type == "ADD_ON":
         return "ACCESSORY"
@@ -148,7 +148,7 @@ def _resolve_pim_category_and_subcategory(product, initial_type: str):
             product_type__in=[initial_type, "ALL"],
             is_active=True,
         ).first()
-        if not category:
+        if not category and initial_type == "FINISHED_GOOD":
             category = ProductCategory.objects.filter(name__iexact=cat_name, is_active=True).first()
 
     if not category:
@@ -167,6 +167,43 @@ def _resolve_pim_category_and_subcategory(product, initial_type: str):
         subcategory = ProductSubcategory.objects.filter(
             category=category, name__iexact=sub_name, is_active=True
         ).first()
+
+    # If subcategory is still None, intelligently infer from product name keywords
+    if not subcategory and category:
+        prod_name = (getattr(product, "name", "") or "").lower()
+        if category.product_type == "ACCESSORY" or initial_type == "ACCESSORY":
+            if any(w in prod_name for w in ("plywood", "plyboard", "ply", "board")):
+                subcategory = ProductSubcategory.objects.filter(category=category, slug="plywood-boards").first()
+            elif any(w in prod_name for w in ("rail", "side rail", "hardware")):
+                subcategory = ProductSubcategory.objects.filter(category=category, slug="bed-hardware-side-rails").first()
+            elif any(w in prod_name for w in ("leg", "buffer", "cap", "bush")):
+                subcategory = ProductSubcategory.objects.filter(category=category, slug="legs-caps-buffers").first()
+            elif any(w in prod_name for w in ("fastener", "screw", "bolt", "nut", "nail")):
+                subcategory = ProductSubcategory.objects.filter(category=category, slug="fasteners-nuts-bolts").first()
+            elif any(w in prod_name for w in ("handle", "lock", "hinge", "knob", "latch")):
+                subcategory = ProductSubcategory.objects.filter(category=category, slug="handles-locks-hinges").first()
+            elif any(w in prod_name for w in ("foam", "cushion", "fabric", "cloth", "sponge")):
+                subcategory = ProductSubcategory.objects.filter(category=category, slug="foam-cushions-fabric").first()
+            elif any(w in prod_name for w in ("mirror", "glass")):
+                subcategory = ProductSubcategory.objects.filter(category=category, slug="mirrors-glass-tops").first()
+        elif category.product_type == "RAW_MATERIAL" or initial_type == "RAW_MATERIAL":
+            if any(w in prod_name for w in ("pipe", "tube", "steel pipe", "iron")):
+                subcategory = ProductSubcategory.objects.filter(category=category, slug="steel-pipes-tubes").first()
+            elif any(w in prod_name for w in ("timber", "wood", "plank", "log")):
+                subcategory = ProductSubcategory.objects.filter(category=category, slug="timber-wood-planks").first()
+            elif any(w in prod_name for w in ("sheet", "metal", "mesh")):
+                subcategory = ProductSubcategory.objects.filter(category=category, slug="sheet-metal-mesh").first()
+            elif any(w in prod_name for w in ("paint", "powder", "polish", "primer")):
+                subcategory = ProductSubcategory.objects.filter(category=category, slug="paints-powder-polish").first()
+            elif any(w in prod_name for w in ("adhesive", "glue", "chemical", "fevicol", "resin")):
+                subcategory = ProductSubcategory.objects.filter(category=category, slug="adhesives-chemicals").first()
+        elif category.product_type == "SERVICE" or initial_type == "SERVICE":
+            if any(w in prod_name for w in ("install", "assembly", "fitting")):
+                subcategory = ProductSubcategory.objects.filter(category=category, slug="installation-assembly").first()
+            elif any(w in prod_name for w in ("transport", "delivery", "shipping", "freight")):
+                subcategory = ProductSubcategory.objects.filter(category=category, slug="transport-delivery").first()
+            elif any(w in prod_name for w in ("repair", "maintenance", "service")):
+                subcategory = ProductSubcategory.objects.filter(category=category, slug="maintenance-repair").first()
 
     return category, subcategory
 
@@ -211,14 +248,23 @@ def ensure_pim_product_for_product(product) -> "object | None":
         target_type = existing.product_type or "FINISHED_GOOD"
         cat_text = (getattr(product, "category", None) or "").strip()
         sub_text = (getattr(product, "subcategory", None) or "").strip()
-        if existing.category and existing.category.slug == "unclassified":
+        is_mismatched_cat = (
+            not existing.category
+            or existing.category.slug == "unclassified"
+            or (
+                existing.category.product_type
+                and existing.category.product_type != "ALL"
+                and existing.category.product_type != target_type
+            )
+        )
+        if is_mismatched_cat:
             resolved_cat, resolved_sub = _resolve_pim_category_and_subcategory(product, target_type)
             if resolved_cat and resolved_cat.id != existing.category_id:
                 existing.category = resolved_cat
                 existing.subcategory = resolved_sub
                 needs_save = True
                 fields_to_update.extend(["category", "subcategory"])
-        elif cat_text:
+        elif cat_text or not existing.subcategory:
             resolved_cat, resolved_sub = _resolve_pim_category_and_subcategory(product, target_type)
             if resolved_cat and resolved_cat.slug != "unclassified" and (
                 resolved_cat.id != existing.category_id
