@@ -329,12 +329,31 @@ def _deposit_readiness(subscription) -> dict:
     outstanding = Decimal(summary["security_deposit_pending"])
     is_rent_lease = getattr(subscription, "plan_type", "") in [PlanType.RENT, PlanType.LEASE]
 
+    snap = getattr(subscription, "pricing_snapshot", None) or {}
+    option = snap.get("deposit_payment_option", "FULL")
+    init_dep = Decimal(str(snap.get("initial_deposit_payment", "0") or "0"))
+
+    is_partial_buffer_satisfied = False
+    if is_rent_lease and option == "PARTIAL" and init_dep > MONEY_ZERO:
+        due_date_str = snap.get("deposit_due_date")
+        buffer_valid = True
+        if due_date_str:
+            try:
+                from datetime import date as _dt
+                buffer_valid = timezone.localdate() <= _dt.fromisoformat(str(due_date_str)[:10])
+            except Exception:
+                pass
+        is_partial_buffer_satisfied = collected >= init_dep and buffer_valid
+
+    is_ready = summary["is_paid"] or is_partial_buffer_satisfied
+
     return {
         "required": is_rent_lease or expected > MONEY_ZERO,
-        "ready": summary["is_paid"],
+        "ready": is_ready,
         "expected_amount": summary["security_deposit_amount"],
         "collected_amount": summary["security_deposit_paid"],
         "outstanding_amount": summary["security_deposit_pending"],
+        "is_partial_buffer": is_partial_buffer_satisfied,
         "evidence_source": "DEPOSIT_SUMMARY",
     }
 

@@ -471,6 +471,92 @@ class PreActivationContractModificationTests(TestCase):
         self.assertEqual(updated.rent_profile.security_deposit_amount, Decimal("4800.00"))
         self.assertEqual(updated.contract_items.filter(status="ACTIVE").count(), 2)
 
+    def test_pre_activation_modify_rent_contract_partial_deposit(self):
+        from contracts.services.contract_lifecycle_service import modify_pre_activation_contract
+        from contracts.services.contract_activation_readiness_service import (
+            get_subscription_deposit_summary,
+            _deposit_readiness,
+        )
+        from subscriptions.models import (
+            RentLeaseBillingDemand,
+            RentLeaseDemandStatus,
+            RentLeaseDemandType,
+            RentLeaseDepositTransaction,
+            RentLeaseDepositTransactionType,
+            RentLeaseDepositTransactionStatus,
+        )
+
+        from tests.helpers import create_payment_collection_finance_account
+        test_fa = create_payment_collection_finance_account(
+            code="UPI-TEST",
+            name="UPI Collection Test Account",
+        )
+
+        sub = create_rent_contract(
+            customer=self.customer1,
+            product=self.product1,  # 12,000 base
+            tenure_months=12,
+            security_deposit_percent=Decimal("20.00"),  # 2,400 deposit
+            monthly_yield_percent=Decimal("5.00"),
+            performed_by=self.user,
+            save_as_draft=True,
+        )
+        self.assertEqual(sub.status, SubscriptionStatus.DRAFT)
+
+        # Modify to partial deposit terms with 1500 upfront and 900 remaining
+        updated = modify_pre_activation_contract(
+            subscription=sub,
+            performed_by=self.user,
+            data={
+                "items": [
+                    {
+                        "product": self.product1.id,
+                        "quantity": 1,
+                        "unit_base_price": "12000.00",
+                        "monthly_yield_percent": "5.00",
+                        "security_deposit_percent": "20.00",
+                    },
+                ],
+                "deposit_payment_option": "PARTIAL",
+                "deposit_buffer_days": 30,
+                "initial_deposit_payment": "1500.00",
+                "deposit_payment_method": "UPI",
+                "deposit_finance_account_id": test_fa.id,
+                "deposit_reference_no": "967118200466",
+            },
+        )
+
+        demand = RentLeaseBillingDemand.objects.get(
+            subscription=updated,
+            demand_type=RentLeaseDemandType.SECURITY_DEPOSIT,
+        )
+        self.assertEqual(demand.amount, Decimal("2400.00"))
+        self.assertEqual(demand.collected_amount, Decimal("1500.00"))
+        self.assertEqual(demand.held_amount, Decimal("1500.00"))
+        self.assertEqual(demand.status, RentLeaseDemandStatus.PARTIAL)
+
+        summary = get_subscription_deposit_summary(updated)
+        self.assertEqual(summary["security_deposit_amount"], "2400.00")
+        self.assertEqual(summary["security_deposit_paid"], "1500.00")
+        self.assertEqual(summary["security_deposit_pending"], "900.00")
+        self.assertEqual(summary["deposit_status"], "PARTIALLY_PAID")
+
+        readiness = _deposit_readiness(updated)
+        self.assertTrue(readiness["ready"])
+        self.assertTrue(readiness["is_partial_buffer"])
+
+        tx = RentLeaseDepositTransaction.objects.filter(
+            subscription=updated,
+            demand=demand,
+            transaction_type=RentLeaseDepositTransactionType.DEPOSIT_RECEIPT,
+            status=RentLeaseDepositTransactionStatus.ACTIVE,
+        ).first()
+        self.assertIsNotNone(tx)
+        self.assertEqual(tx.amount, Decimal("1500.00"))
+        self.assertEqual(tx.payment_method, "UPI")
+        self.assertEqual(tx.finance_account_id, test_fa.id)
+        self.assertEqual(tx.external_reference_no, "967118200466")
+
     def test_modify_blocked_after_activation(self):
         from contracts.services.contract_lifecycle_service import modify_pre_activation_contract
 

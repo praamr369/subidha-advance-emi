@@ -17,7 +17,9 @@ export type UnifiedCollectionPayload = {
   splits?: CollectionSplit[];
   reference_no?: string;
   notes?: string;
+  note?: string;
   receipt_date?: string;
+  payment_date?: string;
   branch_id?: number | null;
   cash_counter_id?: number | null;
   idempotency_key?: string;

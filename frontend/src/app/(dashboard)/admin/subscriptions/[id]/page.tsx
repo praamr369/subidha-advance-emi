@@ -46,6 +46,7 @@ import {
   type DeliveryRecord,
 } from "@/services/deliveries";
 import { listPayments, type PaymentRecord } from "@/services/payments";
+import { CreditCard } from "lucide-react";
 
 // Mirrors backend SubscriptionStatus (subscriptions/enums.py). Omitting the
 // rent/lease lifecycle states here made live rent contracts render as "Unknown".
@@ -1375,14 +1376,48 @@ export default function AdminSubscriptionDetailPage() {
                         />
                       </>
                     }
-                  /> : <DetailHeroSurface
-                    eyebrow={subscription.plan_type === "LEASE" ? "Lease Security Deposit" : "Rent Security Deposit"}
-                    title={`${subscription.rent_lease_kpis?.deposit_status || "PENDING"} deposit`}
-                    description="Security deposit collection is separate from monthly rent and is tracked from canonical billing demands."
-                    tone={subscription.rent_lease_kpis?.deposit_pending === "0.00" ? "success" : "warning"}
-                    badge={<ERPStatusBadge status={subscription.rent_lease_kpis?.deposit_pending === "0.00" ? "COMPLETED" : "ACTIVE"} label={subscription.rent_lease_kpis?.deposit_pending === "0.00" ? "Deposit settled" : "Deposit pending"} size="md" />}
-                    meta={<><DetailMetricTile label="Deposit Due" value={money(subscription.rent_lease_kpis?.deposit_due || "0.00")} /><DetailMetricTile label="Paid" value={money(subscription.rent_lease_kpis?.deposit_paid || "0.00")} tone="success" /><DetailMetricTile label="Pending" value={money(subscription.rent_lease_kpis?.deposit_pending || "0.00")} tone={subscription.rent_lease_kpis?.deposit_pending === "0.00" ? "success" : "warning"} /></>}
-                  />}
+                  /> : (() => {
+                    const depositDueVal = Number(subscription.rent_lease_kpis?.deposit_due || contractProfile?.security_deposit_amount || 0);
+                    const depositPaidVal = Number(subscription.rent_lease_kpis?.deposit_paid || contractProfile?.deposit_settlement?.received || 0);
+                    const depositPendingVal = Number(subscription.rent_lease_kpis?.deposit_pending || Math.max(0, depositDueVal - depositPaidVal));
+                    const isDepOpen = depositPendingVal > 0.005;
+                    const canEdit = ["DRAFT", "REQUESTED", "PENDING_APPROVAL", "APPROVED"].includes(String(subscription.status || "")) &&
+                      !(subscription as Record<string, unknown>).terms_locked_at;
+                    return (
+                      <DetailHeroSurface
+                        eyebrow={subscription.plan_type === "LEASE" ? "Lease Security Deposit" : "Rent Security Deposit"}
+                        title={`${subscription.rent_lease_kpis?.deposit_status || (isDepOpen && depositPaidVal > 0 ? "PARTIALLY_PAID" : "PENDING")} deposit`}
+                        description="Security deposit collection is separate from monthly rent and is tracked from canonical billing demands."
+                        tone={!isDepOpen ? "success" : "warning"}
+                        badge={<ERPStatusBadge status={!isDepOpen ? "COMPLETED" : "ACTIVE"} label={!isDepOpen ? "Deposit settled" : "Deposit pending"} size="md" />}
+                        meta={<><DetailMetricTile label="Deposit Due" value={money(subscription.rent_lease_kpis?.deposit_due || "0.00")} /><DetailMetricTile label="Paid" value={money(subscription.rent_lease_kpis?.deposit_paid || "0.00")} tone="success" /><DetailMetricTile label="Pending" value={money(subscription.rent_lease_kpis?.deposit_pending || "0.00")} tone={!isDepOpen ? "success" : "warning"} /></>}
+                        footer={
+                          (isDepOpen || canEdit) ? (
+                            <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border/60">
+                              {isDepOpen && (
+                                <button
+                                  type="button"
+                                  onClick={() => setCollectDepositModalOpen(true)}
+                                  className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-sky-700 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-sky-800"
+                                >
+                                  <CreditCard className="h-3.5 w-3.5" />
+                                  Collect Remaining Deposit ({money(depositPendingVal)})
+                                </button>
+                              )}
+                              {canEdit && (
+                                <Link
+                                  href={`/admin/subscriptions/${subscription.id}/edit`}
+                                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-background/80 px-3 text-xs font-medium text-foreground hover:bg-muted transition"
+                                >
+                                  ✏️ Edit Terms / Correct Deposit
+                                </Link>
+                              )}
+                            </div>
+                          ) : null
+                        }
+                      />
+                    );
+                  })()}
 
                   {isEmiSubscription ? <DetailHeroSurface
                     eyebrow="Waiver And Settlement"
@@ -1989,9 +2024,10 @@ export default function AdminSubscriptionDetailPage() {
                           const contractStatus = String(subscription.status || "").toUpperCase();
                           const ended = ["CANCELLED", "CLOSED"].includes(contractStatus);
                           const goodsBackOrOut = ["HANDED_OVER", "RETURN_PENDING", "RETURNED", "COMPLETED"].includes(contractStatus);
-                          const depositReceived = Number(contractProfile.deposit_settlement?.received ?? 0);
-                          const depositDue = Number(contractProfile.security_deposit_amount ?? 0);
-                          const depositOpen = depositReceived + 0.005 < depositDue;
+                          const depositReceived = Number(subscription.rent_lease_kpis?.deposit_paid || contractProfile?.deposit_settlement?.received || 0);
+                          const depositDue = Number(subscription.rent_lease_kpis?.deposit_due || contractProfile?.security_deposit_amount || 0);
+                          const depositPending = Number(subscription.rent_lease_kpis?.deposit_pending || Math.max(0, depositDue - depositReceived));
+                          const depositOpen = depositPending > 0.005 || (depositReceived + 0.005 < depositDue);
                           const settleLabel = ["RETURNED", "COMPLETED"].includes(contractStatus)
                             ? "Refund Deposit & Close Contract"
                             : "Cancel / Close Contract";
@@ -2628,13 +2664,13 @@ export default function AdminSubscriptionDetailPage() {
           />
         ) : null}
 
-        {subscription && !isEmiSubscription && contractProfile ? (
+        {subscription && !isEmiSubscription ? (
           <CollectSecurityDepositModal
             subscriptionId={subscription.id}
             contractNumber={subscription.subscription_number || `SUB-${subscription.id}`}
             customerName={subscription.customer_name || ""}
-            securityDepositDue={Number(contractProfile.security_deposit_amount || 0)}
-            securityDepositReceived={Number(contractProfile.deposit_settlement?.received ?? 0)}
+            securityDepositDue={Number(subscription.rent_lease_kpis?.deposit_due || contractProfile?.security_deposit_amount || 0)}
+            securityDepositReceived={Number(subscription.rent_lease_kpis?.deposit_paid || contractProfile?.deposit_settlement?.received || 0)}
             open={collectDepositModalOpen}
             onOpenChange={setCollectDepositModalOpen}
             onCollected={() => void loadPage()}

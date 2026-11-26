@@ -1634,7 +1634,10 @@ export default function SubscriptionCreatePage({
             if (snap.deposit_payment_option) setDepositPaymentOption(snap.deposit_payment_option as "FULL" | "PARTIAL");
             if (snap.deposit_buffer_days) setDepositBufferDays(String(snap.deposit_buffer_days));
             if (snap.deposit_due_date) setDepositDueDate(String(snap.deposit_due_date).slice(0, 10));
-            if (snap.initial_deposit_payment) setInitialDepositPayment(String(snap.initial_deposit_payment));
+            if (snap.initial_deposit_payment != null) setInitialDepositPayment(String(snap.initial_deposit_payment));
+            if (snap.deposit_finance_account_id) setDepositFinanceAccountId(String(snap.deposit_finance_account_id));
+            if (snap.deposit_payment_method) setDepositPaymentMethod(snap.deposit_payment_method as any);
+            if (snap.deposit_reference_no) setDepositReferenceNo(String(snap.deposit_reference_no));
           }
         }
       } catch (err) {
@@ -2135,7 +2138,10 @@ export default function SubscriptionCreatePage({
             ? Number(initialDepositPayment)
             : depositPaymentOption === "FULL"
               ? securityDepositAmount
-              : null;
+              : 0;
+          body.deposit_finance_account_id = depositFinanceAccountId ? Number(depositFinanceAccountId) : null;
+          body.deposit_payment_method = depositPaymentMethod || "CASH";
+          body.deposit_reference_no = depositReferenceNo.trim() || undefined;
 
           if (isLeasePlan) {
             body.buyout_amount = leaseBuyoutAmount.trim() ? leaseBuyoutAmount.trim() : null;

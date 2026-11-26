@@ -394,6 +394,32 @@ def create_rent_contract(
                 else RentLeaseDemandStatus.PARTIAL
             )
             deposit_demand.save(update_fields=["collected_amount", "held_amount", "refundable_amount", "status", "updated_at"])
+            from subscriptions.models import RentLeaseDepositTransaction, RentLeaseDepositTransactionType, RentLeaseDepositTransactionStatus
+            if not RentLeaseDepositTransaction.objects.filter(
+                subscription=subscription,
+                demand=deposit_demand,
+                transaction_type__in=[
+                    RentLeaseDepositTransactionType.DEPOSIT_RECEIPT,
+                    RentLeaseDepositTransactionType.COLLECTED,
+                ],
+                status=RentLeaseDepositTransactionStatus.ACTIVE,
+            ).exists():
+                RentLeaseDepositTransaction.objects.create(
+                    subscription=subscription,
+                    demand=deposit_demand,
+                    customer=subscription.customer,
+                    plan_type=subscription.plan_type,
+                    transaction_type=RentLeaseDepositTransactionType.DEPOSIT_RECEIPT,
+                    amount=init_amount,
+                    transaction_date=start_date or timezone.localdate(),
+                    payment_method=deposit_payment_method or "CASH",
+                    finance_account_id=deposit_finance_account_id,
+                    external_reference_no=deposit_reference_no or "",
+                    performed_by=performed_by,
+                    created_by=performed_by,
+                    reason=f"Security deposit collected at contract creation ({deposit_payment_option}) - Ref: {deposit_reference_no}".strip(),
+                    metadata={"reference_key": deposit_demand.reference_key, "deposit_payment_option": deposit_payment_option},
+                )
 
     log_audit(
         action_type=AuditLog.ActionType.SUB_CREATED,
@@ -663,6 +689,32 @@ def create_lease_contract(
                 else RentLeaseDemandStatus.PARTIAL
             )
             deposit_demand.save(update_fields=["collected_amount", "held_amount", "refundable_amount", "status", "updated_at"])
+            from subscriptions.models import RentLeaseDepositTransaction, RentLeaseDepositTransactionType, RentLeaseDepositTransactionStatus
+            if not RentLeaseDepositTransaction.objects.filter(
+                subscription=subscription,
+                demand=deposit_demand,
+                transaction_type__in=[
+                    RentLeaseDepositTransactionType.DEPOSIT_RECEIPT,
+                    RentLeaseDepositTransactionType.COLLECTED,
+                ],
+                status=RentLeaseDepositTransactionStatus.ACTIVE,
+            ).exists():
+                RentLeaseDepositTransaction.objects.create(
+                    subscription=subscription,
+                    demand=deposit_demand,
+                    customer=subscription.customer,
+                    plan_type=subscription.plan_type,
+                    transaction_type=RentLeaseDepositTransactionType.DEPOSIT_RECEIPT,
+                    amount=init_amount,
+                    transaction_date=start_date or timezone.localdate(),
+                    payment_method=deposit_payment_method or "CASH",
+                    finance_account_id=deposit_finance_account_id,
+                    external_reference_no=deposit_reference_no or "",
+                    performed_by=performed_by,
+                    created_by=performed_by,
+                    reason=f"Security deposit collected at contract creation ({deposit_payment_option}) - Ref: {deposit_reference_no}".strip(),
+                    metadata={"reference_key": deposit_demand.reference_key, "deposit_payment_option": deposit_payment_option},
+                )
 
     log_audit(
         action_type=AuditLog.ActionType.SUB_CREATED,

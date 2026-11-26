@@ -118,7 +118,9 @@ export function CollectSecurityDepositModal({
         payment_method: paymentMethod,
         finance_account_id: Number(financeAccountId),
         reference_no: referenceNo.trim() || undefined,
+        payment_date: paymentDate,
         receipt_date: paymentDate,
+        note: notes.trim() || undefined,
         notes: notes.trim() || undefined,
         idempotency_key: `SEC-DEP-${subscriptionId}-${Date.now()}`,
       });
