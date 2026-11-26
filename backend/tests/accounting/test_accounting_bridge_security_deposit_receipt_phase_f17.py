@@ -131,6 +131,23 @@ class AccountingBridgeSecurityDepositReceiptPhaseF17Tests(APITestCase):
             ).exists()
         )
 
+    def test_approved_receipt_event_auto_posts_with_none_actor(self):
+        from accounting.services.accounting_bridge_security_deposit_service import auto_post_deposit_transaction
+        from accounting.services.bridge_posting_approval_service import set_bridge_posting_approval
+
+        tx = self._deposit(plan_type=PlanType.RENT, suffix="AUTONONE")
+        set_bridge_posting_approval(event_key="rent_security_deposit_receipt", approved=True, actor=self.admin)
+        result = auto_post_deposit_transaction(tx, actor=None)
+
+        self.assertTrue(result.get("posted"), result)
+        self.assertTrue(
+            JournalEntry.objects.filter(
+                source_model="RentLeaseDepositTransaction",
+                source_id=str(tx.id),
+                status=JournalEntryStatus.POSTED,
+            ).exists()
+        )
+
     def test_concrete_rent_and_lease_deposit_receipt_candidate_generation(self):
         rent = self._deposit(plan_type=PlanType.RENT, suffix="RENT")
         lease = self._deposit(plan_type=PlanType.LEASE, suffix="LEASE")

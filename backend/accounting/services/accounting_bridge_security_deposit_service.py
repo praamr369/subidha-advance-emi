@@ -600,6 +600,13 @@ def auto_post_deposit_transaction(transaction_row, *, actor=None) -> dict:
     key = candidate.get("idempotency_key")
     if not candidate_id or not key:
         return {"posted": False, "reason": "missing_candidate_key"}
+    if actor is None:
+        from django.contrib.auth import get_user_model
+        actor = (
+            getattr(transaction_row, "performed_by", None)
+            or getattr(transaction_row, "created_by", None)
+            or get_user_model().objects.filter(is_superuser=True).order_by("id").first()
+        )
     try:
         with transaction.atomic():
             return post_bridge_candidate(

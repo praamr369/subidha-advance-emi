@@ -1293,8 +1293,17 @@ def preview_bridge_candidate(candidate_id: str) -> dict[str, Any]:
 
 
 def _create_pending_reconciliation_item(*, journal: JournalEntry, source_model: str, source_id: str, source_label: str, amount: Decimal, candidate_id: str, actor, note: str = "") -> ReconciliationItem:
+    resolved_actor = actor
+    if resolved_actor is None:
+        from django.contrib.auth import get_user_model
+
+        resolved_actor = (
+            getattr(journal, "posted_by", None)
+            or getattr(journal, "created_by", None)
+            or get_user_model().objects.filter(is_superuser=True).order_by("id").first()
+        )
     phase_slice = "F14" if source_model == RENT_LEASE_DEMAND_SOURCE_MODEL else "F11" if source_model == COMMISSION_PAYOUT_SOURCE_MODEL else "F10" if source_model == COMMISSION_SOURCE_MODEL else "F5" if source_model == DEBIT_NOTE_SOURCE_MODEL else "F4" if source_model in {CREDIT_NOTE_SOURCE_MODEL, DIRECT_SALE_RETURN_SOURCE_MODEL} else "F3" if source_model == BILLING_INVOICE_SOURCE_MODEL else "F2" if source_model == RECEIPT_SOURCE_MODEL else "F"
-    run = ReconciliationRun.objects.create(run_no=next_reconciliation_run_no(), scope="BRIDGE_POSTING", module="ACCOUNTING_BRIDGE", date_from=journal.entry_date, date_to=journal.entry_date, status=ReconciliationRunStatus.COMPLETED, started_by=actor, started_at=timezone.now(), finished_at=timezone.now(), total_checked=1, total_matched=0, total_exceptions=1, high_risk_count=0, metadata={"phase": "F", "phase_slice": phase_slice, "system_created_after_bridge_post": True, "verification_required": True, "posting_note": note})
+    run = ReconciliationRun.objects.create(run_no=next_reconciliation_run_no(), scope="BRIDGE_POSTING", module="ACCOUNTING_BRIDGE", date_from=journal.entry_date, date_to=journal.entry_date, status=ReconciliationRunStatus.COMPLETED, started_by=resolved_actor, started_at=timezone.now(), finished_at=timezone.now(), total_checked=1, total_matched=0, total_exceptions=1, high_risk_count=0, metadata={"phase": "F", "phase_slice": phase_slice, "system_created_after_bridge_post": True, "verification_required": True, "posting_note": note})
     item = ReconciliationItem.objects.create(run=run, module="ACCOUNTING_BRIDGE_PHASE_F", source_type=source_model, source_id=source_id, source_label=source_label, expected_amount=amount, actual_amount=amount, amount_delta=Decimal("0.00"), severity=ReconciliationSeverity.MEDIUM, status=ReconciliationItemStatus.NEEDS_REVIEW, exception_code="POSTED_UNVERIFIED", exception_message="Bridge journal was posted and is waiting for explicit reconciliation verification.", recommended_action="Run reconciliation checks, then verify this bridge item if no hard exception is reported.", metadata={"journal_entry_id": journal.id, "journal_entry_no": journal.entry_no, "bridge_candidate_id": candidate_id, "action_href": "/admin/accounting/bridge-reconciliation"})
     ReconciliationEvidence.objects.create(item=item, evidence_type=source_model, object_id=source_id, label=source_label, amount=amount, status="SOURCE")
     ReconciliationEvidence.objects.create(item=item, evidence_type="JournalEntry", object_id=str(journal.id), label=journal.entry_no, amount=amount, status=journal.status)

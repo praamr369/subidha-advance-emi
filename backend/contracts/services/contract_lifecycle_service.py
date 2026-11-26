@@ -784,7 +784,7 @@ def modify_pre_activation_contract(
                             tx = None
 
                     if not tx:
-                        RentLeaseDepositTransaction.objects.create(
+                        tx = RentLeaseDepositTransaction.objects.create(
                             subscription=subscription,
                             demand=dep_demand,
                             customer=subscription.customer,
@@ -800,6 +800,8 @@ def modify_pre_activation_contract(
                             reason=note_text,
                             metadata={"reference_key": dep_demand.reference_key, "deposit_payment_option": deposit_payment_option},
                         )
+                        from accounting.services.accounting_bridge_security_deposit_service import auto_post_deposit_transaction
+                        auto_post_deposit_transaction(tx, actor=performed_by)
                 else:
                     RentLeaseDepositTransaction.objects.filter(
                         subscription=subscription,
