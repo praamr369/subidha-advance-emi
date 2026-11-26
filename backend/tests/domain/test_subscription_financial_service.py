@@ -249,3 +249,48 @@ class SubscriptionFinancialServiceTests(TestCase):
         self.assertEqual(snapshot["outstanding_amount"], "0.00")
         self.assertEqual(snapshot["pending_amount"], "0.00")
         self.assertEqual(snapshot["warnings"], [])
+
+    def test_dashboard_summary_with_direct_sale_string_id(self):
+        from django.utils import timezone
+        from subscriptions.services.subscription_financial_service import (
+            _pending_emi_sort_key,
+            build_customer_dashboard_summary,
+        )
+        from billing.models import DirectSale
+        from accounting.models import DocumentSequence
+
+        doc_seq = DocumentSequence.objects.first()
+        if not doc_seq:
+            doc_seq = DocumentSequence.objects.create(
+                series_code="TEST-DS-SEQ",
+                prefix="DS",
+                document_type="DIRECT_SALE",
+            )
+
+        ds = DirectSale.objects.create(
+            customer=self.customer,
+            sale_date=timezone.localdate(),
+            financial_year="2026-2027",
+            doc_series=doc_seq,
+            grand_total=Decimal("5000.00"),
+            received_total=Decimal("2000.00"),
+            balance_total=Decimal("3000.00"),
+            status="CONFIRMED",
+        )
+
+        # Ensure sort key works on direct sale row with 'ds-<id>' string ID
+        ds_row = {
+            "id": f"ds-{ds.id}",
+            "due_date": ds.sale_date.isoformat(),
+            "month_no": 1,
+            "balance_amount": ds.balance_total,
+        }
+        key = _pending_emi_sort_key(ds_row)
+        self.assertEqual(key[0], ds.sale_date)
+        self.assertEqual(key[1], 1)
+        self.assertEqual(key[2], ds.id)
+
+        # Build customer dashboard summary including this customer who has direct sales
+        summary = build_customer_dashboard_summary([self.subscription], customer=self.customer)
+        self.assertIsNotNone(summary)
+        self.assertIn("next_due_amount", summary)

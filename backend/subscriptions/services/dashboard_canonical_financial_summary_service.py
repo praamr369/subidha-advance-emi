@@ -160,17 +160,32 @@ def _cashier_visible_payments_queryset():
     )
 
 
-def _pending_emi_sort_key(row: dict) -> tuple[date, int, int]:
+def _safe_sort_int(val, default: int = 0) -> int:
+    if val is None:
+        return default
+    if isinstance(val, int):
+        return val
+    try:
+        return int(val)
+    except (TypeError, ValueError):
+        import re
+
+        m = re.search(r"\d+", str(val))
+        return int(m.group()) if m else default
+
+
+def _pending_emi_sort_key(row: dict) -> tuple[date, int, int, str]:
     due_date_raw = row.get("due_date")
     try:
-        due_date = date.fromisoformat(str(due_date_raw))
+        due_date = date.fromisoformat(str(due_date_raw)[:10])
     except (TypeError, ValueError):
         due_date = date.max
 
     return (
         due_date,
-        int(row.get("month_no") or 0),
-        int(row.get("id") or 0),
+        _safe_sort_int(row.get("month_no")),
+        _safe_sort_int(row.get("id")),
+        str(row.get("id") or ""),
     )
 
 
