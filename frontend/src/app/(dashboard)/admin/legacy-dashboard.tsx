@@ -240,7 +240,7 @@ function DashboardKpiCard({
 }
 
 function MiniBar({ value, max, color }: { value: number; max: number; color: string }) {
-  const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0;
+  const pct = max > 0 ? Math.max(0, Math.min(100, Math.round((value / max) * 100))) : 0;
   return (
     <div className="h-1.5 w-full rounded-full bg-slate-200/80 dark:bg-slate-700/60 overflow-hidden">
       <div className={`h-full rounded-full transition-all duration-500 ${color}`} style={{ width: `${pct}%` }} />
@@ -308,7 +308,7 @@ function ModuleOperationalCard({
         <div className="mt-3">
           <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1">
             <span>{bar.label}</span>
-            <span className="font-semibold">{bar.max > 0 ? Math.round((bar.value / bar.max) * 100) : 0}%</span>
+            <span className="font-semibold">{bar.max > 0 ? Math.max(0, Math.min(100, Math.round((bar.value / bar.max) * 100))) : 0}%</span>
           </div>
           <MiniBar value={bar.value} max={bar.max} color={bar.color} />
         </div>
@@ -1190,19 +1190,22 @@ export default function AdminDashboardPage() {
                     kpis={[
                       { value: legacy.modules.rent_lease.active_rent, label: "Rent", tone: "neutral" },
                       { value: legacy.modules.rent_lease.active_lease, label: "Lease", tone: "neutral" },
-                      { value: legacy.modules.rent_lease.open_demand_count, label: "Open", tone: legacy.modules.rent_lease.open_demand_count > 0 ? "warning" : "success" },
+                      { value: legacy.modules.rent_lease.open_demand_count, label: "Open Dues", tone: legacy.modules.rent_lease.open_demand_count > 0 ? "warning" : "success" },
                     ]}
                     bar={(() => {
-                      const total = legacy.modules.rent_lease.active_rent + legacy.modules.rent_lease.active_lease;
-                      return total > 0 ? {
-                        value: total - legacy.modules.rent_lease.open_demand_count,
-                        max: total,
+                      const totalDemands = legacy.modules.rent_lease.total_demand_count ?? (legacy.modules.rent_lease.active_rent + legacy.modules.rent_lease.active_lease);
+                      const paidDemands = legacy.modules.rent_lease.paid_demand_count ?? Math.max(0, totalDemands - legacy.modules.rent_lease.open_demand_count);
+                      return totalDemands > 0 ? {
+                        value: paidDemands,
+                        max: totalDemands,
                         color: "bg-violet-500",
-                        label: "Demand cleared",
+                        label: "Demands settled",
                       } : undefined;
                     })()}
                     actions={[
-                      { label: "Deposits", href: ROUTES.admin.rentLease },
+                      { label: "Contracts", href: ROUTES.admin.rentLease },
+                      { label: "Monthly Dues", href: `${ROUTES.admin.rentLease}?tab=demands` },
+                      { label: "Deposits", href: ROUTES.admin.financeDeposits },
                     ]}
                   />
                   <ModuleOperationalCard
@@ -1211,18 +1214,46 @@ export default function AdminDashboardPage() {
                     icon={<PackageSearch className="h-4 w-4 text-white" />}
                     iconBg="bg-slate-600 dark:bg-slate-700"
                     alert={
+                      (legacy.analytics?.inventory?.stock_health?.low_stock_count ?? 0) > 0 ||
                       legacy.modules.purchasing.draft_goods_receipts +
                         legacy.modules.purchasing.draft_vendor_bills >
                       0
                     }
-                    kpis={[
-                      { value: legacy.modules.purchasing.open_purchase_orders, label: "POs open", tone: "neutral" },
-                      { value: legacy.modules.purchasing.draft_goods_receipts, label: "GRN draft", tone: legacy.modules.purchasing.draft_goods_receipts > 0 ? "warning" : "neutral" },
-                      { value: legacy.modules.purchasing.draft_vendor_bills, label: "Bills draft", tone: legacy.modules.purchasing.draft_vendor_bills > 0 ? "warning" : "neutral" },
-                    ]}
+                    kpis={
+                      legacy.analytics?.inventory?.total_units_on_hand != null
+                        ? [
+                            { value: legacy.analytics.inventory.total_units_on_hand, label: "In Stock", tone: "neutral" },
+                            {
+                              value: legacy.analytics.inventory.stock_health?.low_stock_count ?? 0,
+                              label: "Low Stock",
+                              tone: (legacy.analytics.inventory.stock_health?.low_stock_count ?? 0) > 0 ? "danger" : "success",
+                            },
+                            { value: legacy.modules.purchasing.open_purchase_orders, label: "POs Open", tone: "neutral" },
+                          ]
+                        : [
+                            { value: legacy.modules.purchasing.open_purchase_orders, label: "POs open", tone: "neutral" },
+                            { value: legacy.modules.purchasing.draft_goods_receipts, label: "GRN draft", tone: legacy.modules.purchasing.draft_goods_receipts > 0 ? "warning" : "neutral" },
+                            { value: legacy.modules.purchasing.draft_vendor_bills, label: "Bills draft", tone: legacy.modules.purchasing.draft_vendor_bills > 0 ? "warning" : "neutral" },
+                          ]
+                    }
+                    bar={
+                      legacy.analytics?.inventory?.stock_health != null
+                        ? (() => {
+                            const sh = legacy.analytics.inventory.stock_health;
+                            const totalTracked = (sh.healthy_count ?? 0) + (sh.low_stock_count ?? 0) + (sh.out_of_stock_count ?? 0);
+                            return totalTracked > 0 ? {
+                              value: sh.healthy_count ?? 0,
+                              max: totalTracked,
+                              color: "bg-emerald-500",
+                              label: "Healthy stock ratio",
+                            } : undefined;
+                          })()
+                        : undefined
+                    }
                     actions={[
-                      { label: "New PO", href: ROUTES.admin.purchaseOrders },
                       { label: "Stock on hand", href: ROUTES.admin.inventoryStockOnHand },
+                      { label: "New PO", href: ROUTES.admin.purchaseOrders },
+                      { label: "Stock Ledger", href: ROUTES.admin.inventoryLedger },
                     ]}
                   />
                   <ModuleOperationalCard
@@ -1238,7 +1269,16 @@ export default function AdminDashboardPage() {
                       { value: legacy.modules.hr.pending_leave_requests, label: "Leave req", tone: legacy.modules.hr.pending_leave_requests > 0 ? "warning" : "success" },
                       { value: legacy.modules.hr.unpaid_salary_sheets, label: "Unpaid sal", tone: legacy.modules.hr.unpaid_salary_sheets > 0 ? "danger" : "success" },
                     ]}
+                    bar={
+                      legacy.attendance && legacy.attendance.total_staff > 0 ? {
+                        value: legacy.attendance.present + legacy.attendance.half_day,
+                        max: legacy.attendance.total_staff,
+                        color: "bg-emerald-500",
+                        label: "Staff present today",
+                      } : undefined
+                    }
                     actions={[
+                      { label: "Staff directory", href: ROUTES.admin.hrStaff },
                       { label: "Run payroll", href: ROUTES.admin.hrPayroll },
                       { label: "Leave requests", href: ROUTES.admin.hrLeave },
                     ]}
@@ -1277,10 +1317,21 @@ export default function AdminDashboardPage() {
                     kpis={[
                       { value: legacy.modules.support.open_tickets, label: "Tickets", tone: legacy.modules.support.open_tickets > 0 ? "danger" : "success" },
                       { value: legacy.modules.support.open_delivery_cases, label: "Delivery", tone: legacy.modules.support.open_delivery_cases > 0 ? "warning" : "neutral" },
-                      { value: 0, label: "Resolved", tone: "success" },
+                      { value: legacy.modules.support.resolved_tickets ?? 0, label: "Resolved", tone: "success" },
                     ]}
+                    bar={(() => {
+                      const totalTickets = (legacy.modules.support.open_tickets ?? 0) + (legacy.modules.support.resolved_tickets ?? 0);
+                      return totalTickets > 0 ? {
+                        value: legacy.modules.support.resolved_tickets ?? 0,
+                        max: totalTickets,
+                        color: "bg-rose-500",
+                        label: "Resolution rate",
+                      } : undefined;
+                    })()}
                     actions={[
+                      { label: "Service desk", href: ROUTES.admin.serviceDesk },
                       { label: "New ticket", href: ROUTES.admin.serviceDeskTickets },
+                      { label: "Deliveries", href: ROUTES.admin.deliveries },
                     ]}
                   />
                   <ModuleOperationalCard
@@ -1301,6 +1352,7 @@ export default function AdminDashboardPage() {
                     ]}
                     actions={[
                       { label: "Run selection", href: ROUTES.admin.batches },
+                      { label: "All batches", href: ROUTES.admin.batches },
                     ]}
                   />
                   <ModuleOperationalCard

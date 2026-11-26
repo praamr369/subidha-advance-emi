@@ -1726,20 +1726,41 @@ button {
 .dark :is(.dashboard-app, .auth-stage) :is(
     .border-slate-200,
     .border-slate-200\/80,
-    .border-slate-300
+    .border-slate-300,
+    .border-stone-200,
+    .border-stone-300,
+    .border-zinc-200,
+    .border-zinc-300,
+    .border-gray-200,
+    .border-gray-300
   ) {
   border-color: var(--border) !important;
 }
 
 .dark :is(.dashboard-app, .auth-stage) :is(
     .bg-white,
+    .bg-white\/5,
+    .bg-white\/10,
+    .bg-white\/20,
+    .bg-white\/30,
+    .bg-white\/40,
     .bg-white\/50,
     .bg-white\/60,
     .bg-white\/70,
     .bg-white\/75,
     .bg-white\/80,
     .bg-white\/85,
-    .bg-white\/90
+    .bg-white\/90,
+    .bg-white\/95,
+    .bg-white\/98,
+    .bg-slate-50,
+    .bg-slate-100,
+    .bg-stone-50,
+    .bg-stone-100,
+    .bg-zinc-50,
+    .bg-zinc-100,
+    .bg-gray-50,
+    .bg-gray-100
   ) {
   background-color: color-mix(in oklab, var(--card) 90%, var(--surface-muted) 10%) !important;
 }
@@ -2203,6 +2224,66 @@ button {
     color-mix(in oklab, white 96%, var(--surface-muted) 4%),
     color-mix(in oklab, var(--surface-card-soft) 84%, var(--surface-muted) 16%)
   );
+}
+
+/* ---------------------------------------------------------------------------
+ * Global Dark Mode Tables, Containers, and Metric Cards Enforcement
+ * Ensures all data grids, card strips, and overflow containers stay dark
+ * --------------------------------------------------------------------------- */
+.dark .dashboard-app .portal-page-content .overflow-x-auto,
+.dark .portal-page-content .overflow-x-auto,
+.dark .portal-page-content > .overflow-x-auto,
+.dark .dashboard-app .overflow-x-auto,
+.dark .table-surface-frame,
+.dark div.rounded-xl.border.overflow-x-auto,
+.dark .rounded-xl:has(table) {
+  background: var(--surface-card) !important;
+  background-image: none !important;
+  border-color: var(--border) !important;
+  box-shadow: var(--surface-shadow) !important;
+}
+
+.dark table {
+  background-color: transparent !important;
+  color: var(--foreground) !important;
+}
+
+.dark table thead th {
+  background: color-mix(in oklab, var(--surface-muted) 70%, var(--card) 30%) !important;
+  color: var(--foreground) !important;
+  border-color: var(--border) !important;
+}
+
+.dark table tbody td {
+  border-color: color-mix(in oklab, var(--border) 60%, transparent) !important;
+  color: var(--foreground);
+}
+
+.dark table tbody tr:hover td {
+  background: color-mix(in oklab, var(--accent) 24%, var(--card) 76%) !important;
+}
+
+.dark article:has(.enterprise-metric),
+.dark .portal-stat-tile,
+.dark .enterprise-metric-card,
+.dark .workspace-kpi-band,
+.dark .workspace-header-panel,
+.dark .workspace-pill,
+.dark .workspace-action-bar,
+.dark .workspace-filter-bar,
+.dark .surface-panel-elevated {
+  background: var(--surface-card) !important;
+  background-image: none !important;
+  border-color: var(--border) !important;
+  box-shadow: none !important;
+}
+
+.dark .enterprise-eyebrow {
+  color: var(--muted-foreground) !important;
+}
+
+.dark .enterprise-metric {
+  color: var(--foreground) !important;
 }
 
 .public-app .auth-stage {

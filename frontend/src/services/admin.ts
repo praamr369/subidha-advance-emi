@@ -275,6 +275,8 @@ export type AdminDashboardModules = {
     deposits_held: string;
     open_demand_count: number;
     open_demand_amount: string;
+    total_demand_count?: number;
+    paid_demand_count?: number;
   };
   purchasing: {
     open_purchase_orders: number;
@@ -296,6 +298,7 @@ export type AdminDashboardModules = {
   support: {
     open_tickets: number;
     open_delivery_cases: number;
+    resolved_tickets?: number;
   };
 };
 
@@ -565,6 +568,8 @@ function normalizeModules(
       deposits_held: toMoneyString(rentLease.deposits_held),
       open_demand_count: toNumber(rentLease.open_demand_count),
       open_demand_amount: toMoneyString(rentLease.open_demand_amount),
+      total_demand_count: toNumber(rentLease.total_demand_count),
+      paid_demand_count: toNumber(rentLease.paid_demand_count),
     },
     purchasing: {
       open_purchase_orders: toNumber(purchasing.open_purchase_orders),
@@ -586,6 +591,7 @@ function normalizeModules(
     support: {
       open_tickets: toNumber(support.open_tickets),
       open_delivery_cases: toNumber(support.open_delivery_cases),
+      resolved_tickets: toNumber(support.resolved_tickets),
     },
   };
 }

@@ -131,8 +131,12 @@ def _build_module_kpis(today: date) -> dict:
     deposits_held = RentLeaseBillingDemand.objects.filter(
         demand_type=RentLeaseDemandType.SECURITY_DEPOSIT
     ).aggregate(total=Sum("held_amount"))["total"]
-    demands_open = RentLeaseBillingDemand.objects.filter(
+    rent_monthly_demands = RentLeaseBillingDemand.objects.filter(
         demand_type__in=[RentLeaseDemandType.RENT_MONTHLY, RentLeaseDemandType.LEASE_MONTHLY],
+    )
+    demands_total_count = rent_monthly_demands.count()
+    demands_paid_count = rent_monthly_demands.filter(status=RentLeaseDemandStatus.PAID).count()
+    demands_open = rent_monthly_demands.filter(
         status__in=[RentLeaseDemandStatus.PENDING, RentLeaseDemandStatus.PARTIAL, RentLeaseDemandStatus.OVERDUE],
     ).aggregate(total=Sum("amount"), n=Count("id"))
 
@@ -166,6 +170,8 @@ def _build_module_kpis(today: date) -> dict:
             "deposits_held": _money(deposits_held),
             "open_demand_count": int(demands_open["n"] or 0),
             "open_demand_amount": _money(demands_open["total"]),
+            "total_demand_count": demands_total_count,
+            "paid_demand_count": demands_paid_count,
         },
         "purchasing": {
             "open_purchase_orders": PurchaseOrder.objects.filter(
@@ -198,6 +204,7 @@ def _build_module_kpis(today: date) -> dict:
             "open_tickets": SupportTicket.objects.exclude(
                 status__in=[SupportTicketStatus.RESOLVED, SupportTicketStatus.CLOSED, SupportTicketStatus.REJECTED]
             ).count(),
+            "resolved_tickets": SupportTicket.objects.filter(status=SupportTicketStatus.RESOLVED).count(),
             "open_delivery_cases": ServiceDeskCase.objects.filter(
                 status__in=["OPEN", "UNDER_REVIEW", "AUTHORIZED", "IN_SERVICE"]
             ).count(),

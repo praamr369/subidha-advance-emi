@@ -27,28 +27,28 @@ const noticeToneStyles: Record<
 > = {
   default: {
     shell:
-      "border-border bg-[linear-gradient(180deg,color-mix(in_oklab,white_96%,var(--surface-muted)_4%),color-mix(in_oklab,var(--surface-card-soft)_78%,var(--surface-muted)_22%))] text-foreground",
+      "border-border bg-[linear-gradient(180deg,color-mix(in_oklab,white_96%,var(--surface-muted)_4%),color-mix(in_oklab,var(--surface-card-soft)_78%,var(--surface-muted)_22%))] dark:border-border dark:bg-card dark:bg-none text-foreground",
     icon: "border-border bg-[var(--surface-card-elevated)] text-muted-foreground",
   },
   info: {
     shell:
-      "border-sky-200/90 bg-[linear-gradient(180deg,rgba(240,249,255,0.98),rgba(224,242,254,0.92))] text-sky-950",
-    icon: "border-sky-200/90 bg-card text-sky-700",
+      "border-sky-200/90 bg-[linear-gradient(180deg,rgba(240,249,255,0.98),rgba(224,242,254,0.92))] dark:bg-sky-950/40 dark:border-sky-800 dark:bg-none dark:text-sky-200 text-sky-950",
+    icon: "border-sky-200/90 bg-card text-sky-700 dark:text-sky-300 dark:border-sky-800",
   },
   success: {
     shell:
-      "border-emerald-200/90 bg-[linear-gradient(180deg,rgba(236,253,245,0.98),rgba(220,252,231,0.92))] text-emerald-950",
-    icon: "border-emerald-200/90 bg-card text-emerald-700",
+      "border-emerald-200/90 bg-[linear-gradient(180deg,rgba(236,253,245,0.98),rgba(220,252,231,0.92))] dark:bg-emerald-950/40 dark:border-emerald-800 dark:bg-none dark:text-emerald-200 text-emerald-950",
+    icon: "border-emerald-200/90 bg-card text-emerald-700 dark:text-emerald-300 dark:border-emerald-800",
   },
   warning: {
     shell:
-      "border-amber-200/90 bg-[linear-gradient(180deg,rgba(255,251,235,0.98),rgba(254,243,199,0.92))] text-amber-950",
-    icon: "border-amber-200/90 bg-card text-amber-700",
+      "border-amber-200/90 bg-[linear-gradient(180deg,rgba(255,251,235,0.98),rgba(254,243,199,0.92))] dark:bg-amber-950/40 dark:border-amber-800 dark:bg-none dark:text-amber-200 text-amber-950",
+    icon: "border-amber-200/90 bg-card text-amber-700 dark:text-amber-300 dark:border-amber-800",
   },
   danger: {
     shell:
-      "border-red-200/90 bg-[linear-gradient(180deg,rgba(254,242,242,0.98),rgba(254,226,226,0.92))] text-red-950",
-    icon: "border-red-200/90 bg-card text-red-700",
+      "border-red-200/90 bg-[linear-gradient(180deg,rgba(254,242,242,0.98),rgba(254,226,226,0.92))] dark:bg-red-950/40 dark:border-red-800 dark:bg-none dark:text-red-200 text-red-950",
+    icon: "border-red-200/90 bg-card text-red-700 dark:text-red-300 dark:border-red-800",
   },
 };
 
@@ -151,7 +151,7 @@ export function WorkspaceTimeline({
           {index < items.length - 1 ? (
             <span className="absolute left-3 top-6 h-[calc(100%-0.25rem)] w-px bg-[color-mix(in_oklab,var(--surface-border-strong)_82%,transparent)]" />
           ) : null}
-          <div className="rounded-xl border border-[color-mix(in_oklab,var(--surface-border-strong)_82%,white_18%)] bg-[linear-gradient(180deg,color-mix(in_oklab,white_98%,var(--surface-muted)_2%),color-mix(in_oklab,var(--surface-card-soft)_82%,var(--surface-muted)_18%))] px-4 py-4 shadow-[0_18px_44px_-36px_rgba(15,23,42,0.32)]">
+          <div className="rounded-xl border border-[color-mix(in_oklab,var(--surface-border-strong)_82%,white_18%)] bg-[linear-gradient(180deg,color-mix(in_oklab,white_98%,var(--surface-muted)_2%),color-mix(in_oklab,var(--surface-card-soft)_82%,var(--surface-muted)_18%))] dark:border-border dark:bg-card dark:bg-none dark:shadow-none px-4 py-4 shadow-[0_18px_44px_-36px_rgba(15,23,42,0.32)]">
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">

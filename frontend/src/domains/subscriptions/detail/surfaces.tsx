@@ -37,16 +37,16 @@ type DetailMetricTileProps = {
 function surfaceToneClassName(tone: SurfaceTone = "default") {
   switch (tone) {
     case "success":
-      return "border-emerald-200/80 bg-[linear-gradient(160deg,rgba(236,253,245,0.95),rgba(209,250,229,0.85))]";
+      return "border-emerald-200/80 bg-[linear-gradient(160deg,rgba(236,253,245,0.95),rgba(209,250,229,0.85))] dark:border-border dark:bg-card dark:bg-none";
     case "info":
-      return "border-sky-200/80 bg-[linear-gradient(160deg,rgba(240,249,255,0.96),rgba(224,242,254,0.84))]";
+      return "border-sky-200/80 bg-[linear-gradient(160deg,rgba(240,249,255,0.96),rgba(224,242,254,0.84))] dark:border-border dark:bg-card dark:bg-none";
     case "warning":
-      return "border-amber-200/80 bg-[linear-gradient(160deg,rgba(255,251,235,0.96),rgba(254,243,199,0.86))]";
+      return "border-amber-200/80 bg-[linear-gradient(160deg,rgba(255,251,235,0.96),rgba(254,243,199,0.86))] dark:border-border dark:bg-card dark:bg-none";
     case "danger":
-      return "border-red-200/80 bg-[linear-gradient(160deg,rgba(254,242,242,0.96),rgba(254,226,226,0.86))]";
+      return "border-red-200/80 bg-[linear-gradient(160deg,rgba(254,242,242,0.96),rgba(254,226,226,0.86))] dark:border-border dark:bg-card dark:bg-none";
     case "default":
     default:
-      return "border-slate-200/80 bg-[linear-gradient(160deg,rgba(255,255,255,0.96),rgba(248,250,252,0.88))]";
+      return "border-slate-200/80 bg-[linear-gradient(160deg,rgba(255,255,255,0.96),rgba(248,250,252,0.88))] dark:border-border dark:bg-card dark:bg-none";
   }
 }
 
@@ -140,15 +140,15 @@ export function DetailSectionShell({
   return (
     <section
       className={cn(
-        "rounded-[28px] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.9))] p-5 shadow-[0_26px_90px_-42px_rgba(15,23,42,0.32)] backdrop-blur-xl",
+        "rounded-[28px] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.9))] dark:border-border dark:bg-card dark:bg-none dark:shadow-none p-5 shadow-[0_26px_90px_-42px_rgba(15,23,42,0.32)] backdrop-blur-xl",
         className
       )}
     >
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <h2 className="text-lg font-semibold tracking-tight text-slate-950">{title}</h2>
+          <h2 className="text-lg font-semibold tracking-tight text-slate-950 dark:text-foreground">{title}</h2>
           {description ? (
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 dark:text-muted-foreground">
               {description}
             </p>
           ) : null}

@@ -68,7 +68,7 @@ export function MetricCard({
   return (
     <article
       className={cn(
-        "rounded-xl border border-[color-mix(in_oklab,var(--surface-border-strong)_78%,white_22%)] bg-[linear-gradient(180deg,color-mix(in_oklab,white_98%,var(--surface-muted)_2%),color-mix(in_oklab,var(--surface-card-soft)_82%,var(--surface-muted)_18%))] p-4 shadow-[0_18px_45px_-38px_rgba(15,23,42,0.34)]",
+        "rounded-xl border border-[color-mix(in_oklab,var(--surface-border-strong)_78%,white_22%)] bg-[linear-gradient(180deg,color-mix(in_oklab,white_98%,var(--surface-muted)_2%),color-mix(in_oklab,var(--surface-card-soft)_82%,var(--surface-muted)_18%))] dark:border-border dark:bg-card dark:bg-none dark:shadow-none p-4 shadow-[0_18px_45px_-38px_rgba(15,23,42,0.34)]",
         className
       )}
     >

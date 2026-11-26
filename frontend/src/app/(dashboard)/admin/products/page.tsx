@@ -323,12 +323,12 @@ function PimProductRow({
         <div className="flex items-center gap-2 flex-wrap">
           <span className="font-medium text-sm">{p.full_name || p.name}</span>
           {!isChild && hasChildren && (
-            <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-full px-1.5 py-0.5">
+            <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 dark:bg-blue-950/50 dark:border-blue-800 dark:text-blue-300 rounded-full px-1.5 py-0.5">
               Base Product
             </span>
           )}
           {isChild && (
-            <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-violet-700 bg-violet-50 border border-violet-200 rounded-full px-1.5 py-0.5">
+            <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-violet-700 bg-violet-50 border border-violet-200 dark:bg-violet-950/50 dark:border-violet-800 dark:text-violet-300 rounded-full px-1.5 py-0.5">
               Variant SKU
             </span>
           )}
@@ -1156,7 +1156,7 @@ function PimPanel({
       </div>
 
       {/* PIM product hierarchical table */}
-      <div className="rounded-xl border overflow-x-auto">
+      <div className="rounded-xl border border-border bg-card overflow-x-auto">
         {pimError ? (
           <div className="p-8 text-center text-sm text-red-600">{pimError}</div>
         ) : pimLoading ? (
@@ -1691,7 +1691,7 @@ export default function AdminProductsPage() {
           <button
             type="button"
             onClick={() => { setShowVariantSkus((v) => !v); setPage(1); }}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${showVariantSkus ? "bg-violet-50 border-violet-300 text-violet-700" : "bg-muted border-muted-foreground/20 text-muted-foreground hover:text-foreground"}`}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${showVariantSkus ? "bg-violet-50 border-violet-300 text-violet-700 dark:bg-violet-950/40 dark:border-violet-800 dark:text-violet-300" : "bg-muted border-muted-foreground/20 text-muted-foreground hover:text-foreground"}`}
           >
             <GitBranch className="h-3 w-3" />
             {showVariantSkus ? "Hiding base product only" : "Show Variant SKUs"}

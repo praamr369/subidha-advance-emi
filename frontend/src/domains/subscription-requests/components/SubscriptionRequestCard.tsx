@@ -175,7 +175,7 @@ export default function SubscriptionRequestCard({
   showRequester = false,
 }: SubscriptionRequestCardProps) {
   const rootClassName = cn(
-    "rounded-[28px] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.92))] p-4 shadow-[0_24px_72px_-46px_rgba(15,23,42,0.34)] transition",
+    "rounded-[28px] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.92))] dark:border-border dark:bg-card dark:bg-none dark:shadow-none p-4 shadow-[0_24px_72px_-46px_rgba(15,23,42,0.34)] transition",
     href ? "hover:border-slate-300 hover:shadow-[0_28px_84px_-48px_rgba(15,23,42,0.42)]" : "",
     className
   );
@@ -184,7 +184,7 @@ export default function SubscriptionRequestCard({
     return (
       <Link href={href} className={rootClassName}>
         <CardBody request={request} showRequester={showRequester} />
-        <div className="mt-4 border-t border-slate-200/80 pt-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+        <div className="mt-4 border-t border-slate-200/80 dark:border-border pt-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-muted-foreground">
           Open request detail
         </div>
       </Link>
