@@ -96,6 +96,11 @@ class AdminRentContractCreateSerializer(serializers.Serializer):
         required=False,
         default="CASH",
     )
+    deposit_reference_no = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        default="",
+    )
 
     def validate_start_date(self, value):
         return value or timezone.localdate()
@@ -160,6 +165,11 @@ class AdminLeaseContractCreateSerializer(serializers.Serializer):
     deposit_payment_method = serializers.CharField(
         required=False,
         default="CASH",
+    )
+    deposit_reference_no = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        default="",
     )
 
     def validate_start_date(self, value):

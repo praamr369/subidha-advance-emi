@@ -20,7 +20,7 @@ import KycReadinessPanel from "@/domains/subscriptions/components/KycReadinessPa
 import type { ContractKycReadiness } from "@/services/kyc-readiness";
 import SignatureCanvas from "@/components/forms/SignatureCanvas";
 import { CustomerSignatureLinkModal } from "@/components/contracts/CustomerSignatureLinkModal";
-import { Barcode, CheckCircle2, PackagePlus, Plus, Smartphone, Zap } from "lucide-react";
+import { Barcode, CheckCircle2, CreditCard, PackagePlus, Plus, Smartphone, Wallet, Zap } from "lucide-react";
 import MobileHandoverModal from "@/components/handover/MobileHandoverModal";
 import { dataUrlToFile } from "@/services/mobile-handover";
 import {
@@ -36,6 +36,7 @@ import QuickOpeningStockDrawer, {
 } from "@/components/inventory/QuickOpeningStockDrawer";
 import AccessorySelectionPanel, { type AccessorySelectionResult } from "@/components/inventory/AccessorySelectionPanel";
 import { fetchBillingAccessoryOptions, type ParentVariantOption } from "@/services/inventory";
+import { listFinanceAccounts, type FinanceAccount } from "@/services/accounting";
 
 type PlanType = "EMI" | "RENT" | "LEASE";
 type SubscriptionCreateVariant = "page" | "drawer";
@@ -716,6 +717,35 @@ export default function SubscriptionCreatePage({
   const [depositBufferDays, setDepositBufferDays] = useState("30");
   const [depositDueDate, setDepositDueDate] = useState(new Date().toISOString().slice(0, 10));
   const [initialDepositPayment, setInitialDepositPayment] = useState("");
+  const [depositFinanceAccountId, setDepositFinanceAccountId] = useState<string>("");
+  const [depositPaymentMethod, setDepositPaymentMethod] = useState<"CASH" | "UPI" | "BANK_TRANSFER" | "CARD" | "CHEQUE">("CASH");
+  const [depositReferenceNo, setDepositReferenceNo] = useState("");
+  const [financeAccounts, setFinanceAccounts] = useState<FinanceAccount[]>([]);
+  const [loadingFinanceAccounts, setLoadingFinanceAccounts] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    setLoadingFinanceAccounts(true);
+    listFinanceAccounts({ is_active: 1, page_size: 100, for_payment_collection: "true" })
+      .then((res) => {
+        if (!isMounted) return;
+        const accounts = Array.isArray(res) ? res : res.results || [];
+        setFinanceAccounts(accounts);
+        if (accounts.length > 0) {
+          const defaultAcc = accounts.find((a) => a.kind === "CASH" && a.collection_ready !== false) || accounts[0];
+          if (defaultAcc) {
+            setDepositFinanceAccountId(String(defaultAcc.id));
+          }
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (isMounted) setLoadingFinanceAccounts(false);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [signatureFile, setSignatureFile] = useState<File | null>(null);
@@ -2186,6 +2216,9 @@ export default function SubscriptionCreatePage({
             : depositPaymentOption === "FULL"
               ? securityDepositAmount
               : null,
+          deposit_finance_account_id: depositFinanceAccountId ? Number(depositFinanceAccountId) : null,
+          deposit_payment_method: depositPaymentMethod || "CASH",
+          deposit_reference_no: depositReferenceNo.trim() || undefined,
         };
 
         created = await apiFetch<CreatedSubscriptionResponse>("/admin/contracts/rent/", {
@@ -2236,6 +2269,9 @@ export default function SubscriptionCreatePage({
             : depositPaymentOption === "FULL"
               ? securityDepositAmount
               : null,
+          deposit_finance_account_id: depositFinanceAccountId ? Number(depositFinanceAccountId) : null,
+          deposit_payment_method: depositPaymentMethod || "CASH",
+          deposit_reference_no: depositReferenceNo.trim() || undefined,
         };
 
         created = await apiFetch<CreatedSubscriptionResponse>("/admin/contracts/lease/", {
@@ -3583,6 +3619,102 @@ export default function SubscriptionCreatePage({
                           </select>
                           <div className="mt-1 text-[10px] text-amber-600 dark:text-amber-400 font-medium">
                             Full balance due within {depositBufferDays} days from contract start
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Upfront Security Deposit Payment & Finance Account */}
+                    {(depositPaymentOption === "FULL" || Number(initialDepositPayment) > 0) && Number(securityDepositAmount) > 0 && (
+                      <div className="mt-3 rounded-lg border border-sky-200 dark:border-sky-800 bg-sky-50/50 dark:bg-sky-950/20 p-3.5">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 text-xs font-semibold text-sky-900 dark:text-sky-200">
+                            <CreditCard className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400" />
+                            Upfront Deposit Collection &amp; Finance Account
+                          </div>
+                          <span className="text-[11px] font-semibold text-sky-800 dark:text-sky-300">
+                            Collecting: {money(depositPaymentOption === "FULL" ? securityDepositAmount : Number(initialDepositPayment || 0))}
+                          </span>
+                        </div>
+                        <p className="mt-0.5 text-[11px] text-sky-700/80 dark:text-sky-400">
+                          Select the receiving finance account where the customer paid, ensuring accurate double-entry ledger posting.
+                        </p>
+
+                        <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                          {/* Finance Account */}
+                          <div>
+                            <label className="text-xs font-medium text-foreground">
+                              Receiving Finance Account <span className="text-rose-500">*</span>
+                            </label>
+                            <select
+                              value={depositFinanceAccountId}
+                              onChange={(e) => setDepositFinanceAccountId(e.target.value)}
+                              className="mt-1 h-9 w-full rounded-lg border border-border bg-background px-3 text-xs outline-none focus:border-ring"
+                            >
+                              {financeAccounts.length === 0 ? (
+                                <option value="">{loadingFinanceAccounts ? "Loading accounts..." : "No accounts found"}</option>
+                              ) : (
+                                financeAccounts.map((acc) => (
+                                  <option key={acc.id} value={acc.id}>
+                                    {acc.name} ({acc.kind}{acc.branch_name ? ` · ${acc.branch_name}` : ""})
+                                  </option>
+                                ))
+                              )}
+                            </select>
+                            <div className="mt-1 text-[10px] text-muted-foreground">
+                              Where customer paid deposit
+                            </div>
+                          </div>
+
+                          {/* Payment Method */}
+                          <div>
+                            <label className="text-xs font-medium text-foreground">
+                              Payment Method <span className="text-rose-500">*</span>
+                            </label>
+                            <select
+                              value={depositPaymentMethod}
+                              onChange={(e) => {
+                                const newMethod = e.target.value as typeof depositPaymentMethod;
+                                setDepositPaymentMethod(newMethod);
+                                if (newMethod === "CASH") {
+                                  const cashAcc = financeAccounts.find((a) => a.kind === "CASH");
+                                  if (cashAcc) setDepositFinanceAccountId(String(cashAcc.id));
+                                } else if (newMethod === "UPI") {
+                                  const upiOrBank = financeAccounts.find((a) => a.kind === "UPI" || a.kind === "BANK");
+                                  if (upiOrBank) setDepositFinanceAccountId(String(upiOrBank.id));
+                                } else if (newMethod === "BANK_TRANSFER" || newMethod === "CARD" || newMethod === "CHEQUE") {
+                                  const bankAcc = financeAccounts.find((a) => a.kind === "BANK");
+                                  if (bankAcc) setDepositFinanceAccountId(String(bankAcc.id));
+                                }
+                              }}
+                              className="mt-1 h-9 w-full rounded-lg border border-border bg-background px-3 text-xs outline-none focus:border-ring"
+                            >
+                              <option value="CASH">Cash Desk</option>
+                              <option value="UPI">UPI / QR Code</option>
+                              <option value="BANK_TRANSFER">Bank Transfer (NEFT/RTGS/IMPS)</option>
+                              <option value="CARD">Debit / Credit Card</option>
+                              <option value="CHEQUE">Cheque</option>
+                            </select>
+                            <div className="mt-1 text-[10px] text-muted-foreground">
+                              Tender used for deposit
+                            </div>
+                          </div>
+
+                          {/* Transaction / Reference ID */}
+                          <div>
+                            <label className="text-xs font-medium text-foreground">
+                              Reference / UTR / Note (Optional)
+                            </label>
+                            <input
+                              type="text"
+                              value={depositReferenceNo}
+                              onChange={(e) => setDepositReferenceNo(e.target.value)}
+                              placeholder="e.g. UTR12345678, Receipt #"
+                              className="mt-1 h-9 w-full rounded-lg border border-border bg-background px-3 text-xs outline-none focus:border-ring"
+                            />
+                            <div className="mt-1 text-[10px] text-muted-foreground">
+                              Transaction reference / UTR
+                            </div>
                           </div>
                         </div>
                       </div>

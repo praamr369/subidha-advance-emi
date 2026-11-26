@@ -178,16 +178,27 @@ def route_collection(
             "message": "Direct-sale collection posted through the existing retail receipt service.",
         }
 
-    if source_type in {ContractReferenceType.RENT, ContractReferenceType.LEASE}:
-        plan_type = PlanType.RENT if source_type == ContractReferenceType.RENT else PlanType.LEASE
-        subscription = Subscription.objects.filter(pk=source_id, plan_type=plan_type).first()
-        if not subscription:
-            raise ValidationError({"source_id": "Rent/lease subscription was not found."})
-        position = rent_lease_receivable_position(subscription)
-        demand_id = position.get("demand_id")
-        demand_type = position.get("demand_type")
-        if not position.get("is_collectible") or not demand_id:
-            raise ValidationError(position.get("disabled_reason") or "No collectible rent/lease demand is currently pending.")
+    if source_type in {ContractReferenceType.RENT, ContractReferenceType.LEASE, "SECURITY_DEPOSIT"}:
+        if source_type == "SECURITY_DEPOSIT":
+            subscription = Subscription.objects.filter(pk=source_id, plan_type__in=[PlanType.RENT, PlanType.LEASE]).first()
+            if not subscription:
+                from subscriptions.models import RentLeaseBillingDemand
+                demand_obj = RentLeaseBillingDemand.objects.filter(pk=source_id).select_related("subscription").first()
+                if demand_obj:
+                    subscription = demand_obj.subscription
+            if not subscription:
+                raise ValidationError({"source_id": "Rent/lease contract for security deposit collection was not found."})
+            demand_type = RentLeaseDemandType.SECURITY_DEPOSIT
+        else:
+            plan_type = PlanType.RENT if source_type == ContractReferenceType.RENT else PlanType.LEASE
+            subscription = Subscription.objects.filter(pk=source_id, plan_type=plan_type).first()
+            if not subscription:
+                raise ValidationError({"source_id": "Rent/lease subscription was not found."})
+            position = rent_lease_receivable_position(subscription)
+            demand_id = position.get("demand_id")
+            demand_type = position.get("demand_type")
+            if not position.get("is_collectible") or not demand_id:
+                raise ValidationError(position.get("disabled_reason") or "No collectible rent/lease demand is currently pending.")
         common_kwargs = {
             "subscription": subscription,
             "amount": amount,

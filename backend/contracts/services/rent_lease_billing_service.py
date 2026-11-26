@@ -191,7 +191,7 @@ def ensure_security_deposit_demand(*, subscription: Subscription, performed_by=N
         elif buffer_days and int(buffer_days) > 0:
             created_base = subscription.created_at.date() if subscription.created_at else timezone.localdate()
             from datetime import timedelta
-            due_date = min(created_base + timedelta(days=int(buffer_days)), subscription.start_date or created_base)
+            due_date = (subscription.start_date or created_base) + timedelta(days=int(buffer_days))
         else:
             # Full upfront: due at creation or contract start date, whichever is earlier
             created_base = subscription.created_at.date() if subscription.created_at else timezone.localdate()

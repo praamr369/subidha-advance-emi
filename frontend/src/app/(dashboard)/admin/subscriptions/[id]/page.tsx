@@ -39,6 +39,7 @@ import { CustomerSignatureLinkModal } from "@/components/contracts/CustomerSigna
 import DynamicUpiQrModal from "@/components/payments/DynamicUpiQrModal";
 import { GenerateRentLeaseLedgerModal } from "./GenerateRentLeaseLedgerModal";
 import { SettleRentLeaseContractModal } from "./SettleRentLeaseContractModal";
+import { CollectSecurityDepositModal } from "./CollectSecurityDepositModal";
 import ProductAttributeBadges from "@/components/ui/ProductAttributeBadges";
 import {
   normalizeDeliveryRecord,
@@ -834,6 +835,7 @@ export default function AdminSubscriptionDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
   const [settleModalOpen, setSettleModalOpen] = useState(false);
+  const [collectDepositModalOpen, setCollectDepositModalOpen] = useState(false);
   const [signatureModalOpen, setSignatureModalOpen] = useState(false);
   const [upiQrModalOpen, setUpiQrModalOpen] = useState(false);
 
@@ -1996,12 +1998,13 @@ export default function AdminSubscriptionDetailPage() {
                           return (
                             <>
                               {!ended && !goodsBackOrOut && depositOpen ? (
-                                <Link
-                                  href={`/admin/finance/collect?subscription=${subscription.id}&context=security_deposit`}
+                                <button
+                                  type="button"
+                                  onClick={() => setCollectDepositModalOpen(true)}
                                   className="inline-flex h-9 items-center justify-center rounded-md bg-sky-700 px-4 text-sm font-medium text-white shadow-sm transition hover:bg-sky-800"
                                 >
                                   Collect Security Deposit
-                                </Link>
+                                </button>
                               ) : null}
                               {!ended && !goodsBackOrOut ? (
                                 <Link
@@ -2622,6 +2625,19 @@ export default function AdminSubscriptionDetailPage() {
             open={settleModalOpen}
             onOpenChange={setSettleModalOpen}
             onSettled={() => void loadPage()}
+          />
+        ) : null}
+
+        {subscription && !isEmiSubscription && contractProfile ? (
+          <CollectSecurityDepositModal
+            subscriptionId={subscription.id}
+            contractNumber={subscription.subscription_number || `SUB-${subscription.id}`}
+            customerName={subscription.customer_name || ""}
+            securityDepositDue={Number(contractProfile.security_deposit_amount || 0)}
+            securityDepositReceived={Number(contractProfile.deposit_settlement?.received ?? 0)}
+            open={collectDepositModalOpen}
+            onOpenChange={setCollectDepositModalOpen}
+            onCollected={() => void loadPage()}
           />
         ) : null}
 

@@ -187,6 +187,7 @@ def create_rent_contract(
     initial_deposit_payment: Decimal | None = None,
     deposit_finance_account_id: int | None = None,
     deposit_payment_method: str = "CASH",
+    deposit_reference_no: str = "",
 ) -> Subscription:
     if start_date is None:
         start_date = timezone.now().date()
@@ -228,7 +229,7 @@ def create_rent_contract(
     if deposit_due_date is not None:
         deposit_due_date = deposit_due_date
     elif deposit_payment_option == "PARTIAL":
-        deposit_due_date = min(today + timedelta(days=deposit_buffer_days), start_date)
+        deposit_due_date = (start_date or today) + timedelta(days=deposit_buffer_days)
     else:
         # Full upfront deposit: due at contract activation/creation (today) or on start_date if earlier
         deposit_due_date = min(today, start_date)
@@ -365,21 +366,24 @@ def create_rent_contract(
     # If upfront deposit collection was provided
     if initial_deposit_payment is not None and Decimal(str(initial_deposit_payment)) > MONEY_ZERO:
         init_amount = q2(Decimal(str(initial_deposit_payment)))
-        if deposit_finance_account_id:
-            try:
-                from contracts.services.rent_lease_collection_workflow_service import collect_security_deposit_with_metadata
-                collect_security_deposit_with_metadata(
-                    subscription=subscription,
-                    amount=init_amount,
-                    performed_by=performed_by,
-                    finance_account_id=deposit_finance_account_id,
-                    payment_method=deposit_payment_method or "CASH",
-                    payment_date=start_date,
-                    note=f"Security deposit collected at contract creation ({deposit_payment_option})",
-                )
-            except Exception:
-                pass
-        else:
+        from contracts.services.rent_lease_collection_workflow_service import collect_security_deposit_with_metadata
+        try:
+            collect_security_deposit_with_metadata(
+                subscription=subscription,
+                amount=init_amount,
+                performed_by=performed_by,
+                finance_account_id=deposit_finance_account_id,
+                payment_method=deposit_payment_method or "CASH",
+                payment_date=start_date,
+                reference_no=deposit_reference_no or "",
+                note=f"Security deposit collected at contract creation ({deposit_payment_option})",
+            )
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning(
+                "Upfront deposit collection bridge skipped or fallback applied: %s",
+                str(exc),
+            )
             deposit_demand.refresh_from_db()
             deposit_demand.collected_amount = min(init_amount, deposit_demand.amount)
             deposit_demand.held_amount = deposit_demand.collected_amount
@@ -444,6 +448,7 @@ def create_lease_contract(
     initial_deposit_payment: Decimal | None = None,
     deposit_finance_account_id: int | None = None,
     deposit_payment_method: str = "CASH",
+    deposit_reference_no: str = "",
 ) -> Subscription:
     if start_date is None:
         start_date = timezone.now().date()
@@ -485,7 +490,7 @@ def create_lease_contract(
     if deposit_due_date is not None:
         deposit_due_date = deposit_due_date
     elif deposit_payment_option == "PARTIAL":
-        deposit_due_date = min(today + timedelta(days=deposit_buffer_days), start_date)
+        deposit_due_date = (start_date or today) + timedelta(days=deposit_buffer_days)
     else:
         # Full upfront deposit: due at contract activation/creation (today) or on start_date if earlier
         deposit_due_date = min(today, start_date)
@@ -630,21 +635,24 @@ def create_lease_contract(
     # If upfront deposit collection was provided
     if initial_deposit_payment is not None and Decimal(str(initial_deposit_payment)) > MONEY_ZERO:
         init_amount = q2(Decimal(str(initial_deposit_payment)))
-        if deposit_finance_account_id:
-            try:
-                from contracts.services.rent_lease_collection_workflow_service import collect_security_deposit_with_metadata
-                collect_security_deposit_with_metadata(
-                    subscription=subscription,
-                    amount=init_amount,
-                    performed_by=performed_by,
-                    finance_account_id=deposit_finance_account_id,
-                    payment_method=deposit_payment_method or "CASH",
-                    payment_date=start_date,
-                    note=f"Security deposit collected at contract creation ({deposit_payment_option})",
-                )
-            except Exception:
-                pass
-        else:
+        from contracts.services.rent_lease_collection_workflow_service import collect_security_deposit_with_metadata
+        try:
+            collect_security_deposit_with_metadata(
+                subscription=subscription,
+                amount=init_amount,
+                performed_by=performed_by,
+                finance_account_id=deposit_finance_account_id,
+                payment_method=deposit_payment_method or "CASH",
+                payment_date=start_date,
+                reference_no=deposit_reference_no or "",
+                note=f"Security deposit collected at contract creation ({deposit_payment_option})",
+            )
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning(
+                "Upfront deposit collection bridge skipped or fallback applied: %s",
+                str(exc),
+            )
             deposit_demand.refresh_from_db()
             deposit_demand.collected_amount = min(init_amount, deposit_demand.amount)
             deposit_demand.held_amount = deposit_demand.collected_amount
