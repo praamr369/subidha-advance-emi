@@ -63,6 +63,7 @@ from inventory.services.purchase_needs_list_service import build_purchase_needs_
 from inventory.services.lot_tracking_list_service import build_lot_tracking_list, export_lots_csv
 from inventory.services.stock_on_hand_service import (
     build_stock_on_hand_summary,
+    export_stock_on_hand_csv,
     get_critical_shortages,
     get_stock_on_hand_items,
     get_stock_on_hand_facets,
@@ -1552,8 +1553,40 @@ class AdminStockOnHandView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
     def get(self, request):
-        """Get stock on hand summary with KPI aggregation, filtering, and critical shortages"""
+        """Get stock on hand summary with KPI aggregation, filtering, CSV export, and critical shortages"""
         filter_type = request.query_params.get("filter", "").lower()
+        export_format = (request.query_params.get("export") or request.query_params.get("format") or "").lower()
+
+        loc_raw = (request.query_params.get("location_id") or "").strip()
+        location_id = int(loc_raw) if loc_raw.isdigit() else None
+        attr_filters = (request.query_params.get("attribute_filters") or "").strip()
+        sort_by = (request.query_params.get("sort_by") or "code").strip()
+
+        if export_format == "csv":
+            import csv
+            import io
+            from django.http import HttpResponse
+
+            rows = export_stock_on_hand_csv(
+                search=(request.query_params.get("search") or request.query_params.get("q") or "").strip(),
+                item_type=(request.query_params.get("item_type") or "").strip(),
+                category=(request.query_params.get("category") or "").strip(),
+                subcategory=(request.query_params.get("subcategory") or "").strip(),
+                attribute_key=(request.query_params.get("attribute_key") or "").strip(),
+                attribute_value=(request.query_params.get("attribute_value") or "").strip(),
+                stock_status=(request.query_params.get("stock_status") or "all").strip(),
+                location_id=location_id,
+                attribute_filters=attr_filters or None,
+                sort_by=sort_by or "category",
+            )
+            output = io.StringIO()
+            if rows:
+                writer = csv.DictWriter(output, fieldnames=list(rows[0].keys()))
+                writer.writeheader()
+                writer.writerows(rows)
+            response = HttpResponse(output.getvalue(), content_type="text/csv")
+            response["Content-Disposition"] = 'attachment; filename="stock_on_hand_export.csv"'
+            return response
 
         try:
             page = int(request.query_params.get("page", 1))
@@ -1565,10 +1598,27 @@ class AdminStockOnHandView(APIView):
         if page_size not in {20, 50, 100}:
             page_size = 50
 
+        has_filter_param = any(
+            request.query_params.get(k)
+            for k in (
+                "item_type",
+                "category",
+                "subcategory",
+                "attribute_key",
+                "attribute_value",
+                "attribute_filters",
+                "stock_status",
+                "location_id",
+                "sort_by",
+                "search",
+                "q",
+            )
+        )
+
         if filter_type == "critical":
             # Return only critical shortages (paginated)
             payload = get_critical_shortages(page=page, page_size=page_size)
-        elif filter_type == "all" or any(request.query_params.get(k) for k in ("item_type", "category", "subcategory", "attribute_key", "attribute_value", "stock_status", "search", "q")):
+        elif filter_type == "all" or has_filter_param:
             payload = get_stock_on_hand_items(
                 page=page,
                 page_size=page_size,
@@ -1579,6 +1629,9 @@ class AdminStockOnHandView(APIView):
                 attribute_key=(request.query_params.get("attribute_key") or "").strip(),
                 attribute_value=(request.query_params.get("attribute_value") or "").strip(),
                 stock_status=(request.query_params.get("stock_status") or "all").strip(),
+                location_id=location_id,
+                attribute_filters=attr_filters or None,
+                sort_by=sort_by,
             )
         else:
             # Return full summary with critical shortages list
@@ -1591,8 +1644,17 @@ class AdminStockOnHandFacetsView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
     def get(self, request):
-        """Get categories, subcategories, item types, and variant attribute facets for stock on hand"""
-        return Response(get_stock_on_hand_facets())
+        """Get categories, subcategories, item types, location list, and scoped variant attribute facets"""
+        loc_raw = (request.query_params.get("location_id") or "").strip()
+        location_id = int(loc_raw) if loc_raw.isdigit() else None
+        return Response(
+            get_stock_on_hand_facets(
+                item_type=(request.query_params.get("item_type") or "").strip(),
+                category=(request.query_params.get("category") or "").strip(),
+                subcategory=(request.query_params.get("subcategory") or "").strip(),
+                location_id=location_id,
+            )
+        )
 
 
 class AdminStockOnHandCalculationView(APIView):

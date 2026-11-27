@@ -139,11 +139,22 @@ export type StockOnHandKPIS = {
   total_value: string;
 };
 
+export type StockLocationBreakdown = {
+  location_id: number | null;
+  location_code: string;
+  location_name: string;
+  location_type: string;
+  on_hand_qty: string;
+};
+
 export type CriticalShortage = {
   inventory_item_id?: number;
   product_id: number;
+  pim_product_id?: number | null;
+  pim_variant_id?: number | null;
   product_code: string;
   product_name: string;
+  brand?: string;
   sku: string;
   barcode?: string;
   qr_code?: string;
@@ -161,32 +172,102 @@ export type CriticalShortage = {
   shortage_qty: string;
   standard_cost?: string;
   selling_price?: string;
+  margin_percent?: string | null;
   valuation_total?: string;
+  valuation_method?: string;
   stock_status?: "HEALTHY" | "LOW_STOCK" | "OUT_OF_STOCK" | string;
   stock_tracking_enabled?: boolean;
   stock_tracking_status?: string;
+  lot_tracking_enabled?: boolean;
+  default_location_name?: string | null;
+  location_breakdown?: StockLocationBreakdown[];
+  variant_group_name?: string | null;
+  variant_label?: string;
+  accessory_count?: number;
+  service_count?: number;
+  bom_count?: number;
+  bom_usage_count?: number;
+  linked_fg_count?: number;
   is_active?: boolean;
 };
 
 export type StockOnHandItem = CriticalShortage;
 
+export type StockFacetSubcategoryNode = {
+  name: string;
+  sku_count: number;
+  in_stock_count: number;
+  low_stock_count: number;
+  out_of_stock_count: number;
+  physical_qty: string;
+  reserved_qty: string;
+  available_qty: string;
+  valuation_total: string;
+};
+
+export type StockFacetCategoryNode = StockFacetSubcategoryNode & {
+  subcategories: StockFacetSubcategoryNode[];
+};
+
+export type StockAttributeFacet = {
+  name: string;
+  values: Array<{
+    value: string;
+    sku_count: number;
+    physical_qty: string;
+    available_qty: string;
+  }>;
+};
+
 export type StockOnHandFacets = {
-  item_types: Array<{ code: string; label: string; count: number }>;
+  item_types: Array<{
+    code: string;
+    label: string;
+    count: number;
+    physical_qty?: string;
+    available_qty?: string;
+    valuation_total?: string;
+  }>;
   categories: Array<{ name: string; count: number }>;
   subcategories: string[];
+  category_tree?: StockFacetCategoryNode[];
   attributes: Record<string, string[]>;
+  attribute_facets?: StockAttributeFacet[];
+  locations?: Array<{
+    id: number;
+    code: string;
+    name: string;
+    location_type: string;
+  }>;
 };
 
 export type StockOnHandCalculationDetail = {
   inventory_item_id: number;
+  product_id?: number;
+  pim_product_id?: number | null;
+  pim_variant_id?: number | null;
   sku: string;
   product_name: string;
   product_code: string;
+  brand?: string;
+  barcode?: string;
+  qr_code?: string;
+  item_type?: string;
+  item_type_display?: string;
   category: string;
+  subcategory?: string;
   unit_of_measure: string;
+  valuation_method?: string;
   standard_cost: string;
   selling_price: string;
   valuation_total: string;
+  default_location_name?: string | null;
+  location_breakdown?: StockLocationBreakdown[];
+  linked_accessories_count?: number;
+  linked_services_count?: number;
+  bom_count?: number;
+  bom_usage_count?: number;
+  linked_fg_count?: number;
   attributes: Record<string, string>;
   calculation: {
     opening_stock_qty: string;
@@ -217,6 +298,7 @@ export type StockOnHandCalculationDetail = {
     quantity_in: string;
     quantity_out: string;
     running_balance: string;
+    location_name?: string;
     reference_model?: string;
     reference_id?: string;
     notes?: string;
@@ -232,7 +314,21 @@ export type StockOnHandFilterParams = {
   subcategory?: string;
   attribute_key?: string;
   attribute_value?: string;
+  attribute_filters?: Record<string, string>;
   stock_status?: string;
+  location_id?: number | null;
+  sort_by?: string;
+};
+
+export type StockOnHandFilteredSummary = {
+  total_skus: number;
+  in_stock_count: number;
+  low_stock_count: number;
+  out_of_stock_count: number;
+  total_physical_qty: string;
+  total_reserved_qty: string;
+  total_available_qty: string;
+  total_value: string;
 };
 
 export type StockOnHandSummaryResponse = {
@@ -245,6 +341,7 @@ export type CriticalShortagesListResponse = {
   page: number;
   page_size: number;
   num_pages: number;
+  filtered_summary?: StockOnHandFilteredSummary;
   results: CriticalShortage[];
 };
 
@@ -282,25 +379,36 @@ export function getCriticalShortages(
   });
 }
 
+function buildStockOnHandQueryParams(p: StockOnHandFilterParams): URLSearchParams {
+  const query = new URLSearchParams({ filter: "all" });
+  if (p.page) query.set("page", String(p.page));
+  if (p.pageSize) query.set("page_size", String(p.pageSize));
+  if (p.search) query.set("search", p.search);
+  if (p.item_type && p.item_type !== "ALL") query.set("item_type", p.item_type);
+  if (p.category && p.category !== "ALL") query.set("category", p.category);
+  if (p.subcategory && p.subcategory !== "ALL") query.set("subcategory", p.subcategory);
+  if (p.attribute_key) query.set("attribute_key", p.attribute_key);
+  if (p.attribute_value) query.set("attribute_value", p.attribute_value);
+  if (p.attribute_filters && Object.keys(p.attribute_filters).length > 0) {
+    query.set("attribute_filters", JSON.stringify(p.attribute_filters));
+  }
+  if (p.stock_status && p.stock_status !== "all") query.set("stock_status", p.stock_status);
+  if (p.location_id) query.set("location_id", String(p.location_id));
+  if (p.sort_by && p.sort_by !== "code") query.set("sort_by", p.sort_by);
+  return query;
+}
+
 export function getStockOnHandItems(
   pageOrParams: number | StockOnHandFilterParams = 1,
   pageSize = 50,
   search = ""
 ): Promise<CriticalShortagesListResponse> {
-  const query = new URLSearchParams({ filter: "all" });
+  let query: URLSearchParams;
 
   if (typeof pageOrParams === "object") {
-    const p = pageOrParams;
-    if (p.page) query.set("page", String(p.page));
-    if (p.pageSize) query.set("page_size", String(p.pageSize));
-    if (p.search) query.set("search", p.search);
-    if (p.item_type && p.item_type !== "ALL") query.set("item_type", p.item_type);
-    if (p.category && p.category !== "ALL") query.set("category", p.category);
-    if (p.subcategory && p.subcategory !== "ALL") query.set("subcategory", p.subcategory);
-    if (p.attribute_key) query.set("attribute_key", p.attribute_key);
-    if (p.attribute_value) query.set("attribute_value", p.attribute_value);
-    if (p.stock_status && p.stock_status !== "all") query.set("stock_status", p.stock_status);
+    query = buildStockOnHandQueryParams(pageOrParams);
   } else {
+    query = new URLSearchParams({ filter: "all" });
     query.set("page", String(pageOrParams));
     query.set("page_size", String(pageSize));
     if (search) query.set("search", search);
@@ -309,8 +417,25 @@ export function getStockOnHandItems(
   return apiFetch<CriticalShortagesListResponse>(`/admin/inventory/stock-on-hand/?${query.toString()}`);
 }
 
-export function getStockOnHandFacets(): Promise<StockOnHandFacets> {
-  return apiFetch<StockOnHandFacets>("/admin/inventory/stock-on-hand/facets/");
+export function getStockOnHandExportPath(params: StockOnHandFilterParams = {}): string {
+  const query = buildStockOnHandQueryParams(params);
+  query.set("export", "csv");
+  return `/admin/inventory/stock-on-hand/?${query.toString()}`;
+}
+
+export function getStockOnHandFacets(params?: {
+  item_type?: string;
+  category?: string;
+  subcategory?: string;
+  location_id?: number | null;
+}): Promise<StockOnHandFacets> {
+  const query = new URLSearchParams();
+  if (params?.item_type && params.item_type !== "ALL") query.set("item_type", params.item_type);
+  if (params?.category && params.category !== "ALL") query.set("category", params.category);
+  if (params?.subcategory && params.subcategory !== "ALL") query.set("subcategory", params.subcategory);
+  if (params?.location_id) query.set("location_id", String(params.location_id));
+  const qs = query.toString();
+  return apiFetch<StockOnHandFacets>(`/admin/inventory/stock-on-hand/facets/${qs ? `?${qs}` : ""}`);
 }
 
 export function getStockOnHandCalculation(itemId: number | string): Promise<StockOnHandCalculationDetail> {
@@ -834,9 +959,11 @@ export type AccessoryLinkedFG = {
 export type AccessoryRow = {
   id: number;
   product_id?: number;
+  pim_product_id?: number | null;
   product_code: string;
   name?: string;
   product_name?: string;
+  brand?: string;
   variant_label?: string;
   variant_group?: number | null;
   variant_group_name?: string | null;
@@ -848,9 +975,16 @@ export type AccessoryRow = {
   linked_fg_count?: number;
   stock_tracking_status?: string;
   physical_qty?: string;
+  reserved_qty?: string;
+  available_qty?: string;
+  valuation_total?: string;
   reorder_level_qty?: string;
   category?: string;
   subcategory?: string;
+  attributes?: Array<{ name: string; value: string }>;
+  attributes_map?: Record<string, string>;
+  default_location_name?: string | null;
+  location_breakdown?: StockLocationBreakdown[];
   barcode?: string;
   is_active?: boolean;
   linked_finished_goods?: AccessoryLinkedFG[];
@@ -1159,15 +1293,42 @@ export async function updateStockLocation(
   });
 }
 
-export async function listAccessories(
-  opts: { q?: string; page?: number; page_size?: number } = {}
-): Promise<PaginatedResponse<AccessoryRow>> {
-  const params = new URLSearchParams();
+export type CatalogFilterOpts = {
+  q?: string;
+  page?: number;
+  page_size?: number;
+  tracking_status?: string;
+  category?: string;
+  subcategory?: string;
+  stock_status?: string;
+  attribute_filters?: Record<string, string>;
+  location_id?: number | null;
+  sort_by?: string;
+};
+
+function appendCatalogFilterParams(params: URLSearchParams, opts?: CatalogFilterOpts) {
+  if (!opts) return;
   if (opts.q) params.append("q", opts.q);
   if (opts.page) params.append("page", String(opts.page));
   if (opts.page_size) params.append("page_size", String(opts.page_size));
+  if (opts.tracking_status) params.append("tracking_status", opts.tracking_status);
+  if (opts.category && opts.category !== "ALL") params.append("category", opts.category);
+  if (opts.subcategory && opts.subcategory !== "ALL") params.append("subcategory", opts.subcategory);
+  if (opts.stock_status && opts.stock_status !== "all") params.append("stock_status", opts.stock_status);
+  if (opts.attribute_filters && Object.keys(opts.attribute_filters).length > 0) {
+    params.append("attribute_filters", JSON.stringify(opts.attribute_filters));
+  }
+  if (opts.location_id) params.append("location_id", String(opts.location_id));
+  if (opts.sort_by) params.append("sort_by", opts.sort_by);
+}
+
+export async function listAccessories(
+  opts: CatalogFilterOpts = {}
+): Promise<PaginatedResponse<AccessoryRow> & { summary?: StockOnHandFilteredSummary }> {
+  const params = new URLSearchParams();
+  appendCatalogFilterParams(params, opts);
   const url = params.toString() ? `/admin/inventory/accessories/?${params}` : "/admin/inventory/accessories/";
-  return apiFetch<PaginatedResponse<AccessoryRow>>(url, { method: "GET" });
+  return apiFetch<PaginatedResponse<AccessoryRow> & { summary?: StockOnHandFilteredSummary }>(url, { method: "GET" });
 }
 
 export async function listAccessoryVariantGroups(
@@ -1549,8 +1710,10 @@ export async function assignAccessoryVariantGroup(
 type InventoryItemSummaryBase = {
   id: number;
   product_id: number;
+  pim_product_id?: number | null;
   product_code: string;
   product_name: string;
+  brand?: string;
   sku: string;
   stock_item_type: string;
   unit_of_measure: string;
@@ -1564,6 +1727,13 @@ type InventoryItemSummaryBase = {
   category: string;
   subcategory: string;
   base_price: string;
+  reserved_qty?: string;
+  available_qty?: string;
+  valuation_total?: string;
+  attributes?: Array<{ name: string; value: string }>;
+  attributes_map?: Record<string, string>;
+  default_location_name?: string | null;
+  location_breakdown?: StockLocationBreakdown[];
 };
 
 // ============================================================================
@@ -1577,17 +1747,18 @@ export type FinishedGoodRow = InventoryItemSummaryBase & {
   physical_qty: string;
 };
 
-export async function listFinishedGoods(params?: {
-  q?: string;
-  page?: number;
-  page_size?: number;
-  tracking_status?: string;
-}): Promise<{ count: number; page: number; page_size: number; num_pages: number; results: FinishedGoodRow[] }> {
+export async function listFinishedGoods(
+  params?: CatalogFilterOpts
+): Promise<{
+  count: number;
+  page: number;
+  page_size: number;
+  num_pages: number;
+  summary?: StockOnHandFilteredSummary;
+  results: FinishedGoodRow[];
+}> {
   const query = new URLSearchParams();
-  if (params?.q) query.append("q", params.q);
-  if (params?.page) query.append("page", String(params.page));
-  if (params?.page_size) query.append("page_size", String(params.page_size));
-  if (params?.tracking_status) query.append("tracking_status", params.tracking_status);
+  appendCatalogFilterParams(query, params);
   const qs = query.toString();
   return apiFetch(`/admin/inventory/finished-goods/${qs ? `?${qs}` : ""}`);
 }
@@ -1601,17 +1772,18 @@ export type RawMaterialRow = InventoryItemSummaryBase & {
   physical_qty: string;
 };
 
-export async function listRawMaterials(params?: {
-  q?: string;
-  page?: number;
-  page_size?: number;
-  tracking_status?: string;
-}): Promise<{ count: number; page: number; page_size: number; num_pages: number; results: RawMaterialRow[] }> {
+export async function listRawMaterials(
+  params?: CatalogFilterOpts
+): Promise<{
+  count: number;
+  page: number;
+  page_size: number;
+  num_pages: number;
+  summary?: StockOnHandFilteredSummary;
+  results: RawMaterialRow[];
+}> {
   const query = new URLSearchParams();
-  if (params?.q) query.append("q", params.q);
-  if (params?.page) query.append("page", String(params.page));
-  if (params?.page_size) query.append("page_size", String(params.page_size));
-  if (params?.tracking_status) query.append("tracking_status", params.tracking_status);
+  appendCatalogFilterParams(query, params);
   const qs = query.toString();
   return apiFetch(`/admin/inventory/raw-materials/${qs ? `?${qs}` : ""}`);
 }

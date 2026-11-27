@@ -95,14 +95,29 @@ export default function StockCalculationDrawer({
             <>
               {/* Product Profile & Attribute Banner */}
               <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2.5">
+                <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-2.5">
                   <div>
                     <span className="text-[10px] font-semibold uppercase text-muted-foreground">SKU / Item Code</span>
-                    <div className="font-mono text-sm font-bold text-foreground">{data.sku}</div>
+                    <div className="font-mono text-sm font-bold text-foreground">
+                      {data.sku || data.product_code}
+                    </div>
+                    <div className="text-[11px] text-muted-foreground mt-0.5 flex flex-wrap gap-2">
+                      <span>Code: {data.product_code}</span>
+                      {data.barcode && <span>· Barcode: {data.barcode}</span>}
+                      {data.brand && <span>· Brand: {data.brand}</span>}
+                    </div>
                   </div>
                   <div className="text-right">
-                    <span className="text-[10px] font-semibold uppercase text-muted-foreground">Category</span>
-                    <div className="text-sm font-semibold text-foreground">{data.category || "General"}</div>
+                    <span className="text-[10px] font-semibold uppercase text-muted-foreground">Classification</span>
+                    <div className="text-sm font-semibold text-foreground">
+                      {data.category || "General"}
+                      {data.subcategory ? ` › ${data.subcategory}` : ""}
+                    </div>
+                    {data.item_type_display && (
+                      <span className="inline-block mt-0.5 rounded border border-border px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground">
+                        {data.item_type_display}
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -110,15 +125,15 @@ export default function StockCalculationDrawer({
                 {data.attributes && Object.keys(data.attributes).length > 0 && (
                   <div>
                     <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1.5">
-                      Variant Specifications
+                      Variant &amp; Product Specifications
                     </span>
                     <div className="flex flex-wrap gap-1.5">
                       {Object.entries(data.attributes).map(([k, v]) => (
                         <span
                           key={k}
-                          className="inline-flex items-center gap-1 rounded-md border border-amber-300/60 bg-amber-50/70 dark:bg-amber-950/30 dark:border-amber-700/50 px-2 py-0.5 text-xs text-amber-900 dark:text-amber-300 font-medium"
+                          className="inline-flex items-center gap-1 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-xs text-amber-800 dark:text-amber-300 font-medium"
                         >
-                          <strong className="font-semibold text-amber-950 dark:text-amber-200">{k}:</strong> {v}
+                          <strong className="font-semibold">{k}:</strong> {v}
                         </span>
                       ))}
                     </div>
@@ -126,7 +141,7 @@ export default function StockCalculationDrawer({
                 )}
 
                 {/* Price & Valuation Summary */}
-                <div className="grid grid-cols-3 gap-2 pt-2 border-t border-border text-xs">
+                <div className="grid grid-cols-4 gap-2 pt-2 border-t border-border text-xs">
                   <div>
                     <span className="text-muted-foreground text-[10px] block uppercase">Standard Cost</span>
                     <strong className="font-mono text-foreground font-semibold">
@@ -145,7 +160,80 @@ export default function StockCalculationDrawer({
                       {formatDocumentMoney(data.valuation_total)}
                     </strong>
                   </div>
+                  <div>
+                    <span className="text-muted-foreground text-[10px] block uppercase">Method / Reorder</span>
+                    <strong className="font-mono text-foreground font-semibold">
+                      {data.valuation_method || "AVG"} · {parseFloat(data.calculation.reorder_level_qty).toFixed(0)}
+                    </strong>
+                  </div>
                 </div>
+
+                {/* Linked Catalog Capabilities */}
+                {(data.linked_accessories_count || data.linked_services_count || data.bom_count || data.bom_usage_count || data.linked_fg_count) ? (
+                  <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border text-[11px] text-muted-foreground">
+                    {Boolean(data.linked_accessories_count) && (
+                      <span className="rounded-md bg-muted px-2 py-0.5">{data.linked_accessories_count} linked accessories</span>
+                    )}
+                    {Boolean(data.linked_services_count) && (
+                      <span className="rounded-md bg-muted px-2 py-0.5">{data.linked_services_count} services</span>
+                    )}
+                    {Boolean(data.bom_count) && (
+                      <span className="rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2 py-0.5">{data.bom_count} BOM(s)</span>
+                    )}
+                    {Boolean(data.bom_usage_count) && (
+                      <span className="rounded-md bg-violet-500/10 text-violet-600 dark:text-violet-400 px-2 py-0.5">Used in {data.bom_usage_count} BOM(s)</span>
+                    )}
+                    {Boolean(data.linked_fg_count) && (
+                      <span className="rounded-md bg-sky-500/10 text-sky-600 dark:text-sky-400 px-2 py-0.5">Attached to {data.linked_fg_count} FG(s)</span>
+                    )}
+                    {data.item_type === "FINISHED_GOOD" && (
+                      <Link
+                        href={`/admin/inventory/finished-goods/${data.inventory_item_id}`}
+                        className="ml-auto font-semibold text-primary hover:underline inline-flex items-center gap-1"
+                      >
+                        Open FG Profile <ExternalLink className="h-3 w-3" />
+                      </Link>
+                    )}
+                  </div>
+                ) : null}
+              </div>
+
+              {/* Location-wise Stock Breakdown */}
+              <div className="rounded-xl border border-border bg-card p-4 space-y-2.5">
+                <div className="flex items-center justify-between border-b border-border pb-2">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">
+                    Stock by Location
+                  </h3>
+                  {data.default_location_name && (
+                    <span className="text-[11px] text-muted-foreground">
+                      Default: <strong className="text-foreground">{data.default_location_name}</strong>
+                    </span>
+                  )}
+                </div>
+                {data.location_breakdown && data.location_breakdown.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {data.location_breakdown.map((loc, idx) => (
+                      <div
+                        key={`${loc.location_id ?? "unloc"}-${idx}`}
+                        className="flex items-center justify-between rounded-lg border border-border bg-muted/20 px-3 py-2 text-xs"
+                      >
+                        <div>
+                          <div className="font-semibold text-foreground">{loc.location_name}</div>
+                          <div className="text-[10px] text-muted-foreground">
+                            {loc.location_code} {loc.location_type ? `· ${loc.location_type}` : ""}
+                          </div>
+                        </div>
+                        <span className="font-mono font-bold text-foreground">
+                          {parseFloat(loc.on_hand_qty).toFixed(2)} {data.unit_of_measure}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    No location-tagged ledger entries yet{data.default_location_name ? ` (default: ${data.default_location_name})` : ""}.
+                  </p>
+                )}
               </div>
 
               {/* Stock Formula Breakdown */}

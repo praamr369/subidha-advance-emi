@@ -2,13 +2,35 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { AlertCircle, CheckCircle, Edit2, FlaskConical, Plus, Trash2, X } from "lucide-react";
+import {
+  AlertCircle,
+  Calculator,
+  CheckCircle,
+  Edit2,
+  FlaskConical,
+  LayoutGrid,
+  Plus,
+  Table2,
+  Trash2,
+  X,
+} from "lucide-react";
 
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
+import InventoryCategoryAttributeFilterBar from "@/components/admin/inventory/InventoryCategoryAttributeFilterBar";
+import StockCalculationDrawer from "@/components/admin/inventory/StockCalculationDrawer";
+import { useDebounce } from "@/hooks/useDebounce";
+import { formatDocumentMoney } from "@/lib/documents/formatters";
 import { ROUTES } from "@/lib/routes";
-import { listRawMaterials, quickCreateRawMaterial, type RawMaterialRow } from "@/services/inventory";
+import {
+  getStockOnHandFacets,
+  listRawMaterials,
+  quickCreateRawMaterial,
+  type RawMaterialRow,
+  type StockOnHandFacets,
+  type StockOnHandFilteredSummary,
+} from "@/services/inventory";
 import { apiFetch } from "@/lib/api";
 
 const INP = "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring";
@@ -33,22 +55,34 @@ function rowToEdit(row: RawMaterialRow): EditForm {
 
 function StockBadge({ qty, reorder }: { qty: string; reorder: string }) {
   const q = parseFloat(qty ?? "0"), r = parseFloat(reorder ?? "0");
-  const cls = q <= 0 ? "text-red-600 dark:text-red-400 font-bold" : q <= r ? "text-amber-600 dark:text-amber-400 font-semibold" : "text-green-600 dark:text-green-400 font-semibold";
+  const cls = q <= 0 ? "text-rose-600 dark:text-rose-400 font-bold" : r > 0 && q <= r ? "text-amber-600 dark:text-amber-400 font-semibold" : "text-emerald-600 dark:text-emerald-400 font-semibold";
   return <span className={cls}>{q.toFixed(3)}</span>;
 }
 
 function BomBadge({ count }: { count: number }) {
   if (!count) return <span className="text-xs text-muted-foreground">—</span>;
-  return <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-[11px] font-semibold text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">{count} BOM{count > 1 ? "s" : ""}</span>;
+  return <span className="inline-flex items-center gap-1 rounded-full bg-purple-500/15 px-2 py-0.5 text-[11px] font-semibold text-purple-700 dark:text-purple-300">{count} BOM{count > 1 ? "s" : ""}</span>;
 }
 
 export default function RawMaterialsPage() {
   const [rows, setRows] = useState<RawMaterialRow[]>([]);
+  const [summary, setSummary] = useState<StockOnHandFilteredSummary | null>(null);
+  const [facets, setFacets] = useState<StockOnHandFacets | null>(null);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Filters
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 250);
+  const [category, setCategory] = useState("ALL");
+  const [subcategory, setSubcategory] = useState("ALL");
+  const [stockStatus, setStockStatus] = useState("all");
+  const [attributeFilters, setAttributeFilters] = useState<Record<string, string>>({});
+  const [sortBy, setSortBy] = useState("category");
+  const [viewMode, setViewMode] = useState<"table" | "cards">("table");
   const [page, setPage] = useState(1);
+  const [inspectItemId, setInspectItemId] = useState<number | null>(null);
   const PAGE_SIZE = 25;
 
   const [showCreate, setShowCreate] = useState(false);
@@ -65,19 +99,66 @@ export default function RawMaterialsPage() {
   const [deleting, setDeleting] = useState(false);
   const [deleteErr, setDeleteErr] = useState<string | null>(null);
 
+  useEffect(() => {
+    let cancelled = false;
+    getStockOnHandFacets({
+      item_type: "RAW_MATERIAL",
+      category,
+      subcategory,
+    })
+      .then((res) => {
+        if (!cancelled) setFacets(res);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [category, subcategory]);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await listRawMaterials({ q: search || undefined, page, page_size: PAGE_SIZE });
+      const res = await listRawMaterials({
+        q: debouncedSearch.trim() || undefined,
+        category: category !== "ALL" ? category : undefined,
+        subcategory: subcategory !== "ALL" ? subcategory : undefined,
+        stock_status: stockStatus !== "all" ? stockStatus : undefined,
+        attribute_filters: Object.keys(attributeFilters).length > 0 ? attributeFilters : undefined,
+        sort_by: sortBy,
+        page,
+        page_size: PAGE_SIZE,
+      });
       setRows(res.results ?? []);
       setTotal(res.count ?? 0);
+      setSummary(res.summary ?? null);
       setError(null);
     } catch (e) { setError(e instanceof Error ? e.message : "Failed to load."); }
     finally { setLoading(false); }
-  }, [search, page]);
+  }, [debouncedSearch, category, subcategory, stockStatus, attributeFilters, sortBy, page]);
 
   useEffect(() => { void load(); }, [load]);
-  useEffect(() => { setPage(1); }, [search]);
+
+  const handleToggleAttribute = (key: string, value: string) => {
+    setPage(1);
+    setAttributeFilters((prev) => {
+      const next = { ...prev };
+      if ((next[key] || "").toLowerCase() === value.toLowerCase()) {
+        delete next[key];
+      } else {
+        next[key] = value;
+      }
+      return next;
+    });
+  };
+
+  const clearAllFilters = () => {
+    setPage(1);
+    setSearch("");
+    setCategory("ALL");
+    setSubcategory("ALL");
+    setStockStatus("all");
+    setAttributeFilters({});
+  };
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -110,14 +191,14 @@ export default function RawMaterialsPage() {
   }
 
   const numPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const zeroStock = rows.filter((r) => parseFloat(r.physical_qty ?? "0") <= 0).length;
+  const zeroStock = summary ? summary.out_of_stock_count : rows.filter((r) => parseFloat(r.physical_qty ?? "0") <= 0).length;
   const bomUsed = rows.filter((r) => (r.bom_usage_count ?? 0) > 0).length;
 
   return (
     <ERPPageShell
       eyebrow="Inventory"
       title="Raw Materials"
-      subtitle="Input materials for manufacturing BOMs. Track stock, cost, reorder levels and BOM usage."
+      subtitle="Input materials for manufacturing BOMs — plywood, timber, steel pipes, sheet metal, foam, and polish tracked by category, subcategory, and specs."
       breadcrumbs={[
         { label: "Admin", href: ROUTES.admin.dashboard },
         { label: "Inventory", href: ROUTES.admin.inventory },
@@ -129,8 +210,12 @@ export default function RawMaterialsPage() {
         { label: "Zero Stock", value: loading ? "—" : zeroStock, tone: zeroStock > 0 ? "danger" : "success" },
         { label: "In BOMs", value: loading ? "—" : bomUsed, tone: "info" },
       ]}
+      actions={[
+        { href: `${ROUTES.admin.inventoryStockOnHand}?item_type=RAW_MATERIAL`, label: "Stock Command Center", variant: "primary" },
+        { href: ROUTES.admin.manufacturingBoms, label: "Manage BOMs", variant: "secondary" },
+      ]}
     >
-      <div className="space-y-5">
+      <div className="space-y-4">
 
         {/* Create form */}
         {showCreate ? (
@@ -155,7 +240,11 @@ export default function RawMaterialsPage() {
               </div>
               <div>
                 <label htmlFor="f-category" className="mb-1 block text-xs font-medium text-muted-foreground">Category</label>
-                <input id="f-category" value={cf.category} onChange={(e) => setCf((f) => ({ ...f, category: e.target.value }))} placeholder="Timber, Hardware, Fabric…" className={INP} />
+                <input id="f-category" value={cf.category} onChange={(e) => setCf((f) => ({ ...f, category: e.target.value }))} placeholder="Raw Materials & Lumber" className={INP} />
+              </div>
+              <div>
+                <label htmlFor="f-create-subcat" className="mb-1 block text-xs font-medium text-muted-foreground">Subcategory</label>
+                <input id="f-create-subcat" value={cf.subcategory} onChange={(e) => setCf((f) => ({ ...f, subcategory: e.target.value }))} placeholder="Steel Pipes & Tubes, Timber…" className={INP} />
               </div>
               {createErr && (
                 <div className="sm:col-span-2 flex gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
@@ -169,31 +258,193 @@ export default function RawMaterialsPage() {
             </div>
           </form>
         ) : (
-          <div className="flex flex-wrap gap-3">
-            <button onClick={() => setShowCreate(true)} className={BTN_PRIMARY}><Plus className="h-4 w-4" />New Raw Material</button>
-            <Link href={ROUTES.admin.manufacturingBoms} className={BTN_GHOST}>Manage BOMs →</Link>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap gap-3">
+              <button onClick={() => setShowCreate(true)} className={BTN_PRIMARY}><Plus className="h-4 w-4" />New Raw Material</button>
+              <Link href={ROUTES.admin.manufacturingBoms} className={BTN_GHOST}>Manage BOMs →</Link>
+            </div>
+            <div className="inline-flex rounded-xl border border-border bg-muted/40 p-0.5">
+              <button
+                type="button"
+                onClick={() => setViewMode("table")}
+                className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
+                  viewMode === "table"
+                    ? "bg-background text-foreground shadow-2xs"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Table2 className="h-3.5 w-3.5" />
+                Table
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("cards")}
+                className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
+                  viewMode === "cards"
+                    ? "bg-background text-foreground shadow-2xs"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <LayoutGrid className="h-3.5 w-3.5" />
+                Cards
+              </button>
+            </div>
           </div>
         )}
 
-        {/* Filters */}
-        <div className="flex flex-wrap gap-3 rounded-xl border border-border bg-muted/20 px-4 py-3">
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name, code, SKU…" className="min-w-[220px] flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
-          {search && <button onClick={() => setSearch("")} className={BTN_GHOST}><X className="h-3.5 w-3.5" />Clear</button>}
-          <span className="self-center text-xs text-muted-foreground">{total} material{total === 1 ? "" : "s"}</span>
-        </div>
+        {/* Filters & Facets */}
+        <InventoryCategoryAttributeFilterBar
+          facets={facets}
+          search={search}
+          onSearchChange={(val) => {
+            setSearch(val);
+            setPage(1);
+          }}
+          category={category}
+          onCategoryChange={(val) => {
+            setCategory(val);
+            setSubcategory("ALL");
+            setPage(1);
+          }}
+          subcategory={subcategory}
+          onSubcategoryChange={(val) => {
+            setSubcategory(val);
+            setPage(1);
+          }}
+          stockStatus={stockStatus}
+          onStockStatusChange={(val) => {
+            setStockStatus(val);
+            setPage(1);
+          }}
+          attributeFilters={attributeFilters}
+          onToggleAttribute={handleToggleAttribute}
+          onClearAll={clearAllFilters}
+          sortBy={sortBy}
+          onSortChange={(val) => {
+            setSortBy(val);
+            setPage(1);
+          }}
+          filteredSummary={summary}
+          searchPlaceholder="Search raw material name, code, SKU, thickness, grade…"
+        />
 
         {/* List */}
         {loading ? <ERPLoadingState label="Loading raw materials…" /> : error ? (
           <div className="flex gap-2 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />{error}</div>
         ) : rows.length === 0 ? (
-          <ERPEmptyState title="No raw materials yet" description={search ? "No materials match your search." : "Click 'New Raw Material' to add your first input material."} />
+          <ERPEmptyState title="No raw materials found" description={search ? "No materials match your filters." : "Click 'New Raw Material' to add your first input material."} />
+        ) : viewMode === "table" && editId === null && deleteId === null ? (
+          <div className="overflow-x-auto rounded-xl border border-border bg-card">
+            <table className="w-full min-w-[900px] border-collapse text-xs">
+              <thead className="bg-muted/40 border-b border-border">
+                <tr className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  <th className="px-3 py-2.5 text-left">Code / SKU</th>
+                  <th className="px-3 py-2.5 text-left">Material &amp; Category</th>
+                  <th className="px-3 py-2.5 text-left">Specs / Attributes</th>
+                  <th className="px-3 py-2.5 text-right">Stock (SOH)</th>
+                  <th className="px-3 py-2.5 text-right">Available</th>
+                  <th className="px-3 py-2.5 text-right">Reorder</th>
+                  <th className="px-3 py-2.5 text-right">Std Cost</th>
+                  <th className="px-3 py-2.5 text-right">Value</th>
+                  <th className="px-3 py-2.5 text-center">BOM Usage</th>
+                  <th className="px-3 py-2.5 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/70">
+                {rows.map((row) => {
+                  const avail = parseFloat(row.available_qty ?? row.physical_qty ?? "0");
+                  const reorder = parseFloat(row.reorder_level_qty ?? "0");
+                  return (
+                    <tr key={row.id} className="hover:bg-muted/30 transition-colors align-top">
+                      <td className="px-3 py-2.5 font-mono">
+                        <div className="font-bold text-foreground">{row.product_code}</div>
+                        {row.sku && row.sku !== row.product_code && (
+                          <div className="text-[10px] text-muted-foreground">{row.sku}</div>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <div className="font-semibold text-foreground">{row.product_name}</div>
+                        <div className="text-[10px] text-muted-foreground">
+                          {row.category || "Uncategorized"}
+                          {row.subcategory ? ` › ${row.subcategory}` : ""}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        {row.attributes && row.attributes.length > 0 ? (
+                          <div className="flex flex-wrap gap-1 max-w-[200px]">
+                            {row.attributes.map((a) => (
+                              <button
+                                key={`${a.name}-${a.value}`}
+                                type="button"
+                                onClick={() => handleToggleAttribute(a.name, a.value)}
+                                className="rounded border border-border bg-background px-1.5 py-0.5 text-[10px] hover:bg-muted"
+                              >
+                                <strong className="text-muted-foreground">{a.name}:</strong> {a.value}
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-mono">
+                        <StockBadge qty={row.physical_qty} reorder={row.reorder_level_qty} />{" "}
+                        <span className="text-[10px] text-muted-foreground">{row.unit_of_measure}</span>
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                        {avail.toFixed(2)}
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-mono text-muted-foreground">
+                        {reorder.toFixed(2)}
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-mono">
+                        {formatDocumentMoney(row.standard_unit_cost)}
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-mono font-bold text-primary">
+                        {row.valuation_total ? formatDocumentMoney(row.valuation_total) : "—"}
+                      </td>
+                      <td className="px-3 py-2.5 text-center">
+                        <BomBadge count={row.bom_usage_count ?? 0} />
+                      </td>
+                      <td className="px-3 py-2.5 text-right">
+                        <div className="inline-flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setInspectItemId(row.id)}
+                            className={BTN_GHOST}
+                            title="Audit stock math"
+                          >
+                            <Calculator className="h-3 w-3 text-primary" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setEditId(row.id); setEf(rowToEdit(row)); setSaveErr(null); setDeleteId(null); setViewMode("cards"); }}
+                            className={BTN_GHOST}
+                          >
+                            <Edit2 className="h-3 w-3" />Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setDeleteId(row.id); setDeleteErr(null); setEditId(null); setViewMode("cards"); }}
+                            className={BTN_DANGER}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         ) : (
           <div className="space-y-2">
             {rows.map((row) => {
               const isEditing = editId === row.id, isDeleting = deleteId === row.id;
               const qty = parseFloat(row.physical_qty ?? "0");
               const reorder = parseFloat(row.reorder_level_qty ?? "0");
-              const dot = qty <= 0 ? "bg-red-500" : qty <= reorder ? "bg-amber-500" : "bg-emerald-500";
+              const dot = qty <= 0 ? "bg-rose-500" : reorder > 0 && qty <= reorder ? "bg-amber-500" : "bg-emerald-500";
               return (
                 <div key={row.id} className="overflow-hidden rounded-xl border border-border bg-card">
                   <div className="flex flex-wrap items-start gap-3 px-4 py-3">
@@ -213,6 +464,15 @@ export default function RawMaterialsPage() {
                         <span>{row.unit_of_measure}</span>
                         {row.category ? <span>{row.category}{row.subcategory ? ` › ${row.subcategory}` : ""}</span> : null}
                       </div>
+                      {row.attributes && row.attributes.length > 0 && (
+                        <div className="mt-1.5 flex flex-wrap gap-1">
+                          {row.attributes.map((a) => (
+                            <span key={`${a.name}-${a.value}`} className="rounded border border-border bg-background px-1.5 py-0.5 text-[10px]">
+                              <strong className="text-muted-foreground">{a.name}:</strong> {a.value}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     <div className="mr-2 flex shrink-0 flex-wrap gap-4 text-xs">
                       {[
@@ -228,6 +488,9 @@ export default function RawMaterialsPage() {
                       ))}
                     </div>
                     <div className="flex shrink-0 flex-wrap gap-2">
+                      <button onClick={() => setInspectItemId(row.id)} className={BTN_GHOST}>
+                        <Calculator className="h-3.5 w-3.5 text-primary" />Audit
+                      </button>
                       <button onClick={() => { if (isEditing) { setEditId(null); return; } setEditId(row.id); setEf(rowToEdit(row)); setSaveErr(null); setDeleteId(null); }} className={BTN_GHOST}>
                         <Edit2 className="h-3.5 w-3.5" />{isEditing ? "Close" : "Edit"}
                       </button>
@@ -333,6 +596,14 @@ export default function RawMaterialsPage() {
         </div>
 
       </div>
+
+      {inspectItemId && (
+        <StockCalculationDrawer
+          itemId={inspectItemId}
+          isOpen={Boolean(inspectItemId)}
+          onClose={() => setInspectItemId(null)}
+        />
+      )}
     </ERPPageShell>
   );
 }

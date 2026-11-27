@@ -4,14 +4,17 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import {
   AlertCircle,
+  Calculator,
   CheckCircle,
   Edit2,
   ExternalLink,
   Layers,
+  LayoutGrid,
   Package,
   Plus,
   QrCode,
   Save,
+  Table2,
   Trash2,
   Wrench,
   X,
@@ -20,6 +23,10 @@ import {
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
+import InventoryCategoryAttributeFilterBar from "@/components/admin/inventory/InventoryCategoryAttributeFilterBar";
+import StockCalculationDrawer from "@/components/admin/inventory/StockCalculationDrawer";
+import { useDebounce } from "@/hooks/useDebounce";
+import { formatDocumentMoney } from "@/lib/documents/formatters";
 import { ROUTES } from "@/lib/routes";
 import { apiFetch } from "@/lib/api";
 import { pimService, type PimCategory } from "@/services/pim";
@@ -32,11 +39,14 @@ import {
   addFGAccessoryLink,
   deleteFGAccessoryLink,
   getAccessoryDetail,
+  getStockOnHandFacets,
   assignAccessoryVariantGroup,
   type AccessoryRow,
   type AccessoryVariantGroup,
   type FinishedGoodRow,
   type AccessoryLinkedFG,
+  type StockOnHandFacets,
+  type StockOnHandFilteredSummary,
 } from "@/services/inventory";
 
 // ─── Style tokens ─────────────────────────────────────────────────────────────
@@ -137,6 +147,16 @@ export default function AccessoriesPage() {
 
   // Filters
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 250);
+  const [category, setCategory] = useState("ALL");
+  const [subcategory, setSubcategory] = useState("ALL");
+  const [stockStatus, setStockStatus] = useState("all");
+  const [attributeFilters, setAttributeFilters] = useState<Record<string, string>>({});
+  const [sortBy, setSortBy] = useState("category");
+  const [viewMode, setViewMode] = useState<"table" | "cards">("table");
+  const [facets, setFacets] = useState<StockOnHandFacets | null>(null);
+  const [summary, setSummary] = useState<StockOnHandFilteredSummary | null>(null);
+  const [inspectItemId, setInspectItemId] = useState<number | null>(null);
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 25;
 
@@ -177,20 +197,69 @@ export default function AccessoriesPage() {
   const [linkingFg, setLinkingFg] = useState(false);
   const [linkFgErr, setLinkFgErr] = useState<string | null>(null);
 
+  // Load facets scoped to accessories
+  useEffect(() => {
+    let cancelled = false;
+    getStockOnHandFacets({
+      item_type: "ACCESSORY",
+      category,
+      subcategory,
+    })
+      .then((res) => {
+        if (!cancelled) setFacets(res);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [category, subcategory]);
+
   // Load accessory catalog
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await listAccessories({ q: search || undefined, page, page_size: PAGE_SIZE });
+      const res = await listAccessories({
+        q: debouncedSearch.trim() || undefined,
+        category: category !== "ALL" ? category : undefined,
+        subcategory: subcategory !== "ALL" ? subcategory : undefined,
+        stock_status: stockStatus !== "all" ? stockStatus : undefined,
+        attribute_filters: Object.keys(attributeFilters).length > 0 ? attributeFilters : undefined,
+        sort_by: sortBy,
+        page,
+        page_size: PAGE_SIZE,
+      });
       setRows(res.results ?? []);
       setTotal(res.count ?? 0);
+      setSummary(res.summary ?? null);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load accessories.");
     } finally {
       setLoading(false);
     }
-  }, [search, page]);
+  }, [debouncedSearch, category, subcategory, stockStatus, attributeFilters, sortBy, page]);
+
+  const handleToggleAttribute = (key: string, value: string) => {
+    setPage(1);
+    setAttributeFilters((prev) => {
+      const next = { ...prev };
+      if ((next[key] || "").toLowerCase() === value.toLowerCase()) {
+        delete next[key];
+      } else {
+        next[key] = value;
+      }
+      return next;
+    });
+  };
+
+  const clearAllFilters = () => {
+    setPage(1);
+    setSearch("");
+    setCategory("ALL");
+    setSubcategory("ALL");
+    setStockStatus("all");
+    setAttributeFilters({});
+  };
 
   // Load variant groups, finished goods, and PIM accessory categories for dropdowns
   const loadLookups = useCallback(async () => {
@@ -394,6 +463,7 @@ export default function AccessoriesPage() {
         { label: "Accessories" },
       ]}
       actions={[
+        { label: "Stock Command Center", href: `${ROUTES.admin.inventoryStockOnHand}?item_type=ACCESSORY`, variant: "primary" as const },
         { label: "Finished Goods", href: ROUTES.admin.inventoryFinishedGoods, variant: "secondary" as const },
         { label: "Variant Groups", href: ROUTES.admin.inventoryAccessoryVariantGroups, variant: "secondary" as const },
       ]}
@@ -598,34 +668,82 @@ export default function AccessoriesPage() {
             </div>
           </form>
         ) : (
-          <div className="flex flex-wrap gap-3">
-            <button onClick={() => setShowCreate(true)} className={BTN_PRIMARY}>
-              <Plus className="h-4 w-4" />New Accessory
-            </button>
-            <Link href={ROUTES.admin.inventoryFinishedGoods} className={BTN_GHOST}>
-              ← Finished Goods
-            </Link>
-            <Link href={ROUTES.admin.inventoryAccessoryVariantGroups} className={BTN_GHOST}>
-              Variant Groups →
-            </Link>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap gap-3">
+              <button onClick={() => setShowCreate(true)} className={BTN_PRIMARY}>
+                <Plus className="h-4 w-4" />New Accessory
+              </button>
+              <Link href={ROUTES.admin.inventoryFinishedGoods} className={BTN_GHOST}>
+                ← Finished Goods
+              </Link>
+              <Link href={ROUTES.admin.inventoryAccessoryVariantGroups} className={BTN_GHOST}>
+                Variant Groups →
+              </Link>
+            </div>
+            <div className="inline-flex rounded-xl border border-border bg-muted/40 p-0.5">
+              <button
+                type="button"
+                onClick={() => setViewMode("table")}
+                className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
+                  viewMode === "table"
+                    ? "bg-background text-foreground shadow-2xs"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Table2 className="h-3.5 w-3.5" />
+                Table
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("cards")}
+                className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold transition ${
+                  viewMode === "cards"
+                    ? "bg-background text-foreground shadow-2xs"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <LayoutGrid className="h-3.5 w-3.5" />
+                Cards
+              </button>
+            </div>
           </div>
         )}
 
-        {/* ── Filters ──────────────────────────────────────────────────────── */}
-        <div className="flex flex-wrap gap-3 rounded-xl border border-border bg-muted/20 px-4 py-3">
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name, code, SKU, group…"
-            className="min-w-[220px] flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-          />
-          {search && (
-            <button onClick={() => setSearch("")} className={BTN_GHOST}>
-              <X className="h-3.5 w-3.5" />Clear
-            </button>
-          )}
-          <span className="self-center text-xs text-muted-foreground">{total} accessory{total === 1 ? "" : "ies"}</span>
-        </div>
+        {/* ── Filters & Facets ─────────────────────────────────────────────── */}
+        <InventoryCategoryAttributeFilterBar
+          facets={facets}
+          search={search}
+          onSearchChange={(val) => {
+            setSearch(val);
+            setPage(1);
+          }}
+          category={category}
+          onCategoryChange={(val) => {
+            setCategory(val);
+            setSubcategory("ALL");
+            setPage(1);
+          }}
+          subcategory={subcategory}
+          onSubcategoryChange={(val) => {
+            setSubcategory(val);
+            setPage(1);
+          }}
+          stockStatus={stockStatus}
+          onStockStatusChange={(val) => {
+            setStockStatus(val);
+            setPage(1);
+          }}
+          attributeFilters={attributeFilters}
+          onToggleAttribute={handleToggleAttribute}
+          onClearAll={clearAllFilters}
+          sortBy={sortBy}
+          onSortChange={(val) => {
+            setSortBy(val);
+            setPage(1);
+          }}
+          filteredSummary={summary}
+          searchPlaceholder="Search accessory name, code, SKU, group, plyboard, side rail…"
+        />
 
         {/* ── List ─────────────────────────────────────────────────────────── */}
         {loading ? (
@@ -636,9 +754,132 @@ export default function AccessoriesPage() {
           </div>
         ) : rows.length === 0 ? (
           <ERPEmptyState
-            title="No accessories yet"
-            description={search ? "No accessories match your search." : "Click 'New Accessory' to add your first item."}
+            title="No accessories found"
+            description={search ? "No accessories match your filters." : "Click 'New Accessory' to add your first item."}
           />
+        ) : viewMode === "table" && editId === null && deleteId === null ? (
+          <div className="overflow-x-auto rounded-xl border border-border bg-card">
+            <table className="w-full min-w-[920px] border-collapse text-xs">
+              <thead className="bg-muted/40 border-b border-border">
+                <tr className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  <th className="px-3 py-2.5 text-left">Code / SKU</th>
+                  <th className="px-3 py-2.5 text-left">Accessory &amp; Category</th>
+                  <th className="px-3 py-2.5 text-left">Variant Group &amp; Attributes</th>
+                  <th className="px-3 py-2.5 text-right">Stock (SOH)</th>
+                  <th className="px-3 py-2.5 text-right">Available</th>
+                  <th className="px-3 py-2.5 text-right">Price / Cost</th>
+                  <th className="px-3 py-2.5 text-right">Value</th>
+                  <th className="px-3 py-2.5 text-center">FG Links</th>
+                  <th className="px-3 py-2.5 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/70">
+                {rows.map((row) => {
+                  const avail = parseFloat(row.available_qty ?? row.physical_qty ?? "0");
+                  return (
+                    <tr key={row.id} className="hover:bg-muted/30 transition-colors align-top">
+                      <td className="px-3 py-2.5 font-mono">
+                        <div className="font-bold text-foreground">{row.product_code}</div>
+                        {row.sku && row.sku !== row.product_code && (
+                          <div className="text-[10px] text-muted-foreground">{row.sku}</div>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <div className="font-semibold text-foreground">{row.product_name ?? row.name}</div>
+                        <div className="text-[10px] text-muted-foreground">
+                          {row.category || "Uncategorized"}
+                          {row.subcategory ? ` › ${row.subcategory}` : ""}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <div className="flex flex-wrap gap-1 max-w-[220px]">
+                          {row.variant_group ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-violet-500/15 px-2 py-0.5 text-[10px] font-semibold text-violet-700 dark:text-violet-300">
+                              <Layers className="h-2.5 w-2.5" />
+                              {row.variant_group_name || row.variant_group_code}
+                              {row.variant_label ? ` · ${row.variant_label}` : ""}
+                            </span>
+                          ) : (
+                            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
+                              Standalone
+                            </span>
+                          )}
+                          {(row.attributes ?? [])
+                            .filter((a) => a.name !== "Variant Group")
+                            .map((a) => (
+                              <button
+                                key={`${a.name}-${a.value}`}
+                                type="button"
+                                onClick={() => handleToggleAttribute(a.name, a.value)}
+                                className="rounded border border-border bg-background px-1.5 py-0.5 text-[10px] hover:bg-muted"
+                              >
+                                <strong className="text-muted-foreground">{a.name}:</strong> {a.value}
+                              </button>
+                            ))}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-mono">
+                        <StockQty qty={row.physical_qty ?? "0"} reorder={row.reorder_level_qty ?? "0"} />{" "}
+                        <span className="text-[10px] text-muted-foreground">{row.unit_of_measure}</span>
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                        {avail.toFixed(2)}
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-mono">
+                        <div>{formatDocumentMoney(row.base_price ?? "0")}</div>
+                        <div className="text-[10px] text-muted-foreground">Cost {formatDocumentMoney(row.standard_unit_cost ?? "0")}</div>
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-mono font-bold text-primary">
+                        {row.valuation_total ? formatDocumentMoney(row.valuation_total) : "—"}
+                      </td>
+                      <td className="px-3 py-2.5 text-center">
+                        <LinkedBadge count={row.linked_fg_count ?? 0} onClick={() => openProfile(row, "linked_fgs")} />
+                      </td>
+                      <td className="px-3 py-2.5 text-right">
+                        <div className="inline-flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setInspectItemId(row.id)}
+                            className={BTN_GHOST}
+                            title="Audit stock math"
+                          >
+                            <Calculator className="h-3 w-3 text-primary" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openProfile(row)}
+                            className="inline-flex items-center gap-1 rounded-lg bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary hover:bg-primary/20"
+                          >
+                            <ExternalLink className="h-3 w-3" /> Profile
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditId(row.id);
+                              setEf(rowToEditForm(row));
+                              setSaveErr(null);
+                              setDeleteId(null);
+                              setViewMode("cards");
+                            }}
+                            className={BTN_GHOST}
+                          >
+                            <Edit2 className="h-3 w-3" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setDeleteId(row.id); setDeleteErr(null); setEditId(null); setViewMode("cards"); }}
+                            className={BTN_DANGER}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         ) : (
           <div className="space-y-2">
             {rows.map((row) => {
@@ -1265,6 +1506,14 @@ export default function AccessoriesPage() {
         )}
 
       </div>
+
+      {inspectItemId && (
+        <StockCalculationDrawer
+          itemId={inspectItemId}
+          isOpen={Boolean(inspectItemId)}
+          onClose={() => setInspectItemId(null)}
+        />
+      )}
     </ERPPageShell>
   );
 }

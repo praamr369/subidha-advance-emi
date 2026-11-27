@@ -1,19 +1,24 @@
 "use client";
 
 import React from "react";
-import { AlertTriangle, Package, Lock, TrendingDown } from "lucide-react";
-import type { StockOnHandKPIS } from "@/services/inventory";
+import { AlertTriangle, Boxes, CheckCircle2, Lock, Package } from "lucide-react";
+import type { StockOnHandFilteredSummary, StockOnHandKPIS } from "@/services/inventory";
 
 interface StockOnHandKPIStripProps {
   summary: StockOnHandKPIS | null;
+  filteredSummary?: StockOnHandFilteredSummary | null;
+  hasActiveFilter?: boolean;
   isLoading?: boolean;
 }
 
 const StockOnHandKPIStrip: React.FC<StockOnHandKPIStripProps> = ({
   summary,
+  filteredSummary,
+  hasActiveFilter = false,
   isLoading = false,
 }) => {
-  const formatValue = (value: string) => {
+  const formatValue = (value: string | undefined) => {
+    if (!value) return "0";
     try {
       return parseFloat(value).toLocaleString("en-IN", {
         minimumFractionDigits: 0,
@@ -24,7 +29,8 @@ const StockOnHandKPIStrip: React.FC<StockOnHandKPIStripProps> = ({
     }
   };
 
-  const formatCurrency = (value: string) => {
+  const formatCurrency = (value: string | undefined) => {
+    if (!value) return "₹0";
     try {
       return `₹${parseFloat(value).toLocaleString("en-IN", {
         minimumFractionDigits: 0,
@@ -37,116 +43,128 @@ const StockOnHandKPIStrip: React.FC<StockOnHandKPIStripProps> = ({
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[...Array(4)].map((_, i) => (
-          <div key={i} className="rounded-lg border bg-white p-4 animate-pulse">
-            <div className="h-3 bg-gray-200 rounded w-20 mb-2"></div>
-            <div className="h-6 bg-gray-200 rounded w-16"></div>
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        {[...Array(5)].map((_, i) => (
+          <div key={i} className="rounded-xl border border-border bg-card p-4 animate-pulse">
+            <div className="h-3 bg-muted rounded w-20 mb-2" />
+            <div className="h-6 bg-muted rounded w-16" />
           </div>
         ))}
       </div>
     );
   }
 
-  if (!summary) return null;
+  const activeData = hasActiveFilter && filteredSummary ? filteredSummary : null;
+  if (!summary && !activeData) return null;
 
-  const isCritical = parseInt(summary.critical_shortage_count.toString()) > 0;
+  const physicalQty = activeData ? activeData.total_physical_qty : summary?.total_physical_qty;
+  const reservedQty = activeData ? activeData.total_reserved_qty : summary?.total_reserved_qty;
+  const availableQty = activeData ? activeData.total_available_qty : summary?.total_available_qty;
+  const totalValue = activeData ? activeData.total_value : summary?.total_value;
+  const criticalCount = activeData
+    ? activeData.low_stock_count + activeData.out_of_stock_count
+    : (summary?.critical_shortage_count ?? 0);
+  const isCritical = criticalCount > 0;
 
   return (
-    <div className="space-y-4">
-      {/* Main KPI Strip */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         {/* Physical Quantity */}
-        <div className="rounded-lg border bg-white p-4">
-          <div className="flex items-center justify-between mb-2">
-            <div className="text-xs text-gray-600">Physical Qty</div>
-            <Package className="h-4 w-4 text-blue-500" />
+        <div className="rounded-xl border border-border bg-card p-4 shadow-2xs">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              {activeData ? "Filtered Physical" : "Physical SOH"}
+            </span>
+            <Package className="h-4 w-4 text-sky-500" />
           </div>
-          <div className="text-xl font-bold text-gray-900">
-            {formatValue(summary.total_physical_qty)}
+          <div className="text-xl font-bold text-foreground font-mono tabular-nums">
+            {formatValue(physicalQty)}
           </div>
-          <div className="text-xs text-gray-500 mt-1">units in stock</div>
+          <div className="text-[11px] text-muted-foreground mt-0.5">
+            {activeData ? `${activeData.total_skus} matching SKUs` : "units in stock"}
+          </div>
         </div>
 
         {/* Reserved Quantity */}
-        <div className="rounded-lg border bg-white p-4">
-          <div className="flex items-center justify-between mb-2">
-            <div className="text-xs text-gray-600">Reserved Qty</div>
-            <Lock className="h-4 w-4 text-orange-500" />
+        <div className="rounded-xl border border-border bg-card p-4 shadow-2xs">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Reserved (Held)
+            </span>
+            <Lock className="h-4 w-4 text-amber-500" />
           </div>
-          <div className="text-xl font-bold text-gray-900">
-            {formatValue(summary.total_reserved_qty)}
+          <div className="text-xl font-bold text-amber-600 dark:text-amber-400 font-mono tabular-nums">
+            {formatValue(reservedQty)}
           </div>
-          <div className="text-xs text-gray-500 mt-1">units held</div>
+          <div className="text-[11px] text-muted-foreground mt-0.5">committed soft holds</div>
         </div>
 
         {/* Available Quantity */}
-        <div className="rounded-lg border bg-white p-4 border-green-200 bg-green-50">
-          <div className="flex items-center justify-between mb-2">
-            <div className="text-xs text-gray-600">Available Qty</div>
-            <TrendingDown className="h-4 w-4 text-green-600" />
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 shadow-2xs">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+              Available (ATP)
+            </span>
+            <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
           </div>
-          <div className="text-xl font-bold text-green-700">
-            {formatValue(summary.total_available_qty)}
+          <div className="text-xl font-bold text-emerald-700 dark:text-emerald-300 font-mono tabular-nums">
+            {formatValue(availableQty)}
           </div>
-          <div className="text-xs text-green-600 mt-1">ready for sale</div>
+          <div className="text-[11px] text-emerald-700/80 dark:text-emerald-400/80 mt-0.5">
+            {activeData ? `${activeData.in_stock_count} SKUs healthy` : "ready for sale / delivery"}
+          </div>
         </div>
 
-        {/* Critical Shortages */}
+        {/* Critical / Attention */}
         <div
-          className={`rounded-lg border p-4 ${
-            isCritical ? "bg-red-50 border-red-200" : "bg-white"
+          className={`rounded-xl border p-4 shadow-2xs ${
+            isCritical
+              ? "border-rose-500/30 bg-rose-500/10"
+              : "border-border bg-card"
           }`}
         >
-          <div className="flex items-center justify-between mb-2">
-            <div className="text-xs text-gray-600">Critical</div>
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              {activeData ? "Out / Low Stock" : "Below Reorder"}
+            </span>
             <AlertTriangle
-              className={`h-4 w-4 ${isCritical ? "text-red-600" : "text-gray-400"}`}
+              className={`h-4 w-4 ${isCritical ? "text-rose-500" : "text-muted-foreground"}`}
             />
           </div>
           <div
-            className={`text-xl font-bold ${
-              isCritical ? "text-red-700" : "text-gray-900"
+            className={`text-xl font-bold font-mono tabular-nums ${
+              isCritical ? "text-rose-600 dark:text-rose-400" : "text-foreground"
             }`}
           >
-            {summary.critical_shortage_count}
+            {criticalCount}
           </div>
           <div
-            className={`text-xs mt-1 ${
-              isCritical ? "text-red-600" : "text-gray-500"
+            className={`text-[11px] mt-0.5 ${
+              isCritical ? "text-rose-600/80 dark:text-rose-400/80" : "text-muted-foreground"
             }`}
           >
-            SKUs below reorder
+            {activeData
+              ? `${activeData.out_of_stock_count} out · ${activeData.low_stock_count} low`
+              : "SKUs needing attention"}
           </div>
         </div>
 
         {/* Total Inventory Value */}
-        <div className="rounded-lg border bg-white p-4 border-purple-200 bg-purple-50 md:col-span-1 col-span-2">
-          <div className="flex items-center justify-between mb-2">
-            <div className="text-xs text-gray-600">Total Value</div>
-            <Package className="h-4 w-4 text-purple-600" />
+        <div className="rounded-xl border border-violet-500/30 bg-violet-500/10 p-4 shadow-2xs md:col-span-1 col-span-2">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-violet-700 dark:text-violet-300">
+              {activeData ? "Filtered Value" : "Total Stock Value"}
+            </span>
+            <Boxes className="h-4 w-4 text-violet-600 dark:text-violet-400" />
           </div>
-          <div className="text-lg font-bold text-purple-700">
-            {formatCurrency(summary.total_value)}
+          <div className="text-xl font-bold text-violet-700 dark:text-violet-300 font-mono tabular-nums">
+            {formatCurrency(totalValue)}
           </div>
-          <div className="text-xs text-purple-600 mt-1">inventory value</div>
+          <div className="text-[11px] text-violet-700/80 dark:text-violet-400/80 mt-0.5">
+            at standard / avg cost
+          </div>
         </div>
       </div>
-
-      {/* Critical Alert Banner */}
-      {isCritical && (
-        <div className="rounded-lg border border-red-300 bg-red-50 p-4 flex items-start gap-3">
-          <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
-          <div>
-            <h3 className="font-semibold text-red-900">Critical Stock Alert</h3>
-            <p className="text-sm text-red-700 mt-1">
-              {summary.critical_shortage_count} SKU
-              {summary.critical_shortage_count !== 1 ? "s are" : " is"} below reorder point.
-              Review the critical shortages table below.
-            </p>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

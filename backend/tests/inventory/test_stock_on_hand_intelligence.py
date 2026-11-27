@@ -77,6 +77,8 @@ class StockOnHandIntelligenceTests(APITestCase):
             category_master=self.cat_raw,
             category="Plywood & Board",
             item_type=ProductItemType.RAW_MATERIAL,
+            is_emi_enabled=False,
+            is_direct_sale_enabled=False,
             base_price=Decimal("2500.00"),
             base_specs={"thickness": "18mm", "grade": "Commercial MR"},
         )
@@ -87,6 +89,32 @@ class StockOnHandIntelligenceTests(APITestCase):
             opening_stock_qty=Decimal("100.000"),
             reorder_level_qty=Decimal("20.000"),
             standard_unit_cost=Decimal("1800.00"),
+        )
+
+        # 4b. Second Bed (Steel Queen Bed) so we can verify Steel vs Solid Wood bed tracing
+        self.subcat_queen = ProductSubcategoryMaster.objects.create(
+            name="Queen Size Bed",
+            category=self.cat_bed,
+        )
+        self.steel_bed_product = Product.objects.create(
+            name="Heavy Duty Steel Bed",
+            product_code="BED-STEEL-01",
+            sku="SF-BED-STEEL-QUEEN",
+            category_master=self.cat_bed,
+            category="Bed",
+            subcategory_master=self.subcat_queen,
+            subcategory="Queen Size Bed",
+            item_type=ProductItemType.FINISHED_GOOD,
+            base_price=Decimal("22000.00"),
+            base_specs={"size": "Queen", "material": "Steel", "storage": "None"},
+        )
+        self.steel_bed_item = InventoryItem.objects.create(
+            product=self.steel_bed_product,
+            sku="SF-BED-STEEL-QUEEN",
+            stock_item_type=InventoryItemType.FINISHED_GOOD,
+            opening_stock_qty=Decimal("4.000"),
+            reorder_level_qty=Decimal("1.000"),
+            standard_unit_cost=Decimal("14000.00"),
         )
 
         # 5. Add a stock ledger movement to bed item
@@ -104,7 +132,8 @@ class StockOnHandIntelligenceTests(APITestCase):
     def test_stock_on_hand_list_and_calculations(self):
         res = self.client.get("/api/v1/admin/inventory/stock-on-hand/?filter=all")
         self.assertEqual(res.status_code, status.HTTP_200_OK)
-        self.assertEqual(res.data["count"], 3)
+        self.assertEqual(res.data["count"], 4)
+        self.assertIn("filtered_summary", res.data)
 
         # Verify bed quantities (10 opening - 2 sale out = 8 physical)
         bed_row = next((r for r in res.data["results"] if r["inventory_item_id"] == self.bed_item.id), None)
@@ -123,9 +152,10 @@ class StockOnHandIntelligenceTests(APITestCase):
         # Finished goods only
         res_fg = self.client.get("/api/v1/admin/inventory/stock-on-hand/?item_type=FINISHED_GOOD")
         self.assertEqual(res_fg.status_code, status.HTTP_200_OK)
-        self.assertEqual(res_fg.data["count"], 2)
+        self.assertEqual(res_fg.data["count"], 3)
         skus = [r["sku"] for r in res_fg.data["results"]]
         self.assertIn("SF-BED-ROYAL-KING", skus)
+        self.assertIn("SF-BED-STEEL-QUEEN", skus)
         self.assertIn("SF-ALM-STL-01", skus)
         self.assertNotIn("RM-PLY-18MM", skus)
 
@@ -138,8 +168,8 @@ class StockOnHandIntelligenceTests(APITestCase):
     def test_filter_by_category_and_subcategory(self):
         res_bed = self.client.get("/api/v1/admin/inventory/stock-on-hand/?category=Bed")
         self.assertEqual(res_bed.status_code, status.HTTP_200_OK)
-        self.assertEqual(res_bed.data["count"], 1)
-        self.assertEqual(res_bed.data["results"][0]["sku"], "SF-BED-ROYAL-KING")
+        self.assertEqual(res_bed.data["count"], 2)
+        self.assertEqual(Decimal(res_bed.data["filtered_summary"]["total_available_qty"]), Decimal("12.000"))
 
         res_subcat = self.client.get("/api/v1/admin/inventory/stock-on-hand/?subcategory=King Size Bed")
         self.assertEqual(res_subcat.status_code, status.HTTP_200_OK)
@@ -153,24 +183,60 @@ class StockOnHandIntelligenceTests(APITestCase):
         self.assertEqual(res_king.data["count"], 1)
         self.assertEqual(res_king.data["results"][0]["sku"], "SF-BED-ROYAL-KING")
 
-        # Filter Material=Steel
-        res_steel = self.client.get("/api/v1/admin/inventory/stock-on-hand/?attribute_key=Material&attribute_value=Steel")
-        self.assertEqual(res_steel.status_code, status.HTTP_200_OK)
-        self.assertEqual(res_steel.data["count"], 1)
-        self.assertEqual(res_steel.data["results"][0]["sku"], "SF-ALM-STL-01")
+        # Filter Material=Steel within category=Bed -> only Steel Bed, NOT Almirah
+        res_steel_bed = self.client.get(
+            "/api/v1/admin/inventory/stock-on-hand/?category=Bed&attribute_key=Material&attribute_value=Steel"
+        )
+        self.assertEqual(res_steel_bed.status_code, status.HTTP_200_OK)
+        self.assertEqual(res_steel_bed.data["count"], 1)
+        self.assertEqual(res_steel_bed.data["results"][0]["sku"], "SF-BED-STEEL-QUEEN")
+
+        # Multi-attribute filter via attribute_filters
+        res_multi = self.client.get(
+            "/api/v1/admin/inventory/stock-on-hand/?attribute_filters=Material:Steel|Size:3-Door"
+        )
+        self.assertEqual(res_multi.status_code, status.HTTP_200_OK)
+        self.assertEqual(res_multi.data["count"], 1)
+        self.assertEqual(res_multi.data["results"][0]["sku"], "SF-ALM-STL-01")
 
     def test_stock_facets_endpoint(self):
-        res = self.client.get("/api/v1/admin/inventory/stock-on-hand/facets/")
+        res = self.client.get("/api/v1/admin/inventory/stock-on-hand/facets/?category=Bed")
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertIn("item_types", res.data)
         self.assertIn("categories", res.data)
         self.assertIn("subcategories", res.data)
+        self.assertIn("category_tree", res.data)
         self.assertIn("attributes", res.data)
+        self.assertIn("attribute_facets", res.data)
+        self.assertIn("locations", res.data)
 
         cat_names = [c["name"] for c in res.data["categories"]]
         self.assertIn("Bed", cat_names)
         self.assertIn("Almirah", cat_names)
         self.assertIn("Plywood & Board", cat_names)
+
+        bed_node = next(c for c in res.data["category_tree"] if c["name"] == "Bed")
+        self.assertEqual(bed_node["sku_count"], 2)
+        self.assertEqual(Decimal(bed_node["available_qty"]), Decimal("12.000"))
+
+        mat_facet = next(a for a in res.data["attribute_facets"] if a["name"] == "Material")
+        mat_vals = {v["value"]: v for v in mat_facet["values"]}
+        self.assertEqual(Decimal(mat_vals["Solid Wood"]["available_qty"]), Decimal("8.000"))
+        self.assertEqual(Decimal(mat_vals["Steel"]["available_qty"]), Decimal("4.000"))
+
+    def test_catalog_endpoints_support_category_and_attribute_filters(self):
+        res_fg = self.client.get(
+            "/api/v1/admin/inventory/finished-goods/?category=Bed&attribute_key=Material&attribute_value=Steel"
+        )
+        self.assertEqual(res_fg.status_code, status.HTTP_200_OK)
+        self.assertEqual(res_fg.data["count"], 1)
+        self.assertEqual(res_fg.data["results"][0]["sku"], "SF-BED-STEEL-QUEEN")
+        self.assertIn("available_qty", res_fg.data["results"][0])
+        self.assertIn("summary", res_fg.data)
+
+        res_csv = self.client.get("/api/v1/admin/inventory/stock-on-hand/?category=Bed&export=csv")
+        self.assertEqual(res_csv.status_code, status.HTTP_200_OK)
+        self.assertIn("SF-BED-ROYAL-KING", res_csv.content.decode("utf-8"))
 
     def test_stock_calculation_details_endpoint(self):
         res = self.client.get(f"/api/v1/admin/inventory/stock-on-hand/{self.bed_item.id}/calculation/")

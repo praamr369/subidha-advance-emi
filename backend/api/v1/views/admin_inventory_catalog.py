@@ -173,34 +173,232 @@ class FGServiceLinkWriteSerializer(serializers.Serializer):
         return attrs
 
 
-def _inventory_item_summary(item: InventoryItem) -> dict:
+def _inventory_item_summary(
+    item: InventoryItem,
+    *,
+    reserved_qty: Decimal | None = None,
+    location_breakdown: list[dict] | None = None,
+) -> dict:
+    from inventory.services.stock_on_hand_service import (
+        _resolve_category_and_subcategory,
+        _resolve_item_pricing,
+        _resolve_pim_product,
+        extract_inventory_item_attributes,
+    )
+
     prod = item.product
     physical_qty = getattr(item, "physical_qty", None)
     if physical_qty is None:
         physical_qty = item.current_stock_quantity()
+    physical_dec = Decimal(str(physical_qty or "0"))
+    reserved_dec = reserved_qty if reserved_qty is not None else item.reserved_qty()
+    available_dec = max(QUANTITY_ZERO, physical_dec - reserved_dec)
+    cost, price = _resolve_item_pricing(item)
+    valuation_total = (physical_dec * cost).quantize(Decimal("0.01")) if physical_dec > QUANTITY_ZERO else MONEY_ZERO
+    cat_name, subcat_name = _resolve_category_and_subcategory(item)
+    attrs_map = extract_inventory_item_attributes(item)
+    attrs_list = [{"name": k, "value": v} for k, v in attrs_map.items()]
+    pim_var = getattr(prod, "pim_variant", None)
+    pim_prod = _resolve_pim_product(prod)
+    brand = (getattr(pim_var, "brand", "") or "").strip() or (getattr(prod, "brand", "") or "").strip() or (getattr(pim_prod, "brand", "") or "").strip()
+
     return {
         "id": item.id,
         "product_id": prod.id,
+        "pim_product_id": pim_prod.id if pim_prod else None,
         "product_code": prod.product_code,
-        "product_name": prod.name,
+        "product_name": getattr(pim_var, "variant_name", "") or prod.name,
+        "brand": brand,
         "sku": item.sku,
         "stock_item_type": item.stock_item_type,
         "unit_of_measure": item.unit_of_measure,
         "stock_tracking_enabled": item.stock_tracking_enabled,
         "stock_tracking_status": InventoryItem.live_stock_tracking_status(item.stock_tracking_status, physical_qty),
-        "standard_unit_cost": str(item.standard_unit_cost or "0.00"),
+        "standard_unit_cost": str(item.standard_unit_cost or cost or "0.00"),
         "reorder_level_qty": str(item.reorder_level_qty),
         "valuation_method": item.valuation_method,
         "barcode": item.barcode,
         "is_active": getattr(prod, "is_active", True),
-        "category": prod.category or (prod.category_master.name if prod.category_master_id else ""),
-        "subcategory": prod.subcategory or (prod.subcategory_master.name if prod.subcategory_master_id else ""),
-        "base_price": str(prod.base_price),
-        "physical_qty": str(physical_qty or "0.00"),
+        "category": cat_name if cat_name != "Uncategorized" else "",
+        "subcategory": subcat_name,
+        "base_price": str(price),
+        "physical_qty": str(physical_dec),
+        "reserved_qty": str(reserved_dec),
+        "available_qty": str(available_dec),
+        "valuation_total": str(valuation_total),
+        "attributes": attrs_list,
+        "attributes_map": attrs_map,
+        "default_location_name": item.default_stock_location.name if item.default_stock_location_id else None,
+        "location_breakdown": location_breakdown if location_breakdown is not None else [],
         "variant_group": item.variant_group_id,
         "variant_group_name": item.variant_group.name if item.variant_group_id else None,
         "variant_group_code": item.variant_group.code if item.variant_group_id else None,
         "variant_label": item.variant_label or "",
+    }
+
+
+def _filtered_catalog_list(request, *, item_type: str, extra_row_fn):
+    from inventory.services.stock_on_hand_service import (
+        _apply_sort,
+        _build_location_breakdown_map,
+        _build_reserved_map,
+        _item_matches_attributes,
+        _parse_attribute_filters,
+        _resolve_item_pricing,
+    )
+    from inventory.services.stock_service import attach_bulk_stock_quantities
+
+    loc_raw = (request.query_params.get("location_id") or "").strip()
+    location_id = int(loc_raw) if loc_raw.isdigit() else None
+
+    qs = (
+        InventoryItem.objects
+        .filter(stock_item_type=item_type)
+        .select_related(
+            "product",
+            "product__category_master",
+            "product__subcategory_master",
+            "product__pim_variant",
+            "product__pim_variant__product",
+            "product__pim_variant__product__category",
+            "product__pim_variant__product__subcategory",
+            "default_stock_location",
+            "variant_group",
+        )
+        .prefetch_related(
+            "accessory_links",
+            "service_links",
+            "product__pim_variant__attribute_values__attribute",
+            "product__pim__category",
+            "product__pim__subcategory",
+            "product__pim__attributes__attribute",
+        )
+        .order_by("product__name", "id")
+    )
+    qs = _annotate_stock_qty(qs)
+
+    q = (request.query_params.get("q") or request.query_params.get("search") or "").strip()
+    if q:
+        qs = qs.filter(
+            Q(product__name__icontains=q)
+            | Q(product__product_code__icontains=q)
+            | Q(sku__icontains=q)
+            | Q(barcode__icontains=q)
+            | Q(variant_label__icontains=q)
+            | Q(variant_group__name__icontains=q)
+            | Q(product__category__icontains=q)
+            | Q(product__subcategory__icontains=q)
+            | Q(product__base_specs__icontains=q)
+            | Q(product__pim_variant__attribute_values__value_text__icontains=q)
+            | Q(product__pim__attributes__value_text__icontains=q)
+        ).distinct()
+
+    tracking_status = (request.query_params.get("tracking_status") or "").strip().upper()
+    if tracking_status:
+        qs = qs.filter(stock_tracking_status=tracking_status)
+
+    category = (request.query_params.get("category") or "").strip()
+    if category and category != "ALL":
+        qs = qs.filter(
+            Q(product__category__iexact=category)
+            | Q(product__category_master__name__iexact=category)
+            | Q(product__pim_variant__product__category__name__iexact=category)
+            | Q(product__pim__category__name__iexact=category)
+        ).distinct()
+
+    subcategory = (request.query_params.get("subcategory") or "").strip()
+    if subcategory and subcategory != "ALL":
+        qs = qs.filter(
+            Q(product__subcategory__iexact=subcategory)
+            | Q(product__subcategory_master__name__iexact=subcategory)
+            | Q(product__pim_variant__product__subcategory__name__iexact=subcategory)
+            | Q(product__pim__subcategory__name__iexact=subcategory)
+        ).distinct()
+
+    stock_status = (request.query_params.get("stock_status") or "").strip().lower()
+    if stock_status == "in_stock":
+        qs = qs.filter(physical_qty__gt=QUANTITY_ZERO)
+    elif stock_status == "low_stock":
+        qs = qs.filter(physical_qty__gt=QUANTITY_ZERO, physical_qty__lte=F("reorder_level_qty"), reorder_level_qty__gt=QUANTITY_ZERO)
+    elif stock_status == "out_of_stock":
+        qs = qs.filter(physical_qty__lte=QUANTITY_ZERO)
+
+    attr_pairs = _parse_attribute_filters(
+        attribute_key=(request.query_params.get("attribute_key") or "").strip(),
+        attribute_value=(request.query_params.get("attribute_value") or "").strip(),
+        attribute_filters=(request.query_params.get("attribute_filters") or "").strip() or None,
+    )
+    items_all = list(qs)
+    if attr_pairs:
+        items_all = [it for it in items_all if _item_matches_attributes(it, attr_pairs)]
+
+    reserved_map = _build_reserved_map(item_ids=[it.id for it in items_all], location_id=location_id)
+    sort_by = (request.query_params.get("sort_by") or "").strip()
+    if sort_by:
+        items_all = _apply_sort(items_all, sort_by, reserved_map)
+
+    # Summary KPIs over all filtered items
+    tot_phys = QUANTITY_ZERO
+    tot_res = QUANTITY_ZERO
+    tot_avail = QUANTITY_ZERO
+    tot_val = MONEY_ZERO
+    in_stock_cnt = 0
+    low_stock_cnt = 0
+    out_of_stock_cnt = 0
+
+    for it in items_all:
+        p = Decimal(str(getattr(it, "physical_qty", 0) or 0))
+        r = reserved_map.get(it.id, QUANTITY_ZERO)
+        a = max(QUANTITY_ZERO, p - r)
+        reord = Decimal(str(it.reorder_level_qty or 0))
+        cost, _ = _resolve_item_pricing(it)
+        tot_phys += p
+        tot_res += r
+        tot_avail += a
+        if p > QUANTITY_ZERO:
+            tot_val += (p * cost).quantize(Decimal("0.01"))
+        if p <= QUANTITY_ZERO:
+            out_of_stock_cnt += 1
+        elif reord > QUANTITY_ZERO and p <= reord:
+            low_stock_cnt += 1
+        else:
+            in_stock_cnt += 1
+
+    page = max(1, int(request.query_params.get("page", 1)))
+    page_size = min(100, max(10, int(request.query_params.get("page_size", 20))))
+    offset = (page - 1) * page_size
+    total = len(items_all)
+    page_items = items_all[offset: offset + page_size]
+
+    attach_bulk_stock_quantities(page_items)
+    loc_map = _build_location_breakdown_map([it.id for it in page_items])
+
+    results = []
+    for it in page_items:
+        d = _inventory_item_summary(
+            it,
+            reserved_qty=reserved_map.get(it.id, QUANTITY_ZERO),
+            location_breakdown=loc_map.get(it.id, []),
+        )
+        extra_row_fn(it, d)
+        results.append(d)
+
+    return {
+        "count": total,
+        "page": page,
+        "page_size": page_size,
+        "num_pages": max(1, (total + page_size - 1) // page_size),
+        "summary": {
+            "total_skus": total,
+            "in_stock_count": in_stock_cnt,
+            "low_stock_count": low_stock_cnt,
+            "out_of_stock_count": out_of_stock_cnt,
+            "total_physical_qty": str(tot_phys),
+            "total_reserved_qty": str(tot_res),
+            "total_available_qty": str(tot_avail),
+            "total_value": str(tot_val),
+        },
+        "results": results,
     }
 
 
@@ -316,33 +514,12 @@ class AdminFinishedGoodsListView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
     def get(self, request):
-        qs = (
-            InventoryItem.objects
-            .filter(stock_item_type=InventoryItemType.FINISHED_GOOD)
-            .select_related("product", "product__category_master", "product__subcategory_master", "default_stock_location")
-            .prefetch_related("accessory_links", "service_links")
-            .order_by("product__name", "id")
-        )
-        qs = _annotate_stock_qty(qs)
-        q = (request.query_params.get("q") or "").strip()
-        if q:
-            qs = qs.filter(
-                Q(product__name__icontains=q)
-                | Q(product__product_code__icontains=q)
-                | Q(sku__icontains=q)
-            )
-        tracking_status = (request.query_params.get("tracking_status") or "").strip().upper()
-        if tracking_status:
-            qs = qs.filter(stock_tracking_status=tracking_status)
-
-        def _row(item):
-            d = _inventory_item_summary(item)
+        def _extra(item, d):
             d["accessory_count"] = item.accessory_links.count()
             d["service_count"] = item.service_links.count()
             d["has_bom"] = hasattr(item, "manufacturing_boms") and item.manufacturing_boms.filter(status="ACTIVE").exists()
-            return d
 
-        return Response(_paginate(qs, request, _row))
+        return Response(_filtered_catalog_list(request, item_type=InventoryItemType.FINISHED_GOOD, extra_row_fn=_extra))
 
 
 class AdminFinishedGoodProfileView(APIView):
@@ -403,30 +580,10 @@ class AdminRawMaterialsListView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
     def get(self, request):
-        qs = (
-            InventoryItem.objects
-            .filter(stock_item_type=InventoryItemType.RAW_MATERIAL)
-            .select_related("product", "product__category_master", "default_stock_location")
-            .order_by("product__name", "id")
-        )
-        qs = _annotate_stock_qty(qs)
-        q = (request.query_params.get("q") or "").strip()
-        if q:
-            qs = qs.filter(
-                Q(product__name__icontains=q)
-                | Q(product__product_code__icontains=q)
-                | Q(sku__icontains=q)
-            )
-        tracking_status = (request.query_params.get("tracking_status") or "").strip().upper()
-        if tracking_status:
-            qs = qs.filter(stock_tracking_status=tracking_status)
-
-        def _row(item):
-            d = _inventory_item_summary(item)
+        def _extra(item, d):
             d["bom_usage_count"] = item.manufacturing_bom_lines.count()
-            return d
 
-        return Response(_paginate(qs, request, _row))
+        return Response(_filtered_catalog_list(request, item_type=InventoryItemType.RAW_MATERIAL, extra_row_fn=_extra))
 
 
 class AdminRawMaterialDetailView(APIView):
@@ -510,27 +667,10 @@ class AdminAccessoriesListView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
     def get(self, request):
-        qs = (
-            InventoryItem.objects
-            .filter(stock_item_type=InventoryItemType.ACCESSORY)
-            .select_related("product", "product__category_master", "default_stock_location", "variant_group")
-            .order_by("product__name", "id")
-        )
-        qs = _annotate_stock_qty(qs)
-        q = (request.query_params.get("q") or "").strip()
-        if q:
-            qs = qs.filter(
-                Q(product__name__icontains=q)
-                | Q(product__product_code__icontains=q)
-                | Q(sku__icontains=q)
-            )
-
-        def _row(item):
-            d = _inventory_item_summary(item)
+        def _extra(item, d):
             d["linked_fg_count"] = item.linked_to_finished_goods.count()
-            return d
 
-        return Response(_paginate(qs, request, _row))
+        return Response(_filtered_catalog_list(request, item_type=InventoryItemType.ACCESSORY, extra_row_fn=_extra))
 
 
 class AdminAccessoryDetailView(APIView):

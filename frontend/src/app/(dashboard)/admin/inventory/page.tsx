@@ -116,9 +116,9 @@ function CategoryRow({ label, count, inStock, low, out, value, icon, color, href
         <div className="mt-0.5 text-xs text-muted-foreground">{count} SKUs · {formatRupee(value)} value</div>
       </div>
       <div className="hidden flex-wrap items-center gap-2 sm:flex">
-        <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">{inStock} healthy</span>
-        {low > 0 ? <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800">{low} low</span> : null}
-        {out > 0 ? <span className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-800">{out} out</span> : null}
+        <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">{inStock} healthy</span>
+        {low > 0 ? <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-300">{low} low</span> : null}
+        {out > 0 ? <span className="rounded-full border border-rose-500/30 bg-rose-500/10 px-2 py-0.5 text-[11px] font-semibold text-rose-700 dark:text-rose-300">{out} out</span> : null}
       </div>
       <Link
         href={href}
