@@ -1,10 +1,15 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import type { EnterpriseColumnDef } from "@/components/enterprise/columns";
 import EnterpriseDataTable from "@/components/enterprise/EnterpriseDataTable";
+import AccountingPurchaseBillDetailDrawer, {
+  summarizePurchaseBillItems,
+} from "@/components/accounting/AccountingPurchaseBillDetailDrawer";
+import { buildAdminPurchaseBillPrintRoute } from "@/lib/route-builders";
 import {
   AccountingNotice,
   AccountingRefreshButton,
@@ -118,6 +123,7 @@ export default function AccountingPurchaseBillsPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [activeTaxMode, setActiveTaxMode] = useState<BusinessTaxMode>("GST_UNREGISTERED");
   const [openAccLineIdx, setOpenAccLineIdx] = useState<number | null>(null);
+  const [viewingBill, setViewingBill] = useState<AccountingPurchaseBill | null>(null);
 
   const query = useQuery({
     queryKey: ["accounting", "purchase-bills"],
@@ -254,6 +260,23 @@ export default function AccountingPurchaseBillsPage() {
       render: (row) => row.branch_code || row.branch_name || "Primary default",
     },
     { key: "vendor_name", header: "Vendor" },
+    {
+      key: "items_summary",
+      header: "Items",
+      render: (row) => {
+        const { lineCount, totalQty, previewText } = summarizePurchaseBillItems(row);
+        return (
+          <div className="min-w-[160px]">
+            <div className="text-xs font-semibold text-foreground">
+              {lineCount} item{lineCount === 1 ? "" : "s"} · {totalQty.toLocaleString("en-IN", { maximumFractionDigits: 3 })} qty
+            </div>
+            <div className="truncate max-w-[220px] text-[11px] text-muted-foreground" title={previewText}>
+              {previewText}
+            </div>
+          </div>
+        );
+      },
+    },
     { key: "stock_location_name", header: "Inward Location" },
     { key: "status", header: "Status" },
     { key: "grand_total", header: "Grand Total", render: (row) => accountingMoney(row.grand_total) },
@@ -263,6 +286,19 @@ export default function AccountingPurchaseBillsPage() {
       header: "Actions",
       render: (row) => (
         <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setViewingBill(row)}
+            className="rounded-xl border border-primary/40 bg-primary/10 px-3 py-2 text-xs font-semibold text-primary transition hover:bg-primary/20 cursor-pointer"
+          >
+            View Bill
+          </button>
+          <Link
+            href={buildAdminPurchaseBillPrintRoute(row.id, "accounting")}
+            className="inline-flex items-center rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900 transition hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+          >
+            Print
+          </Link>
           {row.status === "DRAFT" ? (
             <button
               type="button"
@@ -794,6 +830,10 @@ export default function AccountingPurchaseBillsPage() {
           />
         </WorkspaceSection>
       </div>
+
+      {viewingBill ? (
+        <AccountingPurchaseBillDetailDrawer bill={viewingBill} onClose={() => setViewingBill(null)} />
+      ) : null}
     </ERPPageShell>
   );
 }

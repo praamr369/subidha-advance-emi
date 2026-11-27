@@ -196,8 +196,12 @@ export function buildAdminRentLeaseContractPrintRoute(id: number | string): stri
   return `${ADMIN_RENT_LEASE_CONTRACTS_ROUTE}/${id}/contract/print`;
 }
 
-export function buildAdminPurchaseBillPrintRoute(id: number | string): string {
-  return `${ROUTES.admin.purchases}/${id}/bill/print`;
+export function buildAdminPurchaseBillPrintRoute(
+  id: number | string,
+  source?: "accounting" | "vendor",
+): string {
+  const base = `${ROUTES.admin.purchases}/${id}/bill/print`;
+  return source === "accounting" ? `${base}?source=accounting` : base;
 }
 
 export function buildAdminVendorPaymentVoucherPrintRoute(id: number | string): string {

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import {
@@ -134,7 +134,9 @@ function buildLineItems(bill: VendorBillRecord): DocumentLineItem[] {
 
 export default function AdminPurchaseBillPrintPage() {
   const params = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
   const billId = params?.id;
+  const isAccountingSource = searchParams.get("source") === "accounting";
   const [bill, setBill] = useState<VendorBillRecord | null>(null);
   const [vendor, setVendor] = useState<VendorRecord | null>(null);
   const [outstanding, setOutstanding] = useState<VendorOutstandingRecord | null>(null);
@@ -150,7 +152,10 @@ export default function AdminPurchaseBillPrintPage() {
       setLoading(true);
       setError(null);
       try {
-        const billPayload = await apiFetch<VendorBillRecord>(`/inventory/vendor-bills/${billId}/`, { cache: "no-store" });
+        const endpoint = isAccountingSource
+          ? `/inventory/purchase-bills/${billId}/`
+          : `/inventory/vendor-bills/${billId}/`;
+        const billPayload = await apiFetch<VendorBillRecord>(endpoint, { cache: "no-store" });
         let vendorPayload: VendorRecord | null = null;
         let outstandingPayload: VendorOutstandingRecord | null = null;
         if (billPayload.vendor != null) {
@@ -184,7 +189,7 @@ export default function AdminPurchaseBillPrintPage() {
     return () => {
       mounted = false;
     };
-  }, [billId]);
+  }, [billId, isAccountingSource]);
 
   const generatedAt = useMemo(() => new Date().toISOString(), []);
 

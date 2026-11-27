@@ -1,6 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+
+import AccountingPurchaseBillDetailDrawer, {
+  summarizePurchaseBillItems,
+} from "@/components/accounting/AccountingPurchaseBillDetailDrawer";
+import { buildAdminPurchaseBillPrintRoute } from "@/lib/route-builders";
+import { listPurchaseBills, type AccountingPurchaseBill } from "@/services/accounting";
 
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
@@ -366,24 +373,28 @@ function GRDetailDrawer({ gr, onPosted, onClose }: DetailDrawerProps) {
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default function AdminPurchaseReceiptsPage() {
   const [rows, setRows] = useState<GoodsReceipt[]>([]);
+  const [directInwardBills, setDirectInwardBills] = useState<AccountingPurchaseBill[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [selected, setSelected] = useState<GoodsReceipt | null>(null);
+  const [selectedDirectBill, setSelectedDirectBill] = useState<AccountingPurchaseBill | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [grRes, poRes, itemRes] = await Promise.allSettled([
+      const [grRes, directBillRes, poRes, itemRes] = await Promise.allSettled([
         listGoodsReceipts(),
+        listPurchaseBills({ status: "POSTED" }),
         listPurchaseOrders({ page_size: 200 }),
         listInventoryItems({ is_active: true, page_size: 500 }),
       ]);
       if (grRes.status === "fulfilled") setRows(grRes.value.results);
-      else setError("Failed to load goods receipts.");
+      else if (directBillRes.status !== "fulfilled") setError("Failed to load goods receipts.");
+      if (directBillRes.status === "fulfilled") setDirectInwardBills(directBillRes.value.results);
       if (poRes.status === "fulfilled") setPurchaseOrders(poRes.value.results);
       if (itemRes.status === "fulfilled") setItems(itemRes.value.results);
     } finally {
@@ -415,13 +426,83 @@ export default function AdminPurchaseReceiptsPage() {
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
       stats={[
-        { label: "Goods Receipts", value: loading ? "—" : rows.length, tone: "info" },
-        { label: "Draft (unposted)", value: loading ? "—" : rows.filter(r => r.status === "DRAFT").length, tone: !loading && rows.filter(r => r.status === "DRAFT").length > 0 ? "warning" : "success" },
-        { label: "Received", value: loading ? "—" : rows.filter(r => r.status === "RECEIVED").length, tone: "success" },
+        { label: "Total Receipts / Inward", value: loading ? "—" : rows.length + directInwardBills.length, tone: "info" },
+        { label: "Draft GRNs (unposted)", value: loading ? "—" : rows.filter(r => r.status === "DRAFT").length, tone: !loading && rows.filter(r => r.status === "DRAFT").length > 0 ? "warning" : "success" },
+        { label: "Received (GRN + Direct Bills)", value: loading ? "—" : rows.filter(r => r.status === "RECEIVED").length + directInwardBills.length, tone: "success" },
       ]}
     >
+      {directInwardBills.length > 0 ? (
+        <ERPSectionShell
+          title="Direct Stock Inward (Posted Accounting Purchase Bills)"
+          description="Stock automatically moved into inventory when Accounting Purchase Bills were posted. Click any row to inspect received items and quantities."
+        >
+          <div className="overflow-x-auto rounded-xl border border-border">
+            <table className="min-w-full text-sm">
+              <thead className="bg-muted/50">
+                <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground">
+                  <th className="px-4 py-3">Bill / Inward Ref</th>
+                  <th className="px-4 py-3">Inward Date</th>
+                  <th className="px-4 py-3">Vendor</th>
+                  <th className="px-4 py-3">Inward Location</th>
+                  <th className="px-4 py-3">Items Received</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/60">
+                {directInwardBills.map((bill) => {
+                  const { lineCount, totalQty, previewText } = summarizePurchaseBillItems(bill);
+                  return (
+                    <tr
+                      key={`direct-grn-${bill.id}`}
+                      onClick={() => setSelectedDirectBill(bill)}
+                      className="cursor-pointer hover:bg-muted/40 transition-colors"
+                    >
+                      <td className="px-4 py-3 font-medium text-primary">{bill.bill_no}</td>
+                      <td className="px-4 py-3">{fmt(bill.bill_date)}</td>
+                      <td className="px-4 py-3">{bill.vendor_name ?? "—"}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{bill.stock_location_name ?? "Item default"}</td>
+                      <td className="px-4 py-3">
+                        <div className="text-xs font-semibold text-foreground">
+                          {lineCount} item{lineCount === 1 ? "" : "s"} · {totalQty.toLocaleString("en-IN", { maximumFractionDigits: 3 })} qty
+                        </div>
+                        <div className="max-w-[220px] truncate text-[11px] text-muted-foreground" title={previewText}>
+                          {previewText}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="inline-block rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-bold uppercase text-green-700">
+                          RECEIVED (POSTED)
+                        </span>
+                      </td>
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedDirectBill(bill)}
+                            className="inline-flex h-7 items-center rounded-lg border border-primary/40 bg-primary/10 px-3 text-[11px] font-semibold text-primary hover:bg-primary/20 cursor-pointer"
+                          >
+                            View Items
+                          </button>
+                          <Link
+                            href={buildAdminPurchaseBillPrintRoute(bill.id, "accounting")}
+                            className="inline-flex h-7 items-center rounded-lg border border-amber-300 bg-amber-50 px-3 text-[11px] font-semibold text-amber-950 hover:bg-amber-100"
+                          >
+                            PDF / Print
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </ERPSectionShell>
+      ) : null}
+
       <ERPSectionShell
-        title="Goods Receipts"
+        title="Goods Receipts (Against PO)"
         description="Post only after physical verification. Stock is not updated until the receipt is posted."
         actions={<button onClick={() => setShowCreate(true)} className="h-8 rounded-xl border border-primary bg-primary px-4 text-xs font-semibold text-primary-foreground hover:opacity-90">+ New Receipt</button>}
       >
@@ -471,6 +552,13 @@ export default function AdminPurchaseReceiptsPage() {
 
       {selected ? (
         <GRDetailDrawer gr={selected} onPosted={handlePosted} onClose={() => setSelected(null)} />
+      ) : null}
+
+      {selectedDirectBill ? (
+        <AccountingPurchaseBillDetailDrawer
+          bill={selectedDirectBill}
+          onClose={() => setSelectedDirectBill(null)}
+        />
       ) : null}
     </ERPPageShell>
   );

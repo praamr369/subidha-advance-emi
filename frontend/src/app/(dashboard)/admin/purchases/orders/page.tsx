@@ -1,10 +1,17 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+
+import AccountingPurchaseBillDetailDrawer, {
+  summarizePurchaseBillItems,
+} from "@/components/accounting/AccountingPurchaseBillDetailDrawer";
+import { buildAdminPurchaseBillPrintRoute } from "@/lib/route-builders";
+import { listPurchaseBills, type AccountingPurchaseBill } from "@/services/accounting";
 
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
@@ -416,12 +423,14 @@ export default function AdminPurchaseOrdersPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [rows, setRows] = useState<PurchaseOrder[]>([]);
+  const [directBills, setDirectBills] = useState<AccountingPurchaseBill[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [vendors, setVendors] = useState<VendorLite[]>([]);
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [selected, setSelected] = useState<PurchaseOrder | null>(null);
+  const [selectedDirectBill, setSelectedDirectBill] = useState<AccountingPurchaseBill | null>(null);
 
   // Restore drawer from ?id= query param
   useEffect(() => {
@@ -447,13 +456,15 @@ export default function AdminPurchaseOrdersPage() {
     setError(null);
     try {
       const search = searchParams.get("search") || undefined;
-      const [poRes, vendorRes, itemRes] = await Promise.allSettled([
+      const [poRes, billRes, vendorRes, itemRes] = await Promise.allSettled([
         listPurchaseOrders(search ? { search } : undefined),
+        listPurchaseBills(search ? { search } : undefined),
         listVendorsLite(),
         listInventoryItems({ is_active: true, page_size: 500 }),
       ]);
       if (poRes.status === "fulfilled") setRows(poRes.value.results);
-      else setError("Failed to load purchase orders.");
+      else if (billRes.status !== "fulfilled") setError("Failed to load purchase orders.");
+      if (billRes.status === "fulfilled") setDirectBills(billRes.value.results);
       if (vendorRes.status === "fulfilled") setVendors(vendorRes.value.results);
       if (itemRes.status === "fulfilled") setItems(itemRes.value.results);
     } finally {
@@ -488,11 +499,89 @@ export default function AdminPurchaseOrdersPage() {
         { label: "Purchase Orders", value: loading ? "—" : rows.length, tone: "info" },
         { label: "Draft", value: loading ? "—" : rows.filter(r => r.status === "DRAFT").length, tone: "default" },
         { label: "Awaiting Receipt", value: loading ? "—" : rows.filter(r => r.status === "SENT" || r.status === "PARTIALLY_RECEIVED").length, tone: !loading && rows.filter(r => r.status === "SENT" || r.status === "PARTIALLY_RECEIVED").length > 0 ? "warning" : "success" },
-        { label: "Received / Billed", value: loading ? "—" : rows.filter(r => r.status === "RECEIVED" || r.status === "BILLED").length, tone: "success" },
+        { label: "Received / Direct Billed", value: loading ? "—" : rows.filter(r => r.status === "RECEIVED" || r.status === "BILLED").length + directBills.filter(b => b.status === "POSTED").length, tone: "success" },
       ]}
     >
+      {directBills.length > 0 ? (
+        <ERPSectionShell
+          title="Direct Vendor Purchases (Accounting Purchase Bills)"
+          description="Purchases entered directly via Accounting Purchase Bills (without a separate PO). Click any row to view all bought items, quantities, and bill totals."
+          actions={
+            <Link
+              href={ROUTES.admin.accountingPurchaseBills}
+              className="inline-flex h-8 items-center rounded-xl border border-primary bg-primary px-4 text-xs font-semibold text-primary-foreground hover:opacity-90"
+            >
+              + New Accounting Purchase
+            </Link>
+          }
+        >
+          <div className="overflow-x-auto rounded-xl border border-border">
+            <table className="min-w-full text-sm">
+              <thead className="bg-muted/50">
+                <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground">
+                  <th className="px-4 py-3">Bill No</th>
+                  <th className="px-4 py-3">Date</th>
+                  <th className="px-4 py-3">Vendor</th>
+                  <th className="px-4 py-3">Items Bought</th>
+                  <th className="px-4 py-3">Grand Total</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/60">
+                {directBills.map((bill) => {
+                  const { lineCount, totalQty, previewText } = summarizePurchaseBillItems(bill);
+                  return (
+                    <tr
+                      key={`direct-po-${bill.id}`}
+                      onClick={() => setSelectedDirectBill(bill)}
+                      className="cursor-pointer hover:bg-muted/40 transition-colors"
+                    >
+                      <td className="px-4 py-3 font-medium text-primary">{bill.bill_no}</td>
+                      <td className="px-4 py-3">{fmt(bill.bill_date)}</td>
+                      <td className="px-4 py-3">{bill.vendor_name ?? `#${bill.vendor}`}</td>
+                      <td className="px-4 py-3">
+                        <div className="text-xs font-semibold text-foreground">
+                          {lineCount} item{lineCount === 1 ? "" : "s"} · {totalQty.toLocaleString("en-IN", { maximumFractionDigits: 3 })} qty
+                        </div>
+                        <div className="max-w-[220px] truncate text-[11px] text-muted-foreground" title={previewText}>
+                          {previewText}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 font-medium">₹{Number(bill.grand_total || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${bill.status === "POSTED" ? "bg-green-50 text-green-700" : bill.status === "APPROVED" ? "bg-amber-50 text-amber-700" : "bg-blue-50 text-blue-700"}`}>
+                          {bill.status === "POSTED" ? "BILLED / RECEIVED" : bill.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedDirectBill(bill)}
+                            className="inline-flex h-7 items-center rounded-lg border border-primary/40 bg-primary/10 px-3 text-[11px] font-semibold text-primary hover:bg-primary/20 cursor-pointer"
+                          >
+                            View Bill
+                          </button>
+                          <Link
+                            href={buildAdminPurchaseBillPrintRoute(bill.id, "accounting")}
+                            className="inline-flex h-7 items-center rounded-lg border border-amber-300 bg-amber-50 px-3 text-[11px] font-semibold text-amber-950 hover:bg-amber-100"
+                          >
+                            PDF / Print
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </ERPSectionShell>
+      ) : null}
+
       <ERPSectionShell
-        title="Purchase Orders"
+        title="Purchase Orders (Formal PO Workflow)"
         description="Click a row to view details and actions."
         actions={<button onClick={() => setShowCreate(true)} className="h-8 rounded-xl border border-primary bg-primary px-4 text-xs font-semibold text-primary-foreground hover:opacity-90">+ New PO</button>}
       >
@@ -549,6 +638,13 @@ export default function AdminPurchaseOrdersPage() {
           po={selected}
           onCancelled={handleCancelled}
           onClose={closeDrawer}
+        />
+      ) : null}
+
+      {selectedDirectBill ? (
+        <AccountingPurchaseBillDetailDrawer
+          bill={selectedDirectBill}
+          onClose={() => setSelectedDirectBill(null)}
         />
       ) : null}
     </ERPPageShell>

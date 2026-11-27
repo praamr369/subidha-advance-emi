@@ -6,6 +6,10 @@ import { useSearchParams } from "next/navigation";
 import { z } from "zod";
 
 import { accountingErrorMessage } from "@/components/accounting/shared";
+import AccountingPurchaseBillDetailDrawer, {
+  summarizePurchaseBillItems,
+} from "@/components/accounting/AccountingPurchaseBillDetailDrawer";
+import { listPurchaseBills, type AccountingPurchaseBill } from "@/services/accounting";
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPErrorState from "@/components/erp/ERPErrorState";
 import ERPLoadingState from "@/components/erp/ERPLoadingState";
@@ -457,6 +461,7 @@ export default function AdminPurchaseBillsPage() {
   const initialSearch = searchParams.get("search") || "";
   
   const [rows, setRows] = useState<VendorBill[]>([]);
+  const [accountingBills, setAccountingBills] = useState<AccountingPurchaseBill[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [vendors, setVendors] = useState<VendorLite[]>([]);
@@ -465,21 +470,24 @@ export default function AdminPurchaseBillsPage() {
   const [locations, setLocations] = useState<StockLocation[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [selected, setSelected] = useState<VendorBill | null>(null);
+  const [selectedAccountingBill, setSelectedAccountingBill] = useState<AccountingPurchaseBill | null>(null);
   const [search, setSearch] = useState(initialSearch);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [billRes, vendorRes, grRes, itemRes, locRes] = await Promise.allSettled([
+      const [billRes, accBillRes, vendorRes, grRes, itemRes, locRes] = await Promise.allSettled([
         listVendorBills(search ? { search } : undefined),
+        listPurchaseBills(search ? { search } : undefined),
         listVendorsLite({ page_size: 200, is_active: true }),
         listGoodsReceipts({ status: "RECEIVED", page_size: 200 }),
         listInventoryItems({ is_active: true, page_size: 500 }),
         listStockLocations({ is_active: 1, page_size: 100 }),
       ]);
       if (billRes.status === "fulfilled") setRows(billRes.value.results);
-      else setError("Failed to load vendor bills.");
+      else if (accBillRes.status !== "fulfilled") setError("Failed to load purchase bills.");
+      if (accBillRes.status === "fulfilled") setAccountingBills(accBillRes.value.results);
       if (vendorRes.status === "fulfilled") setVendors(vendorRes.value.results);
       if (grRes.status === "fulfilled") setReceipts(grRes.value.results);
       if (itemRes.status === "fulfilled") setItems(itemRes.value.results);
@@ -513,10 +521,39 @@ export default function AdminPurchaseBillsPage() {
       ]}
       statusBadge={{ label: "Admin Only", tone: "info" as const }}
       stats={[
-        { label: "Vendor Bills", value: loading ? "—" : rows.length, tone: "info" },
-        { label: "Draft (unposted)", value: loading ? "—" : rows.filter(r => r.status === "DRAFT").length, tone: !loading && rows.filter(r => r.status === "DRAFT").length > 0 ? "warning" : "success" },
-        { label: "Posted", value: loading ? "—" : rows.filter(r => r.status === "POSTED").length, tone: "success" },
-        { label: "Posted Value", value: loading ? "—" : `₹${rows.filter(r => r.status === "POSTED").reduce((s, r) => s + Number(r.grand_total || 0), 0).toLocaleString("en-IN")}`, tone: "default" },
+        { label: "Purchase Bills", value: loading ? "—" : rows.length + accountingBills.length, tone: "info" },
+        {
+          label: "Draft / Unposted",
+          value: loading
+            ? "—"
+            : rows.filter(r => r.status === "DRAFT").length +
+              accountingBills.filter(r => r.status === "DRAFT" || r.status === "APPROVED").length,
+          tone:
+            !loading &&
+            rows.filter(r => r.status === "DRAFT").length +
+              accountingBills.filter(r => r.status === "DRAFT" || r.status === "APPROVED").length >
+              0
+              ? "warning"
+              : "success",
+        },
+        {
+          label: "Posted",
+          value: loading
+            ? "—"
+            : rows.filter(r => r.status === "POSTED").length +
+              accountingBills.filter(r => r.status === "POSTED").length,
+          tone: "success",
+        },
+        {
+          label: "Posted Value",
+          value: loading
+            ? "—"
+            : `₹${(
+                rows.filter(r => r.status === "POSTED").reduce((s, r) => s + Number(r.grand_total || 0), 0) +
+                accountingBills.filter(r => r.status === "POSTED").reduce((s, r) => s + Number(r.grand_total || 0), 0)
+              ).toLocaleString("en-IN")}`,
+          tone: "default",
+        },
       ]}
     >
       <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50/50 p-4">
@@ -540,8 +577,88 @@ export default function AdminPurchaseBillsPage() {
         </div>
       </div>
 
+      {accountingBills.length > 0 ? (
+        <ERPSectionShell
+          title="Accounting Purchase Bills (Stock Inward + Ledger)"
+          description="Bills created via the modern Accounting Purchase Bills workflow. Click any row to inspect all purchased items, quantities, and journal details."
+          actions={
+            <Link
+              href={ROUTES.admin.accountingPurchaseBills}
+              className="inline-flex h-8 items-center rounded-xl border border-primary bg-primary px-4 text-xs font-semibold text-primary-foreground hover:opacity-90"
+            >
+              + Create Purchase Bill
+            </Link>
+          }
+        >
+          <div className="overflow-x-auto rounded-xl border border-border">
+            <table className="min-w-full text-sm">
+              <thead className="bg-muted/50">
+                <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground">
+                  <th className="px-4 py-3">Bill No</th>
+                  <th className="px-4 py-3">Date</th>
+                  <th className="px-4 py-3">Vendor</th>
+                  <th className="px-4 py-3">Items Bought</th>
+                  <th className="px-4 py-3">Grand Total</th>
+                  <th className="px-4 py-3">Journal</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Documents</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/60">
+                {accountingBills.map((bill) => {
+                  const { lineCount, totalQty, previewText } = summarizePurchaseBillItems(bill);
+                  return (
+                    <tr
+                      key={`acc-${bill.id}`}
+                      onClick={() => setSelectedAccountingBill(bill)}
+                      className="cursor-pointer hover:bg-muted/40 transition-colors"
+                    >
+                      <td className="px-4 py-3 font-medium text-primary">{bill.bill_no}</td>
+                      <td className="px-4 py-3">{fmt(bill.bill_date)}</td>
+                      <td className="px-4 py-3">{bill.vendor_name ?? "—"}</td>
+                      <td className="px-4 py-3">
+                        <div className="text-xs font-semibold text-foreground">
+                          {lineCount} item{lineCount === 1 ? "" : "s"} · {totalQty.toLocaleString("en-IN", { maximumFractionDigits: 3 })} qty
+                        </div>
+                        <div className="max-w-[220px] truncate text-[11px] text-muted-foreground" title={previewText}>
+                          {previewText}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 font-medium">{rupees(bill.grand_total)}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{bill.posted_journal_entry_no || "—"}</td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${bill.status === "POSTED" ? "bg-green-50 text-green-700" : bill.status === "APPROVED" ? "bg-amber-50 text-amber-700" : "bg-blue-50 text-blue-700"}`}>
+                          {bill.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedAccountingBill(bill)}
+                            className="inline-flex h-7 items-center rounded-lg border border-primary/40 bg-primary/10 px-3 text-[11px] font-semibold text-primary hover:bg-primary/20 cursor-pointer"
+                          >
+                            View Bill
+                          </button>
+                          <Link
+                            href={buildAdminPurchaseBillPrintRoute(bill.id, "accounting")}
+                            className="inline-flex h-7 items-center rounded-lg border border-amber-300 bg-amber-50 px-3 text-[11px] font-semibold text-amber-950 hover:bg-amber-100"
+                          >
+                            PDF / Print
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </ERPSectionShell>
+      ) : null}
+
       <ERPSectionShell
-        title="Vendor Bills"
+        title="Vendor Bills (Against Goods Receipts)"
         description="Posting uses system account mappings. Finance blockers returned by the backend are shown in the detail drawer."
         actions={<button onClick={() => setShowCreate(true)} className="h-8 rounded-xl border border-primary bg-primary px-4 text-xs font-semibold text-primary-foreground hover:opacity-90">+ New Bill</button>}
       >
@@ -598,6 +715,13 @@ export default function AdminPurchaseBillsPage() {
 
       {selected ? (
         <BillDetailDrawer bill={selected} onPosted={handlePosted} onClose={() => setSelected(null)} />
+      ) : null}
+
+      {selectedAccountingBill ? (
+        <AccountingPurchaseBillDetailDrawer
+          bill={selectedAccountingBill}
+          onClose={() => setSelectedAccountingBill(null)}
+        />
       ) : null}
     </ERPPageShell>
   );
