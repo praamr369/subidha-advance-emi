@@ -2471,7 +2471,7 @@ export default function AdminDashboardPage() {
           </>
         ) : null}
         </div>
-        <div className="lg:col-span-1 space-y-6">
+        <div className="lg:col-span-1 space-y-6 lg:sticky lg:top-4 lg:self-start">
           <OperationalCalendar />
         </div>
       </div>
