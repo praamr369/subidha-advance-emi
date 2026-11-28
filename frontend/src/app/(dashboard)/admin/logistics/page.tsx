@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import {
   AlertCircle,
-  Package,
   Truck,
   RefreshCw,
   Undo2,
@@ -14,7 +13,6 @@ import {
 
 import ERPEmptyState from "@/components/erp/ERPEmptyState";
 import ERPPageShell from "@/components/erp/ERPPageShell";
-import { ROUTES } from "@/lib/routes";
 import {
   createTransportFare,
   fetchLogisticsCockpit,

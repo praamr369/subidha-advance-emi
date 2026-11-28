@@ -1,12 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import {
   ArrowLeft,
-  CheckCircle2,
-  Clock,
   CreditCard,
   FileText,
   Printer,
@@ -55,7 +53,6 @@ function formatDateTime(val: string | null | undefined): string {
 
 export default function AdminDirectSaleDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const saleIdStr = Array.isArray(params?.id) ? params.id[0] : params?.id;
   const saleId = saleIdStr ? Number(saleIdStr) : null;
 

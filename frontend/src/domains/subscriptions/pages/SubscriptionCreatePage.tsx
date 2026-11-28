@@ -20,7 +20,7 @@ import KycReadinessPanel from "@/domains/subscriptions/components/KycReadinessPa
 import type { ContractKycReadiness } from "@/services/kyc-readiness";
 import SignatureCanvas from "@/components/forms/SignatureCanvas";
 import { CustomerSignatureLinkModal } from "@/components/contracts/CustomerSignatureLinkModal";
-import { Barcode, CheckCircle2, CreditCard, PackagePlus, Plus, Smartphone, Wallet, Zap } from "lucide-react";
+import { Barcode, CheckCircle2, CreditCard, PackagePlus, Smartphone, Zap } from "lucide-react";
 import MobileHandoverModal from "@/components/handover/MobileHandoverModal";
 import { dataUrlToFile } from "@/services/mobile-handover";
 import {
@@ -5036,6 +5036,7 @@ export default function SubscriptionCreatePage({
             </div>
             <div className="max-h-[70vh] overflow-y-auto p-5">
               <AccessorySelectionPanel
+                key={`contract-acc-${contractAccPanel.productId}-${contractAccPanel.basketItemId}-${contractAccPanel.defaultOpenSetup ? "setup" : "select"}`}
                 productId={contractAccPanel.productId}
                 mode="contract"
                 parentQuantity={contractAccPanel.parentQuantity}

@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 
 import { useParams, useSearchParams } from "next/navigation";
@@ -1074,15 +1075,15 @@ export default function AdminDeliveryDetailPage() {
                     Delivery Verified & Handover Completed
                   </div>
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    This order has been verified with Proof of Delivery (POD). Handover photos and the customer's signature are securely stored for future return & warranty audit trails.
+                    This order has been verified with Proof of Delivery (POD). Handover photos and the customer&apos;s signature are securely stored for future return & warranty audit trails.
                   </p>
                   <div>
-                    <a
+                    <Link
                       href="/admin/deliveries/pod-archive"
                       className="inline-flex h-9 items-center justify-center rounded-xl border border-border bg-background px-3 text-xs font-semibold text-foreground hover:bg-muted/30"
                     >
                       Open POD Archive & Year-End Export →
-                    </a>
+                    </Link>
                   </div>
                 </div>
               ) : (
@@ -1166,12 +1167,12 @@ export default function AdminDeliveryDetailPage() {
                         {handoverLoading ? "Generating..." : "🔗 Generate Driver Handover Link (WhatsApp/SMS)"}
                       </button>
 
-                      <a
+                      <Link
                         href="/admin/deliveries/pod-capture"
                         className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-semibold text-foreground hover:bg-muted/30 transition"
                       >
                         Open In-Desk POD Form
-                      </a>
+                      </Link>
                     </div>
                   )}
                 </div>

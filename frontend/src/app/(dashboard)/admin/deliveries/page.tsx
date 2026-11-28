@@ -494,7 +494,7 @@ export default function AdminDeliveriesPage() {
 
     if (sourceProgress && sourceProgress.is_multi_item) {
       const selectedItems = Object.entries(batchItemQuantities)
-        .filter(([_, qty]) => Number(qty) > 0)
+        .filter(([, qty]) => Number(qty) > 0)
         .map(([productIdStr, qty]) => {
           const pid = Number(productIdStr);
           const progItem = sourceProgress.items.find((i) => i.product_id === pid);

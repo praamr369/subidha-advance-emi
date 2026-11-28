@@ -17,6 +17,7 @@ concurrency:
 jobs:
   backend-release-candidate:
     runs-on: ubuntu-22.04
+    timeout-minutes: 25
     env:
       DEPLOY_CHECK_SETTINGS_MODULE: core.settings.ci_deploy
     defaults:
@@ -43,6 +44,7 @@ jobs:
 
   frontend-release-candidate:
     runs-on: ubuntu-22.04
+    timeout-minutes: 25
     defaults:
       run:
         working-directory: frontend
@@ -57,6 +59,9 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit
+
       - name: Next.js cache
         uses: actions/cache@v4
         continue-on-error: true
@@ -70,7 +75,8 @@ jobs:
       - name: Frontend release-candidate validation
         run: bash scripts/validate-release-candidate.sh
         env:
-          NODE_OPTIONS: '--max-old-space-size=7168'
+          SKIP_NPM_CI: "1"
+          NODE_OPTIONS: '--max-old-space-size=4096'
 
   frontend-release-smoke:
     runs-on: ubuntu-22.04

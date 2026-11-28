@@ -1082,7 +1082,6 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
       return;
     }
     setCustomerLoading(true);
-    const isDirectScan = Boolean(parsed.phone || parsed.customer_code);
     customerSearchTimer.current = window.setTimeout(async () => {
       try {
         const customerMatches = await searchCustomers(trimmed);
@@ -3764,6 +3763,7 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
             </div>
             <div className="max-h-[70vh] overflow-y-auto p-5">
               <AccessorySelectionPanel
+                key={`acc-${accessoryPanel.productId}-${accessoryPanel.lineId}-${accessoryPanel.defaultOpenSetup ? "setup" : "select"}`}
                 productId={accessoryPanel.productId}
                 itemId={accessoryPanel.itemId}
                 mode="sale"

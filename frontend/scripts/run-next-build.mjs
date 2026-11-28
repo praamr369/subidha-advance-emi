@@ -1,9 +1,17 @@
 import fs from "node:fs";
+import path from "node:path";
 import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
 const isSmokeBuild = process.argv.includes("--smoke");
-const buildDir = new URL("../.next", import.meta.url);
-fs.rmSync(buildDir, { recursive: true, force: true });
+const buildDir = fileURLToPath(new URL("../.next", import.meta.url));
+if (fs.existsSync(buildDir)) {
+  // Preserve .next/cache so CI/local incremental compiler caches survive across builds.
+  for (const entry of fs.readdirSync(buildDir)) {
+    if (entry === "cache") continue;
+    fs.rmSync(path.join(buildDir, entry), { recursive: true, force: true });
+  }
+}
 
 const nodeOptions = process.env.NODE_OPTIONS || "";
 const memoryFlag = nodeOptions.includes("--max-old-space-size") ? "" : "--max-old-space-size=4096";
