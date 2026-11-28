@@ -127,7 +127,7 @@ def _acc_link_dict(link: FinishedGoodAccessoryLink) -> dict:
         "charge_mode": link.charge_mode,
         "sale_price": str(link.sale_price or MONEY_ZERO),
         "is_default_included": link.is_default_included,
-        "quantity": str(link.quantity or Decimal("1.000")),
+        "quantity": str(getattr(link, "quantity", None) or Decimal("1.000")),
         "sort_order": link.sort_order,
         "notes": link.notes or "",
     }
@@ -148,7 +148,7 @@ def _svc_link_dict(link: FinishedGoodServiceLink) -> dict:
         "charge_mode": link.charge_mode,
         "sale_price": str(link.sale_price or MONEY_ZERO),
         "is_default_included": link.is_default_included,
-        "quantity": str(link.quantity or Decimal("1.000")),
+        "quantity": str(getattr(link, "quantity", None) or Decimal("1.000")),
         "sort_order": link.sort_order,
         "notes": link.notes or "",
     }
@@ -450,6 +450,9 @@ class FGServiceLinkView(APIView):
         sale_price = _parse_decimal(data.get("sale_price", 0))
 
         with transaction.atomic():
+            from api.v1.views.admin_inventory_quick_create import ensure_service_product
+
+            ensure_service_product(svc)
             link, created = FinishedGoodServiceLink.objects.get_or_create(
                 finished_good=fg,
                 service=svc,

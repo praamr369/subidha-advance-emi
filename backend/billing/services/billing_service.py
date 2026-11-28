@@ -115,6 +115,8 @@ def _direct_sale_source_reference(sale: DirectSale) -> str:
 
 
 def _resolve_line_inventory_item(*, product, inventory_item):
+    if getattr(product, "item_type", None) == "SERVICE":
+        return None
     if inventory_item is not None:
         return inventory_item
     profile = getattr(product, "inventory_profile", None)
@@ -202,6 +204,8 @@ def _assert_products_not_in_active_rent_lease_possession(*, line_payloads: list[
     lines_by_product: dict[int, list[dict]] = {}
     for payload in line_payloads:
         product = payload.get("product")
+        if getattr(product, "item_type", None) == "SERVICE":
+            continue
         product_id = getattr(product, "id", None)
         if product is None or product_id is None:
             continue
@@ -496,7 +500,7 @@ def _sync_direct_sale_purchase_needs(*, sale: DirectSale, line_payloads: list[di
             continue
         shortage_qty = max(Decimal("0.000"), shortage_qty)
         product = payload.get("product")
-        if product is None:
+        if product is None or getattr(product, "item_type", None) == "SERVICE":
             continue
         product_name = getattr(product, "name", "") if product is not None else ""
         note = payload.get("_requirement_note") or f"Auto-created from direct sale {sale.sale_no or sale.id} for {product_name}"

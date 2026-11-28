@@ -1422,3 +1422,71 @@ class BundledItemsStockMovementTests(TestCase):
         )
         self.assertEqual(len(rent_sub.product_snapshot.get("selected_services", [])), 1)
         self.assertEqual(rent_sub.pricing_snapshot.get("services_total"), "500.00")
+
+        # 5. Direct Sale billing accessory options expose service_product_id and Direct Sale accepts attached SERVICE lines
+        from accounting.services.document_sequence_service import DocumentType
+        from api.v1.views.admin_inventory_quick_create import AdminBillingAccessoryOptionsView
+        from api.v1.views.inventory_fg import FGServiceLinkView
+        from billing.services.billing_service import create_direct_sale
+        from inventory.models import PurchaseNeed
+        from tests.helpers import (
+            ensure_document_numbering_profile_for_date,
+            ensure_test_accounting_posting_prerequisites,
+        )
+
+        ensure_test_accounting_posting_prerequisites(performed_by=admin_user)
+        ensure_document_numbering_profile_for_date(DocumentType.DIRECT_SALE, date.today(), performed_by=admin_user)
+        ensure_document_numbering_profile_for_date(DocumentType.TAX_INVOICE, date.today(), performed_by=admin_user)
+
+        svc_link_req = factory.post(
+            f"/api/v1/admin/inventory/finished-goods/{self.bed_inv.id}/services/",
+            {"service": svc.id, "charge_mode": "CHARGEABLE", "sale_price": "500.00"},
+            format="json",
+        )
+        force_authenticate(svc_link_req, user=admin_user)
+        svc_link_res = FGServiceLinkView.as_view()(svc_link_req, pk=self.bed_inv.id)
+        self.assertEqual(svc_link_res.status_code, 201, svc_link_res.data)
+
+        opt_req = factory.get(
+            f"/api/v1/admin/inventory/products/{self.bed_product.id}/accessory-options/?item_id={self.bed_inv.id}"
+        )
+        force_authenticate(opt_req, user=admin_user)
+        opt_res = AdminBillingAccessoryOptionsView.as_view()(opt_req, product_id=self.bed_product.id)
+        self.assertEqual(opt_res.status_code, 200, opt_res.data)
+        svc_opts = opt_res.data.get("service_options", [])
+        self.assertEqual(len(svc_opts), 1)
+        service_prod_id = svc_opts[0].get("service_product_id")
+        self.assertIsNotNone(service_prod_id)
+        service_prod = Product.objects.get(pk=service_prod_id)
+        self.assertEqual(service_prod.item_type, "SERVICE")
+
+        sale = create_direct_sale(
+            payload={
+                "sale_date": date.today(),
+                "customer": self.customer,
+                "tax_mode": "NON_GST",
+                "accessories_configured": True,
+                "lines": [
+                    {
+                        "product": self.bed_product,
+                        "inventory_item": self.bed_inv,
+                        "description": self.bed_product.name,
+                        "quantity": Decimal("1.000"),
+                        "unit_price": Decimal("15000.00"),
+                    },
+                    {
+                        "product": service_prod,
+                        "inventory_item": None,
+                        "description": svc.name,
+                        "quantity": Decimal("1.000"),
+                        "unit_price": Decimal("500.00"),
+                        "is_accessory": False,
+                        "parent_line_index": 0,
+                    },
+                ],
+            },
+            created_by=admin_user,
+        )
+        self.assertEqual(sale.lines.count(), 2)
+        self.assertEqual(sale.grand_total, Decimal("15500.00"))
+        self.assertFalse(PurchaseNeed.objects.filter(product=service_prod).exists())

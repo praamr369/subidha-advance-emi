@@ -94,6 +94,8 @@ type DraftLine = {
   warranty_months?: number;
   warranty_card_number?: string;
   accessories_configured?: boolean;
+  is_service?: boolean;
+  hsn_sac_code?: string;
 };
 
 type FormState = {
@@ -172,6 +174,8 @@ function makeLine(): DraftLine {
     warranty_months: 0,
     warranty_card_number: "",
     accessories_configured: false,
+    is_service: false,
+    hsn_sac_code: "",
   };
 }
 
@@ -248,7 +252,7 @@ function buildLinePayload(line: DraftLine, taxMode: "GST" | "NON_GST", allLines?
   const cgst = taxMode === "GST" ? totals.tax / 2 : 0;
   const sgst = taxMode === "GST" ? totals.tax / 2 : 0;
   const parentLineIndex =
-    line.is_accessory && line.parent_line_id && allLines
+    (line.is_accessory || line.is_service) && line.parent_line_id && allLines
       ? allLines.findIndex((candidate) => candidate.id === line.parent_line_id)
       : -1;
   return {
@@ -264,7 +268,7 @@ function buildLinePayload(line: DraftLine, taxMode: "GST" | "NON_GST", allLines?
     sgst_amount: toDecimal(sgst),
     igst_amount: "0.00",
     line_total: toDecimal(totals.lineTotal),
-    hsn_sac_code: "",
+    hsn_sac_code: line.hsn_sac_code || "",
     serial_number: line.serial_number || "",
     warranty_months: line.warranty_months || 0,
     warranty_card_number: line.warranty_card_number || "",
@@ -1512,22 +1516,30 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
       requirement_note: "",
     }));
 
-    const newSvcLines: DraftLine[] = result.services.map((svc) => ({
-      ...makeLine(),
-      product_id: "",
-      description: svc.serviceName,
-      unit_price: svc.chargeMode === "CHARGEABLE" ? Number(svc.salePrice || 0).toFixed(2) : "0.00",
-      gst_rate: svc.taxRatePercent || "0",
-      product_search: `${svc.serviceCode} - ${svc.serviceName}`,
-      product_loading: false,
-      product_results: [],
-      product_error: null,
-      selected_product: null,
-      is_accessory: false,
-      parent_line_id: parentLineId,
-      create_requirement: false,
-      requirement_quantity: "1.000",
-    }));
+    const newSvcLines: DraftLine[] = result.services
+      .filter((svc) => Boolean(svc.serviceProductId))
+      .map((svc) => ({
+        ...makeLine(),
+        product_id: String(svc.serviceProductId),
+        description: svc.serviceName,
+        unit_price: svc.chargeMode === "CHARGEABLE" ? Number(svc.salePrice || 0).toFixed(2) : "0.00",
+        gst_rate: form.tax_mode === "GST" ? (svc.taxRatePercent || "0.00") : "0.00",
+        hsn_sac_code: svc.hsnSacCode || "",
+        product_search: `${svc.serviceCode} - ${svc.serviceName}`,
+        product_loading: false,
+        product_results: [],
+        product_error: null,
+        selected_product: null,
+        is_accessory: false,
+        is_service: true,
+        parent_line_id: parentLineId,
+        create_requirement: false,
+        requirement_quantity: "1.000",
+      }));
+
+    if (result.services.some((svc) => !svc.serviceProductId)) {
+      setCreateFormError("One or more selected services could not resolve a billing service product. Re-open Variants & Accessories and retry.");
+    }
 
     setLines((prev) => {
       const cleaned = prev
@@ -1825,6 +1837,181 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
       setSubmitting(false);
     }
   }
+
+  const sharedModals = (
+    <>
+      {/* Accessory / Variant / Service selection & inline setup modal */}
+      {accessoryPanel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setAccessoryPanel(null)} />
+          <div className="relative z-10 w-full max-w-2xl rounded-2xl border border-border bg-background shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between gap-4 border-b border-border px-5 py-4">
+              <h2 className="text-base font-semibold text-foreground">Direct Sale Variants, Accessories &amp; Services</h2>
+              <button
+                type="button"
+                onClick={() => setAccessoryPanel(null)}
+                className="rounded p-1.5 text-muted-foreground hover:bg-muted"
+              >
+                <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+                  <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22z" />
+                </svg>
+              </button>
+            </div>
+            <div className="max-h-[75vh] overflow-y-auto p-5">
+              <AccessorySelectionPanel
+                key={`acc-${accessoryPanel.productId}-${accessoryPanel.lineId}-${accessoryPanel.defaultOpenSetup ? "setup" : "select"}`}
+                productId={accessoryPanel.productId}
+                itemId={accessoryPanel.itemId}
+                mode="sale"
+                parentQuantity={accessoryPanel.parentQuantity ?? 1}
+                defaultOpenSetup={accessoryPanel.defaultOpenSetup}
+                onOptionsChanged={() => {
+                  const targetLine = lines.find((l) => l.id === accessoryPanel.lineId);
+                  const searchKey = targetLine?.selected_product?.product_code || targetLine?.selected_product?.name;
+                  if (!searchKey || !targetLine?.selected_product) return;
+                  void searchBillingProducts({
+                    q: searchKey,
+                    page: 1,
+                    page_size: 10,
+                    include_inventory: true,
+                  }).then((res) => {
+                    const refreshed = (res.results ?? []).find((r) => r.id === targetLine.selected_product?.id);
+                    if (refreshed) {
+                      updateLine(accessoryPanel.lineId, { selected_product: refreshed });
+                    }
+                  }).catch(() => {});
+                }}
+                onSwitchParentVariant={(pv: ParentVariantOption) => {
+                  const currentLine = lines.find((l) => l.id === accessoryPanel.lineId);
+                  updateLine(accessoryPanel.lineId, {
+                    product_id: String(pv.product_id),
+                    inventory_item_id: String(pv.inventory_item_id),
+                    description: pv.name,
+                    unit_price: Number(pv.base_price || 0).toFixed(2),
+                    product_search: `${pv.sku || pv.product_code} - ${pv.name}`,
+                    selected_product: {
+                      ...(currentLine?.selected_product ?? {
+                        id: pv.product_id,
+                        name: pv.name,
+                        product_code: pv.product_code,
+                        sku: pv.sku,
+                        base_price: pv.base_price || "0.00",
+                        sale_price: pv.base_price || "0.00",
+                        is_active: true,
+                        stock_item_type: "FINISHED_GOOD",
+                        unit_of_measure: "PCS",
+                      }),
+                      id: pv.product_id,
+                      name: pv.name,
+                      product_code: pv.product_code,
+                      sku: pv.sku,
+                      base_price: pv.base_price || "0.00",
+                      sale_price: pv.base_price || "0.00",
+                      inventory_item_id: pv.inventory_item_id,
+                      current_stock_qty: String(pv.available_stock || "0"),
+                      inventory_status: {
+                        is_in_stock: Number(pv.available_stock || 0) > 0,
+                        available: String(pv.available_stock || "0.000"),
+                        on_hand: String(pv.available_stock || "0.000"),
+                        reserved: "0.000",
+                        incoming: "0.000",
+                        requires_purchase: Number(pv.available_stock || 0) <= 0,
+                      },
+                    },
+                  });
+                  setAccessoryPanel((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          productId: pv.product_id,
+                          itemId: pv.inventory_item_id,
+                        }
+                      : null
+                  );
+                }}
+                onConfirm={handleAccessoryConfirm}
+                onCancel={() => setAccessoryPanel(null)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Customer ID Handover Modal */}
+      {customerMobileHandoverOpen && (
+        <MobileHandoverModal
+          isOpen={customerMobileHandoverOpen}
+          onClose={() => setCustomerMobileHandoverOpen(false)}
+          sessionType="CUSTOMER_ID"
+          title="Scan or Fetch Customer ID from Mobile"
+          onCustomerCaptured={async (data) => {
+            const term = data.phone || data.customer_code || data.name || "";
+            if (term) {
+              handleCustomerSearch(term);
+            }
+          }}
+        />
+      )}
+
+      {/* Direct Sale Digital Signature Modal */}
+      {signatureModalSaleId && (
+        <DirectSaleSignatureModal
+          saleId={signatureModalSaleId}
+          isOpen={Boolean(signatureModalSaleId)}
+          onClose={() => setSignatureModalSaleId(null)}
+          onSignatureSaved={async () => {
+            await salesQuery.refetch();
+          }}
+        />
+      )}
+
+      {/* Quick Opening Stock Drawer */}
+      <QuickOpeningStockDrawer
+        open={stockDrawer.open}
+        onClose={() => setStockDrawer({ open: false, targetLineId: null, product: null })}
+        initialProduct={stockDrawer.product}
+        onStockPosted={handleStockPosted}
+      />
+
+      {/* Dynamic UPI Payment QR Modal */}
+      {upiQrDirectSale && (() => {
+        const bal = Number(upiQrDirectSale.balance_total || 0);
+        const grand = Number(upiQrDirectSale.grand_total || 0);
+        const ref = upiQrDirectSale.billing_invoice_no || upiQrDirectSale.sale_no || `Sale #${upiQrDirectSale.id}`;
+        return (
+          <DynamicUpiQrModal
+            isOpen={Boolean(upiQrDirectSale)}
+            onClose={() => setUpiQrDirectSale(null)}
+            title="Direct Sale Invoice Payment QR"
+            subtitle={`Sale ${ref} · ${upiQrDirectSale.customer_name_snapshot || upiQrDirectSale.customer_name || "Customer"}`}
+            referenceNo={ref}
+            customerName={upiQrDirectSale.customer_name_snapshot || upiQrDirectSale.customer_name || ""}
+            customerPhone={upiQrDirectSale.customer_phone_snapshot || ""}
+            customerId={upiQrDirectSale.customer || null}
+            defaultAmount={bal > 0 ? bal : grand}
+            sourceType="DIRECT_SALE"
+            sourceId={upiQrDirectSale.id}
+            presets={[
+              ...(bal > 0
+                ? [{
+                    label: "Remaining Outstanding Balance",
+                    amount: bal,
+                    description: "Unpaid invoice balance",
+                    defaultNote: `Outstanding Balance for Invoice ${ref}`,
+                  }]
+                : []),
+              {
+                label: "Total Invoice Amount",
+                amount: grand,
+                description: "Full invoice grand total",
+                defaultNote: `Full Payment for Invoice ${ref}`,
+              },
+            ]}
+          />
+        );
+      })()}
+    </>
+  );
 
   if (createMode) {
     return (
@@ -2770,32 +2957,50 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
                                     if (linkedAccLines.length > 0) {
                                       return (
                                         <div className="border-t-2 border-emerald-400 dark:border-emerald-600 overflow-hidden">
-                                          <div className="flex items-center justify-between gap-2 bg-emerald-100 dark:bg-emerald-950/70 px-3 py-2 border-b border-emerald-200 dark:border-emerald-800">
+                                          <div className="flex flex-wrap items-center justify-between gap-2 bg-emerald-100 dark:bg-emerald-950/70 px-3 py-2 border-b border-emerald-200 dark:border-emerald-800">
                                             <div className="flex items-center gap-1.5">
                                               <span className="text-[11px] font-bold text-emerald-900 dark:text-emerald-200 uppercase tracking-wide flex items-center gap-1">
-                                                <span className="text-emerald-600 font-extrabold text-sm">✓</span> {linkedAccLines.length} Accessory Variant{linkedAccLines.length > 1 ? "s" : ""} Added to Sale
+                                                <span className="text-emerald-600 font-extrabold text-sm">✓</span> {linkedAccLines.length} Accessory / Service Item{linkedAccLines.length > 1 ? "s" : ""} Added to Sale
                                               </span>
                                             </div>
-                                            <button
-                                              type="button"
-                                              onClick={() =>
-                                                setAccessoryPanel({
-                                                  productId: line.selected_product!.id,
-                                                  itemId: line.selected_product!.inventory_item_id ?? undefined,
-                                                  lineId: line.id,
-                                                  parentQuantity: Math.max(1, Number(line.quantity || 1)),
-                                                })
-                                              }
-                                              className="inline-flex items-center gap-1 rounded bg-emerald-700 hover:bg-emerald-800 text-white px-2.5 py-1 text-[11px] font-semibold transition-colors shadow-sm"
-                                            >
-                                              Change / Swap Variants
-                                            </button>
+                                            <div className="flex items-center gap-1.5">
+                                              <button
+                                                type="button"
+                                                onClick={() =>
+                                                  setAccessoryPanel({
+                                                    productId: line.selected_product!.id,
+                                                    itemId: line.inventory_item_id ? Number(line.inventory_item_id) : (line.selected_product!.inventory_item_id ?? undefined),
+                                                    lineId: line.id,
+                                                    parentQuantity: Math.max(1, Number(line.quantity || 1)),
+                                                    defaultOpenSetup: true,
+                                                  })
+                                                }
+                                                className="inline-flex items-center gap-1 rounded border border-blue-400/70 bg-white dark:bg-slate-800 px-2 py-1 text-[11px] font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/40"
+                                              >
+                                                + Setup
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={() =>
+                                                  setAccessoryPanel({
+                                                    productId: line.selected_product!.id,
+                                                    itemId: line.inventory_item_id ? Number(line.inventory_item_id) : (line.selected_product!.inventory_item_id ?? undefined),
+                                                    lineId: line.id,
+                                                    parentQuantity: Math.max(1, Number(line.quantity || 1)),
+                                                    defaultOpenSetup: false,
+                                                  })
+                                                }
+                                                className="inline-flex items-center gap-1 rounded bg-emerald-700 hover:bg-emerald-800 text-white px-2.5 py-1 text-[11px] font-semibold transition-colors shadow-sm"
+                                              >
+                                                Change / Swap Variants
+                                              </button>
+                                            </div>
                                           </div>
                                           <div className="divide-y divide-emerald-100 dark:divide-emerald-900 bg-emerald-50/40 dark:bg-emerald-950/30">
                                             {linkedAccLines.map((accLine) => (
                                               <div key={accLine.id} className="flex items-center gap-2 px-3 py-1.5 text-[12px]">
                                                 <span className="font-mono text-[10px] font-bold text-emerald-700 dark:text-emerald-400 shrink-0 w-28 truncate">
-                                                  {accLine.selected_product?.sku || accLine.selected_product?.product_code || accLine.product_search}
+                                                  {accLine.is_service ? "SERVICE" : (accLine.selected_product?.sku || accLine.selected_product?.product_code || accLine.product_search)}
                                                 </span>
                                                 <span className="flex-1 font-semibold text-slate-800 dark:text-slate-200 truncate">
                                                   {accLine.description}
@@ -2806,6 +3011,20 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
                                                 <span className={`shrink-0 rounded px-2 py-0.5 text-[10px] font-bold ${Number(accLine.unit_price) === 0 ? "bg-green-200 text-green-800 dark:bg-green-800 dark:text-green-100" : "bg-amber-200 text-amber-800 dark:bg-amber-800 dark:text-amber-100"}`}>
                                                   {Number(accLine.unit_price) === 0 ? "Free / Included" : `+₹${Number(accLine.unit_price).toFixed(2)}`}
                                                 </span>
+                                                <button
+                                                  type="button"
+                                                  onClick={() =>
+                                                    setLines((current) =>
+                                                      current.length === 1
+                                                        ? current
+                                                        : current.filter((entry) => entry.id !== accLine.id)
+                                                    )
+                                                  }
+                                                  className="rounded px-1.5 py-0.5 text-[11px] text-muted-foreground hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/30"
+                                                  title="Remove attached item from bill"
+                                                >
+                                                  ✕
+                                                </button>
                                               </div>
                                             ))}
                                           </div>
@@ -3346,79 +3565,7 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
             </section>
           </aside>
         </div>
-        {/* Mobile Customer ID Handover Modal */}
-      {customerMobileHandoverOpen && (
-        <MobileHandoverModal
-          isOpen={customerMobileHandoverOpen}
-          onClose={() => setCustomerMobileHandoverOpen(false)}
-          sessionType="CUSTOMER_ID"
-          title="Scan or Fetch Customer ID from Mobile"
-          onCustomerCaptured={async (data) => {
-            const term = data.phone || data.customer_code || data.name || "";
-            if (term) {
-              handleCustomerSearch(term);
-            }
-          }}
-        />
-      )}
-
-      {/* Direct Sale Digital Signature Modal */}
-      {signatureModalSaleId && (
-        <DirectSaleSignatureModal
-          saleId={signatureModalSaleId}
-          isOpen={Boolean(signatureModalSaleId)}
-          onClose={() => setSignatureModalSaleId(null)}
-          onSignatureSaved={async () => {
-            await salesQuery.refetch();
-          }}
-        />
-      )}
-
-      {/* Quick Opening Stock Drawer */}
-      <QuickOpeningStockDrawer
-        open={stockDrawer.open}
-        onClose={() => setStockDrawer({ open: false, targetLineId: null, product: null })}
-        initialProduct={stockDrawer.product}
-        onStockPosted={handleStockPosted}
-      />
-
-      {/* Dynamic UPI Payment QR Modal */}
-      {upiQrDirectSale && (() => {
-        const bal = Number(upiQrDirectSale.balance_total || 0);
-        const grand = Number(upiQrDirectSale.grand_total || 0);
-        const ref = upiQrDirectSale.billing_invoice_no || upiQrDirectSale.sale_no || `Sale #${upiQrDirectSale.id}`;
-        return (
-          <DynamicUpiQrModal
-            isOpen={Boolean(upiQrDirectSale)}
-            onClose={() => setUpiQrDirectSale(null)}
-            title="Direct Sale Invoice Payment QR"
-            subtitle={`Sale ${ref} · ${upiQrDirectSale.customer_name_snapshot || upiQrDirectSale.customer_name || "Customer"}`}
-            referenceNo={ref}
-            customerName={upiQrDirectSale.customer_name_snapshot || upiQrDirectSale.customer_name || ""}
-            customerPhone={upiQrDirectSale.customer_phone_snapshot || ""}
-            customerId={upiQrDirectSale.customer || null}
-            defaultAmount={bal > 0 ? bal : grand}
-            sourceType="DIRECT_SALE"
-            sourceId={upiQrDirectSale.id}
-            presets={[
-              ...(bal > 0
-                ? [{
-                    label: "Remaining Outstanding Balance",
-                    amount: bal,
-                    description: "Unpaid invoice balance",
-                    defaultNote: `Outstanding Balance for Invoice ${ref}`,
-                  }]
-                : []),
-              {
-                label: "Total Invoice Amount",
-                amount: grand,
-                description: "Full invoice grand total",
-                defaultNote: `Full Payment for Invoice ${ref}`,
-              },
-            ]}
-          />
-        );
-      })()}
+        {sharedModals}
     </ERPPageShell>
     );
   }
@@ -3744,175 +3891,7 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
         }}
       />
 
-      {/* Accessory / Service selection panel — shown after selecting a FINISHED_GOOD */}
-      {accessoryPanel && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setAccessoryPanel(null)} />
-          <div className="relative z-10 w-full max-w-xl rounded-2xl border border-border bg-background shadow-2xl overflow-hidden">
-            <div className="flex items-center justify-between gap-4 border-b border-border px-5 py-4">
-              <h2 className="text-base font-semibold text-foreground">Accessories &amp; Services</h2>
-              <button
-                type="button"
-                onClick={() => setAccessoryPanel(null)}
-                className="rounded p-1.5 text-muted-foreground hover:bg-muted"
-              >
-                <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
-                  <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22z" />
-                </svg>
-              </button>
-            </div>
-            <div className="max-h-[70vh] overflow-y-auto p-5">
-              <AccessorySelectionPanel
-                key={`acc-${accessoryPanel.productId}-${accessoryPanel.lineId}-${accessoryPanel.defaultOpenSetup ? "setup" : "select"}`}
-                productId={accessoryPanel.productId}
-                itemId={accessoryPanel.itemId}
-                mode="sale"
-                parentQuantity={accessoryPanel.parentQuantity ?? 1}
-                defaultOpenSetup={accessoryPanel.defaultOpenSetup}
-                onOptionsChanged={() => {
-                  const targetLine = lines.find((l) => l.id === accessoryPanel.lineId);
-                  const searchKey = targetLine?.selected_product?.product_code || targetLine?.selected_product?.name;
-                  if (!searchKey || !targetLine?.selected_product) return;
-                  void searchBillingProducts({
-                    q: searchKey,
-                    page: 1,
-                    page_size: 10,
-                    include_inventory: true,
-                  }).then((res) => {
-                    const refreshed = (res.results ?? []).find((r) => r.id === targetLine.selected_product?.id);
-                    if (refreshed) {
-                      updateLine(accessoryPanel.lineId, { selected_product: refreshed });
-                    }
-                  }).catch(() => {});
-                }}
-                onSwitchParentVariant={(pv: ParentVariantOption) => {
-                  const currentLine = lines.find((l) => l.id === accessoryPanel.lineId);
-                  updateLine(accessoryPanel.lineId, {
-                    product_id: String(pv.product_id),
-                    inventory_item_id: String(pv.inventory_item_id),
-                    description: pv.name,
-                    unit_price: Number(pv.base_price || 0).toFixed(2),
-                    product_search: `${pv.sku || pv.product_code} - ${pv.name}`,
-                    selected_product: {
-                      ...(currentLine?.selected_product ?? {
-                        id: pv.product_id,
-                        name: pv.name,
-                        product_code: pv.product_code,
-                        sku: pv.sku,
-                        base_price: pv.base_price || "0.00",
-                        sale_price: pv.base_price || "0.00",
-                        is_active: true,
-                        stock_item_type: "FINISHED_GOOD",
-                        unit_of_measure: "PCS",
-                      }),
-                      id: pv.product_id,
-                      name: pv.name,
-                      product_code: pv.product_code,
-                      sku: pv.sku,
-                      base_price: pv.base_price || "0.00",
-                      sale_price: pv.base_price || "0.00",
-                      inventory_item_id: pv.inventory_item_id,
-                      current_stock_qty: String(pv.available_stock || "0"),
-                      inventory_status: {
-                        is_in_stock: Number(pv.available_stock || 0) > 0,
-                        available: String(pv.available_stock || "0.000"),
-                        on_hand: String(pv.available_stock || "0.000"),
-                        reserved: "0.000",
-                        incoming: "0.000",
-                        requires_purchase: Number(pv.available_stock || 0) <= 0,
-                      },
-                    },
-                  });
-                  setAccessoryPanel((prev) =>
-                    prev
-                      ? {
-                          ...prev,
-                          productId: pv.product_id,
-                          itemId: pv.inventory_item_id,
-                        }
-                      : null
-                  );
-                }}
-                onConfirm={handleAccessoryConfirm}
-                onCancel={() => setAccessoryPanel(null)}
-              />
-            </div>
-          </div>
-        </div>
-      )}
-      {/* Mobile Customer ID Handover Modal */}
-      {customerMobileHandoverOpen && (
-        <MobileHandoverModal
-          isOpen={customerMobileHandoverOpen}
-          onClose={() => setCustomerMobileHandoverOpen(false)}
-          sessionType="CUSTOMER_ID"
-          title="Scan or Fetch Customer ID from Mobile"
-          onCustomerCaptured={async (data) => {
-            const term = data.phone || data.customer_code || data.name || "";
-            if (term) {
-              handleCustomerSearch(term);
-            }
-          }}
-        />
-      )}
-
-      {/* Direct Sale Digital Signature Modal */}
-      {signatureModalSaleId && (
-        <DirectSaleSignatureModal
-          saleId={signatureModalSaleId}
-          isOpen={Boolean(signatureModalSaleId)}
-          onClose={() => setSignatureModalSaleId(null)}
-          onSignatureSaved={async () => {
-            await salesQuery.refetch();
-          }}
-        />
-      )}
-
-      {/* Quick Opening Stock Drawer */}
-      <QuickOpeningStockDrawer
-        open={stockDrawer.open}
-        onClose={() => setStockDrawer({ open: false, targetLineId: null, product: null })}
-        initialProduct={stockDrawer.product}
-        onStockPosted={handleStockPosted}
-      />
-
-      {/* Dynamic UPI Payment QR Modal */}
-      {upiQrDirectSale && (() => {
-        const bal = Number(upiQrDirectSale.balance_total || 0);
-        const grand = Number(upiQrDirectSale.grand_total || 0);
-        const ref = upiQrDirectSale.billing_invoice_no || upiQrDirectSale.sale_no || `Sale #${upiQrDirectSale.id}`;
-        return (
-          <DynamicUpiQrModal
-            isOpen={Boolean(upiQrDirectSale)}
-            onClose={() => setUpiQrDirectSale(null)}
-            title="Direct Sale Invoice Payment QR"
-            subtitle={`Sale ${ref} · ${upiQrDirectSale.customer_name_snapshot || upiQrDirectSale.customer_name || "Customer"}`}
-            referenceNo={ref}
-            customerName={upiQrDirectSale.customer_name_snapshot || upiQrDirectSale.customer_name || ""}
-            customerPhone={upiQrDirectSale.customer_phone_snapshot || ""}
-            customerId={upiQrDirectSale.customer || null}
-            defaultAmount={bal > 0 ? bal : grand}
-            sourceType="DIRECT_SALE"
-            sourceId={upiQrDirectSale.id}
-            presets={[
-              ...(bal > 0
-                ? [{
-                    label: "Remaining Outstanding Balance",
-                    amount: bal,
-                    description: "Unpaid invoice balance",
-                    defaultNote: `Outstanding Balance for Invoice ${ref}`,
-                  }]
-                : []),
-              {
-                label: "Total Invoice Amount",
-                amount: grand,
-                description: "Full invoice grand total",
-                defaultNote: `Full Payment for Invoice ${ref}`,
-              },
-            ]}
-          />
-        );
-      })()}
+      {sharedModals}
     </ERPPageShell>
   );
 }

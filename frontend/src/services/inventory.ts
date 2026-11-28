@@ -2471,6 +2471,7 @@ export type BillingAccessoryOption = {
 export type BillingServiceOption = {
   link_id: number;
   service_id: number;
+  service_product_id?: number | null;
   service_code: string;
   service_name: string;
   service_category: string;

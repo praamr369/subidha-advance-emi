@@ -55,6 +55,7 @@ export type SelectedAccessory = {
 export type SelectedService = {
   linkId: number;
   serviceId: number;
+  serviceProductId?: number | null;
   serviceName: string;
   serviceCode: string;
   chargeMode: "FREE" | "CHARGEABLE";
@@ -495,6 +496,7 @@ export default function AccessorySelectionPanel({
         services.push({
           linkId: svc.link_id,
           serviceId: svc.service_id,
+          serviceProductId: svc.service_product_id ?? null,
           serviceName: svc.service_name,
           serviceCode: svc.service_code,
           chargeMode: finalSvcMode,

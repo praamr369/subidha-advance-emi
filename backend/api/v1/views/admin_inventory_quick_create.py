@@ -24,10 +24,35 @@ from inventory.models import (
     InventoryValuationMethod,
     StockLocation,
 )
-from subscriptions.models import Product, PlanType, ProductItemType
+from subscriptions.models import Product, PlanType, ProductItemType, ProductStockType
 
 MONEY_ZERO = Decimal("0.00")
 QUANTITY_ZERO = Decimal("0.000")
+
+
+def ensure_service_product(svc) -> Product:
+    """Return a non-stock SERVICE Product backing a ServiceCatalogItem for Direct Sale billing."""
+    code = (svc.code or f"SVC-{svc.id}").strip().upper()
+    existing = Product.objects.filter(product_code=code).first()
+    if existing is not None:
+        return existing
+    defaults = {
+        "name": (svc.name or code).strip(),
+        "category": (svc.category or "").strip(),
+        "base_price": svc.standard_price if svc.standard_price is not None else MONEY_ZERO,
+        "gst_rate": svc.tax_rate_percent,
+        "hsn_sac_code": (svc.hsn_sac_code or "").strip(),
+        "unit_of_measure": "NOS",
+        "item_type": ProductItemType.SERVICE,
+        "stock_type": ProductStockType.NON_STOCK,
+        "is_active": True,
+        "is_direct_sale_enabled": True,
+        "is_emi_enabled": False,
+        "is_rent_enabled": False,
+        "is_lease_enabled": False,
+    }
+    product, _ = Product.objects.get_or_create(product_code=code, defaults=defaults)
+    return product
 
 
 # ---------------------------------------------------------------------------
@@ -858,6 +883,7 @@ class AdminBillingAccessoryOptionsView(APIView):
             {
                 "link_id": lnk.id,
                 "service_id": lnk.service_id,
+                "service_product_id": ensure_service_product(lnk.service).id,
                 "service_code": lnk.service.code,
                 "service_name": lnk.service.name,
                 "service_category": lnk.service.category,
