@@ -49,6 +49,7 @@ import { getComplianceTaxProfile } from "@/services/compliance";
 import type { BusinessTaxMode } from "@/types/compliance";
 
 type PurchaseLineForm = {
+  line_type: "GOODS" | "SERVICE";
   inventory_item: string;
   description: string;
   quantity: string;
@@ -67,10 +68,11 @@ type PurchaseBillForm = {
   lines: PurchaseLineForm[];
 };
 
-function blankLine(): PurchaseLineForm {
+function blankLine(lineType: "GOODS" | "SERVICE" = "GOODS"): PurchaseLineForm {
   return {
+    line_type: lineType,
     inventory_item: "",
-    description: "",
+    description: lineType === "SERVICE" ? "Van Fare / Transport Charge" : "",
     quantity: "1.000",
     unit_cost: "0.00",
     tax_amount: "0.00",
@@ -100,8 +102,11 @@ function lineTotal(line: PurchaseLineForm, taxMode: PurchaseBillForm["tax_mode"]
 }
 
 function toLineForm(line: AccountingPurchaseBillLine): PurchaseLineForm {
+  const lineType =
+    line.line_type === "SERVICE" || !line.inventory_item ? "SERVICE" : "GOODS";
   return {
-    inventory_item: String(line.inventory_item),
+    line_type: lineType,
+    inventory_item: line.inventory_item ? String(line.inventory_item) : "",
     description: line.description ?? "",
     quantity: line.quantity,
     unit_cost: line.unit_cost,
@@ -196,7 +201,8 @@ export default function AccountingPurchaseBillsPage() {
       tax_mode: isGst ? "GST" : "NON_GST",
       notes: legacy.notes || current.notes,
       lines: legacy.lines.map((line) => ({
-        inventory_item: String(line.inventory_item),
+        line_type: line.line_type === "SERVICE" || !line.inventory_item ? "SERVICE" : "GOODS",
+        inventory_item: line.inventory_item ? String(line.inventory_item) : "",
         description: line.description || "",
         quantity: String(line.quantity || "1.000"),
         unit_cost: String(line.unit_cost || "0.00"),
@@ -220,7 +226,13 @@ export default function AccountingPurchaseBillsPage() {
         finance_account: form.finance_account ? Number(form.finance_account) : null,
         notes: form.notes,
         lines: form.lines.map((line) => ({
-          inventory_item: Number(line.inventory_item),
+          line_type: line.line_type,
+          inventory_item:
+            line.line_type === "SERVICE"
+              ? null
+              : line.inventory_item
+                ? Number(line.inventory_item)
+                : null,
           description: line.description,
           quantity: line.quantity,
           unit_cost: line.unit_cost,
@@ -513,78 +525,143 @@ export default function AccountingPurchaseBillsPage() {
                 <div>
                   <div className="text-sm font-semibold text-foreground">Purchase lines</div>
                   <div className="text-xs text-muted-foreground">
-                    Select stock-tracked inventory items. Raw-material items are supported here without starting a manufacturing flow.
+                    Select stock-tracked inventory items or add Service / Van Fare lines included in the full vendor bill &amp; settlement total.
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setForm((current) => ({ ...current, lines: [...current.lines, blankLine()] }))}
-                  className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
-                >
-                  Add Line
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setForm((current) => ({ ...current, lines: [...current.lines, blankLine("GOODS")] }))}
+                    className="rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium text-foreground transition hover:bg-muted"
+                  >
+                    + Add Goods Line
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setForm((current) => ({ ...current, lines: [...current.lines, blankLine("SERVICE")] }))}
+                    className="rounded-xl border border-blue-500/40 bg-blue-500/10 px-3 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-500/20 dark:text-blue-300"
+                  >
+                    + Add Van Fare / Service
+                  </button>
+                </div>
               </div>
 
               {form.lines.map((line, index) => {
+                const isServiceLine = line.line_type === "SERVICE";
                 const selectedItem =
-                  inventoryItems.find((item) => String(item.id) === line.inventory_item) ?? null;
+                  !isServiceLine
+                    ? inventoryItems.find((item) => String(item.id) === line.inventory_item) ?? null
+                    : null;
                 const lastCost = selectedItem?.purchase_unit_cost ?? selectedItem?.standard_unit_cost ?? null;
                 return (
-                  <div key={`${index}-${line.inventory_item}`} className="rounded-[1.2rem] border border-border bg-background p-4">
+                  <div key={`${index}-${line.line_type}-${line.inventory_item}`} className="rounded-[1.2rem] border border-border bg-background p-4">
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                      <span className={`inline-flex rounded-lg px-2.5 py-1 text-[11px] font-semibold ${isServiceLine ? "bg-blue-500/15 text-blue-700 dark:text-blue-300" : "bg-muted text-foreground"}`}>
+                        {isServiceLine ? "Service / Van Fare (Non-Stock)" : "Goods Item (Stock-Tracked)"}
+                      </span>
+                      <select
+                        className="rounded-lg border border-border bg-background px-2.5 py-1 text-xs font-medium text-foreground"
+                        value={line.line_type}
+                        onChange={(event) => {
+                          const nextType = event.target.value === "SERVICE" ? "SERVICE" : "GOODS";
+                          setForm((current) => ({
+                            ...current,
+                            lines: current.lines.map((entry, entryIndex) =>
+                              entryIndex === index
+                                ? {
+                                    ...entry,
+                                    line_type: nextType,
+                                    inventory_item: nextType === "SERVICE" ? "" : entry.inventory_item,
+                                    description:
+                                      nextType === "SERVICE" && !entry.description
+                                        ? "Van Fare / Transport Charge"
+                                        : entry.description,
+                                  }
+                                : entry
+                            ),
+                          }));
+                        }}
+                      >
+                        <option value="GOODS">Goods (Stock Item)</option>
+                        <option value="SERVICE">Service / Van Fare</option>
+                      </select>
+                    </div>
                     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-                      <div className="text-sm text-muted-foreground xl:col-span-2">
-                        <span className="mb-1 block">Inventory item</span>
-                        <SearchableItemSelect
-                          allItems={inventoryItems}
-                          value={line.inventory_item}
-                          placeholder="Search product by name, code, SKU…"
-                          onChange={(itemId, item) => {
-                            if (item && !inventoryItems.some((it) => it.id === item.id)) {
-                              setInventoryItems((prev) => [...prev, item]);
+                      {isServiceLine ? (
+                        <label className="text-sm text-muted-foreground xl:col-span-2">
+                          Service / Van fare description
+                          <input
+                            className={accountingFieldClassName()}
+                            placeholder="e.g. Van Fare / Freight / Unloading Charge"
+                            value={line.description}
+                            onChange={(event) =>
+                              setForm((current) => ({
+                                ...current,
+                                lines: current.lines.map((entry, entryIndex) =>
+                                  entryIndex === index
+                                    ? { ...entry, description: event.target.value }
+                                    : entry
+                                ),
+                              }))
                             }
-                            setForm((current) => ({
-                              ...current,
-                              lines: current.lines.map((entry, entryIndex) =>
-                                entryIndex === index
-                                  ? {
-                                      ...entry,
-                                      inventory_item: itemId,
-                                      // Auto-fill cost from last purchase cost or standard cost
-                                      unit_cost: item?.purchase_unit_cost
-                                        ? parseFloat(item.purchase_unit_cost).toFixed(2)
-                                        : item?.standard_unit_cost
-                                          ? parseFloat(item.standard_unit_cost).toFixed(2)
-                                          : entry.unit_cost,
-                                    }
-                                  : entry
-                              ),
-                            }));
-                            if (item?.stock_item_type === "FINISHED_GOOD") {
-                              setOpenAccLineIdx(index);
-                            } else if (openAccLineIdx === index) {
-                              setOpenAccLineIdx(null);
-                            }
-                          }}
-                          required
-                        />
-                        {selectedItem && lastCost ? (
-                          <p className="mt-1 text-[10px] text-emerald-700">
-                            ✓ Last purchase price: {accountingMoney(lastCost)}
-                            {selectedItem.purchase_unit_cost ? " (auto-filled)" : " (std cost, editable)"}
-                          </p>
-                        ) : selectedItem ? (
-                          <p className="mt-1 text-[10px] text-muted-foreground">No previous purchase cost — enter manually.</p>
-                        ) : null}
-                        {selectedItem?.stock_item_type === "FINISHED_GOOD" && (
-                          <button
-                            type="button"
-                            onClick={() => setOpenAccLineIdx(openAccLineIdx === index ? null : index)}
-                            className="mt-1.5 inline-flex items-center gap-1 rounded-lg border border-primary/30 bg-primary/5 px-2.5 py-1 text-[11px] font-semibold text-primary hover:bg-primary/10"
-                          >
-                            {openAccLineIdx === index ? "Hide Variants & Accessories" : "Select Variants & Vendor Accessories"}
-                          </button>
-                        )}
-                      </div>
+                            required
+                          />
+                        </label>
+                      ) : (
+                        <div className="text-sm text-muted-foreground xl:col-span-2">
+                          <span className="mb-1 block">Inventory item</span>
+                          <SearchableItemSelect
+                            allItems={inventoryItems}
+                            value={line.inventory_item}
+                            placeholder="Search product by name, code, SKU…"
+                            onChange={(itemId, item) => {
+                              if (item && !inventoryItems.some((it) => it.id === item.id)) {
+                                setInventoryItems((prev) => [...prev, item]);
+                              }
+                              setForm((current) => ({
+                                ...current,
+                                lines: current.lines.map((entry, entryIndex) =>
+                                  entryIndex === index
+                                    ? {
+                                        ...entry,
+                                        inventory_item: itemId,
+                                        // Auto-fill cost from last purchase cost or standard cost
+                                        unit_cost: item?.purchase_unit_cost
+                                          ? parseFloat(item.purchase_unit_cost).toFixed(2)
+                                          : item?.standard_unit_cost
+                                            ? parseFloat(item.standard_unit_cost).toFixed(2)
+                                            : entry.unit_cost,
+                                      }
+                                    : entry
+                                ),
+                              }));
+                              if (item?.stock_item_type === "FINISHED_GOOD") {
+                                setOpenAccLineIdx(index);
+                              } else if (openAccLineIdx === index) {
+                                setOpenAccLineIdx(null);
+                              }
+                            }}
+                            required
+                          />
+                          {selectedItem && lastCost ? (
+                            <p className="mt-1 text-[10px] text-emerald-700">
+                              ✓ Last purchase price: {accountingMoney(lastCost)}
+                              {selectedItem.purchase_unit_cost ? " (auto-filled)" : " (std cost, editable)"}
+                            </p>
+                          ) : selectedItem ? (
+                            <p className="mt-1 text-[10px] text-muted-foreground">No previous purchase cost — enter manually.</p>
+                          ) : null}
+                          {selectedItem?.stock_item_type === "FINISHED_GOOD" && (
+                            <button
+                              type="button"
+                              onClick={() => setOpenAccLineIdx(openAccLineIdx === index ? null : index)}
+                              className="mt-1.5 inline-flex items-center gap-1 rounded-lg border border-primary/30 bg-primary/5 px-2.5 py-1 text-[11px] font-semibold text-primary hover:bg-primary/10"
+                            >
+                              {openAccLineIdx === index ? "Hide Variants & Accessories" : "Select Variants & Vendor Accessories"}
+                            </button>
+                          )}
+                        </div>
+                      )}
                       <label className="text-sm text-muted-foreground">
                         Quantity
                         <input
@@ -651,23 +728,25 @@ export default function AccountingPurchaseBillsPage() {
                           <span className="mt-0.5 block text-[10px] text-muted-foreground">Disabled (Non-GST mode)</span>
                         ) : null}
                       </label>
-                      <label className="text-sm text-muted-foreground xl:col-span-4">
-                        Description
-                        <input
-                          className={accountingFieldClassName()}
-                          value={line.description}
-                          onChange={(event) =>
-                            setForm((current) => ({
-                              ...current,
-                              lines: current.lines.map((entry, entryIndex) =>
-                                entryIndex === index
-                                  ? { ...entry, description: event.target.value }
-                                  : entry
-                              ),
-                            }))
-                          }
-                        />
-                      </label>
+                      {!isServiceLine ? (
+                        <label className="text-sm text-muted-foreground xl:col-span-4">
+                          Description / note
+                          <input
+                            className={accountingFieldClassName()}
+                            value={line.description}
+                            onChange={(event) =>
+                              setForm((current) => ({
+                                ...current,
+                                lines: current.lines.map((entry, entryIndex) =>
+                                  entryIndex === index
+                                    ? { ...entry, description: event.target.value }
+                                    : entry
+                                ),
+                              }))
+                            }
+                          />
+                        </label>
+                      ) : null}
                       <div className="rounded-xl border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
                         <div>{selectedItem?.unit_of_measure || "PCS"} · {selectedItem?.stock_item_type || "Select item"}</div>
                         <div className="mt-1 font-medium text-foreground">
@@ -743,6 +822,7 @@ export default function AccountingPurchaseBillsPage() {
                                 const existingIdx = nextLines.findIndex((l) => l.inventory_item === accIdStr);
                                 const desc = `${acc.variantLabel || acc.productName} (Accessory for ${selectedItem.sku || selectedItem.product_code || selectedItem.product_name})`;
                                 const newLine: PurchaseLineForm = {
+                                  line_type: "GOODS",
                                   inventory_item: accIdStr,
                                   description: desc,
                                   quantity: String(Number(acc.quantity || 1).toFixed(3)),
@@ -785,7 +865,25 @@ export default function AccountingPurchaseBillsPage() {
 
               {/* Grand total preview */}
               <div className="flex justify-end">
-                <div className="rounded-xl border border-primary/20 bg-primary/5 px-5 py-3 text-right">
+                <div className="rounded-xl border border-primary/20 bg-primary/5 px-5 py-3 text-right space-y-1">
+                  <div className="flex justify-end gap-4 text-xs text-muted-foreground">
+                    <span>
+                      Goods:{" "}
+                      {accountingMoney(
+                        form.lines
+                          .filter((line) => line.line_type !== "SERVICE")
+                          .reduce((sum, line) => sum + lineTaxableValue(line), 0)
+                      )}
+                    </span>
+                    <span>
+                      Services / Van Fare:{" "}
+                      {accountingMoney(
+                        form.lines
+                          .filter((line) => line.line_type === "SERVICE")
+                          .reduce((sum, line) => sum + lineTaxableValue(line), 0)
+                      )}
+                    </span>
+                  </div>
                   <p className="text-xs text-muted-foreground">Bill grand total (preview)</p>
                   <p className="text-lg font-bold text-primary">
                     {accountingMoney(form.lines.reduce((sum, line) => sum + lineTotal(line, form.tax_mode), 0))}

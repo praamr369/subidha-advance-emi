@@ -2212,6 +2212,7 @@ export type VendorBillStatus = "DRAFT" | "POSTED" | "CANCELLED";
 
 export interface VendorBillLine {
   id?: number;
+  line_type?: "GOODS" | "SERVICE";
   inventory_item?: number | null;
   inventory_item_sku?: string;
   inventory_item_product_name?: string;
@@ -2665,7 +2666,9 @@ export interface VendorBillCreatePayload {
   goods_receipt?: number | null;
   notes?: string;
   lines: {
-    inventory_item: number;
+    line_type?: "GOODS" | "SERVICE";
+    inventory_item?: number | null;
+    description?: string;
     quantity: string;
     unit_cost: string;
     tax_amount?: string;

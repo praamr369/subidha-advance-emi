@@ -59,6 +59,7 @@ type VendorRecord = {
 
 type VendorBillLineRecord = {
   id: number;
+  line_type?: "GOODS" | "SERVICE";
   inventory_item?: number | null;
   inventory_item_sku?: string | null;
   inventory_item_product_name?: string | null;
@@ -120,10 +121,13 @@ function buildLineItems(bill: VendorBillRecord): DocumentLineItem[] {
   return (bill.lines || []).map((line, index) => ({
     key: line.id || `${index}-${line.description}`,
     description: safeDocumentText(line.description || line.inventory_item_product_name, `Item ${index + 1}`),
-    code: [line.inventory_item_sku, line.inventory_item_product_name]
-      .map((part) => (part || "").trim())
-      .filter(Boolean)
-      .join(" · "),
+    code:
+      line.line_type === "SERVICE" || !line.inventory_item
+        ? "Service / Van Fare"
+        : [line.inventory_item_sku, line.inventory_item_product_name]
+            .map((part) => (part || "").trim())
+            .filter(Boolean)
+            .join(" · "),
     quantity: safeDocumentText(line.quantity),
     rate: formatDocumentMoney(line.unit_cost),
     discount: "—",

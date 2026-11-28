@@ -372,9 +372,12 @@ def modify_pre_activation_contract(
         from subscriptions.models import Emi, EmiStatus, LuckyId, LuckyIdStatus, Product
         from api.v1.serializers.admin_resources import build_emi_amounts, q2
         from contracts.services.subscription_service import (
+            assert_standalone_contract_product_allowed,
             build_emi_bundle_snapshots,
             get_subscription_selected_accessories,
+            get_subscription_selected_services,
             normalize_emi_selected_accessories,
+            normalize_emi_selected_services,
         )
 
         product_input = data.get("product")
@@ -386,9 +389,12 @@ def modify_pre_activation_contract(
                     prod = Product.objects.get(pk=int(product_input))
                 except (Product.DoesNotExist, ValueError):
                     raise ValidationError({"product": "Product not found."})
+            assert_standalone_contract_product_allowed(prod)
             if not getattr(prod, "is_emi_enabled", False):
                 raise ValidationError({"product": f"Product '{prod.name}' is not enabled for Advance EMI."})
             subscription.product = prod
+        else:
+            assert_standalone_contract_product_allowed(subscription.product)
 
         batch_input = data.get("batch")
         if batch_input is not None:
@@ -427,22 +433,28 @@ def modify_pre_activation_contract(
                         LuckyId.objects.filter(pk=subscription.lucky_id_id).update(status=LuckyIdStatus.AVAILABLE)
                     subscription.lucky_id = new_lucky
 
-        has_acc_payload = "accessories" in data or "accessories_configured" in data
+        has_acc_payload = "accessories" in data or "services" in data or "accessories_configured" in data
         if has_acc_payload:
-            raw_accessories = data.get("accessories") or []
-            acc_configured = bool(data.get("accessories_configured") or ("accessories" in data))
+            raw_accessories = data.get("accessories") if "accessories" in data else get_subscription_selected_accessories(subscription)
+            raw_services = data.get("services") if "services" in data else get_subscription_selected_services(subscription)
+            acc_configured = bool(data.get("accessories_configured") or ("accessories" in data) or ("services" in data))
         else:
             existing_snapshot = getattr(subscription, "product_snapshot", None) or {}
             raw_accessories = get_subscription_selected_accessories(subscription)
-            acc_configured = bool(existing_snapshot.get("accessories_configured") or raw_accessories)
+            raw_services = get_subscription_selected_services(subscription)
+            acc_configured = bool(existing_snapshot.get("accessories_configured") or raw_accessories or raw_services)
 
         normalized_accessories, accessories_total = normalize_emi_selected_accessories(
             subscription.product,
-            raw_accessories,
+            raw_accessories or [],
+        )
+        normalized_services, services_total = normalize_emi_selected_services(
+            subscription.product,
+            raw_services or [],
         )
 
         # Recompute totals for EMI
-        total_amount = q2(Decimal(str(subscription.product.base_price)) + accessories_total)
+        total_amount = q2(Decimal(str(subscription.product.base_price)) + accessories_total + services_total)
         monthly_amount = q2(total_amount / Decimal(subscription.tenure_months))
         subscription.total_amount = total_amount
         subscription.monthly_amount = monthly_amount
@@ -480,6 +492,7 @@ def modify_pre_activation_contract(
             total_amount=total_amount,
             monthly_amount=monthly_amount,
             selected_accessories=normalized_accessories,
+            selected_services=normalized_services,
             accessories_configured=acc_configured,
         )
         subscription.product_snapshot = product_snapshot
@@ -519,6 +532,12 @@ def modify_pre_activation_contract(
         )
 
         primary_product = normalized_items[0]["product"]
+        from contracts.services.subscription_service import (
+            get_subscription_selected_services,
+            normalize_emi_selected_services,
+        )
+        raw_services = data.get("services") if "services" in data else get_subscription_selected_services(subscription)
+        normalized_services, services_total = normalize_emi_selected_services(primary_product, raw_services or [])
         product_value = sum((it["total_base_price"] for it in normalized_items), MONEY_ZERO)
         monthly_amount = sum((it["monthly_amount"] for it in normalized_items), MONEY_ZERO)
         total_amount = (monthly_amount * Decimal(subscription.tenure_months)).quantize(
@@ -589,6 +608,7 @@ def modify_pre_activation_contract(
             "base_price": str(getattr(primary_product, "base_price", MONEY_ZERO)),
             "items_count": len(normalized_items),
             "items": items_snapshot,
+            "selected_services": normalized_services,
         }
         subscription.pricing_snapshot = {
             "plan_type": plan_type,
@@ -596,6 +616,7 @@ def modify_pre_activation_contract(
             "monthly_amount": str(monthly_amount),
             "total_amount": str(total_amount),
             "total_product_value": str(product_value),
+            "services_total": str(services_total),
             "items_count": len(normalized_items),
             "security_deposit_percent": str(effective_deposit_percent),
             "security_deposit_amount": str(deposit_amount),
@@ -821,8 +842,28 @@ def modify_pre_activation_contract(
         except Exception:
             pass
 
+    from deliveries.services.transport_finance_service import (
+        apply_transport_fields,
+        subscription_transport_source_type,
+        sync_transport_fare_for_source,
+    )
+
+    apply_transport_fields(
+        subscription,
+        van_number=data.get("van_number") if "van_number" in data else None,
+        transport_boy_name=data.get("transport_boy_name") if "transport_boy_name" in data else None,
+        transport_boy_phone=data.get("transport_boy_phone") if "transport_boy_phone" in data else None,
+        van_fare=data.get("van_fare") if "van_fare" in data else None,
+        transport_notes=data.get("transport_notes") if "transport_notes" in data else None,
+    )
+
     subscription.full_clean()
     subscription.save()
+    sync_transport_fare_for_source(
+        source_type=subscription_transport_source_type(subscription.plan_type),
+        source_instance=subscription,
+        performed_by=performed_by,
+    )
 
     if subscription.lucky_id_id and subscription.plan_type == PlanType.EMI:
         LuckyId.objects.filter(pk=subscription.lucky_id_id).update(status=LuckyIdStatus.ASSIGNED)

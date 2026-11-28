@@ -17,6 +17,7 @@ from inventory.models import (
     PurchaseRequestLine,
     PurchaseBill,
     PurchaseBillLine,
+    PurchaseBillLineType,
     StockAdjustment,
     StockAdjustmentLine,
     StockAdjustmentStatus,
@@ -544,15 +545,26 @@ class StockAdjustmentSerializer(serializers.ModelSerializer):
 
 
 class PurchaseBillLineSerializer(serializers.ModelSerializer):
-    inventory_item_sku = serializers.CharField(source="inventory_item.sku", read_only=True)
-    inventory_item_product_name = serializers.CharField(source="inventory_item.product.name", read_only=True)
-    inventory_item_stock_item_type = serializers.CharField(source="inventory_item.stock_item_type", read_only=True)
-    inventory_item_unit_of_measure = serializers.CharField(source="inventory_item.unit_of_measure", read_only=True)
+    line_type = serializers.ChoiceField(
+        choices=PurchaseBillLineType.choices,
+        required=False,
+        default=PurchaseBillLineType.GOODS,
+    )
+    inventory_item = serializers.PrimaryKeyRelatedField(
+        queryset=InventoryItem.objects.all(),
+        required=False,
+        allow_null=True,
+    )
+    inventory_item_sku = serializers.CharField(source="inventory_item.sku", read_only=True, default=None, allow_null=True)
+    inventory_item_product_name = serializers.CharField(source="inventory_item.product.name", read_only=True, default=None, allow_null=True)
+    inventory_item_stock_item_type = serializers.CharField(source="inventory_item.stock_item_type", read_only=True, default=None, allow_null=True)
+    inventory_item_unit_of_measure = serializers.CharField(source="inventory_item.unit_of_measure", read_only=True, default=None, allow_null=True)
 
     class Meta:
         model = PurchaseBillLine
         fields = [
             "id",
+            "line_type",
             "inventory_item",
             "inventory_item_sku",
             "inventory_item_product_name",
@@ -569,6 +581,22 @@ class PurchaseBillLineSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
 
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        inventory_item = attrs.get("inventory_item")
+        line_type = str(
+            attrs.get("line_type")
+            or (PurchaseBillLineType.GOODS if inventory_item is not None else PurchaseBillLineType.SERVICE)
+        ).strip().upper()
+        attrs["line_type"] = line_type
+        if line_type == PurchaseBillLineType.GOODS and inventory_item is None:
+            raise serializers.ValidationError({"inventory_item": "Goods lines require an inventory item."})
+        if line_type == PurchaseBillLineType.SERVICE:
+            attrs["inventory_item"] = None
+            if not (attrs.get("description") or "").strip():
+                raise serializers.ValidationError({"description": "Service / Van Fare lines require a description."})
+        return attrs
+
 
 class PurchaseBillSerializer(serializers.ModelSerializer):
     vendor_name = serializers.CharField(source="vendor.name", read_only=True)
@@ -582,6 +610,8 @@ class PurchaseBillSerializer(serializers.ModelSerializer):
     supplier_gst_as_cost = serializers.SerializerMethodField()
     posted_settled_amount = serializers.SerializerMethodField()
     outstanding_amount = serializers.SerializerMethodField()
+    goods_subtotal = serializers.SerializerMethodField()
+    service_subtotal = serializers.SerializerMethodField()
     lines = PurchaseBillLineSerializer(many=True, required=False)
 
     class Meta:
@@ -598,6 +628,8 @@ class PurchaseBillSerializer(serializers.ModelSerializer):
             "tax_mode",
             "status",
             "subtotal",
+            "goods_subtotal",
+            "service_subtotal",
             "tax_total",
             "grand_total",
             "stock_location",
@@ -624,6 +656,20 @@ class PurchaseBillSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
+
+    def get_goods_subtotal(self, obj):
+        total = sum(
+            (Decimal(str(line.taxable_value or "0.00")) for line in obj.lines.all() if line.line_type != PurchaseBillLineType.SERVICE and line.inventory_item_id),
+            Decimal("0.00"),
+        )
+        return f"{total.quantize(Decimal('0.01')):.2f}"
+
+    def get_service_subtotal(self, obj):
+        total = sum(
+            (Decimal(str(line.taxable_value or "0.00")) for line in obj.lines.all() if line.line_type == PurchaseBillLineType.SERVICE or not line.inventory_item_id),
+            Decimal("0.00"),
+        )
+        return f"{total.quantize(Decimal('0.01')):.2f}"
 
     def get_posted_settled_amount(self, obj):
         total = obj.vendor_settlements.filter(status="POSTED").aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
@@ -670,6 +716,7 @@ class PurchaseBillSerializer(serializers.ModelSerializer):
         if lines is None:
             payload["lines"] = [
                 {
+                    "line_type": line.line_type,
                     "inventory_item": line.inventory_item,
                     "description": line.description,
                     "quantity": line.quantity,
@@ -1116,13 +1163,24 @@ class PurchaseRequestSerializer(serializers.ModelSerializer):
 
 
 class VendorBillLineSerializer(serializers.ModelSerializer):
-    inventory_item_sku = serializers.CharField(source="inventory_item.sku", read_only=True)
-    inventory_item_product_name = serializers.CharField(source="inventory_item.product.name", read_only=True)
+    line_type = serializers.ChoiceField(
+        choices=PurchaseBillLineType.choices,
+        required=False,
+        default=PurchaseBillLineType.GOODS,
+    )
+    inventory_item = serializers.PrimaryKeyRelatedField(
+        queryset=InventoryItem.objects.all(),
+        required=False,
+        allow_null=True,
+    )
+    inventory_item_sku = serializers.CharField(source="inventory_item.sku", read_only=True, default=None, allow_null=True)
+    inventory_item_product_name = serializers.CharField(source="inventory_item.product.name", read_only=True, default=None, allow_null=True)
 
     class Meta:
         model = VendorBillLine
         fields = [
             "id",
+            "line_type",
             "inventory_item",
             "inventory_item_sku",
             "inventory_item_product_name",
@@ -1136,6 +1194,22 @@ class VendorBillLineSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["id", "taxable_value", "line_total", "created_at", "updated_at"]
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        inventory_item = attrs.get("inventory_item")
+        line_type = str(
+            attrs.get("line_type")
+            or (PurchaseBillLineType.GOODS if inventory_item is not None else PurchaseBillLineType.SERVICE)
+        ).strip().upper()
+        attrs["line_type"] = line_type
+        if line_type == PurchaseBillLineType.GOODS and inventory_item is None:
+            raise serializers.ValidationError({"inventory_item": "Goods lines require an inventory item."})
+        if line_type == PurchaseBillLineType.SERVICE:
+            attrs["inventory_item"] = None
+            if not (attrs.get("description") or "").strip():
+                raise serializers.ValidationError({"description": "Service / Van Fare lines require a description."})
+        return attrs
 
 
 class VendorBillSerializer(serializers.ModelSerializer):

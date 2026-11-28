@@ -889,6 +889,8 @@ export type AccountingPurchaseBill = {
   subtotal: string;
   tax_total: string;
   grand_total: string;
+  goods_subtotal?: string;
+  service_subtotal?: string;
   posted_settled_amount?: string;
   outstanding_amount?: string;
   stock_location?: number | null;
@@ -904,7 +906,8 @@ export type AccountingPurchaseBill = {
 
 export type AccountingPurchaseBillLine = {
   id?: number;
-  inventory_item: number;
+  line_type?: "GOODS" | "SERVICE";
+  inventory_item: number | null;
   inventory_item_sku?: string | null;
   inventory_item_product_name?: string | null;
   inventory_item_stock_item_type?: string | null;

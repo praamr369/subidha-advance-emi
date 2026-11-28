@@ -218,9 +218,44 @@ class DirectSaleApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("Direct sale invoice numbering is not configured", str(response.data))
 
-    def test_direct_sale_create_rejects_product_under_active_rent_possession(self):
+    def _post_direct_sale(self, *, quantity="1.000", serial_number="", description="Test line"):
+        qty_dec = Decimal(str(quantity))
+        amount = f"{(qty_dec * Decimal('9500.00')).quantize(Decimal('0.01'))}"
+        line_payload = {
+            "product": self.product.id,
+            "inventory_item": self.inventory_item.id,
+            "description": description,
+            "quantity": quantity,
+            "unit_price": "9500.00",
+            "discount_amount": "0.00",
+            "taxable_value": amount,
+            "gst_rate": None,
+            "cgst_amount": "0.00",
+            "sgst_amount": "0.00",
+            "igst_amount": "0.00",
+            "line_total": amount,
+            "hsn_sac_code": "",
+        }
+        if serial_number:
+            line_payload["serial_number"] = serial_number
+        return self.client.post(
+            "/api/v1/billing/direct-sales/",
+            {
+                "sale_date": date(2026, 4, 16),
+                "customer": self.customer.id,
+                "tax_mode": "NON_GST",
+                "finance_account": self.cash_account.id,
+                "customer_name_snapshot": self.customer.name,
+                "customer_phone_snapshot": self.customer.phone,
+                "lines": [line_payload],
+            },
+            format="json",
+        )
+
+    def test_direct_sale_create_rejects_product_under_active_rent_possession_when_no_free_stock(self):
         self.product.is_rent_enabled = True
         self.product.save(update_fields=["is_rent_enabled"])
+        InventoryItem.objects.filter(pk=self.inventory_item.pk).update(opening_stock_qty=Decimal("1.000"))
         rent_sub = create_rent_contract(
             customer=self.customer,
             product=self.product,
@@ -231,37 +266,102 @@ class DirectSaleApiTests(APITestCase):
         possession = rent_sub.product_possession
         record_handover(possession=possession, handed_over_by=self.admin)
 
-        response = self.client.post(
-            "/api/v1/billing/direct-sales/",
-            {
-                "sale_date": date(2026, 4, 16),
-                "customer": self.customer.id,
-                "tax_mode": "NON_GST",
-                "finance_account": self.cash_account.id,
-                "customer_name_snapshot": self.customer.name,
-                "customer_phone_snapshot": self.customer.phone,
-                "lines": [
-                    {
-                        "product": self.product.id,
-                        "inventory_item": self.inventory_item.id,
-                        "description": "Blocked by active possession",
-                        "quantity": "1.000",
-                        "unit_price": "9500.00",
-                        "discount_amount": "0.00",
-                        "taxable_value": "9500.00",
-                        "gst_rate": None,
-                        "cgst_amount": "0.00",
-                        "sgst_amount": "0.00",
-                        "igst_amount": "0.00",
-                        "line_total": "9500.00",
-                        "hsn_sac_code": "",
-                    }
-                ],
-            },
-            format="json",
-        )
+        response = self._post_direct_sale(quantity="1.000", description="Blocked by active possession")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
         self.assertIn("active rent/lease possession", str(response.data))
+
+    def test_direct_sale_create_allows_free_stock_while_pending_handover_rent_exists(self):
+        self.product.is_rent_enabled = True
+        self.product.save(update_fields=["is_rent_enabled"])
+        InventoryItem.objects.filter(pk=self.inventory_item.pk).update(opening_stock_qty=Decimal("6.000"))
+        create_rent_contract(
+            customer=self.customer,
+            product=self.product,
+            tenure_months=6,
+            security_deposit_percent=Decimal("20.00"),
+            performed_by=self.admin,
+        )
+
+        # 6 in stock, 1 committed to PENDING_HANDOVER rent -> 5 free to sell.
+        blocked = self._post_direct_sale(quantity="6.000", description="Exceeds unencumbered stock")
+        self.assertEqual(blocked.status_code, status.HTTP_400_BAD_REQUEST, blocked.data)
+        self.assertIn("active rent/lease possession", str(blocked.data))
+
+        allowed = self._post_direct_sale(quantity="1.000", description="Uses unencumbered stock")
+        self.assertEqual(allowed.status_code, status.HTTP_201_CREATED, allowed.data)
+
+    def test_direct_sale_create_accounts_for_rent_delivery_ledger_deduction(self):
+        from django.utils import timezone
+        from inventory.models import StockLedger, StockMovementType
+        from subscriptions.models import DeliveryStatus, SubscriptionDelivery
+
+        self.product.is_rent_enabled = True
+        self.product.save(update_fields=["is_rent_enabled"])
+        InventoryItem.objects.filter(pk=self.inventory_item.pk).update(opening_stock_qty=Decimal("6.000"))
+        rent_sub = create_rent_contract(
+            customer=self.customer,
+            product=self.product,
+            tenure_months=6,
+            security_deposit_percent=Decimal("20.00"),
+            performed_by=self.admin,
+        )
+        delivery = SubscriptionDelivery.objects.create(
+            subscription=rent_sub,
+            status=DeliveryStatus.DELIVERED,
+            delivery_reference="DLV-RENT-TEST-1",
+            delivered_at=timezone.now(),
+        )
+        StockLedger.objects.create(
+            inventory_item=self.inventory_item,
+            movement_type=StockMovementType.RENT_HANDOVER_OUT,
+            movement_date=date(2026, 4, 15),
+            quantity_in=Decimal("0.000"),
+            quantity_out=Decimal("1.000"),
+            reference_model="SubscriptionDelivery",
+            reference_id=str(delivery.id),
+        )
+        record_handover(possession=rent_sub.product_possession, handed_over_by=self.admin)
+
+        # Ledger already deducted 1 (available_qty = 5.000); all 5 remaining units are free.
+        allowed = self._post_direct_sale(quantity="5.000", description="All remaining free units")
+        self.assertEqual(allowed.status_code, status.HTTP_201_CREATED, allowed.data)
+
+        blocked = self._post_direct_sale(quantity="6.000", description="Exceeds remaining stock")
+        self.assertEqual(blocked.status_code, status.HTTP_400_BAD_REQUEST, blocked.data)
+        self.assertIn("active rent/lease possession", str(blocked.data))
+
+    def test_direct_sale_create_blocks_matching_serial_even_when_free_stock_exists(self):
+        from deliveries.services.rental_asset_lifecycle_service import (
+            create_rental_asset_from_inventory,
+            reserve_asset_for_subscription,
+        )
+
+        self.product.is_rent_enabled = True
+        self.product.save(update_fields=["is_rent_enabled"])
+        InventoryItem.objects.filter(pk=self.inventory_item.pk).update(opening_stock_qty=Decimal("6.000"))
+        rent_sub = create_rent_contract(
+            customer=self.customer,
+            product=self.product,
+            tenure_months=6,
+            security_deposit_percent=Decimal("20.00"),
+            performed_by=self.admin,
+        )
+        asset = create_rental_asset_from_inventory(
+            product=self.product,
+            asset_code="RA-DS-001",
+            inventory_item=self.inventory_item,
+            serial_no="SN-RENT-001",
+            performed_by=self.admin,
+        )
+        reserve_asset_for_subscription(asset, rent_sub, performed_by=self.admin)
+
+        blocked = self._post_direct_sale(
+            quantity="1.000",
+            serial_number="SN-RENT-001",
+            description="Matching rented serial",
+        )
+        self.assertEqual(blocked.status_code, status.HTTP_400_BAD_REQUEST, blocked.data)
+        self.assertIn("active rent/lease possession", str(blocked.data))
 
     def test_cancelled_invoice_direct_sale_is_removed_from_outstanding_and_not_collectible(self):
         create_response = self.client.post(

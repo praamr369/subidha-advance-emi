@@ -105,3 +105,138 @@ class AdminLogisticsCockpitView(APIView):
         }
         cache.set(CACHE_KEY, payload, CACHE_TTL_SECONDS)
         return Response(payload)
+
+
+def _serialize_transport_fare_entry(entry) -> dict:
+    return {
+        "id": entry.id,
+        "source_type": entry.source_type,
+        "reference_no": entry.reference_no,
+        "customer_name": entry.customer_name,
+        "entry_date": entry.entry_date.isoformat() if entry.entry_date else None,
+        "branch": entry.branch_id,
+        "branch_name": entry.branch.name if entry.branch_id and getattr(entry, "branch", None) else "",
+        "direct_sale": entry.direct_sale_id,
+        "subscription": entry.subscription_id,
+        "subscription_delivery": entry.subscription_delivery_id,
+        "service_case": entry.service_case_id,
+        "van_number": entry.van_number,
+        "transport_boy_name": entry.transport_boy_name,
+        "transport_boy_phone": entry.transport_boy_phone,
+        "van_fare": f"{entry.van_fare:.2f}",
+        "settlement_status": entry.settlement_status,
+        "paid_to_transport_at": entry.paid_to_transport_at.isoformat() if entry.paid_to_transport_at else None,
+        "notes": entry.notes,
+        "accounting_posted": False,
+        "ledger_scope": "TRANSPORT_ONLY_OFF_ACCOUNT",
+        "created_at": entry.created_at.isoformat() if entry.created_at else None,
+        "updated_at": entry.updated_at.isoformat() if entry.updated_at else None,
+    }
+
+
+class AdminTransportFareListCreateView(APIView):
+    """Transport-only off-ledger fare register (isolated from company financial accounts)."""
+
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        from deliveries.services.transport_finance_service import (
+            build_transport_finance_summary,
+            filter_transport_fare_entries,
+        )
+
+        qs = filter_transport_fare_entries(
+            source_type=request.query_params.get("source_type", ""),
+            settlement_status=request.query_params.get("settlement_status", ""),
+            date_from=request.query_params.get("date_from", ""),
+            date_to=request.query_params.get("date_to", ""),
+            q=request.query_params.get("q", ""),
+        )
+        summary = build_transport_finance_summary(qs)
+        results = [_serialize_transport_fare_entry(item) for item in qs[:200]]
+        return Response({"summary": summary, "results": results})
+
+    def post(self, request):
+        from decimal import Decimal
+        from django.shortcuts import get_object_or_404
+        from rest_framework import serializers as drf_serializers, status
+        from deliveries.models import (
+            TransportFareEntry,
+            TransportFareSettlementStatus,
+            TransportFareSourceType,
+        )
+        from deliveries.services.transport_finance_service import to_fare_decimal
+
+        payload = request.data or {}
+        source_type = str(payload.get("source_type") or TransportFareSourceType.MANUAL).strip().upper()
+        if source_type not in TransportFareSourceType.values:
+            raise drf_serializers.ValidationError({"source_type": "Invalid transport fare source_type."})
+        settlement_status = str(
+            payload.get("settlement_status") or TransportFareSettlementStatus.PENDING
+        ).strip().upper()
+        if settlement_status not in TransportFareSettlementStatus.values:
+            raise drf_serializers.ValidationError({"settlement_status": "Invalid settlement_status."})
+
+        try:
+            van_fare = to_fare_decimal(payload.get("van_fare"))
+        except ValueError as exc:
+            raise drf_serializers.ValidationError({"van_fare": str(exc)}) from exc
+
+        van_number = str(payload.get("van_number") or "").strip().upper()
+        boy_name = str(payload.get("transport_boy_name") or "").strip()
+        boy_phone = str(payload.get("transport_boy_phone") or "").strip()
+        if not (van_number or boy_name or boy_phone or van_fare > Decimal("0.00")):
+            raise drf_serializers.ValidationError(
+                {"detail": "Enter van number, transport boy details, or van fare amount."}
+            )
+
+        entry_date = payload.get("entry_date") or timezone.localdate()
+        paid_at = (
+            timezone.now()
+            if settlement_status == TransportFareSettlementStatus.PAID_TO_TRANSPORT
+            else None
+        )
+        entry = TransportFareEntry.objects.create(
+            source_type=source_type,
+            reference_no=str(payload.get("reference_no") or "").strip(),
+            customer_name=str(payload.get("customer_name") or "").strip(),
+            entry_date=entry_date,
+            van_number=van_number,
+            transport_boy_name=boy_name,
+            transport_boy_phone=boy_phone,
+            van_fare=van_fare,
+            settlement_status=settlement_status,
+            paid_to_transport_at=paid_at,
+            notes=str(payload.get("notes") or "").strip(),
+            created_by=request.user,
+            updated_by=request.user,
+        )
+        return Response(_serialize_transport_fare_entry(entry), status=status.HTTP_201_CREATED)
+
+
+class AdminTransportFareDetailView(APIView):
+    """Update settlement status or details on an off-ledger TransportFareEntry."""
+
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def patch(self, request, pk: int):
+        from django.shortcuts import get_object_or_404
+        from rest_framework import serializers as drf_serializers
+        from deliveries.models import TransportFareEntry, TransportFareSettlementStatus
+        from deliveries.services.transport_finance_service import update_transport_fare_entry
+
+        entry = get_object_or_404(TransportFareEntry, pk=pk)
+        payload = dict(request.data or {})
+        if "settlement_status" in payload and payload["settlement_status"]:
+            st = str(payload["settlement_status"]).strip().upper()
+            if st not in TransportFareSettlementStatus.values:
+                raise drf_serializers.ValidationError({"settlement_status": "Invalid settlement_status."})
+        try:
+            updated = update_transport_fare_entry(
+                entry=entry,
+                data=payload,
+                performed_by=request.user,
+            )
+        except ValueError as exc:
+            raise drf_serializers.ValidationError({"van_fare": str(exc)}) from exc
+        return Response(_serialize_transport_fare_entry(updated))

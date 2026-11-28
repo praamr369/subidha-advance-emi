@@ -255,6 +255,17 @@ class DirectSale(BillingTimeStampedModel):
     customer_signature = models.TextField(blank=True, default="")
     customer_signed_at = models.DateTimeField(null=True, blank=True)
     signature_metadata = models.JSONField(default=dict, blank=True)
+    # Off-ledger Transport-Only Fare Memo (never posted to company accounts/invoice)
+    van_number = models.CharField(max_length=60, blank=True, default="")
+    transport_boy_name = models.CharField(max_length=120, blank=True, default="")
+    transport_boy_phone = models.CharField(max_length=30, blank=True, default="")
+    van_fare = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=MONEY_ZERO,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    transport_notes = models.TextField(blank=True, default="")
 
     class Meta:
         db_table = "billing_direct_sales"
@@ -335,6 +346,10 @@ class DirectSale(BillingTimeStampedModel):
         self.idempotency_key = (self.idempotency_key or "").strip() or None
         self.idempotency_payload_hash = (self.idempotency_payload_hash or "").strip()
         self.notes = (self.notes or "").strip()
+        self.van_number = (self.van_number or "").strip().upper()
+        self.transport_boy_name = (self.transport_boy_name or "").strip()
+        self.transport_boy_phone = (self.transport_boy_phone or "").strip()
+        self.transport_notes = (self.transport_notes or "").strip()
         if self.branch_id is None:
             self.branch = (
                 getattr(self.cash_counter, "branch", None)

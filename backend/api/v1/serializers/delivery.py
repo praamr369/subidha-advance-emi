@@ -169,6 +169,11 @@ class AdminSubscriptionDeliveryReadSerializer(_BaseSubscriptionDeliveryReadSeria
             "receiver_phone",
             "delivery_address_snapshot",
             "notes",
+            "van_number",
+            "transport_boy_name",
+            "transport_boy_phone",
+            "van_fare",
+            "transport_notes",
             "failure_reason",
             "admin_override",
             "admin_override_reason",
@@ -228,6 +233,11 @@ class CustomerSubscriptionDeliveryReadSerializer(_BaseSubscriptionDeliveryReadSe
             "receiver_phone",
             "delivery_address_snapshot",
             "notes",
+            "van_number",
+            "transport_boy_name",
+            "transport_boy_phone",
+            "van_fare",
+            "transport_notes",
             "failure_reason",
             "created_at",
             "updated_at",
@@ -278,6 +288,11 @@ class AdminSubscriptionDeliveryCreateSerializer(serializers.Serializer):
     admin_override_reason = serializers.CharField(required=False, allow_blank=True, default="")
     batch_number = serializers.IntegerField(required=False, allow_null=True)
     items = serializers.ListField(child=serializers.DictField(), required=False, allow_empty=True)
+    van_number = serializers.CharField(required=False, allow_blank=True, max_length=64)
+    transport_boy_name = serializers.CharField(required=False, allow_blank=True, max_length=120)
+    transport_boy_phone = serializers.CharField(required=False, allow_blank=True, max_length=30)
+    van_fare = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True)
+    transport_notes = serializers.CharField(required=False, allow_blank=True)
 
     def validate(self, attrs):
         subscription = attrs.get("subscription")
@@ -314,6 +329,11 @@ class AdminSubscriptionDeliveryUpdateSerializer(serializers.Serializer):
     delivery_address_snapshot = serializers.CharField(required=False, allow_blank=True)
     notes = serializers.CharField(required=False, allow_blank=True)
     failure_reason = serializers.CharField(required=False, allow_blank=True)
+    van_number = serializers.CharField(required=False, allow_blank=True, max_length=64)
+    transport_boy_name = serializers.CharField(required=False, allow_blank=True, max_length=120)
+    transport_boy_phone = serializers.CharField(required=False, allow_blank=True, max_length=30)
+    van_fare = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True)
+    transport_notes = serializers.CharField(required=False, allow_blank=True)
 
 
 class AdminSubscriptionDeliveryTransitionSerializer(serializers.Serializer):
@@ -323,12 +343,22 @@ class AdminSubscriptionDeliveryTransitionSerializer(serializers.Serializer):
     receiver_phone = serializers.CharField(required=False, allow_blank=True, max_length=20)
     notes = serializers.CharField(required=False, allow_blank=True)
     failure_reason = serializers.CharField(required=False, allow_blank=True)
+    van_number = serializers.CharField(required=False, allow_blank=True, max_length=64)
+    transport_boy_name = serializers.CharField(required=False, allow_blank=True, max_length=120)
+    transport_boy_phone = serializers.CharField(required=False, allow_blank=True, max_length=30)
+    van_fare = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True)
+    transport_notes = serializers.CharField(required=False, allow_blank=True)
 
 
 class AdminSubscriptionDeliveryMarkDeliveredSerializer(serializers.Serializer):
     receiver_name = serializers.CharField(required=False, allow_blank=True, max_length=100)
     receiver_phone = serializers.CharField(required=False, allow_blank=True, max_length=20)
     notes = serializers.CharField(required=False, allow_blank=True)
+    van_number = serializers.CharField(required=False, allow_blank=True, max_length=64)
+    transport_boy_name = serializers.CharField(required=False, allow_blank=True, max_length=120)
+    transport_boy_phone = serializers.CharField(required=False, allow_blank=True, max_length=30)
+    van_fare = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True)
+    transport_notes = serializers.CharField(required=False, allow_blank=True)
 
 
 class AdminSubscriptionDeliverySplitSerializer(serializers.Serializer):
@@ -379,6 +409,11 @@ class AdminDeliverySourceSubscriptionSerializer(serializers.ModelSerializer):
             "lucky_id",
             "lucky_number",
             "delivery_summary",
+            "van_number",
+            "transport_boy_name",
+            "transport_boy_phone",
+            "van_fare",
+            "transport_notes",
             "created_at",
         )
         read_only_fields = fields
@@ -443,6 +478,11 @@ class AdminDeliveryDirectSaleSourceSerializer(serializers.ModelSerializer):
             "invoice_document_no",
             "invoice_status",
             "delivery_preview",
+            "van_number",
+            "transport_boy_name",
+            "transport_boy_phone",
+            "van_fare",
+            "transport_notes",
             "created_at",
         )
         read_only_fields = fields

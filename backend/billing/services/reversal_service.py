@@ -1355,6 +1355,8 @@ def create_purchase_return(*, purchase_bill_id: int | None = None, vendor_bill_i
         pb_line = by_line.get(pb_line_id)
         if pb_line is None:
             raise ValueError(f"Bill line {pb_line_id} not found.")
+        if not pb_line.inventory_item_id:
+            raise ValueError(f"Service / Van Fare line {pb_line_id} cannot be returned as inventory stock.")
         sold = _qty(pb_line.quantity)
         already = returned_by_bill_line[pb_line.id]
         remaining = sold - already

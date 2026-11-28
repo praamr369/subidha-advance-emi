@@ -1219,3 +1219,206 @@ class BundledItemsStockMovementTests(TestCase):
             inventory_item__product=hybrid_rail, movement_type=StockMovementType.EMI_RETURN_IN
         )
         self.assertEqual(hyb_in.get().quantity_in, Decimal("2.000"))
+
+    def test_quick_create_accessory_individual_sale_and_contract_guards(self):
+        """
+        1. Quick-create accessory creates an ACCESSORY product enabled for Direct Sale only.
+        2. Direct Sale search shows FinishedGoodAccessoryLink items and allows individual accessory sales.
+        3. SFEMI / RENT / LEASE reject standalone ACCESSORY and RAW_MATERIAL products.
+        4. SFEMI and RENT/LEASE accept Finished Goods with Free/Chargeable accessories + services.
+        """
+        from django.contrib.auth import get_user_model
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        from rest_framework.test import APIRequestFactory, force_authenticate
+
+        from api.v1.serializers.admin_resources import SubscriptionAdminSerializer
+        from api.v1.serializers.contracts import AdminRentContractCreateSerializer
+        from api.v1.views.direct_sale_workspace import AdminBillingProductSearchView
+        from api.v1.views.inventory_fg import FGQuickCreateAccessoryView
+        from contracts.services.rent_lease_contract_service import create_rent_contract
+        from contracts.services.subscription_service import create_emi_subscription
+        from inventory.models import ServiceCatalogItem, ServiceCatalogItemStatus, ServiceType
+        from lucky_plan.models import Batch, LuckyId, LuckyIdStatus
+        from subscriptions.models import ProductItemType
+
+        User = get_user_model()
+        admin_user = User.objects.create_superuser("admin_acc_guard", "guard@test.com", "pass123", phone="9999966666")
+        factory = APIRequestFactory()
+
+        # 1. Quick-create & link accessory on bed_inv -> sets item_type=ACCESSORY, direct sale enabled, EMI/RENT/LEASE disabled
+        req = factory.post(
+            f"/api/v1/admin/inventory/finished-goods/{self.bed_inv.id}/quick-create-accessory/",
+            {
+                "name": "Quick Foam Cushion",
+                "product_code": "ACC-QFC-01",
+                "base_price": "1200.00",
+                "charge_mode": "CHARGEABLE",
+                "sale_price": "950.00",
+                "quantity": "2.000",
+            },
+            format="json",
+        )
+        force_authenticate(req, user=admin_user)
+        resp = FGQuickCreateAccessoryView.as_view()(req, pk=self.bed_inv.id)
+        self.assertEqual(resp.status_code, 201, resp.data)
+        acc_prod = Product.objects.get(product_code="ACC-QFC-01")
+        self.assertEqual(acc_prod.item_type, ProductItemType.ACCESSORY)
+        self.assertTrue(acc_prod.is_direct_sale_enabled)
+        self.assertFalse(acc_prod.is_emi_enabled)
+        self.assertFalse(acc_prod.is_rent_enabled)
+        self.assertFalse(acc_prod.is_lease_enabled)
+
+        # 2. Direct Sale product search merges FinishedGoodAccessoryLink on bed_product
+        search_req = factory.get(f"/api/v1/admin/billing/products/search/?q={self.bed_product.product_code}&include_inventory=1")
+        force_authenticate(search_req, user=admin_user)
+        search_resp = AdminBillingProductSearchView.as_view()(search_req)
+        self.assertEqual(search_resp.status_code, 200)
+        bed_row = next((r for r in search_resp.data["results"] if r["id"] == self.bed_product.id), None)
+        self.assertIsNotNone(bed_row)
+        self.assertTrue(any(a["product_code"] == "ACC-QFC-01" for a in bed_row["accessories"]))
+
+        # Raw material product
+        raw_prod = create_product(name="Teak Timber", product_code="RAW-TEAK-01", base_price=Decimal("400.00"), published=True)
+        Product.objects.filter(pk=raw_prod.pk).update(
+            item_type=ProductItemType.RAW_MATERIAL,
+            is_emi_enabled=False,
+            is_rent_enabled=False,
+            is_lease_enabled=False,
+        )
+        raw_prod.refresh_from_db()
+        InventoryItem.objects.create(
+            product=raw_prod,
+            sku="RAW-TEAK-01",
+            stock_item_type=InventoryItemType.RAW_MATERIAL,
+            default_stock_location=self.location,
+            opening_stock_qty=Decimal("10.000"),
+        )
+
+        # 3. Standalone accessory and raw material must be blocked in SFEMI, RENT, and LEASE
+        from tests.helpers import create_batch
+        batch = create_batch(
+            batch_code="B-GUARD-01",
+            duration_months=6,
+        )
+        lucky = batch.lucky_ids.filter(status=LuckyIdStatus.AVAILABLE).order_by("lucky_number").first()
+
+        with self.assertRaises(DjangoValidationError):
+            create_emi_subscription(
+                customer=self.customer,
+                product=acc_prod,
+                batch=batch,
+                lucky_number=1,
+                tenure_months=6,
+                performed_by=admin_user,
+            )
+        with self.assertRaises(DjangoValidationError):
+            create_emi_subscription(
+                customer=self.customer,
+                product=raw_prod,
+                batch=batch,
+                lucky_number=1,
+                tenure_months=6,
+                performed_by=admin_user,
+            )
+
+        emi_ser = SubscriptionAdminSerializer(
+            data={
+                "customer": self.customer.id,
+                "product": acc_prod.id,
+                "plan_type": "EMI",
+                "tenure_months": 6,
+                "start_date": date.today().isoformat(),
+                "batch": batch.id,
+                "lucky_id": lucky.id,
+            }
+        )
+        self.assertFalse(emi_ser.is_valid())
+
+        with self.assertRaises(DjangoValidationError):
+            create_rent_contract(
+                customer=self.customer,
+                product=acc_prod,
+                tenure_months=6,
+                security_deposit_percent=Decimal("20.00"),
+                performed_by=admin_user,
+                save_as_draft=True,
+            )
+
+        rent_ser = AdminRentContractCreateSerializer(
+            data={
+                "customer": self.customer.id,
+                "items": [{"product": acc_prod.id, "quantity": 1, "is_accessory": False}],
+                "tenure_months": 6,
+                "security_deposit_percent": "20.00",
+                "save_as_draft": True,
+            }
+        )
+        self.assertFalse(rent_ser.is_valid())
+
+        # 4. SFEMI and RENT accept Finished Good + Free/Chargeable accessories + Services
+        svc = ServiceCatalogItem.objects.create(
+            code="SVC-INST-99",
+            name="Bed Assembly & Installation",
+            service_type=ServiceType.INSTALLATION,
+            standard_price=Decimal("500.00"),
+            status=ServiceCatalogItemStatus.ACTIVE,
+        )
+        self.bed_product.is_emi_enabled = True
+        self.bed_product.is_rent_enabled = True
+        self.bed_product.save(update_fields=["is_emi_enabled", "is_rent_enabled"])
+
+        emi_bundle_ser = SubscriptionAdminSerializer(
+            data={
+                "customer": self.customer.id,
+                "product": self.bed_product.id,
+                "plan_type": "EMI",
+                "tenure_months": 6,
+                "start_date": date.today().isoformat(),
+                "batch": batch.id,
+                "lucky_id": lucky.id,
+                "accessories_configured": True,
+                "accessories": [
+                    {
+                        "product_id": acc_prod.id,
+                        "quantity": 1,
+                        "unit_base_price": "950.00",
+                        "charge_mode": "CHARGEABLE",
+                    },
+                    {
+                        "product_id": self.ply_product.id,
+                        "quantity": 1,
+                        "unit_base_price": "0.00",
+                        "charge_mode": "FREE",
+                    },
+                ],
+                "services": [
+                    {
+                        "service_id": svc.id,
+                        "charge_mode": "CHARGEABLE",
+                        "sale_price": "500.00",
+                    }
+                ],
+            }
+        )
+        self.assertTrue(emi_bundle_ser.is_valid(), emi_bundle_ser.errors)
+        emi_sub = emi_bundle_ser.save()
+        # 15000 (bed) + 950 (chargeable acc) + 0 (free acc) + 500 (service) = 16450
+        self.assertEqual(emi_sub.total_amount, Decimal("16450.00"))
+        self.assertEqual(len(emi_sub.product_snapshot.get("selected_services", [])), 1)
+        self.assertEqual(emi_sub.pricing_snapshot.get("services_total"), "500.00")
+
+        rent_sub = create_rent_contract(
+            customer=self.customer,
+            items=[
+                {"product": self.bed_product, "quantity": 1, "is_accessory": False},
+                {"product": acc_prod, "quantity": 1, "is_accessory": True, "charge_mode": "FREE"},
+                {"product": self.ply_product, "quantity": 1, "is_accessory": True, "charge_mode": "CHARGEABLE", "unit_base_price": Decimal("300.00")},
+            ],
+            services=[{"service_id": svc.id, "charge_mode": "CHARGEABLE", "sale_price": "500.00"}],
+            tenure_months=6,
+            security_deposit_percent=Decimal("20.00"),
+            performed_by=admin_user,
+            save_as_draft=True,
+        )
+        self.assertEqual(len(rent_sub.product_snapshot.get("selected_services", [])), 1)
+        self.assertEqual(rent_sub.pricing_snapshot.get("services_total"), "500.00")

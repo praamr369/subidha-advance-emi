@@ -77,6 +77,17 @@ class SubscriptionDelivery(TimeStampedModel):
         related_name="kitting_verified_deliveries",
     )
     kitting_notes = models.TextField(blank=True, default="")
+    # Off-ledger Transport-Only Fare Memo (never posted to company accounts)
+    van_number = models.CharField(max_length=60, blank=True, default="")
+    transport_boy_name = models.CharField(max_length=120, blank=True, default="")
+    transport_boy_phone = models.CharField(max_length=30, blank=True, default="")
+    van_fare = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=MONEY_ZERO,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    transport_notes = models.TextField(blank=True, default="")
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -193,6 +204,10 @@ class SubscriptionDelivery(TimeStampedModel):
         self.delivery_address_snapshot = (self.delivery_address_snapshot or "").strip()
         self.failure_reason = (self.failure_reason or "").strip()
         self.stock_blocked_reason = (self.stock_blocked_reason or "").strip()
+        self.van_number = (self.van_number or "").strip().upper()
+        self.transport_boy_name = (self.transport_boy_name or "").strip()
+        self.transport_boy_phone = (self.transport_boy_phone or "").strip()
+        self.transport_notes = (self.transport_notes or "").strip()
         self.full_clean()
         super().save(*args, **kwargs)
 
@@ -911,5 +926,146 @@ class ConsumerReturnRequest(TimeStampedModel):
 # When a security deposit is forfeited (tenant default / damage beyond wear),
 # GST output tax must be raised on the forfeited amount.
 # ---------------------------------------------------------------------------
+
+
+class TransportFareSourceType(models.TextChoices):
+    DIRECT_SALE = "DIRECT_SALE", "Direct Sale"
+    EMI_CONTRACT = "EMI_CONTRACT", "SFEMI Contract"
+    RENT_CONTRACT = "RENT_CONTRACT", "Rent Contract"
+    LEASE_CONTRACT = "LEASE_CONTRACT", "Lease Contract"
+    SUBSCRIPTION_DELIVERY = "SUBSCRIPTION_DELIVERY", "Contract Delivery Challan"
+    DIRECT_SALE_DELIVERY = "DIRECT_SALE_DELIVERY", "Direct Sale Delivery Challan"
+    MANUAL = "MANUAL", "Manual Transport Entry"
+
+
+class TransportFareSettlementStatus(models.TextChoices):
+    PENDING = "PENDING", "Pending"
+    PAID_TO_TRANSPORT = "PAID_TO_TRANSPORT", "Paid to Transport"
+    CUSTOMER_PAID_DIRECT = "CUSTOMER_PAID_DIRECT", "Customer Paid Direct"
+
+
+class TransportFareEntry(TimeStampedModel):
+    """Isolated transport-only finance memo ledger.
+
+    Strictly separate from company accounting: NEVER creates JournalEntry,
+    MoneyMovement, FinanceAccount, BillingInvoice, or FinancialLedger rows.
+    """
+
+    source_type = models.CharField(
+        max_length=32,
+        choices=TransportFareSourceType.choices,
+        default=TransportFareSourceType.MANUAL,
+        db_index=True,
+    )
+    direct_sale = models.ForeignKey(
+        "billing.DirectSale",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="transport_fare_entries",
+    )
+    subscription = models.ForeignKey(
+        "contracts.Subscription",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="transport_fare_entries",
+    )
+    subscription_delivery = models.ForeignKey(
+        SubscriptionDelivery,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="transport_fare_entries",
+    )
+    service_case = models.ForeignKey(
+        "service_desk.ServiceDeskCase",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="transport_fare_entries",
+    )
+    branch = models.ForeignKey(
+        "branch_control.Branch",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="transport_fare_entries",
+    )
+    entry_date = models.DateField(default=timezone.localdate, db_index=True)
+    reference_no = models.CharField(max_length=80, blank=True, default="", db_index=True)
+    customer_name = models.CharField(max_length=160, blank=True, default="")
+    van_number = models.CharField(max_length=60, blank=True, default="", db_index=True)
+    transport_boy_name = models.CharField(max_length=120, blank=True, default="")
+    transport_boy_phone = models.CharField(max_length=30, blank=True, default="")
+    van_fare = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=MONEY_ZERO,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    settlement_status = models.CharField(
+        max_length=32,
+        choices=TransportFareSettlementStatus.choices,
+        default=TransportFareSettlementStatus.PENDING,
+        db_index=True,
+    )
+    paid_to_transport_at = models.DateTimeField(null=True, blank=True)
+    notes = models.TextField(blank=True, default="")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="created_transport_fare_entries",
+    )
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="updated_transport_fare_entries",
+    )
+    updated_at = models.DateTimeField(auto_now=True, db_index=True)
+
+    class Meta:
+        db_table = "deliveries_transport_fare_entries"
+        ordering = ["-entry_date", "-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["source_type", "entry_date"]),
+            models.Index(fields=["settlement_status", "entry_date"]),
+        ]
+
+    def clean(self):
+        errors = {}
+        if self.van_fare is None or Decimal(str(self.van_fare)) < MONEY_ZERO:
+            errors["van_fare"] = "Van fare cannot be negative."
+        if not any(
+            [
+                (self.van_number or "").strip(),
+                (self.transport_boy_name or "").strip(),
+                (self.transport_boy_phone or "").strip(),
+                Decimal(str(self.van_fare or MONEY_ZERO)) > MONEY_ZERO,
+            ]
+        ):
+            errors["van_fare"] = "Provide at least van number, transport boy details, or van fare."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.reference_no = (self.reference_no or "").strip()
+        self.customer_name = (self.customer_name or "").strip()
+        self.van_number = (self.van_number or "").strip().upper()
+        self.transport_boy_name = (self.transport_boy_name or "").strip()
+        self.transport_boy_phone = (self.transport_boy_phone or "").strip()
+        self.notes = (self.notes or "").strip()
+        if self.branch_id is None:
+            self.branch = _default_branch()
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Transport {self.source_type} {self.reference_no or self.pk} - {self.van_fare}"
+
 
 

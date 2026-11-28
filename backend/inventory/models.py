@@ -181,6 +181,11 @@ class PurchaseBillStatus(models.TextChoices):
     CANCELLED = "CANCELLED", "Cancelled"
 
 
+class PurchaseBillLineType(models.TextChoices):
+    GOODS = "GOODS", "Goods / Inventory"
+    SERVICE = "SERVICE", "Service / Van Fare"
+
+
 class PurchaseTaxMode(models.TextChoices):
     GST = "GST", "GST"
     NON_GST = "NON_GST", "Non-GST"
@@ -1035,10 +1040,18 @@ class PurchaseBillLine(InventoryTimeStampedModel):
         on_delete=models.CASCADE,
         related_name="lines",
     )
+    line_type = models.CharField(
+        max_length=16,
+        choices=PurchaseBillLineType.choices,
+        default=PurchaseBillLineType.GOODS,
+        db_index=True,
+    )
     inventory_item = models.ForeignKey(
         InventoryItem,
         on_delete=models.PROTECT,
         related_name="purchase_bill_lines",
+        null=True,
+        blank=True,
     )
     description = models.CharField(max_length=255, blank=True, default="")
     quantity = models.DecimalField(
@@ -1060,11 +1073,18 @@ class PurchaseBillLine(InventoryTimeStampedModel):
         ordering = ["id"]
 
     def clean(self):
+        errors = {}
+        if self.line_type == PurchaseBillLineType.GOODS and not self.inventory_item_id:
+            errors["inventory_item"] = "Goods lines require an inventory item."
+        if self.line_type == PurchaseBillLineType.SERVICE and not (self.description or "").strip():
+            errors["description"] = "Service / Van Fare lines require a description."
         expected_total = Decimal(str(self.taxable_value or MONEY_ZERO)) + Decimal(
             str(self.tax_amount or MONEY_ZERO)
         )
         if self.line_total != expected_total:
-            raise ValidationError({"line_total": "Line total must equal taxable value plus tax amount."})
+            errors["line_total"] = "Line total must equal taxable value plus tax amount."
+        if errors:
+            raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
         self.description = (self.description or "").strip()
@@ -1255,7 +1275,19 @@ class VendorBill(InventoryTimeStampedModel):
 
 class VendorBillLine(InventoryTimeStampedModel):
     vendor_bill = models.ForeignKey(VendorBill, on_delete=models.CASCADE, related_name="lines")
-    inventory_item = models.ForeignKey(InventoryItem, on_delete=models.PROTECT, related_name="vendor_bill_lines")
+    line_type = models.CharField(
+        max_length=16,
+        choices=PurchaseBillLineType.choices,
+        default=PurchaseBillLineType.GOODS,
+        db_index=True,
+    )
+    inventory_item = models.ForeignKey(
+        InventoryItem,
+        on_delete=models.PROTECT,
+        related_name="vendor_bill_lines",
+        null=True,
+        blank=True,
+    )
     description = models.CharField(max_length=255, blank=True, default="")
     quantity = models.DecimalField(max_digits=12, decimal_places=3, validators=[MinValueValidator(Decimal("0.001"))])
     unit_cost = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(MONEY_ZERO)])
@@ -1266,6 +1298,15 @@ class VendorBillLine(InventoryTimeStampedModel):
     class Meta:
         db_table = "inventory_vendor_bill_lines"
         ordering = ["id"]
+
+    def clean(self):
+        errors = {}
+        if self.line_type == PurchaseBillLineType.GOODS and not self.inventory_item_id:
+            errors["inventory_item"] = "Goods lines require an inventory item."
+        if self.line_type == PurchaseBillLineType.SERVICE and not (self.description or "").strip():
+            errors["description"] = "Service / Van Fare lines require a description."
+        if errors:
+            raise ValidationError(errors)
 
 
 class VendorPayment(InventoryTimeStampedModel):

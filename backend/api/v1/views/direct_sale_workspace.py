@@ -112,9 +112,11 @@ def _last_sale_price(product_id: int) -> str | None:
 
 
 def _serialize_product_row(product: Product, *, include_extended: bool) -> dict:
+    from inventory.models import FinishedGoodAccessoryLink
     from products_core.models import ProductRelationship
 
     inventory = _inventory_payload(product)
+    inv_profile = getattr(product, "inventory_profile", None)
     payload = {
         "id": product.id,
         "name": product.name,
@@ -134,16 +136,72 @@ def _serialize_product_row(product: Product, *, include_extended: bool) -> dict:
         "unit_of_measure": getattr(product, "unit_of_measure", "PCS") or "PCS",
         "base_specs": getattr(product, "base_specs", None) or {},
         "description": getattr(product, "description", "") or "",
-        "stock_item_type": getattr(product, "item_type", None) or getattr(product, "stock_item_type", None),
+        "stock_item_type": getattr(inv_profile, "stock_item_type", None) or getattr(product, "item_type", None),
     }
     if include_extended:
         from django.db.models import Q as _Q
         payload["lifecycle_status"] = getattr(product, "lifecycle_status", None)
 
-        # Base-level accessories on this product (no variant scoping)
-        acc_q = _Q(product_id=product.id, relationship_type="ACCESSORY", parent_variant__isnull=True)
+        merged_accessories: list[dict] = []
+        seen_acc_product_ids: set[int] = set()
 
-        # Variant-specific accessories: stored with parent_variant_sku matching this product's SKU
+        # 1. Inventory FinishedGoodAccessoryLink entries (canonical FG accessory setup)
+        if inv_profile is not None:
+            fg_links = (
+                FinishedGoodAccessoryLink.objects.filter(finished_good=inv_profile)
+                .select_related("accessory__product", "variant_group", "sourcing_vendor")
+                .prefetch_related("variant_group__variants__product")
+                .order_by("sort_order", "id")
+            )
+            for link in fg_links:
+                s_type = getattr(link, "sourcing_type", "SUPPLIED_WITH_PARENT") or "SUPPLIED_WITH_PARENT"
+                s_vendor_name = link.sourcing_vendor.name if getattr(link, "sourcing_vendor", None) else ""
+                c_mode = getattr(link, "charge_mode", "FREE") or "FREE"
+                if link.accessory_id and link.accessory.product_id:
+                    acc_prod = link.accessory.product
+                    if acc_prod.id in seen_acc_product_ids:
+                        continue
+                    seen_acc_product_ids.add(acc_prod.id)
+                    merged_accessories.append({
+                        "id": acc_prod.id,
+                        "name": acc_prod.name,
+                        "product_code": acc_prod.product_code,
+                        "sku": link.accessory.sku or acc_prod.sku,
+                        "quantity": str(link.quantity or "1.000"),
+                        "included_in_price": c_mode == "FREE",
+                        "charge_mode": c_mode,
+                        "sale_price": str(link.sale_price or "0.00"),
+                        "sourcing_type": s_type,
+                        "sourcing_vendor_id": link.sourcing_vendor_id,
+                        "sourcing_vendor_name": s_vendor_name,
+                        "is_supplied_with_parent": s_type == "SUPPLIED_WITH_PARENT",
+                    })
+                elif link.variant_group_id:
+                    first_var = (
+                        link.variant_group.variants.filter(is_active=True)
+                        .select_related("product")
+                        .order_by("variant_label", "product__name")
+                        .first()
+                    )
+                    if first_var and first_var.product_id and first_var.product_id not in seen_acc_product_ids:
+                        seen_acc_product_ids.add(first_var.product_id)
+                        merged_accessories.append({
+                            "id": first_var.product_id,
+                            "name": link.variant_group.name or first_var.product.name,
+                            "product_code": link.variant_group.code or first_var.product.product_code,
+                            "sku": first_var.sku or first_var.product.sku,
+                            "quantity": str(link.quantity or "1.000"),
+                            "included_in_price": c_mode == "FREE",
+                            "charge_mode": c_mode,
+                            "sale_price": str(link.sale_price or "0.00"),
+                            "sourcing_type": s_type,
+                            "sourcing_vendor_id": link.sourcing_vendor_id,
+                            "sourcing_vendor_name": s_vendor_name,
+                            "is_supplied_with_parent": s_type == "SUPPLIED_WITH_PARENT",
+                        })
+
+        # 2. Legacy/PIM ProductRelationship entries not already represented
+        acc_q = _Q(product_id=product.id, relationship_type="ACCESSORY", parent_variant__isnull=True)
         sku = getattr(product, "sku", None) or ""
         if sku:
             acc_q = acc_q | _Q(parent_variant_sku=sku, relationship_type="ACCESSORY")
@@ -153,8 +211,11 @@ def _serialize_product_row(product: Product, *, include_extended: bool) -> dict:
             .select_related("related_product", "sourcing_vendor")
             .order_by("id")
         )
-        payload["accessories"] = [
-            {
+        for rel in accessories:
+            if not rel.related_product_id or rel.related_product_id in seen_acc_product_ids:
+                continue
+            seen_acc_product_ids.add(rel.related_product_id)
+            merged_accessories.append({
                 "id": rel.related_product_id,
                 "name": rel.related_product.name,
                 "product_code": rel.related_product.product_code,
@@ -167,9 +228,8 @@ def _serialize_product_row(product: Product, *, include_extended: bool) -> dict:
                 "sourcing_vendor_id": rel.sourcing_vendor_id,
                 "sourcing_vendor_name": rel.sourcing_vendor.name if getattr(rel, "sourcing_vendor", None) else "",
                 "is_supplied_with_parent": (getattr(rel, "sourcing_type", "") or "SUPPLIED_WITH_PARENT") == "SUPPLIED_WITH_PARENT",
-            }
-            for rel in accessories
-        ]
+            })
+        payload["accessories"] = merged_accessories
     return payload
 
 

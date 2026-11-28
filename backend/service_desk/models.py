@@ -285,6 +285,17 @@ class ServiceDeskCase(ServiceDeskTimeStampedModel):
         blank=True,
         related_name="closed_service_desk_cases",
     )
+    # Off-ledger Transport-Only Fare Memo (never posted to company accounts)
+    van_number = models.CharField(max_length=60, blank=True, default="")
+    transport_boy_name = models.CharField(max_length=120, blank=True, default="")
+    transport_boy_phone = models.CharField(max_length=30, blank=True, default="")
+    van_fare = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=MONEY_ZERO,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    transport_notes = models.TextField(blank=True, default="")
 
     class Meta:
         db_table = "service_desk_cases"
@@ -360,6 +371,10 @@ class ServiceDeskCase(ServiceDeskTimeStampedModel):
         self.internal_notes = (self.internal_notes or "").strip()
         self.resolution_summary = (self.resolution_summary or "").strip()
         self.payment_exception_reason = (self.payment_exception_reason or "").strip()
+        self.van_number = (self.van_number or "").strip().upper()
+        self.transport_boy_name = (self.transport_boy_name or "").strip()
+        self.transport_boy_phone = (self.transport_boy_phone or "").strip()
+        self.transport_notes = (self.transport_notes or "").strip()
         self.full_clean()
         super().save(*args, **kwargs)
 

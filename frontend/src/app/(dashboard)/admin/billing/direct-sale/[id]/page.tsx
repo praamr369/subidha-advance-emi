@@ -369,6 +369,21 @@ export default function AdminDirectSaleDetailPage() {
                   </div>
                   <div className="text-foreground">{deliveryAddress || (sale.delivery_required ? "Same as billing address" : "Store Counter Pickup")}</div>
                 </div>
+                {(sale.van_number || sale.transport_boy_name || sale.transport_boy_phone || Number(sale.van_fare || 0) > 0) ? (
+                  <div className="rounded-xl border border-amber-300/70 bg-amber-50/40 p-3.5 space-y-1 sm:col-span-2 dark:bg-amber-950/15">
+                    <div className="text-xs font-medium text-amber-800 dark:text-amber-300 uppercase tracking-wide">
+                      Transport &amp; Van Fare (Transport-Only · Off-Ledger)
+                    </div>
+                    <div className="text-sm text-foreground flex flex-wrap gap-x-4 gap-y-1">
+                      <span>Van: <strong>{sale.van_number || "—"}</strong></span>
+                      <span>Boy: <strong>{sale.transport_boy_name || "—"}</strong> {sale.transport_boy_phone ? `(${sale.transport_boy_phone})` : ""}</span>
+                      <span>Fare: <strong>₹{Number(sale.van_fare || 0).toFixed(2)}</strong></span>
+                    </div>
+                    {sale.transport_notes ? (
+                      <div className="text-xs text-muted-foreground">{sale.transport_notes}</div>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
             </ERPSectionShell>
           </div>

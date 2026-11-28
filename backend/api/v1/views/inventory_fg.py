@@ -490,7 +490,7 @@ class FGQuickCreateAccessoryView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
 
     def post(self, request, pk: int):
-        from subscriptions.models import Product
+        from subscriptions.models import Product, ProductItemType
         from django.db import transaction as db_tx
 
         fg = _get_fg(pk)
@@ -502,6 +502,9 @@ class FGQuickCreateAccessoryView(APIView):
         uom = (data.get("unit_of_measure") or "PCS").strip()
         charge_mode = data.get("charge_mode", FGAccessoryChargeMode.FREE)
         sale_price = _parse_decimal(data.get("sale_price", "0"))
+        quantity = _parse_decimal(data.get("quantity", "1.000"), Decimal("1.000"))
+        if quantity <= Decimal("0.000"):
+            quantity = Decimal("1.000")
         is_default_included = bool(data.get("is_default_included", True))
         sort_order = int(data.get("sort_order", 1))
         notes = (data.get("notes") or "").strip()
@@ -519,6 +522,12 @@ class FGQuickCreateAccessoryView(APIView):
                 name=product_name,
                 product_code=product_code,
                 base_price=base_price,
+                unit_of_measure=uom,
+                item_type=ProductItemType.ACCESSORY,
+                is_emi_enabled=False,
+                is_rent_enabled=False,
+                is_lease_enabled=False,
+                is_direct_sale_enabled=True,
                 is_active=True,
             )
             acc_item = InventoryItem.objects.create(
@@ -534,6 +543,7 @@ class FGQuickCreateAccessoryView(APIView):
                 charge_mode=charge_mode,
                 sale_price=sale_price if charge_mode != FGAccessoryChargeMode.FREE else MONEY_ZERO,
                 is_default_included=is_default_included,
+                quantity=quantity,
                 sort_order=sort_order,
                 notes=notes,
             )

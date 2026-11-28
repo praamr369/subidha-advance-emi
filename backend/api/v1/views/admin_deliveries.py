@@ -301,6 +301,11 @@ class AdminDeliveryListCreateView(APIView):
                 admin_override_reason=validated.get("admin_override_reason", ""),
                 batch_number=validated.get("batch_number"),
                 items=validated.get("items"),
+                van_number=validated.get("van_number"),
+                transport_boy_name=validated.get("transport_boy_name"),
+                transport_boy_phone=validated.get("transport_boy_phone"),
+                van_fare=validated.get("van_fare"),
+                transport_notes=validated.get("transport_notes"),
             )
         except ValueError as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
@@ -399,6 +404,11 @@ class AdminDeliverySourceSubscriptionPrefillView(APIView):
                     "delivery_address_snapshot": address_snapshot,
                     "notes": "",
                     "batch_number": progress["next_batch_number"],
+                    "van_number": (getattr(subscription, "van_number", "") or "").strip(),
+                    "transport_boy_name": (getattr(subscription, "transport_boy_name", "") or "").strip(),
+                    "transport_boy_phone": (getattr(subscription, "transport_boy_phone", "") or "").strip(),
+                    "van_fare": str(getattr(subscription, "van_fare", None) or "0.00"),
+                    "transport_notes": (getattr(subscription, "transport_notes", "") or "").strip(),
                 },
             }
         )
@@ -464,6 +474,11 @@ class AdminDeliveryPdfView(APIView):
             delivery_address_snapshot=serializer.validated_data.get("delivery_address_snapshot"),
             notes=serializer.validated_data.get("notes"),
             failure_reason=serializer.validated_data.get("failure_reason"),
+            van_number=serializer.validated_data.get("van_number"),
+            transport_boy_name=serializer.validated_data.get("transport_boy_name"),
+            transport_boy_phone=serializer.validated_data.get("transport_boy_phone"),
+            van_fare=serializer.validated_data.get("van_fare"),
+            transport_notes=serializer.validated_data.get("transport_notes"),
         )
         return Response(AdminSubscriptionDeliveryReadSerializer(delivery).data)
 
@@ -486,6 +501,11 @@ class AdminDeliveryTransitionView(APIView):
                 receiver_phone=serializer.validated_data.get("receiver_phone"),
                 notes=serializer.validated_data.get("notes"),
                 failure_reason=serializer.validated_data.get("failure_reason"),
+                van_number=serializer.validated_data.get("van_number"),
+                transport_boy_name=serializer.validated_data.get("transport_boy_name"),
+                transport_boy_phone=serializer.validated_data.get("transport_boy_phone"),
+                van_fare=serializer.validated_data.get("van_fare"),
+                transport_notes=serializer.validated_data.get("transport_notes"),
             )
         except ValueError as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
@@ -508,6 +528,11 @@ class AdminDeliveryMarkDeliveredView(APIView):
                 receiver_name=serializer.validated_data.get("receiver_name"),
                 receiver_phone=serializer.validated_data.get("receiver_phone"),
                 notes=serializer.validated_data.get("notes"),
+                van_number=serializer.validated_data.get("van_number"),
+                transport_boy_name=serializer.validated_data.get("transport_boy_name"),
+                transport_boy_phone=serializer.validated_data.get("transport_boy_phone"),
+                van_fare=serializer.validated_data.get("van_fare"),
+                transport_notes=serializer.validated_data.get("transport_notes"),
             )
         except ValueError as exc:
             raise serializers.ValidationError({"detail": str(exc)}) from exc
@@ -717,6 +742,11 @@ class AdminDeliverySourceDirectSalePrefillView(APIView):
                     "receiver_phone": receiver_phone,
                     "delivery_address_snapshot": snapshot_lines,
                     "notes": "",
+                    "van_number": (getattr(sale, "van_number", "") or "").strip(),
+                    "transport_boy_name": (getattr(sale, "transport_boy_name", "") or "").strip(),
+                    "transport_boy_phone": (getattr(sale, "transport_boy_phone", "") or "").strip(),
+                    "van_fare": str(getattr(sale, "van_fare", None) or "0.00"),
+                    "transport_notes": (getattr(sale, "transport_notes", "") or "").strip(),
                 },
             }
         )
@@ -728,10 +758,20 @@ class _DirectSaleScheduleSerializer(serializers.Serializer):
     receiver_phone = serializers.CharField(required=False, allow_blank=True, max_length=20)
     delivery_address_snapshot = serializers.CharField(required=False, allow_blank=True)
     notes = serializers.CharField(required=False, allow_blank=True)
+    van_number = serializers.CharField(required=False, allow_blank=True, max_length=64)
+    transport_boy_name = serializers.CharField(required=False, allow_blank=True, max_length=120)
+    transport_boy_phone = serializers.CharField(required=False, allow_blank=True, max_length=30)
+    van_fare = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True)
+    transport_notes = serializers.CharField(required=False, allow_blank=True)
 
 
 class _DirectSaleDispatchSerializer(serializers.Serializer):
     notes = serializers.CharField(required=False, allow_blank=True)
+    van_number = serializers.CharField(required=False, allow_blank=True, max_length=64)
+    transport_boy_name = serializers.CharField(required=False, allow_blank=True, max_length=120)
+    transport_boy_phone = serializers.CharField(required=False, allow_blank=True, max_length=30)
+    van_fare = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True)
+    transport_notes = serializers.CharField(required=False, allow_blank=True)
 
 
 class _DirectSaleDeliveredSerializer(serializers.Serializer):
@@ -739,6 +779,11 @@ class _DirectSaleDeliveredSerializer(serializers.Serializer):
     receiver_phone = serializers.CharField(required=False, allow_blank=True, max_length=20)
     delivery_note = serializers.CharField(required=False, allow_blank=True)
     delivered_at = serializers.DateTimeField(required=False, allow_null=True)
+    van_number = serializers.CharField(required=False, allow_blank=True, max_length=64)
+    transport_boy_name = serializers.CharField(required=False, allow_blank=True, max_length=120)
+    transport_boy_phone = serializers.CharField(required=False, allow_blank=True, max_length=30)
+    van_fare = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True)
+    transport_notes = serializers.CharField(required=False, allow_blank=True)
 
 
 class _DirectSaleMetadataSerializer(serializers.Serializer):
@@ -748,6 +793,11 @@ class _DirectSaleMetadataSerializer(serializers.Serializer):
     delivery_address_snapshot = serializers.CharField(required=False, allow_blank=True)
     failure_or_cancellation_reason = serializers.CharField(required=False, allow_blank=True)
     operational_notes = serializers.CharField(required=False, allow_blank=True)
+    van_number = serializers.CharField(required=False, allow_blank=True, max_length=64)
+    transport_boy_name = serializers.CharField(required=False, allow_blank=True, max_length=120)
+    transport_boy_phone = serializers.CharField(required=False, allow_blank=True, max_length=30)
+    van_fare = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, allow_null=True)
+    transport_notes = serializers.CharField(required=False, allow_blank=True)
 
 
 class _DirectSalePaymentExceptionApprovalSerializer(serializers.Serializer):

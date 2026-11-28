@@ -279,6 +279,11 @@ type SubscriptionDetailRecord = {
   waived_amount: string;
   fulfillment_status: string | null;
   delivery_status: string | null;
+  van_number?: string;
+  transport_boy_name?: string;
+  transport_boy_phone?: string;
+  van_fare?: string;
+  transport_notes?: string;
   created_at: string | null;
   emi_count: number;
   paid_emi_count: number;
@@ -714,6 +719,11 @@ function normalizeSubscriptionDetail(
     waived_amount: String(raw.waived_amount ?? "0.00"),
     fulfillment_status: toNullableString(raw.fulfillment_status),
     delivery_status: toNullableString(raw.delivery_status),
+    van_number: toStringValue(raw.van_number),
+    transport_boy_name: toStringValue(raw.transport_boy_name),
+    transport_boy_phone: toStringValue(raw.transport_boy_phone),
+    van_fare: toStringValue(raw.van_fare),
+    transport_notes: toStringValue(raw.transport_notes),
     created_at: toNullableString(raw.created_at),
     emi_count: toNumber(raw.emi_count),
     paid_emi_count: toNumber(raw.paid_emi_count),
@@ -1573,6 +1583,27 @@ export default function AdminSubscriptionDetailPage() {
                   <DetailValue label="Start Date" value={formatDate(subscription.start_date)} />
                   <DetailValue label="Created At" value={formatDateTime(subscription.created_at)} />
                 </div>
+                {(subscription.van_number ||
+                  subscription.transport_boy_name ||
+                  subscription.transport_boy_phone ||
+                  Number(subscription.van_fare || 0) > 0) ? (
+                  <div className="mt-4 rounded-xl border border-amber-300/60 bg-amber-50/40 p-3.5 text-sm dark:bg-amber-950/15">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-amber-800 dark:text-amber-300">
+                      Transport &amp; Van Fare (Transport-Only · Off-Ledger)
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-foreground">
+                      <span>Van No: <strong>{subscription.van_number || "—"}</strong></span>
+                      <span>
+                        Transport Boy: <strong>{subscription.transport_boy_name || "—"}</strong>
+                        {subscription.transport_boy_phone ? ` (${subscription.transport_boy_phone})` : ""}
+                      </span>
+                      <span>Van Fare: <strong>₹{Number(subscription.van_fare || 0).toFixed(2)}</strong></span>
+                    </div>
+                    {subscription.transport_notes ? (
+                      <div className="mt-1 text-xs text-muted-foreground">{subscription.transport_notes}</div>
+                    ) : null}
+                  </div>
+                ) : null}
               </DetailPanel>
 
               {subscription.contract_items && subscription.contract_items.length > 0 && !isEmiSubscription ? (

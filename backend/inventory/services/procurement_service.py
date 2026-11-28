@@ -290,7 +290,7 @@ def post_vendor_bill(*, vendor_bill_id: int, posted_by=None):
     tax_total = Decimal("0.00")
     for line in bill.lines.all():
         taxable_value = _money(line.taxable_value)
-        if line.inventory_item.stock_tracking_enabled:
+        if line.inventory_item_id and line.inventory_item.stock_tracking_enabled:
             inventory_total += taxable_value
         else:
             expense_total += taxable_value
@@ -349,8 +349,9 @@ def post_vendor_bill(*, vendor_bill_id: int, posted_by=None):
     bill.status = VendorBillStatus.POSTED
     bill.save(update_fields=["posted_journal_entry", "status", "updated_at"])
 
-    # Feature: Auto-generate PO and GR for legacy Vendor Bills to maintain accurate pipeline
-    if not bill.purchase_order_id and not bill.goods_receipt_id:
+    # Feature: Auto-generate PO and GR for legacy Vendor Bills (for goods lines only)
+    goods_lines = [line for line in bill.lines.all() if line.inventory_item_id]
+    if not bill.purchase_order_id and not bill.goods_receipt_id and goods_lines:
         # 1. Create Purchase Order
         po = PurchaseOrder.objects.create(
             po_no=f"PO-AUTO-{bill.bill_no}",
@@ -360,7 +361,7 @@ def post_vendor_bill(*, vendor_bill_id: int, posted_by=None):
             expected_date=bill.bill_date,
             notes=f"Auto-generated from standalone vendor bill {bill.bill_no}"
         )
-        for line in bill.lines.all():
+        for line in goods_lines:
             PurchaseOrderLine.objects.create(
                 purchase_order=po,
                 inventory_item=line.inventory_item,
@@ -405,7 +406,8 @@ def post_vendor_bill(*, vendor_bill_id: int, posted_by=None):
         bill.purchase_order.save(update_fields=["status", "updated_at"])
     from inventory.services.stock_service import sync_inventory_item_cost_on_receipt
     for line in bill.lines.all():
-        sync_inventory_item_cost_on_receipt(line.inventory_item, line.unit_cost)
+        if line.inventory_item_id:
+            sync_inventory_item_cost_on_receipt(line.inventory_item, line.unit_cost)
     log_inventory_event(
         action_type=AuditLog.ActionType.VENDOR_BILL_POSTED,
         instance=bill,

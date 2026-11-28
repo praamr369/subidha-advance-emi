@@ -116,6 +116,17 @@ class Subscription(TimeStampedModel):
         blank=True,
         help_text="Timestamp when the agreement PDF hash was committed.",
     )
+    # Off-ledger Transport-Only Fare Memo (never posted to company accounts/EMI/demands)
+    van_number = models.CharField(max_length=60, blank=True, default="")
+    transport_boy_name = models.CharField(max_length=120, blank=True, default="")
+    transport_boy_phone = models.CharField(max_length=30, blank=True, default="")
+    van_fare = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=MONEY_ZERO,
+        validators=[MinValueValidator(MONEY_ZERO)],
+    )
+    transport_notes = models.TextField(blank=True, default="")
 
     class Meta:
         db_table = "subscriptions"
@@ -276,6 +287,10 @@ class Subscription(TimeStampedModel):
                     {"agreement_pdf_hash": "Agreement PDF hash is immutable once committed."}
                 )
 
+        self.van_number = (self.van_number or "").strip().upper()
+        self.transport_boy_name = (self.transport_boy_name or "").strip()
+        self.transport_boy_phone = (self.transport_boy_phone or "").strip()
+        self.transport_notes = (self.transport_notes or "").strip()
         self.full_clean()
 
         previous_lucky_id_id = None

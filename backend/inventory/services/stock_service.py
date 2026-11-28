@@ -19,6 +19,7 @@ from inventory.models import (
     InventoryItem,
     PurchaseBill,
     PurchaseBillLine,
+    PurchaseBillLineType,
     PurchaseBillStatus,
     SOFT_HOLD_MOVEMENT_TYPES,
     StockLocation,
@@ -111,12 +112,29 @@ def _normalize_purchase_bill_lines(*, lines: list[dict], tax_mode: str) -> list[
 
     for line in lines:
         inventory_item = line.get("inventory_item")
-        if not isinstance(inventory_item, InventoryItem):
-            raise ValueError("Each purchase bill line must reference an inventory item.")
-        if not inventory_item.stock_tracking_enabled:
-            raise ValueError("Purchase bill lines require stock-tracked inventory items.")
+        raw_line_type = str(
+            line.get("line_type")
+            or (PurchaseBillLineType.GOODS if inventory_item is not None else PurchaseBillLineType.SERVICE)
+        ).strip().upper()
+        if raw_line_type not in {PurchaseBillLineType.GOODS, PurchaseBillLineType.SERVICE}:
+            raise ValueError("Purchase bill line_type must be GOODS or SERVICE.")
 
-        quantity = _quantity(line.get("quantity"))
+        description = str(line.get("description") or "").strip()
+        if raw_line_type == PurchaseBillLineType.GOODS:
+            if not isinstance(inventory_item, InventoryItem):
+                raise ValueError("Each goods purchase bill line must reference an inventory item.")
+            if not inventory_item.stock_tracking_enabled:
+                raise ValueError("Purchase bill goods lines require stock-tracked inventory items.")
+            if not description:
+                description = (
+                    str(getattr(inventory_item.product, "name", "") or inventory_item.sku or "")
+                ).strip()
+        else:
+            inventory_item = None
+            if not description:
+                description = "Van Fare / Service"
+
+        quantity = _quantity(line.get("quantity") if line.get("quantity") not in (None, "") else "1.000")
         if quantity <= Decimal("0.000"):
             raise ValueError("Purchase bill quantity must be greater than zero.")
 
@@ -135,10 +153,9 @@ def _normalize_purchase_bill_lines(*, lines: list[dict], tax_mode: str) -> list[
 
         normalized_lines.append(
             {
+                "line_type": raw_line_type,
                 "inventory_item": inventory_item,
-                "description": (
-                    str(line.get("description") or getattr(inventory_item.product, "name", "") or inventory_item.sku or "")
-                ).strip(),
+                "description": description,
                 "quantity": quantity,
                 "unit_cost": unit_cost,
                 "taxable_value": taxable_value,
@@ -156,6 +173,7 @@ def _replace_purchase_bill_lines(*, purchase_bill: PurchaseBill, lines: list[dic
         [
             PurchaseBillLine(
                 purchase_bill=purchase_bill,
+                line_type=line.get("line_type", PurchaseBillLineType.GOODS),
                 inventory_item=line["inventory_item"],
                 description=line.get("description", ""),
                 quantity=line["quantity"],
@@ -1058,13 +1076,24 @@ def post_purchase_bill(*, purchase_bill_id: int, posted_by):
 
     accounts = ensure_phase3_system_accounts()
     inventory_total = Decimal("0.00")
+    inventory_tax = Decimal("0.00")
+    service_total = Decimal("0.00")
+    service_tax = Decimal("0.00")
     tax_total = Decimal("0.00")
     created_count = 0
     existing_count = 0
 
     for line in purchase_bill.lines.all():
-        inventory_total += Decimal(str(line.taxable_value or "0.00"))
-        tax_total += Decimal(str(line.tax_amount or "0.00"))
+        line_taxable = Decimal(str(line.taxable_value or "0.00"))
+        line_tax = Decimal(str(line.tax_amount or "0.00"))
+        tax_total += line_tax
+        if line.line_type == PurchaseBillLineType.SERVICE or not line.inventory_item_id:
+            service_total += line_taxable
+            service_tax += line_tax
+            continue
+
+        inventory_total += line_taxable
+        inventory_tax += line_tax
         _, created = create_stock_ledger_entry(
             inventory_item=line.inventory_item,
             movement_type=StockMovementType.PURCHASE_IN,
@@ -1086,31 +1115,45 @@ def post_purchase_bill(*, purchase_bill_id: int, posted_by):
         else accounts["ACCOUNTS_PAYABLE"]
     )
     post_input_gst = should_post_input_gst()
-    inventory_debit_amount = inventory_total if post_input_gst else inventory_total + tax_total
-    lines = [
-        {
-            "chart_account": accounts["INVENTORY_ASSET"],
-            "description": purchase_bill.bill_no,
-            "debit_amount": inventory_debit_amount,
-            "credit_amount": Decimal("0.00"),
-        },
-        {
-            "chart_account": credit_account,
-            "description": purchase_bill.bill_no,
-            "debit_amount": Decimal("0.00"),
-            "credit_amount": purchase_bill.grand_total,
-        },
-    ]
+    inventory_debit_amount = inventory_total if post_input_gst else inventory_total + inventory_tax
+    service_debit_amount = service_total if post_input_gst else service_total + service_tax
+    service_expense_account = accounts.get("DELIVERY_EXPENSE") or accounts["PURCHASE_EXPENSE"]
+    lines = []
+    if inventory_debit_amount > 0:
+        lines.append(
+            {
+                "chart_account": accounts["INVENTORY_ASSET"],
+                "description": purchase_bill.bill_no,
+                "debit_amount": inventory_debit_amount,
+                "credit_amount": Decimal("0.00"),
+            }
+        )
+    if service_debit_amount > 0:
+        lines.append(
+            {
+                "chart_account": service_expense_account,
+                "description": f"Service / Van Fare {purchase_bill.bill_no}",
+                "debit_amount": service_debit_amount,
+                "credit_amount": Decimal("0.00"),
+            }
+        )
     if tax_total > 0 and post_input_gst:
-        lines.insert(
-            1,
+        lines.append(
             {
                 "chart_account": accounts["INPUT_GST"],
                 "description": f"Input GST {purchase_bill.bill_no}",
                 "debit_amount": tax_total,
                 "credit_amount": Decimal("0.00"),
-            },
+            }
         )
+    lines.append(
+        {
+            "chart_account": credit_account,
+            "description": purchase_bill.bill_no,
+            "debit_amount": Decimal("0.00"),
+            "credit_amount": purchase_bill.grand_total,
+        }
+    )
 
     journal_entry, _ = post_bridge_entry(
         source_instance=purchase_bill,
@@ -1163,7 +1206,11 @@ def post_purchase_bill(*, purchase_bill_id: int, posted_by):
         },
     )
     reconcile_direct_sale_needs_after_inventory_in(
-        product_ids={line.inventory_item.product_id for line in purchase_bill.lines.all()},
+        product_ids={
+            line.inventory_item.product_id
+            for line in purchase_bill.lines.all()
+            if line.inventory_item_id
+        },
         actor=posted_by,
     )
     return purchase_bill, True

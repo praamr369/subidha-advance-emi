@@ -124,6 +124,11 @@ type FormState = {
   delivery_snapshot_state: string;
   delivery_snapshot_pincode: string;
   received_total: string;
+  van_number: string;
+  transport_boy_name: string;
+  transport_boy_phone: string;
+  van_fare: string;
+  transport_notes: string;
   notes: string;
   terms: string;
   new_customer_name: string;
@@ -426,6 +431,11 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
     delivery_snapshot_state: "",
     delivery_snapshot_pincode: "",
     received_total: "0.00",
+    van_number: "",
+    transport_boy_name: "",
+    transport_boy_phone: "",
+    van_fare: "",
+    transport_notes: "",
     notes: "",
     terms: "",
     new_customer_name: "",
@@ -444,6 +454,7 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
     itemId?: number;
     lineId: string;
     parentQuantity?: number;
+    defaultOpenSetup?: boolean;
   } | null>(null);
   const lineSearchTimers = useRef<Record<string, number>>({});
   const customerSearchTimer = useRef<number | null>(null);
@@ -1023,6 +1034,11 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
       delivery_snapshot_state: "",
       delivery_snapshot_pincode: "",
       received_total: "0.00",
+      van_number: "",
+      transport_boy_name: "",
+      transport_boy_phone: "",
+      van_fare: "",
+      transport_notes: "",
       notes: "",
       terms: "",
       new_customer_name: "",
@@ -1206,7 +1222,9 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
           direct_sale_enabled: true,
         });
         updateLine(lineId, {
-          product_results: payload.results,
+          product_results: (payload.results ?? []).filter(
+            (r) => (r.stock_item_type ?? "FINISHED_GOOD") !== "RAW_MATERIAL"
+          ),
           product_loading: false,
           product_error: null,
         });
@@ -1633,6 +1651,11 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
       grand_total: toDecimal(totals.grand),
       received_total: toDecimal(totals.received),
       balance_total: toDecimal(totals.balance),
+      van_number: form.van_number.trim(),
+      transport_boy_name: form.transport_boy_name.trim(),
+      transport_boy_phone: form.transport_boy_phone.trim(),
+      van_fare: form.van_fare.trim() ? Number(form.van_fare).toFixed(2) : "0.00",
+      transport_notes: form.transport_notes.trim(),
       notes: finalNotes,
       terms: finalTerms,
       accessories_configured: lines.some((l) => Boolean(l.accessories_configured || l.is_accessory)),
@@ -2268,6 +2291,73 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
                         />
                       </label>
                     </div>
+                    <div className="mt-4 rounded-xl border border-amber-300/60 bg-amber-50/40 p-4 dark:bg-amber-950/15">
+                      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <div className="text-sm font-semibold text-foreground">
+                            Transport &amp; Van Fare (Transport-Only Finance)
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Recorded for transport tracking only — nothing is posted to company ledger or added to the customer&apos;s invoice.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                        <label className="grid gap-1.5 text-sm">
+                          <span className="font-medium text-foreground">Van / Vehicle Number</span>
+                          <input
+                            value={form.van_number}
+                            onChange={(event) => setForm((current) => ({ ...current, van_number: event.target.value.toUpperCase() }))}
+                            disabled={submitting}
+                            placeholder="e.g. WB-02-AB-1234"
+                            className={FIELD_CLASS}
+                          />
+                        </label>
+                        <label className="grid gap-1.5 text-sm">
+                          <span className="font-medium text-foreground">Transport Boy Name</span>
+                          <input
+                            value={form.transport_boy_name}
+                            onChange={(event) => setForm((current) => ({ ...current, transport_boy_name: event.target.value }))}
+                            disabled={submitting}
+                            placeholder="Driver / helper name"
+                            className={FIELD_CLASS}
+                          />
+                        </label>
+                        <label className="grid gap-1.5 text-sm">
+                          <span className="font-medium text-foreground">Transport Boy Phone</span>
+                          <input
+                            value={form.transport_boy_phone}
+                            onChange={(event) => setForm((current) => ({ ...current, transport_boy_phone: event.target.value }))}
+                            disabled={submitting}
+                            placeholder="10-digit mobile number"
+                            className={FIELD_CLASS}
+                          />
+                        </label>
+                        <label className="grid gap-1.5 text-sm">
+                          <span className="font-medium text-foreground">Van Fare Charge (Off-Ledger ₹)</span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={form.van_fare}
+                            onChange={(event) => setForm((current) => ({ ...current, van_fare: event.target.value }))}
+                            disabled={submitting}
+                            placeholder="0.00"
+                            className={FIELD_CLASS}
+                          />
+                        </label>
+                      </div>
+                      <label className="mt-3 grid gap-1.5 text-sm">
+                        <span className="font-medium text-foreground">Transport Notes</span>
+                        <input
+                          value={form.transport_notes}
+                          onChange={(event) => setForm((current) => ({ ...current, transport_notes: event.target.value }))}
+                          disabled={submitting}
+                          placeholder="Optional route, trip, or settlement note for transport only"
+                          className={FIELD_CLASS}
+                        />
+                      </label>
+                    </div>
                     <label className="mt-4 grid gap-2 text-sm">
                       <span className="font-medium text-foreground">Notes</span>
                       <textarea
@@ -2626,22 +2716,41 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
                                         >
                                           Edit PIM
                                         </button>
-                                        {line.selected_product.stock_item_type === "FINISHED_GOOD" && (
-                                          <button
-                                            type="button"
-                                            onClick={() =>
-                                              setAccessoryPanel({
-                                                productId: line.selected_product!.id,
-                                                itemId: line.inventory_item_id ? Number(line.inventory_item_id) : undefined,
-                                                lineId: line.id,
-                                                parentQuantity: Math.max(1, Number(line.quantity || 1)),
-                                              })
-                                            }
-                                            className="inline-flex items-center gap-1 rounded border border-primary/40 bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary hover:bg-primary/20"
-                                            title="Choose product variant, accessory variants, and add-on pricing"
-                                          >
-                                            Variants &amp; Accessories
-                                          </button>
+                                        {(line.selected_product.stock_item_type === "FINISHED_GOOD" || !line.selected_product.stock_item_type) && (
+                                          <>
+                                            <button
+                                              type="button"
+                                              onClick={() =>
+                                                setAccessoryPanel({
+                                                  productId: line.selected_product!.id,
+                                                  itemId: line.inventory_item_id ? Number(line.inventory_item_id) : undefined,
+                                                  lineId: line.id,
+                                                  parentQuantity: Math.max(1, Number(line.quantity || 1)),
+                                                  defaultOpenSetup: false,
+                                                })
+                                              }
+                                              className="inline-flex items-center gap-1 rounded border border-primary/40 bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary hover:bg-primary/20"
+                                              title="Choose product variant, accessory variants, services, and add-on pricing"
+                                            >
+                                              Variants &amp; Accessories
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() =>
+                                                setAccessoryPanel({
+                                                  productId: line.selected_product!.id,
+                                                  itemId: line.inventory_item_id ? Number(line.inventory_item_id) : undefined,
+                                                  lineId: line.id,
+                                                  parentQuantity: Math.max(1, Number(line.quantity || 1)),
+                                                  defaultOpenSetup: true,
+                                                })
+                                              }
+                                              className="inline-flex items-center gap-1 rounded border border-blue-400/60 bg-white dark:bg-slate-800 px-2 py-0.5 text-[11px] font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/40"
+                                              title="Link or create accessories and services for this finished good"
+                                            >
+                                              + Setup Accessories
+                                            </button>
+                                          </>
                                         )}
                                       </div>
                                     </div>
@@ -3659,6 +3768,23 @@ export default function DirectSaleWorkspace({ orchestrationCreate = false }: Dir
                 itemId={accessoryPanel.itemId}
                 mode="sale"
                 parentQuantity={accessoryPanel.parentQuantity ?? 1}
+                defaultOpenSetup={accessoryPanel.defaultOpenSetup}
+                onOptionsChanged={() => {
+                  const targetLine = lines.find((l) => l.id === accessoryPanel.lineId);
+                  const searchKey = targetLine?.selected_product?.product_code || targetLine?.selected_product?.name;
+                  if (!searchKey || !targetLine?.selected_product) return;
+                  void searchBillingProducts({
+                    q: searchKey,
+                    page: 1,
+                    page_size: 10,
+                    include_inventory: true,
+                  }).then((res) => {
+                    const refreshed = (res.results ?? []).find((r) => r.id === targetLine.selected_product?.id);
+                    if (refreshed) {
+                      updateLine(accessoryPanel.lineId, { selected_product: refreshed });
+                    }
+                  }).catch(() => {});
+                }}
                 onSwitchParentVariant={(pv: ParentVariantOption) => {
                   const currentLine = lines.find((l) => l.id === accessoryPanel.lineId);
                   updateLine(accessoryPanel.lineId, {

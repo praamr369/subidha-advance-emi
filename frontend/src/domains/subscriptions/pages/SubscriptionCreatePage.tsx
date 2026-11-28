@@ -69,6 +69,7 @@ type ProductOption = {
   is_lease_enabled?: boolean;
   // Phase 2
   is_direct_sale_enabled?: boolean;
+  stock_item_type?: string | null;
   lifecycle_status?: string;
   on_hand_qty?: string;
   reserved_qty?: string;
@@ -89,6 +90,18 @@ export type ContractBasketItem = {
   charge_mode?: "FREE" | "CHARGEABLE" | "";
 };
 
+export type ContractServiceBasketItem = {
+  id: string;
+  service_id: number;
+  service_name: string;
+  service_code: string;
+  charge_mode: "FREE" | "CHARGEABLE";
+  sale_price: string;
+  tax_rate_percent?: string;
+  hsn_sac_code?: string;
+  parent_item_id?: string | null;
+};
+
 function billingRowToProductOption(row: BillingProductSearchRow): ProductOption {
   const inv = row.inventory_status;
   return {
@@ -102,6 +115,7 @@ function billingRowToProductOption(row: BillingProductSearchRow): ProductOption 
     is_rent_enabled: row.is_rent_enabled,
     is_lease_enabled: row.is_lease_enabled,
     is_direct_sale_enabled: row.is_direct_sale_enabled,
+    stock_item_type: row.stock_item_type ?? null,
     lifecycle_status: row.lifecycle_status || undefined,
     on_hand_qty: inv?.on_hand,
     reserved_qty: inv?.reserved,
@@ -235,6 +249,7 @@ function normalizeProduct(raw: Record<string, unknown>): ProductOption {
     // Phase 2
     is_direct_sale_enabled:
       typeof raw.is_direct_sale_enabled === "boolean" ? raw.is_direct_sale_enabled : undefined,
+    stock_item_type: toOptionalString(raw.stock_item_type ?? raw.item_type) ?? null,
     lifecycle_status: toOptionalString(raw.lifecycle_status),
   };
 }
@@ -468,12 +483,14 @@ export default function SubscriptionCreatePage({
   const [customer, setCustomer] = useState<CustomerOption | null>(null);
   const [product, setProduct] = useState<ProductOption | null>(null);
   const [contractItems, setContractItems] = useState<ContractBasketItem[]>([]);
+  const [contractServices, setContractServices] = useState<ContractServiceBasketItem[]>([]);
   const [emiAccessoriesConfigured, setEmiAccessoriesConfigured] = useState(false);
   const [addingProduct, setAddingProduct] = useState(false);
   const [contractAccPanel, setContractAccPanel] = useState<{
     basketItemId: string;
     productId: number;
     parentQuantity: number;
+    defaultOpenSetup?: boolean;
   } | null>(null);
   const [batch, setBatch] = useState<BatchOption | null>(null);
   const [luckyId, setLuckyId] = useState<LuckyIdOption | null>(null);
@@ -540,6 +557,13 @@ export default function SubscriptionCreatePage({
       const customEvent = event as CustomEvent;
       const saved = customEvent.detail;
       if (!saved || !saved.id) return;
+      const savedType = String(saved.product_type || saved.item_type || saved.stock_item_type || "FINISHED_GOOD").toUpperCase();
+      if (savedType === "ACCESSORY" || savedType === "RAW_MATERIAL" || savedType === "SERVICE") {
+        setProductNotice(
+          `"${saved.name}" was saved as ${savedType}. Attach accessories/services to a Finished Good via Variants & Accessories rather than selecting them standalone.`
+        );
+        return;
+      }
       const newOption: ProductOption = {
         id: saved.id,
         name: saved.name,
@@ -650,6 +674,22 @@ export default function SubscriptionCreatePage({
       const insertAt = parentIdx >= 0 ? parentIdx + 1 : cleaned.length;
       return [...cleaned.slice(0, insertAt), ...accItems, ...cleaned.slice(insertAt)];
     });
+
+    setContractServices((prev) => {
+      const cleaned = prev.filter((svc) => svc.parent_item_id !== parentBasketId);
+      const mappedSvcs: ContractServiceBasketItem[] = result.services.map((svc, idx) => ({
+        id: `svc-${svc.serviceId}-${Date.now()}-${idx}`,
+        service_id: svc.serviceId,
+        service_name: svc.serviceName,
+        service_code: svc.serviceCode,
+        charge_mode: svc.chargeMode,
+        sale_price: svc.chargeMode === "FREE" ? "0.00" : Number(svc.salePrice || 0).toFixed(2),
+        tax_rate_percent: svc.taxRatePercent,
+        hsn_sac_code: svc.hsnSacCode,
+        parent_item_id: parentBasketId,
+      }));
+      return [...cleaned, ...mappedSvcs];
+    });
   }
 
   function removeProductFromBasket(id: string) {
@@ -662,6 +702,7 @@ export default function SubscriptionCreatePage({
       }
       return next;
     });
+    setContractServices((prev) => prev.filter((svc) => svc.parent_item_id !== id));
   }
 
   function updateBasketQuantity(id: string, qty: number) {
@@ -711,6 +752,11 @@ export default function SubscriptionCreatePage({
   const [leaseBuyoutAmount, setLeaseBuyoutAmount] = useState("");
   const [ownershipTransferAllowed, setOwnershipTransferAllowed] = useState(false);
   const [handoverNotes, setHandoverNotes] = useState("");
+  const [vanNumber, setVanNumber] = useState("");
+  const [transportBoyName, setTransportBoyName] = useState("");
+  const [transportBoyPhone, setTransportBoyPhone] = useState("");
+  const [vanFare, setVanFare] = useState("");
+  const [transportNotes, setTransportNotes] = useState("");
   const [contractTermsSnapshot, setContractTermsSnapshot] = useState("");
   const [yieldRatePercent, setYieldRatePercent] = useState("5.00");
   const [depositPaymentOption, setDepositPaymentOption] = useState<"FULL" | "PARTIAL">("FULL");
@@ -918,15 +964,26 @@ export default function SubscriptionCreatePage({
     return Number(manualTenureMonths || 0);
   }, [isEmiPlan, batch?.duration_months, manualTenureMonths]);
 
+  const contractServicesTotal = useMemo(() => {
+    return contractServices.reduce(
+      (acc, svc) => acc + (svc.charge_mode === "FREE" ? 0 : Number(svc.sale_price || 0)),
+      0
+    );
+  }, [contractServices]);
+
   const totalProductBaseValue = useMemo(() => {
-    if (contractItems.length > 0) {
-      return contractItems.reduce(
-        (acc, it) => acc + it.quantity * (Number(it.unit_base_price) || 0),
-        0
-      );
+    const itemsBase =
+      contractItems.length > 0
+        ? contractItems.reduce(
+            (acc, it) => acc + it.quantity * (Number(it.unit_base_price) || 0),
+            0
+          )
+        : Number(product?.base_price ?? 0);
+    if (isEmiPlan) {
+      return itemsBase + contractServicesTotal;
     }
-    return Number(product?.base_price ?? 0);
-  }, [contractItems, product?.base_price]);
+    return itemsBase;
+  }, [contractItems, product?.base_price, isEmiPlan, contractServicesTotal]);
 
   const monthlyAmount = useMemo(() => {
     if (!tenureMonths || tenureMonths <= 0) return "0.00";
@@ -1617,6 +1674,29 @@ export default function SubscriptionCreatePage({
             });
           }
 
+          const rawSelectedServices = (
+            Array.isArray(data.selected_services)
+              ? data.selected_services
+              : Array.isArray((data.product_snapshot as Record<string, unknown> | null)?.selected_services)
+                ? ((data.product_snapshot as Record<string, unknown>).selected_services as unknown[])
+                : []
+          ) as Record<string, unknown>[];
+          if (rawSelectedServices.length > 0) {
+            setContractServices(
+              rawSelectedServices.map((svc, idx) => ({
+                id: `svc-init-${svc.service_id || idx}-${Date.now()}`,
+                service_id: Number(svc.service_id || 0),
+                service_name: String(svc.service_name || `Service #${svc.service_id}`),
+                service_code: String(svc.service_code || ""),
+                charge_mode: String(svc.charge_mode || "FREE").toUpperCase() === "CHARGEABLE" ? "CHARGEABLE" : "FREE",
+                sale_price: String(svc.sale_price || "0.00"),
+                tax_rate_percent: String(svc.tax_rate_percent || "0.00"),
+                hsn_sac_code: String(svc.hsn_sac_code || ""),
+                parent_item_id: null,
+              }))
+            );
+          }
+
           const prof = (pType === "RENT" ? data.rent_profile : data.lease_profile) as Record<string, unknown> | null;
           if (prof) {
             if (prof.security_deposit_percent) setSecurityDepositPercent(String(prof.security_deposit_percent));
@@ -1639,6 +1719,11 @@ export default function SubscriptionCreatePage({
             if (snap.deposit_payment_method) setDepositPaymentMethod(snap.deposit_payment_method as any);
             if (snap.deposit_reference_no) setDepositReferenceNo(String(snap.deposit_reference_no));
           }
+          if (data.van_number) setVanNumber(String(data.van_number));
+          if (data.transport_boy_name) setTransportBoyName(String(data.transport_boy_name));
+          if (data.transport_boy_phone) setTransportBoyPhone(String(data.transport_boy_phone));
+          if (data.van_fare && Number(data.van_fare) > 0) setVanFare(String(data.van_fare));
+          if (data.transport_notes) setTransportNotes(String(data.transport_notes));
         }
       } catch (err) {
         if (!cancelled) {
@@ -1762,27 +1847,34 @@ export default function SubscriptionCreatePage({
             );
             if (!cancelled) {
               const normalized = normalizeProduct(payload);
-              // The search picker already filters by plan mode; the prefill path
-              // must apply the same rule or the form silently blocks every submit.
-              const modeOk = isEmiPlan
-                ? normalized.is_emi_enabled !== false
-                : isRentPlan
-                  ? Boolean(normalized.is_rent_enabled)
-                  : isLeasePlan
-                    ? Boolean(normalized.is_lease_enabled)
-                    : true;
-              if (!modeOk) {
+              const pStockType = String(normalized.stock_item_type || "FINISHED_GOOD").toUpperCase();
+              if (pStockType === "ACCESSORY" || pStockType === "RAW_MATERIAL" || pStockType === "SERVICE") {
                 messages.push(
-                  `"${normalized.name}" was not applied because it is not enabled for ${planType} contracts. Enable ${planType} on the product, or pick another product.`
+                  `"${normalized.name}" cannot be selected standalone in contracts because it is classified as ${pStockType}.`
                 );
               } else {
-                setProduct(normalized);
-                setProductQuery(
-                  normalized.product_code
-                    ? `${normalized.name} ${normalized.product_code}`
-                    : normalized.name
-                );
-                setProductResults([]);
+                // The search picker already filters by plan mode; the prefill path
+                // must apply the same rule or the form silently blocks every submit.
+                const modeOk = isEmiPlan
+                  ? normalized.is_emi_enabled !== false
+                  : isRentPlan
+                    ? Boolean(normalized.is_rent_enabled)
+                    : isLeasePlan
+                      ? Boolean(normalized.is_lease_enabled)
+                      : true;
+                if (!modeOk) {
+                  messages.push(
+                    `"${normalized.name}" was not applied because it is not enabled for ${planType} contracts. Enable ${planType} on the product, or pick another product.`
+                  );
+                } else {
+                  setProduct(normalized);
+                  setProductQuery(
+                    normalized.product_code
+                      ? `${normalized.name} ${normalized.product_code}`
+                      : normalized.name
+                  );
+                  setProductResults([]);
+                }
               }
             }
           } catch {
@@ -2102,14 +2194,25 @@ export default function SubscriptionCreatePage({
               })
             : undefined;
 
-        const body: Record<string, unknown> = {
-          customer: customer.id,
-          product: primaryProd.id,
-          plan_type: planType,
-          tenure_months: tenureMonths,
-          start_date: startDate,
-          partner: partner?.id ?? null,
-        };
+          const body: Record<string, unknown> = {
+            customer: customer.id,
+            product: primaryProd.id,
+            plan_type: planType,
+            tenure_months: tenureMonths,
+            start_date: startDate,
+            partner: partner?.id ?? null,
+            van_number: vanNumber.trim(),
+            transport_boy_name: transportBoyName.trim(),
+            transport_boy_phone: transportBoyPhone.trim(),
+            van_fare: vanFare.trim() ? Number(vanFare).toFixed(2) : "0.00",
+            transport_notes: transportNotes.trim(),
+          };
+
+        const contractServicesPayload = contractServices.map((svc) => ({
+          service_id: svc.service_id,
+          charge_mode: svc.charge_mode,
+          sale_price: svc.charge_mode === "FREE" ? "0.00" : svc.sale_price,
+        }));
 
         if (isEmiPlan) {
           const emiAccessoriesPayload = contractItems
@@ -2123,10 +2226,12 @@ export default function SubscriptionCreatePage({
           body.batch = batch?.id ?? null;
           body.lucky_id = luckyId?.id ?? null;
           body.accessories = emiAccessoriesPayload;
+          body.services = contractServicesPayload;
           body.accessories_configured =
-            emiAccessoriesConfigured || emiAccessoriesPayload.length > 0;
+            emiAccessoriesConfigured || emiAccessoriesPayload.length > 0 || contractServicesPayload.length > 0;
         } else {
           body.items = itemsPayload;
+          body.services = contractServicesPayload;
           body.security_deposit_percent = Number(effectiveDepositPercent) || depositPercentNumber;
           body.monthly_yield_percent = Number(yieldRatePercent) || 5.0;
           body.handover_notes = handoverNotes || "";
@@ -2162,6 +2267,11 @@ export default function SubscriptionCreatePage({
             unit_base_price: it.unit_base_price,
             charge_mode: it.charge_mode || "PAID",
           }));
+        const emiServicesPayload = contractServices.map((svc) => ({
+          service_id: svc.service_id,
+          charge_mode: svc.charge_mode,
+          sale_price: svc.charge_mode === "FREE" ? "0.00" : svc.sale_price,
+        }));
         const body: Record<string, unknown> = {
           customer: customer.id,
           product: product!.id,
@@ -2172,8 +2282,14 @@ export default function SubscriptionCreatePage({
           batch: batch?.id ?? null,
           lucky_id: luckyId?.id ?? null,
           accessories: emiAccessoriesPayload,
+          services: emiServicesPayload,
           accessories_configured:
-            emiAccessoriesConfigured || emiAccessoriesPayload.length > 0,
+            emiAccessoriesConfigured || emiAccessoriesPayload.length > 0 || emiServicesPayload.length > 0,
+          van_number: vanNumber.trim(),
+          transport_boy_name: transportBoyName.trim(),
+          transport_boy_phone: transportBoyPhone.trim(),
+          van_fare: vanFare.trim() ? Number(vanFare).toFixed(2) : "0.00",
+          transport_notes: transportNotes.trim(),
         };
 
         created = await apiFetch<CreatedSubscriptionResponse>("/admin/subscriptions/", {
@@ -2202,11 +2318,17 @@ export default function SubscriptionCreatePage({
                 };
               })
             : undefined;
+        const rentServicesPayload = contractServices.map((svc) => ({
+          service_id: svc.service_id,
+          charge_mode: svc.charge_mode,
+          sale_price: svc.charge_mode === "FREE" ? "0.00" : svc.sale_price,
+        }));
 
         const body: Record<string, unknown> = {
           customer: customer.id,
           product: primaryProd.id,
           items: itemsPayload,
+          services: rentServicesPayload,
           tenure_months: tenureMonths,
           start_date: startDate,
           security_deposit_percent: Number(effectiveDepositPercent) || depositPercentNumber,
@@ -2225,6 +2347,11 @@ export default function SubscriptionCreatePage({
           deposit_finance_account_id: depositFinanceAccountId ? Number(depositFinanceAccountId) : null,
           deposit_payment_method: depositPaymentMethod || "CASH",
           deposit_reference_no: depositReferenceNo.trim() || undefined,
+          van_number: vanNumber.trim(),
+          transport_boy_name: transportBoyName.trim(),
+          transport_boy_phone: transportBoyPhone.trim(),
+          van_fare: vanFare.trim() ? Number(vanFare).toFixed(2) : "0.00",
+          transport_notes: transportNotes.trim(),
         };
 
         created = await apiFetch<CreatedSubscriptionResponse>("/admin/contracts/rent/", {
@@ -2254,10 +2381,17 @@ export default function SubscriptionCreatePage({
               })
             : undefined;
 
+        const leaseServicesPayload = contractServices.map((svc) => ({
+          service_id: svc.service_id,
+          charge_mode: svc.charge_mode,
+          sale_price: svc.charge_mode === "FREE" ? "0.00" : svc.sale_price,
+        }));
+
         const body: Record<string, unknown> = {
           customer: customer.id,
           product: primaryProd.id,
           items: itemsPayload,
+          services: leaseServicesPayload,
           tenure_months: tenureMonths,
           start_date: startDate,
           security_deposit_percent: Number(effectiveDepositPercent) || depositPercentNumber,
@@ -2278,6 +2412,11 @@ export default function SubscriptionCreatePage({
           deposit_finance_account_id: depositFinanceAccountId ? Number(depositFinanceAccountId) : null,
           deposit_payment_method: depositPaymentMethod || "CASH",
           deposit_reference_no: depositReferenceNo.trim() || undefined,
+          van_number: vanNumber.trim(),
+          transport_boy_name: transportBoyName.trim(),
+          transport_boy_phone: transportBoyPhone.trim(),
+          van_fare: vanFare.trim() ? Number(vanFare).toFixed(2) : "0.00",
+          transport_notes: transportNotes.trim(),
         };
 
         created = await apiFetch<CreatedSubscriptionResponse>("/admin/contracts/lease/", {
@@ -2783,20 +2922,38 @@ export default function SubscriptionCreatePage({
                                       {itm.product.category ? `· ${itm.product.category}` : ""}
                                     </span>
                                     {!itm.is_accessory && (
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          setContractAccPanel({
-                                            basketItemId: itm.id,
-                                            productId: itm.product.id,
-                                            parentQuantity: itm.quantity,
-                                          })
-                                        }
-                                        className="inline-flex items-center gap-1 rounded border border-primary/30 bg-primary/5 px-1.5 py-0.5 text-[10px] font-semibold text-primary hover:bg-primary/15"
-                                        title="Select product variant & accessory variants for this contract item"
-                                      >
-                                        Variants &amp; Accessories
-                                      </button>
+                                      <div className="inline-flex items-center gap-1">
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            setContractAccPanel({
+                                              basketItemId: itm.id,
+                                              productId: itm.product.id,
+                                              parentQuantity: itm.quantity,
+                                              defaultOpenSetup: false,
+                                            })
+                                          }
+                                          className="inline-flex items-center gap-1 rounded border border-primary/30 bg-primary/5 px-1.5 py-0.5 text-[10px] font-semibold text-primary hover:bg-primary/15"
+                                          title="Select product variant, accessory variants, and services for this contract item"
+                                        >
+                                          Variants &amp; Accessories
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            setContractAccPanel({
+                                              basketItemId: itm.id,
+                                              productId: itm.product.id,
+                                              parentQuantity: itm.quantity,
+                                              defaultOpenSetup: true,
+                                            })
+                                          }
+                                          className="inline-flex items-center gap-1 rounded border border-blue-400/50 bg-blue-50/70 dark:bg-blue-950/40 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40"
+                                          title="Link or quick-create accessories & services for this finished good"
+                                        >
+                                          + Setup Accessories
+                                        </button>
+                                      </div>
                                     )}
                                     <span className="text-[10px] text-muted-foreground">
                                       Stock: <strong>{itm.product.available_qty ?? itm.product.on_hand_qty ?? "0"}</strong>
@@ -2929,6 +3086,43 @@ export default function SubscriptionCreatePage({
                         </tbody>
                       </table>
                     </div>
+
+                    {contractServices.length > 0 && (
+                      <div className="rounded-xl border border-border bg-card/60 p-3 space-y-1.5">
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                          Attached Services ({contractServices.length})
+                        </div>
+                        {contractServices.map((svc) => (
+                          <div
+                            key={svc.id}
+                            className="flex items-center justify-between gap-2 rounded-lg border border-border/50 bg-background/70 px-2.5 py-1.5 text-xs"
+                          >
+                            <div className="min-w-0 flex items-center gap-1.5 flex-wrap">
+                              <span className="inline-flex items-center rounded border border-sky-300 bg-sky-50 dark:border-sky-700 dark:bg-sky-950/50 px-1.5 py-0.5 text-[10px] font-bold text-sky-700 dark:text-sky-300">
+                                Service · {svc.charge_mode === "FREE" ? "Included" : "Chargeable"}
+                              </span>
+                              <span className="font-medium text-foreground truncate">{svc.service_name}</span>
+                              {svc.service_code && (
+                                <span className="font-mono text-[10px] text-muted-foreground">({svc.service_code})</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="font-mono text-xs font-semibold text-foreground">
+                                {svc.charge_mode === "FREE" ? "Included (₹0.00)" : money(svc.sale_price)}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setContractServices((prev) => prev.filter((s) => s.id !== svc.id))}
+                                className="rounded p-1 text-muted-foreground hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/30"
+                                title="Remove service"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
 
                     <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 p-2.5 text-xs">
                       <div className="flex flex-wrap items-center gap-4">
@@ -3125,6 +3319,7 @@ export default function SubscriptionCreatePage({
                     nextLuckyRequestToken();
                     setProduct(null);
                     setContractItems([]);
+                    setContractServices([]);
                     setEmiAccessoriesConfigured(false);
                     setBatch(null);
                     setLuckyId(null);
@@ -3140,48 +3335,83 @@ export default function SubscriptionCreatePage({
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>
                         <div className="text-xs font-semibold text-foreground">
-                          SFEMI Variant &amp; Accessory Bundle
+                          SFEMI Variant, Accessory &amp; Service Bundle
                         </div>
                         <div className="text-[11px] text-muted-foreground font-mono">
                           Base Unit: {money(product.base_price)}
-                          {contractItems.some((it) => it.is_accessory) && (
+                          {(contractItems.some((it) => it.is_accessory) || contractServices.length > 0) && (
                             <> · Bundle Total: <strong className="text-foreground">{money(totalProductBaseValue)}</strong></>
                           )}
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const existingMain = contractItems.find((it) => !it.is_accessory);
-                          let mainId = existingMain?.id;
-                          if (!existingMain) {
-                            mainId = `emi-${product.id}-${Date.now()}`;
-                            setContractItems([
-                              {
-                                id: mainId,
-                                product,
-                                quantity: 1,
-                                unit_base_price: product.base_price || "0.00",
-                                monthly_yield_percent: yieldRatePercent || "5.00",
-                                security_deposit_percent: securityDepositPercent || "20.00",
-                                is_accessory: false,
-                                parent_item_id: null,
-                                charge_mode: "",
-                              },
-                            ]);
-                          }
-                          setContractAccPanel({
-                            basketItemId: mainId!,
-                            productId: product.id,
-                            parentQuantity: 1,
-                          });
-                        }}
-                        className="inline-flex items-center gap-1 rounded-lg border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors"
-                      >
-                        Variants &amp; Accessories
-                      </button>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const existingMain = contractItems.find((it) => !it.is_accessory);
+                            let mainId = existingMain?.id;
+                            if (!existingMain) {
+                              mainId = `emi-${product.id}-${Date.now()}`;
+                              setContractItems([
+                                {
+                                  id: mainId,
+                                  product,
+                                  quantity: 1,
+                                  unit_base_price: product.base_price || "0.00",
+                                  monthly_yield_percent: yieldRatePercent || "5.00",
+                                  security_deposit_percent: securityDepositPercent || "20.00",
+                                  is_accessory: false,
+                                  parent_item_id: null,
+                                  charge_mode: "",
+                                },
+                              ]);
+                            }
+                            setContractAccPanel({
+                              basketItemId: mainId!,
+                              productId: product.id,
+                              parentQuantity: 1,
+                              defaultOpenSetup: false,
+                            });
+                          }}
+                          className="inline-flex items-center gap-1 rounded-lg border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors"
+                        >
+                          Variants &amp; Accessories
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const existingMain = contractItems.find((it) => !it.is_accessory);
+                            let mainId = existingMain?.id;
+                            if (!existingMain) {
+                              mainId = `emi-${product.id}-${Date.now()}`;
+                              setContractItems([
+                                {
+                                  id: mainId,
+                                  product,
+                                  quantity: 1,
+                                  unit_base_price: product.base_price || "0.00",
+                                  monthly_yield_percent: yieldRatePercent || "5.00",
+                                  security_deposit_percent: securityDepositPercent || "20.00",
+                                  is_accessory: false,
+                                  parent_item_id: null,
+                                  charge_mode: "",
+                                },
+                              ]);
+                            }
+                            setContractAccPanel({
+                              basketItemId: mainId!,
+                              productId: product.id,
+                              parentQuantity: 1,
+                              defaultOpenSetup: true,
+                            });
+                          }}
+                          className="inline-flex items-center gap-1 rounded-lg border border-blue-400/50 bg-blue-50/70 dark:bg-blue-950/40 px-2.5 py-1 text-xs font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
+                        >
+                          + Setup Accessories
+                        </button>
+                      </div>
                     </div>
-                    {contractItems.some((it) => it.is_accessory) && (
+                    {(contractItems.some((it) => it.is_accessory) || contractServices.length > 0) && (
                       <div className="space-y-1 border-t border-border/60 pt-2">
                         {contractItems
                           .filter((it) => it.is_accessory)
@@ -3194,7 +3424,7 @@ export default function SubscriptionCreatePage({
                               >
                                 <div className="min-w-0 flex items-center gap-1.5 flex-wrap">
                                   <span className="inline-flex items-center rounded border border-purple-300 bg-purple-50 dark:border-purple-700 dark:bg-purple-950/50 px-1.5 py-0.5 text-[10px] font-bold text-purple-700 dark:text-purple-300">
-                                    ↳ {acc.charge_mode === "FREE" ? "Included" : "Add-on"}
+                                    ↳ {acc.charge_mode === "FREE" ? "Included" : "Chargeable"}
                                   </span>
                                   <span className="font-medium text-foreground truncate">{acc.product.name}</span>
                                   <span className="text-[11px] font-mono text-muted-foreground">
@@ -3220,6 +3450,35 @@ export default function SubscriptionCreatePage({
                               </div>
                             );
                           })}
+                        {contractServices.map((svc) => (
+                          <div
+                            key={svc.id}
+                            className="flex items-center justify-between gap-2 rounded-lg border border-border/50 bg-background/70 px-2.5 py-1.5 text-xs"
+                          >
+                            <div className="min-w-0 flex items-center gap-1.5 flex-wrap">
+                              <span className="inline-flex items-center rounded border border-sky-300 bg-sky-50 dark:border-sky-700 dark:bg-sky-950/50 px-1.5 py-0.5 text-[10px] font-bold text-sky-700 dark:text-sky-300">
+                                Service · {svc.charge_mode === "FREE" ? "Included" : "Chargeable"}
+                              </span>
+                              <span className="font-medium text-foreground truncate">{svc.service_name}</span>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="font-mono text-xs font-semibold text-foreground">
+                                {svc.charge_mode === "FREE" ? "Included (₹0.00)" : money(svc.sale_price)}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEmiAccessoriesConfigured(true);
+                                  setContractServices((prev) => prev.filter((s) => s.id !== svc.id));
+                                }}
+                                className="rounded p-1 text-muted-foreground hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/30"
+                                title="Remove service"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
@@ -3899,6 +4158,52 @@ export default function SubscriptionCreatePage({
                 </div>
               </div>
             )}
+
+            <div className="rounded-xl border border-amber-300/60 bg-amber-50/40 p-4 dark:bg-amber-950/15 space-y-3">
+              <div className="space-y-1">
+                <h3 className="text-sm font-semibold text-foreground">
+                  Transport &amp; Van Fare (Transport-Only Finance · Optional)
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Add van number, transport boy contact, and van fare for this SFEMI / Rent / Lease contract. Tracked in transport-only finance — nothing is posted to company accounts or customer EMI/rent obligations.
+                </p>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <input
+                  value={vanNumber}
+                  onChange={(event) => setVanNumber(event.target.value.toUpperCase())}
+                  placeholder="Van / Vehicle Number"
+                  className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+                />
+                <input
+                  value={transportBoyName}
+                  onChange={(event) => setTransportBoyName(event.target.value)}
+                  placeholder="Transport Boy Name"
+                  className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+                />
+                <input
+                  value={transportBoyPhone}
+                  onChange={(event) => setTransportBoyPhone(event.target.value)}
+                  placeholder="Transport Boy Phone"
+                  className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+                />
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={vanFare}
+                  onChange={(event) => setVanFare(event.target.value)}
+                  placeholder="Van Fare (Off-Ledger ₹)"
+                  className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+                />
+              </div>
+              <input
+                value={transportNotes}
+                onChange={(event) => setTransportNotes(event.target.value)}
+                placeholder="Optional transport / route note (not posted to company ledger)"
+                className="h-10 w-full rounded-xl border border-border bg-background px-4 text-sm outline-none transition focus:border-ring"
+              />
+            </div>
 
             <div className="rounded-xl border border-border bg-background p-4">
               <div className="space-y-1">
@@ -4734,6 +5039,7 @@ export default function SubscriptionCreatePage({
                 productId={contractAccPanel.productId}
                 mode="contract"
                 parentQuantity={contractAccPanel.parentQuantity}
+                defaultOpenSetup={contractAccPanel.defaultOpenSetup}
                 onSwitchParentVariant={(pv: ParentVariantOption) => {
                   const targetBasketId = contractAccPanel.basketItemId;
                   setContractItems((prev) =>

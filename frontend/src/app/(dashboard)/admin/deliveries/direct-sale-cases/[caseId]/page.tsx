@@ -139,6 +139,11 @@ export default function AdminDirectSaleDeliveryDetailPage() {
   const [address, setAddress] = useState("");
   const [failureReason, setFailureReason] = useState("");
   const [operationalNotes, setOperationalNotes] = useState("");
+  const [vanNumber, setVanNumber] = useState("");
+  const [transportBoyName, setTransportBoyName] = useState("");
+  const [transportBoyPhone, setTransportBoyPhone] = useState("");
+  const [vanFare, setVanFare] = useState("");
+  const [transportNotes, setTransportNotes] = useState("");
   const [noteDraft, setNoteDraft] = useState("");
   const [paymentExceptionReason, setPaymentExceptionReason] = useState("");
   const [paymentExceptionAck, setPaymentExceptionAck] = useState(false);
@@ -183,6 +188,11 @@ export default function AdminDirectSaleDeliveryDetailPage() {
       setAddress(payload.delivery_address_snapshot || "");
       setFailureReason(payload.failure_or_cancellation_reason || "");
       setOperationalNotes(payload.operational_notes || payload.notes || "");
+      setVanNumber(payload.van_number || "");
+      setTransportBoyName(payload.transport_boy_name || "");
+      setTransportBoyPhone(payload.transport_boy_phone || "");
+      setVanFare(payload.van_fare && Number(payload.van_fare) > 0 ? payload.van_fare : "");
+      setTransportNotes(payload.transport_notes || "");
       setErrorState(null);
     } else if (rqQuery.error) {
       setDelivery(null);
@@ -206,6 +216,11 @@ export default function AdminDirectSaleDeliveryDetailPage() {
         delivery_address_snapshot: address,
         failure_or_cancellation_reason: failureReason,
         operational_notes: operationalNotes,
+        van_number: vanNumber.trim(),
+        transport_boy_name: transportBoyName.trim(),
+        transport_boy_phone: transportBoyPhone.trim(),
+        van_fare: vanFare.trim() ? Number(vanFare).toFixed(2) : "0.00",
+        transport_notes: transportNotes.trim(),
       });
       setDelivery(updated);
       setMessage("Delivery metadata saved.");
@@ -265,10 +280,20 @@ export default function AdminDirectSaleDeliveryDetailPage() {
           receiver_phone: receiverPhone,
           delivery_address_snapshot: address,
           notes: operationalNotes,
+          van_number: vanNumber.trim(),
+          transport_boy_name: transportBoyName.trim(),
+          transport_boy_phone: transportBoyPhone.trim(),
+          van_fare: vanFare.trim() ? Number(vanFare).toFixed(2) : "0.00",
+          transport_notes: transportNotes.trim(),
         });
       } else if (action === "DISPATCH") {
         updated = await dispatchDirectSaleDeliveryCase(caseId, {
           notes: operationalNotes,
+          van_number: vanNumber.trim(),
+          transport_boy_name: transportBoyName.trim(),
+          transport_boy_phone: transportBoyPhone.trim(),
+          van_fare: vanFare.trim() ? Number(vanFare).toFixed(2) : "0.00",
+          transport_notes: transportNotes.trim(),
         });
       } else if (action === "MARK_DELIVERED") {
         if (!window.confirm("Confirm mark delivered?")) return;
@@ -276,6 +301,11 @@ export default function AdminDirectSaleDeliveryDetailPage() {
           receiver_name: receiverName || delivery.customer_name || "",
           receiver_phone: receiverPhone || delivery.customer_phone || undefined,
           delivery_note: operationalNotes || "Delivered to receiver.",
+          van_number: vanNumber.trim(),
+          transport_boy_name: transportBoyName.trim(),
+          transport_boy_phone: transportBoyPhone.trim(),
+          van_fare: vanFare.trim() ? Number(vanFare).toFixed(2) : "0.00",
+          transport_notes: transportNotes.trim(),
         });
       } else if (action === "CANCEL") {
         if (!failureReason.trim()) {
@@ -711,6 +741,56 @@ export default function AdminDirectSaleDeliveryDetailPage() {
                   disabled={isHistoryOnly}
                   className="min-h-[96px] rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground disabled:cursor-not-allowed disabled:opacity-60 lg:col-span-2"
                 />
+                <div className="lg:col-span-2 rounded-xl border border-amber-300/60 bg-amber-50/40 p-4 dark:bg-amber-950/15 space-y-3">
+                  <div>
+                    <div className="text-sm font-semibold text-foreground">
+                      Delivery Challan Transport &amp; Van Fare (Transport-Only Finance)
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Printed on the Delivery Challan and tracked in the Transport-Only register — nothing is posted to company accounts.
+                    </p>
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <input
+                      value={vanNumber}
+                      onChange={(event) => setVanNumber(event.target.value.toUpperCase())}
+                      placeholder="Van / Vehicle No"
+                      disabled={isHistoryOnly}
+                      className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+                    />
+                    <input
+                      value={transportBoyName}
+                      onChange={(event) => setTransportBoyName(event.target.value)}
+                      placeholder="Transport Boy Name"
+                      disabled={isHistoryOnly}
+                      className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+                    />
+                    <input
+                      value={transportBoyPhone}
+                      onChange={(event) => setTransportBoyPhone(event.target.value)}
+                      placeholder="Transport Boy Phone"
+                      disabled={isHistoryOnly}
+                      className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+                    />
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={vanFare}
+                      onChange={(event) => setVanFare(event.target.value)}
+                      placeholder="Van Fare (Off-Ledger ₹)"
+                      disabled={isHistoryOnly}
+                      className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+                    />
+                  </div>
+                  <input
+                    value={transportNotes}
+                    onChange={(event) => setTransportNotes(event.target.value)}
+                    placeholder="Transport notes (route / settlement note)"
+                    disabled={isHistoryOnly}
+                    className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+                  />
+                </div>
                 <div className="lg:col-span-2">
                   <button
                     type="button"

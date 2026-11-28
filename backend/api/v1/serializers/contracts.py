@@ -40,8 +40,9 @@ class ContractItemInputSerializer(serializers.Serializer):
         prod = attrs.get("product")
         is_acc = bool(attrs.get("is_accessory"))
         inv = getattr(prod, "inventory_profile", None) if prod else None
-        stock_type = getattr(inv, "stock_item_type", None) or getattr(prod, "item_type", None)
-        if not is_acc and stock_type in ("RAW_MATERIAL", "ACCESSORY"):
+        stock_type = (getattr(inv, "stock_item_type", None) or getattr(prod, "item_type", None) or "").strip().upper()
+        item_type = (getattr(prod, "item_type", None) or "").strip().upper()
+        if not is_acc and (stock_type in ("RAW_MATERIAL", "ACCESSORY", "SERVICE") or item_type in ("RAW_MATERIAL", "ACCESSORY", "SERVICE")):
             raise serializers.ValidationError(
                 {"product": f"'{getattr(prod, 'name', prod)}' is an accessory/raw material and must be attached as an accessory of a main product."}
             )
@@ -51,13 +52,14 @@ class ContractItemInputSerializer(serializers.Serializer):
 class AdminRentContractCreateSerializer(serializers.Serializer):
     customer = serializers.PrimaryKeyRelatedField(queryset=Customer.objects.all())
     product = serializers.PrimaryKeyRelatedField(
-        queryset=Product.objects.filter(is_active=True).exclude(
-            inventory_profile__stock_item_type__in=["RAW_MATERIAL", "ACCESSORY"]
-        ),
+        queryset=Product.objects.filter(is_active=True)
+        .exclude(inventory_profile__stock_item_type__in=["RAW_MATERIAL", "ACCESSORY", "SERVICE"])
+        .exclude(item_type__in=["RAW_MATERIAL", "ACCESSORY", "SERVICE"]),
         required=False,
         allow_null=True,
     )
     items = ContractItemInputSerializer(many=True, required=False)
+    services = serializers.ListField(child=serializers.DictField(), required=False)
     tenure_months = serializers.IntegerField(min_value=1)
     start_date = serializers.DateField(required=False)
     security_deposit_percent = serializers.DecimalField(max_digits=5, decimal_places=2, required=False, default="20.00")
@@ -101,6 +103,11 @@ class AdminRentContractCreateSerializer(serializers.Serializer):
         allow_blank=True,
         default="",
     )
+    van_number = serializers.CharField(required=False, allow_blank=True, default="", max_length=64)
+    transport_boy_name = serializers.CharField(required=False, allow_blank=True, default="", max_length=120)
+    transport_boy_phone = serializers.CharField(required=False, allow_blank=True, default="", max_length=30)
+    van_fare = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, default=Decimal("0.00"))
+    transport_notes = serializers.CharField(required=False, allow_blank=True, default="")
 
     def validate_start_date(self, value):
         return value or timezone.localdate()
@@ -119,13 +126,14 @@ class AdminRentContractCreateSerializer(serializers.Serializer):
 class AdminLeaseContractCreateSerializer(serializers.Serializer):
     customer = serializers.PrimaryKeyRelatedField(queryset=Customer.objects.all())
     product = serializers.PrimaryKeyRelatedField(
-        queryset=Product.objects.filter(is_active=True).exclude(
-            inventory_profile__stock_item_type__in=["RAW_MATERIAL", "ACCESSORY"]
-        ),
+        queryset=Product.objects.filter(is_active=True)
+        .exclude(inventory_profile__stock_item_type__in=["RAW_MATERIAL", "ACCESSORY", "SERVICE"])
+        .exclude(item_type__in=["RAW_MATERIAL", "ACCESSORY", "SERVICE"]),
         required=False,
         allow_null=True,
     )
     items = ContractItemInputSerializer(many=True, required=False)
+    services = serializers.ListField(child=serializers.DictField(), required=False)
     tenure_months = serializers.IntegerField(min_value=1)
     start_date = serializers.DateField(required=False)
     security_deposit_percent = serializers.DecimalField(max_digits=5, decimal_places=2, required=False, default="20.00")
@@ -171,6 +179,11 @@ class AdminLeaseContractCreateSerializer(serializers.Serializer):
         allow_blank=True,
         default="",
     )
+    van_number = serializers.CharField(required=False, allow_blank=True, default="", max_length=64)
+    transport_boy_name = serializers.CharField(required=False, allow_blank=True, default="", max_length=120)
+    transport_boy_phone = serializers.CharField(required=False, allow_blank=True, default="", max_length=30)
+    van_fare = serializers.DecimalField(max_digits=12, decimal_places=2, required=False, default=Decimal("0.00"))
+    transport_notes = serializers.CharField(required=False, allow_blank=True, default="")
 
     def validate_start_date(self, value):
         return value or timezone.localdate()

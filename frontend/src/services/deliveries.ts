@@ -117,6 +117,11 @@ export type DeliveryRecord = {
   receiver_phone?: string | null;
   delivery_address_snapshot?: string | null;
   notes?: string | null;
+  van_number?: string | null;
+  transport_boy_name?: string | null;
+  transport_boy_phone?: string | null;
+  van_fare?: string | null;
+  transport_notes?: string | null;
   failure_reason?: string | null;
   // Phase 2: reason populated when status = BLOCKED_STOCK_UNAVAILABLE
   stock_blocked_reason?: string | null;
@@ -262,6 +267,11 @@ export type DeliverySourceSubscriptionPrefill = {
     delivery_address_snapshot?: string;
     notes?: string;
     batch_number?: number;
+    van_number?: string;
+    transport_boy_name?: string;
+    transport_boy_phone?: string;
+    van_fare?: string;
+    transport_notes?: string;
   };
 };
 
@@ -317,6 +327,11 @@ export type DeliverySourceDirectSalePrefill = {
     receiver_phone?: string;
     delivery_address_snapshot?: string;
     notes?: string;
+    van_number?: string;
+    transport_boy_name?: string;
+    transport_boy_phone?: string;
+    van_fare?: string;
+    transport_notes?: string;
   };
 };
 
@@ -484,6 +499,11 @@ export function normalizeDeliveryRecord(payload: unknown): DeliveryRecord {
           } as DeliveryRecord["links"])
         : null,
     detail_hint: toStringOrNull(row.detail_hint),
+    van_number: toStringOrNull(row.van_number),
+    transport_boy_name: toStringOrNull(row.transport_boy_name),
+    transport_boy_phone: toStringOrNull(row.transport_boy_phone),
+    van_fare: toStringOrNull(row.van_fare),
+    transport_notes: toStringOrNull(row.transport_notes),
     grand_total: toStringOrNull(row.grand_total),
     balance_total: toStringOrNull(row.balance_total),
     received_total: toStringOrNull(row.received_total),
@@ -722,6 +742,11 @@ export async function createAdminDelivery(
         receiver_phone?: string;
         delivery_address_snapshot?: string;
         notes?: string;
+        van_number?: string;
+        transport_boy_name?: string;
+        transport_boy_phone?: string;
+        van_fare?: string;
+        transport_notes?: string;
         admin_override?: boolean;
         admin_override_reason?: string;
         batch_number?: number;
@@ -797,6 +822,11 @@ export async function updateAdminDelivery(
     delivery_address_snapshot?: string;
     notes?: string;
     failure_reason?: string;
+    van_number?: string;
+    transport_boy_name?: string;
+    transport_boy_phone?: string;
+    van_fare?: string;
+    transport_notes?: string;
   }
 ): Promise<DeliveryRecord> {
   const response = await apiFetch<unknown>(`/admin/deliveries/${id}/`, {
@@ -815,6 +845,11 @@ export async function transitionAdminDelivery(
     receiver_phone?: string;
     notes?: string;
     failure_reason?: string;
+    van_number?: string;
+    transport_boy_name?: string;
+    transport_boy_phone?: string;
+    van_fare?: string;
+    transport_notes?: string;
   }
 ): Promise<DeliveryRecord> {
   const response = await apiFetch<unknown>(`/admin/deliveries/${id}/transition/`, {
@@ -842,6 +877,11 @@ export async function markAdminDeliveryDelivered(
     receiver_name?: string;
     receiver_phone?: string;
     notes?: string;
+    van_number?: string;
+    transport_boy_name?: string;
+    transport_boy_phone?: string;
+    van_fare?: string;
+    transport_notes?: string;
   }
 ): Promise<DeliveryRecord> {
   const response = await apiFetch<unknown>(`/admin/deliveries/${id}/mark-delivered/`, {
@@ -917,6 +957,11 @@ export async function scheduleDirectSaleDeliveryCase(
     receiver_phone?: string;
     delivery_address_snapshot?: string;
     notes?: string;
+    van_number?: string;
+    transport_boy_name?: string;
+    transport_boy_phone?: string;
+    van_fare?: string;
+    transport_notes?: string;
   }
 ): Promise<DeliveryRecord> {
   return postDirectSaleCaseAction(`/admin/deliveries/direct-sale-cases/${caseId}/schedule/`, payload);
@@ -924,7 +969,14 @@ export async function scheduleDirectSaleDeliveryCase(
 
 export async function dispatchDirectSaleDeliveryCase(
   caseId: number | string,
-  payload: { notes?: string } = {}
+  payload: {
+    notes?: string;
+    van_number?: string;
+    transport_boy_name?: string;
+    transport_boy_phone?: string;
+    van_fare?: string;
+    transport_notes?: string;
+  } = {}
 ): Promise<DeliveryRecord> {
   return postDirectSaleCaseAction(`/admin/deliveries/direct-sale-cases/${caseId}/dispatch/`, payload);
 }
@@ -936,6 +988,11 @@ export async function markDirectSaleDeliveryCaseDelivered(
     receiver_phone?: string;
     delivery_note?: string;
     delivered_at?: string | null;
+    van_number?: string;
+    transport_boy_name?: string;
+    transport_boy_phone?: string;
+    van_fare?: string;
+    transport_notes?: string;
   }
 ): Promise<DeliveryRecord> {
   return postDirectSaleCaseAction(`/admin/deliveries/direct-sale-cases/${caseId}/mark-delivered/`, payload);
@@ -957,6 +1014,11 @@ export async function updateDirectSaleDeliveryCaseMetadata(
     delivery_address_snapshot?: string;
     failure_or_cancellation_reason?: string;
     operational_notes?: string;
+    van_number?: string;
+    transport_boy_name?: string;
+    transport_boy_phone?: string;
+    van_fare?: string;
+    transport_notes?: string;
   }
 ): Promise<DeliveryRecord> {
   const response = await apiFetch<{ delivery?: unknown }>(

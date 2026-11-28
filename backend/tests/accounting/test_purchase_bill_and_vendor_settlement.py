@@ -147,3 +147,85 @@ class PurchaseBillAndVendorSettlementTests(TestCase):
         )
         with self.assertRaisesMessage(ValueError, "exceeds purchase bill outstanding"):
             post_vendor_settlement(vendor_settlement_id=overpayment.id, posted_by=self.admin)
+
+    def test_purchase_bill_with_service_van_fare_line_posts_full_amount_without_stock_movement(self):
+        purchase_bill = upsert_purchase_bill_draft(
+            bill_no="PB-202604-002",
+            bill_date=date(2026, 4, 25),
+            vendor=self.vendor,
+            tax_mode="NON_GST",
+            lines=[
+                {
+                    "line_type": "GOODS",
+                    "inventory_item": self.item,
+                    "description": "Teak Wood Plank",
+                    "quantity": Decimal("2.000"),
+                    "unit_cost": Decimal("500.00"),
+                    "tax_amount": Decimal("0.00"),
+                },
+                {
+                    "line_type": "SERVICE",
+                    "inventory_item": None,
+                    "description": "Van Fare (Tempo Transport)",
+                    "quantity": Decimal("1.000"),
+                    "unit_cost": Decimal("350.00"),
+                    "tax_amount": Decimal("0.00"),
+                },
+            ],
+            performed_by=self.admin,
+        )
+        self.assertEqual(purchase_bill.subtotal, Decimal("1350.00"))
+        self.assertEqual(purchase_bill.grand_total, Decimal("1350.00"))
+        self.assertEqual(purchase_bill.lines.count(), 2)
+
+        purchase_bill, _ = approve_purchase_bill(
+            purchase_bill_id=purchase_bill.id,
+            approved_by=self.admin,
+        )
+        purchase_bill, posted = post_purchase_bill_from_accounting(
+            purchase_bill_id=purchase_bill.id,
+            posted_by=self.admin,
+        )
+        self.assertTrue(posted)
+        self.assertIsNotNone(purchase_bill.posted_journal_entry_id)
+
+        je = purchase_bill.posted_journal_entry
+        self.assertEqual(
+            sum(line.debit_amount for line in je.lines.all()),
+            Decimal("1350.00"),
+        )
+        self.assertEqual(
+            sum(line.credit_amount for line in je.lines.all()),
+            Decimal("1350.00"),
+        )
+
+        # Only GOODS line creates a StockLedger row; SERVICE line does not.
+        goods_line = purchase_bill.lines.get(line_type="GOODS")
+        service_line = purchase_bill.lines.get(line_type="SERVICE")
+        self.assertTrue(
+            StockLedger.objects.filter(
+                reference_model="PurchaseBillLine",
+                reference_id=f"{purchase_bill.id}:{goods_line.id}",
+            ).exists()
+        )
+        self.assertFalse(
+            StockLedger.objects.filter(
+                reference_model="PurchaseBillLine",
+                reference_id=f"{purchase_bill.id}:{service_line.id}",
+            ).exists()
+        )
+
+        # Full bill amount (goods + van fare) is settled against the vendor.
+        settlement = VendorSettlement.objects.create(
+            vendor=self.vendor,
+            settlement_date=date(2026, 4, 26),
+            amount=Decimal("1350.00"),
+            finance_account=self.cash_account,
+            purchase_bill=purchase_bill,
+        )
+        settlement, settlement_posted = post_vendor_settlement(
+            vendor_settlement_id=settlement.id,
+            posted_by=self.admin,
+        )
+        self.assertTrue(settlement_posted)
+        self.assertEqual(Decimal(get_vendor_outstanding(self.vendor)["outstanding"]), Decimal("0.00"))

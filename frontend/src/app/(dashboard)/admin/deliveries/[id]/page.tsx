@@ -149,6 +149,11 @@ export default function AdminDeliveryDetailPage() {
   const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
   const [reason, setReason] = useState("");
+  const [vanNumber, setVanNumber] = useState("");
+  const [transportBoyName, setTransportBoyName] = useState("");
+  const [transportBoyPhone, setTransportBoyPhone] = useState("");
+  const [vanFare, setVanFare] = useState("");
+  const [transportNotes, setTransportNotes] = useState("");
   const [splitQuantities, setSplitQuantities] = useState<Record<number, number>>({});
   const [splitDecisions, setSplitDecisions] = useState<Record<number, "YES" | "NO">>({});
   const [splitDate, setSplitDate] = useState("");
@@ -206,6 +211,11 @@ export default function AdminDeliveryDetailPage() {
       setAddress(deliveryPayload.delivery_address_snapshot || "");
       setNotes(deliveryPayload.notes || "");
       setReason(deliveryPayload.failure_reason || "");
+      setVanNumber(deliveryPayload.van_number || "");
+      setTransportBoyName(deliveryPayload.transport_boy_name || "");
+      setTransportBoyPhone(deliveryPayload.transport_boy_phone || "");
+      setVanFare(deliveryPayload.van_fare && Number(deliveryPayload.van_fare) > 0 ? deliveryPayload.van_fare : "");
+      setTransportNotes(deliveryPayload.transport_notes || "");
     } else if (rqQuery.error) {
       setDelivery(null);
       setTimeline([]);
@@ -309,6 +319,11 @@ export default function AdminDeliveryDetailPage() {
         delivery_address_snapshot: address,
         notes,
         failure_reason: reason,
+        van_number: vanNumber.trim(),
+        transport_boy_name: transportBoyName.trim(),
+        transport_boy_phone: transportBoyPhone.trim(),
+        van_fare: vanFare.trim() ? Number(vanFare).toFixed(2) : "0.00",
+        transport_notes: transportNotes.trim(),
       });
       setDelivery(updated);
       setMessage("Delivery metadata updated.");
@@ -343,6 +358,11 @@ export default function AdminDeliveryDetailPage() {
           receiver_name: receiverName,
           receiver_phone: receiverPhone,
           notes,
+          van_number: vanNumber.trim(),
+          transport_boy_name: transportBoyName.trim(),
+          transport_boy_phone: transportBoyPhone.trim(),
+          van_fare: vanFare.trim() ? Number(vanFare).toFixed(2) : "0.00",
+          transport_notes: transportNotes.trim(),
         });
       } else if (action === "FAILED") {
         updated = await markAdminDeliveryFailed(delivery.id, {
@@ -363,6 +383,11 @@ export default function AdminDeliveryDetailPage() {
           status: action,
           scheduled_date: scheduledDate || null,
           notes,
+          van_number: vanNumber.trim(),
+          transport_boy_name: transportBoyName.trim(),
+          transport_boy_phone: transportBoyPhone.trim(),
+          van_fare: vanFare.trim() ? Number(vanFare).toFixed(2) : "0.00",
+          transport_notes: transportNotes.trim(),
         });
       }
 
@@ -978,6 +1003,51 @@ export default function AdminDeliveryDetailPage() {
                   placeholder="Operational notes"
                   className="min-h-[96px] rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-ring lg:col-span-2"
                 />
+                <div className="lg:col-span-2 rounded-xl border border-amber-300/60 bg-amber-50/40 p-4 dark:bg-amber-950/15 space-y-3">
+                  <div>
+                    <div className="text-sm font-semibold text-foreground">
+                      Delivery Challan Transport &amp; Van Fare (Transport-Only Finance)
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Included in Handover / Delivery Challan PDF and tracked in the Transport-Only register — never posted to company ledger.
+                    </p>
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <input
+                      value={vanNumber}
+                      onChange={(event) => setVanNumber(event.target.value.toUpperCase())}
+                      placeholder="Van / Vehicle No"
+                      className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
+                    />
+                    <input
+                      value={transportBoyName}
+                      onChange={(event) => setTransportBoyName(event.target.value)}
+                      placeholder="Transport Boy Name"
+                      className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
+                    />
+                    <input
+                      value={transportBoyPhone}
+                      onChange={(event) => setTransportBoyPhone(event.target.value)}
+                      placeholder="Transport Boy Phone"
+                      className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
+                    />
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={vanFare}
+                      onChange={(event) => setVanFare(event.target.value)}
+                      placeholder="Van Fare (Off-Ledger ₹)"
+                      className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
+                    />
+                  </div>
+                  <input
+                    value={transportNotes}
+                    onChange={(event) => setTransportNotes(event.target.value)}
+                    placeholder="Transport notes (route / settlement note)"
+                    className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
+                  />
+                </div>
                 <div className="lg:col-span-2">
                   <button
                     type="button"

@@ -281,6 +281,15 @@ def serialize_direct_sale_delivery_case(case: ServiceDeskCase) -> dict:
         "delivery_address_snapshot": delivery_address_snapshot or None,
         "notes": operational_notes,
         "operational_notes": operational_notes,
+        "van_number": (getattr(case, "van_number", "") or getattr(sale, "van_number", "") or "").strip(),
+        "transport_boy_name": (getattr(case, "transport_boy_name", "") or getattr(sale, "transport_boy_name", "") or "").strip(),
+        "transport_boy_phone": (getattr(case, "transport_boy_phone", "") or getattr(sale, "transport_boy_phone", "") or "").strip(),
+        "van_fare": str(
+            getattr(case, "van_fare", Decimal("0.00"))
+            if (getattr(case, "van_fare", None) is not None and Decimal(str(getattr(case, "van_fare") or "0")) > Decimal("0.00"))
+            else (getattr(sale, "van_fare", None) or Decimal("0.00"))
+        ),
+        "transport_notes": (getattr(case, "transport_notes", "") or getattr(sale, "transport_notes", "") or "").strip(),
         "failure_reason": failure_or_cancellation_reason,
         "failure_or_cancellation_reason": failure_or_cancellation_reason,
         "stock_blocked_reason": stock_hint,

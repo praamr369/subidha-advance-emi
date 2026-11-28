@@ -155,6 +155,11 @@ export type DirectSale = {
   delivery_snapshot_district?: string;
   delivery_snapshot_state?: string;
   delivery_snapshot_pincode?: string;
+  van_number?: string;
+  transport_boy_name?: string;
+  transport_boy_phone?: string;
+  van_fare?: string;
+  transport_notes?: string;
   notes?: string;
   terms?: string;
   billing_invoice_id?: number | null;
@@ -229,6 +234,11 @@ export type DirectSalePayload = {
   new_customer_pincode?: string;
   new_customer_gstin?: string;
   new_customer_type?: "UNREGISTERED_CONSUMER" | "REGISTERED_BUSINESS";
+  van_number?: string;
+  transport_boy_name?: string;
+  transport_boy_phone?: string;
+  van_fare?: string;
+  transport_notes?: string;
   notes?: string;
   terms?: string;
   lines: DirectSaleLine[];

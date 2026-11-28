@@ -22,6 +22,7 @@ export type ProductOption = {
   is_rent_enabled?: boolean;
   is_lease_enabled?: boolean;
   is_direct_sale_enabled?: boolean;
+  stock_item_type?: string | null;
   lifecycle_status?: string;
   on_hand_qty?: string;
   reserved_qty?: string;
@@ -77,6 +78,7 @@ export function normalizeProduct(raw: Record<string, unknown>): ProductOption {
     is_lease_enabled: typeof raw.is_lease_enabled === "boolean" ? raw.is_lease_enabled : undefined,
     is_direct_sale_enabled:
       typeof raw.is_direct_sale_enabled === "boolean" ? raw.is_direct_sale_enabled : undefined,
+    stock_item_type: toOptionalString(raw.stock_item_type ?? raw.item_type) ?? null,
     lifecycle_status: toOptionalString(raw.lifecycle_status),
   };
 }
@@ -99,6 +101,7 @@ function rowToOption(row: ProductSpecRow): ProductOption {
     is_rent_enabled: row.is_rent_enabled,
     is_lease_enabled: row.is_lease_enabled,
     is_direct_sale_enabled: row.is_direct_sale_enabled,
+    stock_item_type: row.stock_item_type ?? null,
     lifecycle_status: row.lifecycle_status ?? undefined,
     on_hand_qty: inv?.on_hand,
     reserved_qty: inv?.reserved,
@@ -213,6 +216,16 @@ export default function ProductSelector({
         directSaleOnly={planFilter === "DIRECT_SALE"}
         filterRow={(row) => {
           if (row.lifecycle_status === "DISCONTINUED") return false;
+          const itemType = (row.stock_item_type ?? "FINISHED_GOOD").toUpperCase();
+          if (
+            (planFilter === "EMI" || planFilter === "ADVANCE_EMI" || planFilter === "RENT" || planFilter === "LEASE") &&
+            (itemType === "ACCESSORY" || itemType === "RAW_MATERIAL" || itemType === "SERVICE")
+          ) {
+            return false;
+          }
+          if (planFilter === "DIRECT_SALE" && itemType === "RAW_MATERIAL") {
+            return false;
+          }
           if (planFilter === "EMI" || planFilter === "ADVANCE_EMI") return Boolean(row.is_emi_enabled);
           if (planFilter === "RENT") return Boolean(row.is_rent_enabled);
           if (planFilter === "LEASE") return Boolean(row.is_lease_enabled);

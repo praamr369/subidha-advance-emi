@@ -120,6 +120,11 @@ def schedule_direct_sale_delivery(
     receiver_phone: str = "",
     delivery_address_snapshot: str = "",
     notes: str = "",
+    van_number: str | None = None,
+    transport_boy_name: str | None = None,
+    transport_boy_phone: str | None = None,
+    van_fare=None,
+    transport_notes: str | None = None,
 ):
     case, sale = _lock_direct_sale_case(case_id=case_id)
     _validate_delivery_gate_allowing_payment_exception(case=case, sale=sale)
@@ -140,6 +145,20 @@ def schedule_direct_sale_delivery(
         case.internal_notes = ((case.internal_notes or "").strip() + "\n" + merged).strip()
     if delivery_address_snapshot.strip():
         case.issue_details = delivery_address_snapshot.strip()
+    from deliveries.models import TransportFareSourceType
+    from deliveries.services.transport_finance_service import (
+        apply_transport_fields,
+        sync_transport_fare_for_source,
+    )
+
+    transport_changed = apply_transport_fields(
+        case,
+        van_number=van_number,
+        transport_boy_name=transport_boy_name,
+        transport_boy_phone=transport_boy_phone,
+        van_fare=van_fare,
+        transport_notes=transport_notes,
+    )
     case.save(
         update_fields=[
             "status",
@@ -150,8 +169,14 @@ def schedule_direct_sale_delivery(
             "service_due_at",
             "internal_notes",
             "issue_details",
+            *transport_changed,
             "updated_at",
         ]
+    )
+    sync_transport_fare_for_source(
+        source_type=TransportFareSourceType.DIRECT_SALE_DELIVERY,
+        source_instance=case,
+        performed_by=actor,
     )
     _audit("DIRECT_SALE_DELIVERY_SCHEDULED", case=case, actor=actor)
     return case
@@ -168,6 +193,11 @@ def update_direct_sale_delivery_metadata(
     delivery_address_snapshot: str | None = None,
     failure_or_cancellation_reason: str | None = None,
     operational_notes: str | None = None,
+    van_number: str | None = None,
+    transport_boy_name: str | None = None,
+    transport_boy_phone: str | None = None,
+    van_fare=None,
+    transport_notes: str | None = None,
 ):
     case, _ = _lock_direct_sale_case(case_id=case_id)
 
@@ -191,8 +221,29 @@ def update_direct_sale_delivery_metadata(
         case.internal_notes = (operational_notes or "").strip()
         update_fields.append("internal_notes")
 
+    from deliveries.models import TransportFareSourceType
+    from deliveries.services.transport_finance_service import (
+        apply_transport_fields,
+        sync_transport_fare_for_source,
+    )
+
+    transport_changed = apply_transport_fields(
+        case,
+        van_number=van_number,
+        transport_boy_name=transport_boy_name,
+        transport_boy_phone=transport_boy_phone,
+        van_fare=van_fare,
+        transport_notes=transport_notes,
+    )
+    update_fields.extend(transport_changed)
+
     if update_fields:
         case.save(update_fields=list(dict.fromkeys(update_fields + ["updated_at"])))
+    sync_transport_fare_for_source(
+        source_type=TransportFareSourceType.DIRECT_SALE_DELIVERY,
+        source_instance=case,
+        performed_by=actor,
+    )
 
     _audit(
         "DIRECT_SALE_DELIVERY_METADATA_UPDATED",
@@ -206,7 +257,17 @@ def update_direct_sale_delivery_metadata(
 
 
 @transaction.atomic
-def dispatch_direct_sale_delivery(*, case_id: int, actor, notes: str = ""):
+def dispatch_direct_sale_delivery(
+    *,
+    case_id: int,
+    actor,
+    notes: str = "",
+    van_number: str | None = None,
+    transport_boy_name: str | None = None,
+    transport_boy_phone: str | None = None,
+    van_fare=None,
+    transport_notes: str | None = None,
+):
     case, sale = _lock_direct_sale_case(case_id=case_id)
     _validate_delivery_gate_allowing_payment_exception(case=case, sale=sale)
     if case.status not in {ServiceDeskCaseStatus.AUTHORIZED, ServiceDeskCaseStatus.OPEN, ServiceDeskCaseStatus.UNDER_REVIEW}:
@@ -214,7 +275,26 @@ def dispatch_direct_sale_delivery(*, case_id: int, actor, notes: str = ""):
     case.status = ServiceDeskCaseStatus.IN_SERVICE
     if notes.strip():
         case.internal_notes = ((case.internal_notes or "").strip() + "\n" + notes.strip()).strip()
-    case.save(update_fields=["status", "internal_notes", "updated_at"])
+    from deliveries.models import TransportFareSourceType
+    from deliveries.services.transport_finance_service import (
+        apply_transport_fields,
+        sync_transport_fare_for_source,
+    )
+
+    transport_changed = apply_transport_fields(
+        case,
+        van_number=van_number,
+        transport_boy_name=transport_boy_name,
+        transport_boy_phone=transport_boy_phone,
+        van_fare=van_fare,
+        transport_notes=transport_notes,
+    )
+    case.save(update_fields=["status", "internal_notes", *transport_changed, "updated_at"])
+    sync_transport_fare_for_source(
+        source_type=TransportFareSourceType.DIRECT_SALE_DELIVERY,
+        source_instance=case,
+        performed_by=actor,
+    )
     _audit("DIRECT_SALE_DELIVERY_DISPATCHED", case=case, actor=actor)
     return case
 
@@ -228,6 +308,11 @@ def mark_direct_sale_delivered(
     receiver_phone: str = "",
     delivery_note: str = "",
     delivered_at=None,
+    van_number: str | None = None,
+    transport_boy_name: str | None = None,
+    transport_boy_phone: str | None = None,
+    van_fare=None,
+    transport_notes: str | None = None,
 ):
     case, sale = _lock_direct_sale_case(case_id=case_id)
     _validate_delivery_gate_allowing_payment_exception(case=case, sale=sale)
@@ -241,6 +326,20 @@ def mark_direct_sale_delivered(
     case.resolution_summary = (delivery_note or "Delivered to receiver").strip()
     case.resolved_at = timezone.now()
     case.resolved_by = actor
+    from deliveries.models import TransportFareSourceType
+    from deliveries.services.transport_finance_service import (
+        apply_transport_fields,
+        sync_transport_fare_for_source,
+    )
+
+    transport_changed = apply_transport_fields(
+        case,
+        van_number=van_number,
+        transport_boy_name=transport_boy_name,
+        transport_boy_phone=transport_boy_phone,
+        van_fare=van_fare,
+        transport_notes=transport_notes,
+    )
     case.save(
         update_fields=[
             "status",
@@ -249,8 +348,14 @@ def mark_direct_sale_delivered(
             "resolution_summary",
             "resolved_at",
             "resolved_by",
+            *transport_changed,
             "updated_at",
         ]
+    )
+    sync_transport_fare_for_source(
+        source_type=TransportFareSourceType.DIRECT_SALE_DELIVERY,
+        source_instance=case,
+        performed_by=actor,
     )
     sale.delivered_at = delivered_at or timezone.now()
     sale.save(update_fields=["delivered_at", "updated_at"])

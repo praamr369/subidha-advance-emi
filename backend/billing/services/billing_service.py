@@ -123,45 +123,206 @@ def _resolve_line_inventory_item(*, product, inventory_item):
     return InventoryItem.objects.filter(product=product).first()
 
 
-def _assert_products_not_in_active_rent_lease_possession(*, line_payloads: list[dict]) -> None:
-    from subscriptions.models import PlanType, PossessionStatus, ProductPossession
+def _format_possession_product_label(product_code: str | None, product_name: str | None, fallback_id: int) -> str:
+    code = (product_code or "").strip() or f"PRODUCT#{fallback_id}"
+    name = (product_name or "").strip()
+    return f"{code} ({name})" if name else code
 
-    product_ids = {
-        int(payload["product"].id)
-        for payload in line_payloads
-        if payload.get("product") is not None and getattr(payload["product"], "id", None) is not None
-    }
-    if not product_ids:
+
+def _encumbered_rent_lease_stock_qty(*, product_id: int, inventory_item: InventoryItem, possessions: list) -> Decimal:
+    """Return how much of ``inventory_item.available_qty()`` is still committed to active rent/lease possessions.
+
+    A rent/lease contract creates a ProductPossession immediately (PENDING_HANDOVER),
+    while physical stock is only deducted later when SubscriptionDelivery posts
+    RENT_HANDOVER_OUT / LEASE_HANDOVER_OUT. Any portion not yet deducted (or already
+    returned-in prior to inspection approval) remains inside available_qty() and must
+    not be sold via Direct Sale.
+    """
+    from contracts.models import ContractItem
+    from deliveries.models import SubscriptionDelivery
+    from inventory.models import (
+        RENT_LEASE_HANDOVER_OUT_TYPES,
+        RENT_LEASE_RETURN_IN_TYPES,
+        StockLedger,
+    )
+
+    sub_ids = [p.subscription_id for p in possessions]
+    contract_qty_map: dict[int, Decimal] = {}
+    for sub_id, total_qty in (
+        ContractItem.objects.filter(subscription_id__in=sub_ids, product_id=product_id)
+        .values_list("subscription_id")
+        .annotate(total_qty=Sum("quantity"))
+    ):
+        if total_qty is not None:
+            contract_qty_map[sub_id] = Decimal(str(total_qty))
+
+    delivery_to_sub: dict[int, int] = dict(
+        SubscriptionDelivery.objects.filter(subscription_id__in=sub_ids).values_list("id", "subscription_id")
+    )
+    ref_to_sub: dict[str, int] = {}
+    for del_id, sub_id in delivery_to_sub.items():
+        ref_to_sub[str(del_id)] = sub_id
+        ref_to_sub[f"{del_id}-{product_id}"] = sub_id
+
+    handover_out_by_sub: dict[int, Decimal] = {}
+    return_in_by_sub: dict[int, Decimal] = {}
+    if ref_to_sub:
+        for ref_id, movement_type, q_in, q_out in StockLedger.objects.filter(
+            inventory_item=inventory_item,
+            reference_model="SubscriptionDelivery",
+            reference_id__in=list(ref_to_sub.keys()),
+            movement_type__in=list(RENT_LEASE_HANDOVER_OUT_TYPES | RENT_LEASE_RETURN_IN_TYPES),
+        ).values_list("reference_id", "movement_type", "quantity_in", "quantity_out"):
+            sub_id = ref_to_sub.get(ref_id)
+            if sub_id is None:
+                continue
+            if movement_type in RENT_LEASE_HANDOVER_OUT_TYPES:
+                handover_out_by_sub[sub_id] = handover_out_by_sub.get(sub_id, Decimal("0.000")) + Decimal(str(q_out or "0"))
+            elif movement_type in RENT_LEASE_RETURN_IN_TYPES:
+                return_in_by_sub[sub_id] = return_in_by_sub.get(sub_id, Decimal("0.000")) + Decimal(str(q_in or "0"))
+
+    total_encumbered = Decimal("0.000")
+    for possession in possessions:
+        sub_id = possession.subscription_id
+        pos_qty = contract_qty_map.get(sub_id, Decimal("1.000"))
+        net_deducted = max(
+            Decimal("0.000"),
+            handover_out_by_sub.get(sub_id, Decimal("0.000")) - return_in_by_sub.get(sub_id, Decimal("0.000")),
+        )
+        total_encumbered += max(Decimal("0.000"), pos_qty - net_deducted)
+    return total_encumbered
+
+
+def _assert_products_not_in_active_rent_lease_possession(*, line_payloads: list[dict]) -> None:
+    from django.db.models import Q
+    from contracts.models import SubscriptionStatus
+    from products_core.models import RentalAsset
+    from subscriptions.models import PlanType, PossessionStatus, ProductPossession, RentalAssetStatus
+
+    lines_by_product: dict[int, list[dict]] = {}
+    for payload in line_payloads:
+        product = payload.get("product")
+        product_id = getattr(product, "id", None)
+        if product is None or product_id is None:
+            continue
+        lines_by_product.setdefault(int(product_id), []).append(payload)
+
+    if not lines_by_product:
         return
 
-    blocked_rows = list(
+    product_ids = set(lines_by_product.keys())
+    active_possessions = list(
         ProductPossession.objects.select_related("product", "subscription")
         .filter(
             product_id__in=product_ids,
             subscription__plan_type__in=[PlanType.RENT, PlanType.LEASE],
         )
         .exclude(status=PossessionStatus.CLOSED)
-        .values_list(
-            "product__product_code",
-            "product__name",
-            "subscription__id",
-            "status",
+        .exclude(
+            subscription__status=SubscriptionStatus.CANCELLED,
+            status=PossessionStatus.PENDING_HANDOVER,
         )
     )
-    if not blocked_rows:
-        return
+    possessions_by_product: dict[int, list[ProductPossession]] = {}
+    for possession in active_possessions:
+        possessions_by_product.setdefault(possession.product_id, []).append(possession)
 
-    refs = []
-    for product_code, product_name, subscription_id, status in blocked_rows:
-        code = (product_code or "").strip() or f"PRODUCT#{subscription_id}"
-        name = (product_name or "").strip()
-        label = f"{code} ({name})" if name else code
-        refs.append(f"{label} -> SUB-{subscription_id} [{status}]")
-    refs = sorted(set(refs))
+    refs: list[str] = []
+
+    # 1. Always block explicit serial/asset matches against active possessions or committed RentalAssets.
+    serial_product_ids = {
+        pid
+        for pid, lines in lines_by_product.items()
+        if any((lp.get("serial_number") or "").strip() for lp in lines)
+    }
+    committed_assets_by_product: dict[int, list[RentalAsset]] = {}
+    if serial_product_ids:
+        for asset in (
+            RentalAsset.objects.select_related("product")
+            .filter(product_id__in=serial_product_ids)
+            .filter(
+                Q(
+                    status__in=[
+                        RentalAssetStatus.RESERVED,
+                        RentalAssetStatus.HANDED_OVER,
+                        RentalAssetStatus.RETURNED,
+                        RentalAssetStatus.UNDER_REPAIR,
+                    ]
+                )
+                | Q(current_subscription__isnull=False)
+            )
+        ):
+            committed_assets_by_product.setdefault(asset.product_id, []).append(asset)
+
+    for pid in serial_product_ids:
+        for lp in lines_by_product[pid]:
+            sn = (lp.get("serial_number") or "").strip()
+            if not sn:
+                continue
+            sn_cf = sn.casefold()
+            product = lp["product"]
+            label = _format_possession_product_label(
+                getattr(product, "product_code", None),
+                getattr(product, "name", None),
+                pid,
+            )
+            for possession in possessions_by_product.get(pid, []):
+                if (possession.serial_number or "").strip().casefold() == sn_cf:
+                    refs.append(f"{label} [SN: {sn}] -> SUB-{possession.subscription_id} [{possession.status}]")
+            for asset in committed_assets_by_product.get(pid, []):
+                if sn_cf in {
+                    (asset.serial_no or "").strip().casefold(),
+                    (asset.asset_code or "").strip().casefold(),
+                }:
+                    sub_ref = f"SUB-{asset.current_subscription_id}" if asset.current_subscription_id else asset.asset_code
+                    refs.append(f"{label} [Asset: {asset.asset_code}] -> {sub_ref} [{asset.status}]")
+
+    # 2. For products with active rent/lease possessions, allow Direct Sale only when
+    #    enough unencumbered stock exists beyond what is committed to those possessions.
+    for pid, possessions in possessions_by_product.items():
+        product_lines = lines_by_product[pid]
+        requested_qty = sum((Decimal(str(lp.get("quantity") or "0")) for lp in product_lines), Decimal("0.000"))
+        if requested_qty <= Decimal("0.000"):
+            continue
+
+        product = product_lines[0]["product"]
+        inventory_item = next(
+            (lp.get("inventory_item") for lp in product_lines if lp.get("inventory_item") is not None),
+            None,
+        ) or _resolve_line_inventory_item(product=product, inventory_item=None)
+
+        blocked_for_product = False
+        if inventory_item is None or not inventory_item.stock_tracking_enabled:
+            blocked_for_product = True
+        else:
+            available_qty = Decimal(str(inventory_item.available_qty()))
+            encumbered_qty = _encumbered_rent_lease_stock_qty(
+                product_id=pid,
+                inventory_item=inventory_item,
+                possessions=possessions,
+            )
+            free_sellable_qty = max(Decimal("0.000"), available_qty - encumbered_qty)
+            all_purchase_req = all(bool(lp.get("_create_purchase_requirement")) for lp in product_lines)
+            if requested_qty > free_sellable_qty and not (
+                all_purchase_req and available_qty <= Decimal("0.000") and encumbered_qty <= Decimal("0.000")
+            ):
+                blocked_for_product = True
+
+        if blocked_for_product:
+            for possession in possessions:
+                label = _format_possession_product_label(
+                    getattr(possession.product, "product_code", None),
+                    getattr(possession.product, "name", None),
+                    possession.subscription_id,
+                )
+                refs.append(f"{label} -> SUB-{possession.subscription_id} [{possession.status}]")
+
+    if not refs:
+        return
 
     raise ValueError(
         "Direct sale is blocked for assets under active rent/lease possession: "
-        + "; ".join(refs)
+        + "; ".join(sorted(set(refs)))
     )
 
 
@@ -614,6 +775,8 @@ def create_direct_sale(*, payload: dict, created_by):
     received_total = _money(payload.get("received_total"))
     payload["received_total"] = received_total
     payload["balance_total"] = totals["grand_total"] - received_total
+    if "van_fare" in payload:
+        payload["van_fare"] = _money(payload.get("van_fare"))
     sale = DirectSale.objects.create(
         sale_no=_issue_series_number(payload["doc_series"], prefix_fallback="SALE"),
         **payload,
@@ -622,7 +785,14 @@ def create_direct_sale(*, payload: dict, created_by):
     _sync_direct_sale_purchase_needs(sale=sale, line_payloads=line_payloads, actor=created_by)
     _sync_direct_sale_invoice(sale=sale, line_payloads=line_payloads)
     from billing.services.direct_sale_delivery_bridge_service import sync_direct_sale_delivery_case
+    from deliveries.models import TransportFareSourceType
+    from deliveries.services.transport_finance_service import sync_transport_fare_for_source
 
+    sync_transport_fare_for_source(
+        source_type=TransportFareSourceType.DIRECT_SALE,
+        source_instance=sale,
+        performed_by=created_by,
+    )
     sync_direct_sale_delivery_case(sale=sale, actor=created_by)
     from contracts.services.contract_reference_service import (
         ensure_contract_reference_for_direct_sale,
@@ -750,6 +920,8 @@ def update_direct_sale(*, direct_sale_id: int, payload: dict, updated_by):
     received_total = _money(payload.get("received_total", sale.received_total))
     payload["received_total"] = received_total
     payload["balance_total"] = totals["grand_total"] - received_total
+    if "van_fare" in payload:
+        payload["van_fare"] = _money(payload.get("van_fare"))
     for key, value in payload.items():
         setattr(sale, key, value)
     sale.save()
@@ -759,7 +931,14 @@ def update_direct_sale(*, direct_sale_id: int, payload: dict, updated_by):
     _sync_direct_sale_purchase_needs(sale=sale, line_payloads=line_payloads, actor=updated_by)
     _sync_direct_sale_invoice(sale=sale, line_payloads=line_payloads)
     from billing.services.direct_sale_delivery_bridge_service import sync_direct_sale_delivery_case
+    from deliveries.models import TransportFareSourceType
+    from deliveries.services.transport_finance_service import sync_transport_fare_for_source
 
+    sync_transport_fare_for_source(
+        source_type=TransportFareSourceType.DIRECT_SALE,
+        source_instance=sale,
+        performed_by=updated_by,
+    )
     sync_direct_sale_delivery_case(sale=sale, actor=updated_by)
     log_audit(
         action_type=AuditLog.ActionType.PAYMENT_FLAGGED,

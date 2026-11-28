@@ -99,6 +99,8 @@ def _normalize_contract_items(
         charge_mode = str(it.get("charge_mode") or "").strip().upper()
 
         if not is_accessory:
+            from contracts.services.subscription_service import assert_standalone_contract_product_allowed
+            assert_standalone_contract_product_allowed(prod)
             if plan_type == PlanType.RENT and not getattr(prod, "is_rent_enabled", False):
                 raise ValidationError(
                     {"items": f"Product '{getattr(prod, 'name', prod)}' is not enabled for RENT contracts."}
@@ -113,9 +115,12 @@ def _normalize_contract_items(
             raise ValidationError({"items": f"Item {idx}: Quantity must be greater than zero."})
 
         unit_price = it.get("unit_base_price")
-        if unit_price is None or str(unit_price).strip() == "":
-            unit_price = MONEY_ZERO if (is_accessory and charge_mode == "FREE") else getattr(prod, "base_price", MONEY_ZERO)
-        unit_price_d = Decimal(str(unit_price)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        if is_accessory and charge_mode in {"FREE", "INCLUDED"}:
+            unit_price_d = MONEY_ZERO
+        else:
+            if unit_price is None or str(unit_price).strip() == "":
+                unit_price = getattr(prod, "base_price", MONEY_ZERO)
+            unit_price_d = Decimal(str(unit_price)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
         if unit_price_d < Decimal("0.00"):
             raise ValidationError({"items": f"Item {idx}: Unit base price cannot be negative."})
 
@@ -173,6 +178,7 @@ def create_rent_contract(
     customer,
     product=None,
     items: list[dict] | None = None,
+    services: list[dict] | None = None,
     tenure_months: int,
     start_date=None,
     security_deposit_percent: Decimal,
@@ -188,6 +194,11 @@ def create_rent_contract(
     deposit_finance_account_id: int | None = None,
     deposit_payment_method: str = "CASH",
     deposit_reference_no: str = "",
+    van_number: str = "",
+    transport_boy_name: str = "",
+    transport_boy_phone: str = "",
+    van_fare: Decimal = Decimal("0.00"),
+    transport_notes: str = "",
 ) -> Subscription:
     if start_date is None:
         start_date = timezone.now().date()
@@ -210,6 +221,8 @@ def create_rent_contract(
     )
 
     primary_product = normalized_items[0]["product"]
+    from contracts.services.subscription_service import normalize_emi_selected_services
+    normalized_services, services_total = normalize_emi_selected_services(primary_product, services or [])
     product_value = sum((it["total_base_price"] for it in normalized_items), MONEY_ZERO)
     monthly_amount = sum((it["monthly_amount"] for it in normalized_items), MONEY_ZERO)
     total_amount = (monthly_amount * Decimal(tenure_months)).quantize(
@@ -274,6 +287,11 @@ def create_rent_contract(
         total_amount=total_amount,
         monthly_amount=monthly_amount,
         status=contract_status,
+        van_number=(van_number or "").strip(),
+        transport_boy_name=(transport_boy_name or "").strip(),
+        transport_boy_phone=(transport_boy_phone or "").strip(),
+        van_fare=q2(Decimal(str(van_fare or MONEY_ZERO))),
+        transport_notes=(transport_notes or "").strip(),
         product_snapshot={
             "product_id": primary_product.id,
             "product_code": getattr(primary_product, "product_code", ""),
@@ -281,6 +299,7 @@ def create_rent_contract(
             "base_price": str(getattr(primary_product, "base_price", MONEY_ZERO)),
             "items_count": len(normalized_items),
             "items": items_snapshot,
+            "selected_services": normalized_services,
         },
         pricing_snapshot={
             "plan_type": PlanType.RENT,
@@ -288,6 +307,7 @@ def create_rent_contract(
             "monthly_amount": str(monthly_amount),
             "total_amount": str(total_amount),
             "total_product_value": str(product_value),
+            "services_total": str(services_total),
             "items_count": len(normalized_items),
             "security_deposit_percent": str(effective_deposit_percent),
             "security_deposit_amount": str(deposit_amount),
@@ -449,6 +469,15 @@ def create_rent_contract(
         from contracts.services.rent_lease_billing_service import generate_monthly_demands_for_subscription
         generate_monthly_demands_for_subscription(subscription=subscription, performed_by=performed_by)
 
+    from deliveries.models import TransportFareSourceType
+    from deliveries.services.transport_finance_service import sync_transport_fare_for_source
+
+    sync_transport_fare_for_source(
+        source_type=TransportFareSourceType.RENT_CONTRACT,
+        source_instance=subscription,
+        performed_by=performed_by,
+    )
+
     return subscription
 
 
@@ -458,6 +487,7 @@ def create_lease_contract(
     customer,
     product=None,
     items: list[dict] | None = None,
+    services: list[dict] | None = None,
     tenure_months: int,
     start_date=None,
     security_deposit_percent: Decimal,
@@ -475,6 +505,11 @@ def create_lease_contract(
     deposit_finance_account_id: int | None = None,
     deposit_payment_method: str = "CASH",
     deposit_reference_no: str = "",
+    van_number: str = "",
+    transport_boy_name: str = "",
+    transport_boy_phone: str = "",
+    van_fare: Decimal = Decimal("0.00"),
+    transport_notes: str = "",
 ) -> Subscription:
     if start_date is None:
         start_date = timezone.now().date()
@@ -497,6 +532,8 @@ def create_lease_contract(
     )
 
     primary_product = normalized_items[0]["product"]
+    from contracts.services.subscription_service import normalize_emi_selected_services
+    normalized_services, services_total = normalize_emi_selected_services(primary_product, services or [])
     product_value = sum((it["total_base_price"] for it in normalized_items), MONEY_ZERO)
     monthly_amount = sum((it["monthly_amount"] for it in normalized_items), MONEY_ZERO)
     total_amount = (monthly_amount * Decimal(tenure_months)).quantize(
@@ -567,6 +604,11 @@ def create_lease_contract(
         total_amount=total_amount,
         monthly_amount=monthly_amount,
         status=contract_status,
+        van_number=(van_number or "").strip(),
+        transport_boy_name=(transport_boy_name or "").strip(),
+        transport_boy_phone=(transport_boy_phone or "").strip(),
+        van_fare=q2(Decimal(str(van_fare or MONEY_ZERO))),
+        transport_notes=(transport_notes or "").strip(),
         product_snapshot={
             "product_id": primary_product.id,
             "product_code": getattr(primary_product, "product_code", ""),
@@ -574,6 +616,7 @@ def create_lease_contract(
             "base_price": str(getattr(primary_product, "base_price", MONEY_ZERO)),
             "items_count": len(normalized_items),
             "items": items_snapshot,
+            "selected_services": normalized_services,
         },
         pricing_snapshot={
             "plan_type": PlanType.LEASE,
@@ -581,6 +624,7 @@ def create_lease_contract(
             "monthly_amount": str(monthly_amount),
             "total_amount": str(total_amount),
             "total_product_value": str(product_value),
+            "services_total": str(services_total),
             "items_count": len(normalized_items),
             "security_deposit_percent": str(effective_deposit_percent),
             "security_deposit_amount": str(deposit_amount),
@@ -745,6 +789,15 @@ def create_lease_contract(
     if subscription.status == SubscriptionStatus.ACTIVE:
         from contracts.services.rent_lease_billing_service import generate_monthly_demands_for_subscription
         generate_monthly_demands_for_subscription(subscription=subscription, performed_by=performed_by)
+
+    from deliveries.models import TransportFareSourceType
+    from deliveries.services.transport_finance_service import sync_transport_fare_for_source
+
+    sync_transport_fare_for_source(
+        source_type=TransportFareSourceType.LEASE_CONTRACT,
+        source_instance=subscription,
+        performed_by=performed_by,
+    )
 
     return subscription
 

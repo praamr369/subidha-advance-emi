@@ -51,6 +51,7 @@ class AdminRentContractCreateView(APIView):
             customer=data["customer"],
             product=data.get("product"),
             items=data.get("items"),
+            services=data.get("services"),
             tenure_months=data["tenure_months"],
             start_date=data.get("start_date"),
             security_deposit_percent=data["security_deposit_percent"],
@@ -66,6 +67,11 @@ class AdminRentContractCreateView(APIView):
             deposit_finance_account_id=data.get("deposit_finance_account_id"),
             deposit_payment_method=data.get("deposit_payment_method", "CASH"),
             deposit_reference_no=data.get("deposit_reference_no", ""),
+            van_number=data.get("van_number", ""),
+            transport_boy_name=data.get("transport_boy_name", ""),
+            transport_boy_phone=data.get("transport_boy_phone", ""),
+            van_fare=data.get("van_fare") or Decimal("0.00"),
+            transport_notes=data.get("transport_notes", ""),
         )
 
         from contracts.services.contract_pdf_service import generate_contract_pdf_for_subscription
@@ -90,6 +96,7 @@ class AdminLeaseContractCreateView(APIView):
             customer=data["customer"],
             product=data.get("product"),
             items=data.get("items"),
+            services=data.get("services"),
             tenure_months=data["tenure_months"],
             start_date=data.get("start_date"),
             security_deposit_percent=data["security_deposit_percent"],
@@ -107,6 +114,11 @@ class AdminLeaseContractCreateView(APIView):
             deposit_finance_account_id=data.get("deposit_finance_account_id"),
             deposit_payment_method=data.get("deposit_payment_method", "CASH"),
             deposit_reference_no=data.get("deposit_reference_no", ""),
+            van_number=data.get("van_number", ""),
+            transport_boy_name=data.get("transport_boy_name", ""),
+            transport_boy_phone=data.get("transport_boy_phone", ""),
+            van_fare=data.get("van_fare") or Decimal("0.00"),
+            transport_notes=data.get("transport_notes", ""),
         )
 
         from contracts.services.contract_pdf_service import generate_contract_pdf_for_subscription

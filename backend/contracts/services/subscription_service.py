@@ -26,6 +26,26 @@ def _q2(value: Decimal) -> Decimal:
     return Decimal(value).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
+def assert_standalone_contract_product_allowed(product) -> None:
+    """Block standalone accessories, raw materials, and services in SFEMI/RENT/LEASE contracts."""
+    if product is None:
+        return
+    inv_profile = getattr(product, "inventory_profile", None)
+    stock_item_type = (getattr(inv_profile, "stock_item_type", None) or "").strip().upper()
+    item_type = (getattr(product, "item_type", None) or "").strip().upper()
+    effective_type = stock_item_type or item_type
+    if effective_type in {"ACCESSORY", "RAW_MATERIAL", "SERVICE"} or item_type in {"ACCESSORY", "RAW_MATERIAL", "SERVICE"}:
+        raise ValidationError(
+            {
+                "product": (
+                    f"'{getattr(product, 'name', product)}' is classified as {effective_type or item_type} "
+                    "and cannot be sold standalone in SFEMI, Rent, or Lease contracts. "
+                    "Attach it to a finished good instead."
+                )
+            }
+        )
+
+
 def get_subscription_selected_accessories(subscription) -> list[dict]:
     """Return normalized selected accessories stored on an EMI/single-product subscription."""
     snapshot = getattr(subscription, "product_snapshot", None)
@@ -35,6 +55,19 @@ def get_subscription_selected_accessories(subscription) -> list[dict]:
     if not isinstance(raw, list):
         return []
     return [row for row in raw if isinstance(row, dict) and row.get("product_id")]
+
+
+def get_subscription_selected_services(subscription) -> list[dict]:
+    """Return normalized selected services stored on an EMI/Rent/Lease subscription."""
+    snapshot = getattr(subscription, "product_snapshot", None)
+    if not isinstance(snapshot, dict):
+        return []
+    raw = snapshot.get("selected_services")
+    if not isinstance(raw, list):
+        raw = snapshot.get("services")
+    if not isinstance(raw, list):
+        return []
+    return [row for row in raw if isinstance(row, dict) and (row.get("service_id") or row.get("service_name"))]
 
 
 def normalize_emi_selected_accessories(parent_product, raw_accessories) -> tuple[list[dict], Decimal]:
@@ -131,6 +164,94 @@ def normalize_emi_selected_accessories(parent_product, raw_accessories) -> tuple
     return normalized, _q2(accessories_total)
 
 
+def normalize_emi_selected_services(parent_product, raw_services) -> tuple[list[dict], Decimal]:
+    """Validate and price selected service options for an EMI/Rent/Lease contract bundle."""
+    if not raw_services:
+        return [], Decimal("0.00")
+
+    from inventory.models import FinishedGoodServiceLink, ServiceCatalogItem, ServiceCatalogItemStatus
+
+    requested_ids: list[int] = []
+    for row in raw_services:
+        if not isinstance(row, dict):
+            raise ValidationError({"services": "Each service entry must be an object."})
+        sid = row.get("service_id") or row.get("service")
+        if sid in (None, ""):
+            raise ValidationError({"services": "Each service entry must include service_id."})
+        try:
+            requested_ids.append(int(sid))
+        except (TypeError, ValueError):
+            raise ValidationError({"services": f"Invalid service_id '{sid}'."})
+
+    services_by_id = {
+        s.id: s
+        for s in ServiceCatalogItem.objects.filter(id__in=requested_ids, status=ServiceCatalogItemStatus.ACTIVE)
+    }
+    missing = [sid for sid in requested_ids if sid not in services_by_id]
+    if missing:
+        raise ValidationError({"services": f"Active service(s) not found: {missing}"})
+
+    link_map: dict[int, FinishedGoodServiceLink] = {}
+    parent_inv = getattr(parent_product, "inventory_profile", None) if parent_product is not None else None
+    if parent_inv is not None:
+        link_map = {
+            lnk.service_id: lnk
+            for lnk in FinishedGoodServiceLink.objects.filter(
+                finished_good=parent_inv,
+                service_id__in=requested_ids,
+            )
+        }
+
+    normalized: list[dict] = []
+    services_total = Decimal("0.00")
+
+    for row in raw_services:
+        sid = int(row.get("service_id") or row.get("service"))
+        svc = services_by_id[sid]
+        lnk = link_map.get(sid)
+        charge_mode = str(
+            row.get("charge_mode")
+            or (lnk.charge_mode if lnk else "")
+            or "FREE"
+        ).strip().upper()
+        if charge_mode in {"INCLUDED", "FREE"}:
+            charge_mode = "FREE"
+        else:
+            charge_mode = "CHARGEABLE"
+
+        raw_price = row.get("sale_price")
+        if raw_price in (None, ""):
+            raw_price = row.get("unit_base_price")
+        if charge_mode == "FREE":
+            unit_price = Decimal("0.00")
+        elif raw_price not in (None, ""):
+            try:
+                unit_price = _q2(Decimal(str(raw_price)))
+            except Exception:
+                raise ValidationError({"services": f"Invalid price for service {svc.name}."})
+        elif lnk is not None and lnk.sale_price and Decimal(str(lnk.sale_price)) > Decimal("0.00"):
+            unit_price = _q2(Decimal(str(lnk.sale_price)))
+        else:
+            unit_price = _q2(Decimal(str(getattr(svc, "standard_price", 0) or 0)))
+
+        if unit_price < Decimal("0.00"):
+            raise ValidationError({"services": f"Price cannot be negative for service {svc.name}."})
+
+        services_total += unit_price
+        normalized.append({
+            "service_id": svc.id,
+            "service_code": getattr(svc, "code", "") or "",
+            "service_name": svc.name,
+            "charge_mode": charge_mode,
+            "sale_price": str(unit_price),
+            "tax_rate_percent": str(getattr(svc, "tax_rate_percent", Decimal("0.00")) or "0.00"),
+            "hsn_sac_code": getattr(svc, "hsn_sac_code", "") or "",
+            "parent_product_id": getattr(parent_product, "id", None),
+        })
+
+    return normalized, _q2(services_total)
+
+
 def build_emi_bundle_snapshots(
     *,
     product,
@@ -138,26 +259,33 @@ def build_emi_bundle_snapshots(
     total_amount: Decimal,
     monthly_amount: Decimal,
     selected_accessories: list[dict] | None = None,
+    selected_services: list[dict] | None = None,
     accessories_configured: bool = False,
 ) -> tuple[dict, dict]:
     """Build deterministic product_snapshot and pricing_snapshot for an EMI contract."""
     accessories_list = list(selected_accessories or [])
+    services_list = list(selected_services or [])
     accessories_total = _q2(
         sum(Decimal(str(item.get("total_base_price") or "0.00")) for item in accessories_list)
+    )
+    services_total = _q2(
+        sum(Decimal(str(item.get("sale_price") or "0.00")) for item in services_list)
     )
     product_snapshot = {
         "product_id": product.id,
         "product_code": getattr(product, "product_code", "") or "",
         "name": getattr(product, "name", "") or "",
         "base_price": str(_q2(Decimal(str(product.base_price)))),
-        "accessories_configured": bool(accessories_configured or accessories_list),
+        "accessories_configured": bool(accessories_configured or accessories_list or services_list),
         "selected_accessories": accessories_list,
+        "selected_services": services_list,
     }
     pricing_snapshot = {
         "plan_type": PlanType.EMI,
         "tenure_months": int(tenure_months),
         "product_base_price": str(_q2(Decimal(str(product.base_price)))),
         "accessories_total": str(accessories_total),
+        "services_total": str(services_total),
         "monthly_amount": str(_q2(monthly_amount)),
         "total_amount": str(_q2(total_amount)),
     }
@@ -175,8 +303,14 @@ def create_emi_subscription(
     partner=None,
     start_date=None,
     performed_by=None,
+    van_number: str = "",
+    transport_boy_name: str = "",
+    transport_boy_phone: str = "",
+    van_fare: Decimal = Decimal("0.00"),
+    transport_notes: str = "",
 ):
     """Create an EMI subscription using deterministic installment generation."""
+    assert_standalone_contract_product_allowed(product)
 
     if start_date is None:
         start_date = timezone.now().date()
@@ -220,6 +354,20 @@ def create_emi_subscription(
         total_amount=total_amount,
         monthly_amount=monthly_amount,
         status=SubscriptionStatus.ACTIVE,
+        van_number=(van_number or "").strip(),
+        transport_boy_name=(transport_boy_name or "").strip(),
+        transport_boy_phone=(transport_boy_phone or "").strip(),
+        van_fare=_q2(Decimal(str(van_fare or "0.00"))),
+        transport_notes=(transport_notes or "").strip(),
+    )
+
+    from deliveries.models import TransportFareSourceType
+    from deliveries.services.transport_finance_service import sync_transport_fare_for_source
+
+    sync_transport_fare_for_source(
+        source_type=TransportFareSourceType.EMI_CONTRACT,
+        source_instance=subscription,
+        performed_by=performed_by,
     )
 
     lucky.status = LuckyIdStatus.ASSIGNED

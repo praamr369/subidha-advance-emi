@@ -208,3 +208,78 @@ class DirectSaleWorkflowTests(TestCase):
         self.assertTrue(first["created"])
         self.assertFalse(second["created"])
         self.assertEqual(first["receipt"].id, second["receipt"].id)
+
+    def test_direct_sale_transport_and_van_fare_is_off_ledger_and_inherited_by_delivery_challan(self):
+        from accounting.models import JournalEntry
+        from billing.services.direct_sale_delivery_actions import (
+            schedule_direct_sale_delivery,
+            update_direct_sale_delivery_metadata,
+        )
+        from billing.services.direct_sale_delivery_queue import serialize_direct_sale_delivery_case
+        from deliveries.models import TransportFareEntry, TransportFareSourceType
+        from service_desk.models import ServiceDeskCase, ServiceDeskCaseType
+
+        je_before = JournalEntry.objects.count()
+        payload = self._direct_sale_payload(delivery_required=True)
+        payload["van_number"] = "wb-02-tr-9988"
+        payload["transport_boy_name"] = "Raju Driver"
+        payload["transport_boy_phone"] = "9830011223"
+        payload["van_fare"] = Decimal("450.00")
+        payload["transport_notes"] = "Evening tempo trip"
+
+        sale = create_direct_sale(payload=payload, created_by=self.admin)
+        invoice = BillingInvoice.objects.get(direct_sale=sale)
+
+        # Van fare MUST NOT alter sale totals, invoice totals, or company journal entries
+        self.assertEqual(sale.grand_total, Decimal("18000.00"))
+        self.assertEqual(invoice.grand_total, Decimal("18000.00"))
+        self.assertEqual(sale.van_number, "WB-02-TR-9988")
+        self.assertEqual(sale.van_fare, Decimal("450.00"))
+        self.assertEqual(JournalEntry.objects.count(), je_before)
+
+        tf_sale = TransportFareEntry.objects.get(
+            direct_sale=sale,
+            service_case__isnull=True,
+            source_type=TransportFareSourceType.DIRECT_SALE,
+        )
+        self.assertEqual(tf_sale.van_fare, Decimal("450.00"))
+        self.assertEqual(tf_sale.transport_boy_phone, "9830011223")
+
+        # Delivery case inherits transport fields cleanly and updates them on challan actions
+        case = ServiceDeskCase.objects.get(
+            direct_sale=sale,
+            case_type=ServiceDeskCaseType.DIRECT_SALE_DELIVERY,
+        )
+        self.assertEqual(case.van_number, "WB-02-TR-9988")
+        self.assertEqual(case.van_fare, Decimal("450.00"))
+
+        update_direct_sale_delivery_metadata(
+            case_id=case.id,
+            actor=self.admin,
+            van_fare=Decimal("525.00"),
+            transport_boy_phone="9830099999",
+        )
+        case.refresh_from_db()
+        serialized = serialize_direct_sale_delivery_case(case)
+        self.assertEqual(serialized["van_fare"], "525.00")
+        self.assertEqual(serialized["transport_boy_phone"], "9830099999")
+        tf_case = TransportFareEntry.objects.get(
+            service_case=case,
+            source_type=TransportFareSourceType.DIRECT_SALE_DELIVERY,
+        )
+        self.assertEqual(tf_case.van_fare, Decimal("525.00"))
+        self.assertEqual(JournalEntry.objects.count(), je_before)
+
+        approve_billing_invoice(invoice_id=invoice.id, approved_by=self.admin)
+        post_billing_invoice(invoice_id=invoice.id, posted_by=self.admin)
+        je_after_invoice = JournalEntry.objects.count()
+
+        schedule_direct_sale_delivery(
+            case_id=case.id,
+            actor=self.admin,
+            scheduled_date=date(2026, 4, 16),
+            van_fare=Decimal("550.00"),
+        )
+        tf_case.refresh_from_db()
+        self.assertEqual(tf_case.van_fare, Decimal("550.00"))
+        self.assertEqual(JournalEntry.objects.count(), je_after_invoice)

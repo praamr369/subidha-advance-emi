@@ -261,6 +261,19 @@ def sync_direct_sale_delivery_case(*, sale: DirectSale, actor=None) -> ServiceDe
             stock_status=desired_stock,
             resolution_summary=resolution_summary,
             payment_exception_acknowledged=False,
+            van_number=sale.van_number or "",
+            transport_boy_name=sale.transport_boy_name or "",
+            transport_boy_phone=sale.transport_boy_phone or "",
+            van_fare=sale.van_fare or Decimal("0.00"),
+            transport_notes=sale.transport_notes or "",
+        )
+        from deliveries.models import TransportFareSourceType
+        from deliveries.services.transport_finance_service import sync_transport_fare_for_source
+
+        sync_transport_fare_for_source(
+            source_type=TransportFareSourceType.DIRECT_SALE_DELIVERY,
+            source_instance=case,
+            performed_by=actor,
         )
     else:
         updates = []

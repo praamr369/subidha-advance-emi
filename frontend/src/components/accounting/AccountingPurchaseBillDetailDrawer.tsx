@@ -167,8 +167,17 @@ export default function AccountingPurchaseBillDetailDrawer({
                       <tr key={line.id ?? index} className="hover:bg-muted/30">
                         <td className="px-3 py-2.5 text-muted-foreground">{index + 1}</td>
                         <td className="px-3 py-2.5">
-                          <div className="font-medium text-foreground">
-                            {line.inventory_item_product_name || `Item #${line.inventory_item}`}
+                          <div className="flex flex-wrap items-center gap-1.5 font-medium text-foreground">
+                            {line.line_type === "SERVICE" || !line.inventory_item ? (
+                              <>
+                                <span className="rounded bg-blue-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 dark:text-blue-300">
+                                  SERVICE / VAN FARE
+                                </span>
+                                <span>{line.description || "Service / Transport Charge"}</span>
+                              </>
+                            ) : (
+                              <span>{line.inventory_item_product_name || `Item #${line.inventory_item}`}</span>
+                            )}
                           </div>
                           <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
                             {line.inventory_item_sku ? (
@@ -180,7 +189,7 @@ export default function AccountingPurchaseBillDetailDrawer({
                               </span>
                             ) : null}
                           </div>
-                          {line.description ? (
+                          {line.line_type !== "SERVICE" && line.inventory_item && line.description ? (
                             <p className="mt-1 text-[11px] text-muted-foreground">{line.description}</p>
                           ) : null}
                         </td>

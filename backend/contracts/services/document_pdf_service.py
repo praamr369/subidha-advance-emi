@@ -623,6 +623,20 @@ def render_delivery_handover_pdf(*, delivery) -> bytes:
     line(f"Delivery Address: {delivery.delivery_address_snapshot or 'N/A'}", size=10)
     line(f"Receiver: {delivery.receiver_name or 'N/A'}", size=10)
     line(f"Receiver Phone (masked): {_mask_phone(delivery.receiver_phone)}", size=10)
+    van_no = (getattr(delivery, "van_number", "") or getattr(subscription, "van_number", "") or "").strip()
+    boy_name = (getattr(delivery, "transport_boy_name", "") or getattr(subscription, "transport_boy_name", "") or "").strip()
+    boy_phone = (getattr(delivery, "transport_boy_phone", "") or getattr(subscription, "transport_boy_phone", "") or "").strip()
+    van_fare_val = getattr(delivery, "van_fare", None)
+    if van_fare_val is None or Decimal(str(van_fare_val or "0")) <= Decimal("0"):
+        van_fare_val = getattr(subscription, "van_fare", None)
+    if van_no or boy_name or boy_phone or (van_fare_val is not None and Decimal(str(van_fare_val or "0")) > Decimal("0")):
+        rule()
+        line("TRANSPORT / DELIVERY CHALLAN MEMO (Transport-Only Finance · Off-Ledger)", size=10)
+        line(f"Van / Vehicle No.: {van_no or 'N/A'}", size=10)
+        boy_display = f"{boy_name or 'N/A'}" + (f" ({boy_phone})" if boy_phone else "")
+        line(f"Transport Boy / Phone: {boy_display}", size=10)
+        if van_fare_val is not None and Decimal(str(van_fare_val or "0")) > Decimal("0"):
+            line(f"Van Fare (Not posted to company account): INR {Decimal(str(van_fare_val)):.2f}", size=10)
     rule()
     line("Receiver Signature: ____________________________", size=10)
     line("Company Representative Signature: _______________", size=10)

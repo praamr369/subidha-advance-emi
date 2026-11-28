@@ -76,8 +76,14 @@ const vendorBillSchema = z.object({
   notes: z.string().optional().default(""),
 });
 
-function EmptyLine(): VendorBillLine {
-  return { inventory_item: 0, quantity: "1", unit_cost: "0" };
+function EmptyLine(lineType: "GOODS" | "SERVICE" = "GOODS"): VendorBillLine {
+  return {
+    line_type: lineType,
+    inventory_item: lineType === "SERVICE" ? null : 0,
+    description: lineType === "SERVICE" ? "Van Fare / Transport Charge" : "",
+    quantity: "1",
+    unit_cost: "0",
+  };
 }
 
 function CreateBillForm({ vendors, receipts, items, locations, onSaved, onCancel }: CreateBillFormProps) {
@@ -124,7 +130,9 @@ function CreateBillForm({ vendors, receipts, items, locations, onSaved, onCancel
   function setLine(i: number, patch: Partial<VendorBillLine>) {
     setLines((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
   }
-  function addLine() { setLines((prev) => [...prev, EmptyLine()]); }
+  function addLine(lineType: "GOODS" | "SERVICE" = "GOODS") {
+    setLines((prev) => [...prev, EmptyLine(lineType)]);
+  }
   function removeLine(i: number) { setLines((prev) => prev.filter((_, idx) => idx !== i)); }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -138,8 +146,15 @@ function CreateBillForm({ vendors, receipts, items, locations, onSaved, onCancel
         errs[fieldMap[key] ?? key] = issue.message;
       }
     }
-    const validLines = lines.filter((l) => l.inventory_item && parseFloat(l.quantity) > 0);
-    if (!validLines.length) errs.lines = "At least one line with item and quantity > 0 is required.";
+    const validLines = lines.filter((l) => {
+      const qtyOk = parseFloat(l.quantity) > 0;
+      if (!qtyOk) return false;
+      if ((l.line_type || "GOODS") === "SERVICE") {
+        return Boolean((l.description || "").trim());
+      }
+      return Boolean(l.inventory_item);
+    });
+    if (!validLines.length) errs.lines = "At least one goods item or service / van fare line with quantity > 0 is required.";
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setErrors({});
     setBusy(true);
@@ -148,15 +163,20 @@ function CreateBillForm({ vendors, receipts, items, locations, onSaved, onCancel
         bill_no: billNo || undefined,
         bill_date: billDate,
         vendor: Number(vendorId),
-          stock_location: stockLocationId ? Number(stockLocationId) : undefined,
-          goods_receipt: grId ? Number(grId) : null,
+        stock_location: stockLocationId ? Number(stockLocationId) : undefined,
+        goods_receipt: grId ? Number(grId) : null,
         notes,
-        lines: validLines.map((l) => ({
-          inventory_item: Number(l.inventory_item),
-          quantity: l.quantity,
-          unit_cost: l.unit_cost,
-          tax_amount: l.tax_amount || "0.00",
-        })),
+        lines: validLines.map((l) => {
+          const isService = (l.line_type || "GOODS") === "SERVICE";
+          return {
+            line_type: isService ? "SERVICE" : "GOODS",
+            inventory_item: isService ? null : Number(l.inventory_item),
+            description: (l.description || "").trim(),
+            quantity: l.quantity,
+            unit_cost: l.unit_cost,
+            tax_amount: l.tax_amount || "0.00",
+          };
+        }),
       });
       onSaved(bill);
     } catch (err: unknown) {
@@ -218,34 +238,52 @@ function CreateBillForm({ vendors, receipts, items, locations, onSaved, onCancel
               </button>
             ) : null}
           </div>
-          <button type="button" onClick={addLine} className="h-7 rounded-lg border border-border px-3 text-[11px] font-medium hover:bg-muted">+ Add</button>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => addLine("GOODS")} className="h-7 rounded-lg border border-border px-3 text-[11px] font-medium hover:bg-muted">+ Add Item</button>
+            <button type="button" onClick={() => addLine("SERVICE")} className="h-7 rounded-lg border border-blue-500/40 bg-blue-500/10 px-3 text-[11px] font-medium text-blue-700 hover:bg-blue-500/20 dark:text-blue-300">+ Add Van Fare / Service</button>
+          </div>
         </div>
         {errors.lines ? <p className="mb-1 text-[10px] text-red-600">{errors.lines}</p> : null}
         <div className="space-y-3">
-          {lines.map((line, i) => (
+          {lines.map((line, i) => {
+            const isService = (line.line_type || "GOODS") === "SERVICE";
+            return (
             <div key={i} className="space-y-1.5">
               <div className="grid grid-cols-[1fr_80px_90px_80px_32px] gap-2 items-center">
-                <SearchableItemSelect
-                  value={line.inventory_item}
-                  allItems={items}
-                  placeholder="Search product by name, code, SKU…"
-                  onChange={(val, it) => {
-                    const itemId = Number(val) || 0;
-                    const autoCost = it?.purchase_unit_cost || it?.standard_unit_cost;
-                    const shouldFillCost = (!line.unit_cost || line.unit_cost === "0.00" || line.unit_cost === "0") && autoCost;
-                    setLine(i, {
-                      inventory_item: itemId,
-                      description: it ? (it.product_name || it.product_code || "") : line.description,
-                      unit_cost: shouldFillCost ? String(autoCost) : line.unit_cost,
-                    });
-                    if (it) {
-                      setLineItemsMap((prev) => ({ ...prev, [itemId]: it }));
-                      if (it.stock_item_type === "FINISHED_GOOD") {
-                        setOpenAccLineIdx(i);
+                {isService ? (
+                  <div className="flex items-center gap-1.5">
+                    <span className="shrink-0 rounded bg-blue-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 dark:text-blue-300">VAN/SVC</span>
+                    <input
+                      type="text"
+                      placeholder="Service / Van fare description (e.g. Tempo Van Fare)"
+                      value={line.description ?? ""}
+                      onChange={(e) => setLine(i, { description: e.target.value })}
+                      className={inputCls}
+                    />
+                  </div>
+                ) : (
+                  <SearchableItemSelect
+                    value={line.inventory_item ?? 0}
+                    allItems={items}
+                    placeholder="Search product by name, code, SKU…"
+                    onChange={(val, it) => {
+                      const itemId = Number(val) || 0;
+                      const autoCost = it?.purchase_unit_cost || it?.standard_unit_cost;
+                      const shouldFillCost = (!line.unit_cost || line.unit_cost === "0.00" || line.unit_cost === "0") && autoCost;
+                      setLine(i, {
+                        inventory_item: itemId,
+                        description: it ? (it.product_name || it.product_code || "") : line.description,
+                        unit_cost: shouldFillCost ? String(autoCost) : line.unit_cost,
+                      });
+                      if (it) {
+                        setLineItemsMap((prev) => ({ ...prev, [itemId]: it }));
+                        if (it.stock_item_type === "FINISHED_GOOD") {
+                          setOpenAccLineIdx(i);
+                        }
                       }
-                    }
-                  }}
-                />
+                    }}
+                  />
+                )}
                 <input type="number" min="0.001" step="0.001" placeholder="Qty" value={line.quantity} onChange={(e) => setLine(i, { quantity: e.target.value })} className={inputCls} />
                 <input type="number" min="0" step="0.01" placeholder="Unit cost" value={line.unit_cost} onChange={(e) => setLine(i, { unit_cost: e.target.value })} className={inputCls} />
                 <input type="number" min="0" step="0.01" placeholder="Tax" value={line.tax_amount ?? ""} onChange={(e) => setLine(i, { tax_amount: e.target.value })} className={inputCls} />
@@ -253,7 +291,7 @@ function CreateBillForm({ vendors, receipts, items, locations, onSaved, onCancel
               </div>
 
               {(() => {
-                const invId = Number(line.inventory_item || 0);
+                const invId = isService ? 0 : Number(line.inventory_item || 0);
                 const resolvedItem = invId ? (lineItemsMap[invId] || items.find((it) => it.id === invId)) : undefined;
                 if (!resolvedItem || resolvedItem.stock_item_type !== "FINISHED_GOOD") return null;
                 return (
@@ -324,7 +362,8 @@ function CreateBillForm({ vendors, receipts, items, locations, onSaved, onCancel
                 );
               })()}
             </div>
-          ))}
+          );
+          })}
         </div>
         <p className="mt-1 text-[10px] text-muted-foreground">Columns: Item · Qty · Unit Cost · Tax Amount</p>
       </div>
@@ -402,7 +441,11 @@ function BillDetailDrawer({ bill, onPosted, onClose }: DetailDrawerProps) {
                 <tbody className="divide-y divide-border">
                   {bill.lines.map((l: VendorBillLine, i: number) => (
                     <tr key={l.id ?? i}>
-                      <td className="py-1.5 pr-3">{l.inventory_item_product_name ?? `Item #${l.inventory_item}`}</td>
+                      <td className="py-1.5 pr-3">
+                        {l.line_type === "SERVICE" || !l.inventory_item
+                          ? `${l.description || "Van Fare / Service"} (Service)`
+                          : (l.inventory_item_product_name ?? `Item #${l.inventory_item}`)}
+                      </td>
                       <td className="py-1.5 pr-3">{l.quantity}</td>
                       <td className="py-1.5 pr-3">₹{parseFloat(l.unit_cost).toFixed(2)}</td>
                       <td className="py-1.5">₹{parseFloat(l.tax_amount ?? "0").toFixed(2)}</td>

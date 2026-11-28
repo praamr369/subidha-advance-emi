@@ -708,6 +708,11 @@ def create_subscription_delivery(
     admin_override_reason: str = "",
     batch_number: int | None = None,
     items: list[dict] | None = None,
+    van_number: str | None = None,
+    transport_boy_name: str | None = None,
+    transport_boy_phone: str | None = None,
+    van_fare=None,
+    transport_notes: str | None = None,
 ):
     progress = get_subscription_item_delivery_progress(subscription)
     if progress["total_remaining"] <= 0:
@@ -810,6 +815,38 @@ def create_subscription_delivery(
         override_at = timezone.now()
         override_by = performed_by
 
+    from deliveries.models import TransportFareSourceType
+    from deliveries.services.transport_finance_service import (
+        sync_transport_fare_for_source,
+        to_fare_decimal,
+    )
+
+    resolved_van_number = (
+        van_number.strip()
+        if van_number is not None
+        else (getattr(subscription, "van_number", "") or "").strip()
+    )
+    resolved_boy_name = (
+        transport_boy_name.strip()
+        if transport_boy_name is not None
+        else (getattr(subscription, "transport_boy_name", "") or "").strip()
+    )
+    resolved_boy_phone = (
+        transport_boy_phone.strip()
+        if transport_boy_phone is not None
+        else (getattr(subscription, "transport_boy_phone", "") or "").strip()
+    )
+    resolved_van_fare = (
+        to_fare_decimal(van_fare)
+        if van_fare is not None
+        else to_fare_decimal(getattr(subscription, "van_fare", "0.00"))
+    )
+    resolved_transport_notes = (
+        transport_notes.strip()
+        if transport_notes is not None
+        else (getattr(subscription, "transport_notes", "") or "").strip()
+    )
+
     delivery = SubscriptionDelivery.objects.create(
         subscription=subscription,
         batch_number=batch_num,
@@ -820,12 +857,22 @@ def create_subscription_delivery(
         receiver_phone=receiver_phone or subscription.customer.phone,
         delivery_address_snapshot=delivery_address_snapshot or subscription.customer.address,
         notes=notes or "",
+        van_number=resolved_van_number,
+        transport_boy_name=resolved_boy_name,
+        transport_boy_phone=resolved_boy_phone,
+        van_fare=resolved_van_fare,
+        transport_notes=resolved_transport_notes,
         admin_override=bool(admin_override and not eligibility.eligible),
         admin_override_reason=admin_override_reason.strip() if (admin_override and not eligibility.eligible) else "",
         admin_override_by=override_by,
         admin_override_at=override_at,
         created_by=performed_by,
         updated_by=performed_by,
+    )
+    sync_transport_fare_for_source(
+        source_type=TransportFareSourceType.SUBSCRIPTION_DELIVERY,
+        source_instance=delivery,
+        performed_by=performed_by,
     )
 
     from deliveries.models import SubscriptionDeliveryItem
@@ -895,6 +942,11 @@ def update_subscription_delivery_metadata(
     delivery_address_snapshot: str | None = None,
     notes: str | None = None,
     failure_reason: str | None = None,
+    van_number: str | None = None,
+    transport_boy_name: str | None = None,
+    transport_boy_phone: str | None = None,
+    van_fare=None,
+    transport_notes: str | None = None,
 ):
     changed_fields: dict[str, str | None] = {}
 
@@ -917,11 +969,34 @@ def update_subscription_delivery_metadata(
                 next_value.isoformat() if hasattr(next_value, "isoformat") else str(next_value)
             )
 
+    from deliveries.models import TransportFareSourceType
+    from deliveries.services.transport_finance_service import (
+        apply_transport_fields,
+        sync_transport_fare_for_source,
+    )
+
+    transport_changed = apply_transport_fields(
+        delivery,
+        van_number=van_number,
+        transport_boy_name=transport_boy_name,
+        transport_boy_phone=transport_boy_phone,
+        van_fare=van_fare,
+        transport_notes=transport_notes,
+    )
+    for t_field in transport_changed:
+        t_val = getattr(delivery, t_field)
+        changed_fields[t_field] = str(t_val) if t_val is not None else None
+
     if not changed_fields:
         return delivery
 
     delivery.updated_by = performed_by
     delivery.save()
+    sync_transport_fare_for_source(
+        source_type=TransportFareSourceType.SUBSCRIPTION_DELIVERY,
+        source_instance=delivery,
+        performed_by=performed_by,
+    )
 
     _write_delivery_audit(
         action_type=AuditLog.ActionType.DELIVERY_UPDATED,
@@ -956,6 +1031,11 @@ def transition_subscription_delivery_status(
     receiver_phone: str | None = None,
     notes: str | None = None,
     failure_reason: str | None = None,
+    van_number: str | None = None,
+    transport_boy_name: str | None = None,
+    transport_boy_phone: str | None = None,
+    van_fare=None,
+    transport_notes: str | None = None,
 ):
     next_status = (next_status or "").strip().upper()
     if next_status not in DeliveryStatus.values:
@@ -998,6 +1078,21 @@ def transition_subscription_delivery_status(
     if notes is not None:
         delivery.notes = notes.strip()
 
+    from deliveries.models import TransportFareSourceType
+    from deliveries.services.transport_finance_service import (
+        apply_transport_fields,
+        sync_transport_fare_for_source,
+    )
+
+    apply_transport_fields(
+        delivery,
+        van_number=van_number,
+        transport_boy_name=transport_boy_name,
+        transport_boy_phone=transport_boy_phone,
+        van_fare=van_fare,
+        transport_notes=transport_notes,
+    )
+
     now = timezone.now()
     if next_status == DeliveryStatus.DISPATCHED:
         delivery.dispatched_at = delivery.dispatched_at or now
@@ -1018,6 +1113,11 @@ def transition_subscription_delivery_status(
     delivery.status = next_status
     delivery.updated_by = performed_by
     delivery.save()
+    sync_transport_fare_for_source(
+        source_type=TransportFareSourceType.SUBSCRIPTION_DELIVERY,
+        source_instance=delivery,
+        performed_by=performed_by,
+    )
 
     sync_subscription_fulfillment_status(delivery.subscription)
 
@@ -1092,7 +1192,19 @@ def transition_subscription_delivery_status(
     return delivery
 
 
-def mark_subscription_delivery_delivered(*, delivery, performed_by=None, receiver_name=None, receiver_phone=None, notes=None):
+def mark_subscription_delivery_delivered(
+    *,
+    delivery,
+    performed_by=None,
+    receiver_name=None,
+    receiver_phone=None,
+    notes=None,
+    van_number=None,
+    transport_boy_name=None,
+    transport_boy_phone=None,
+    van_fare=None,
+    transport_notes=None,
+):
     return transition_subscription_delivery_status(
         delivery=delivery,
         next_status=DeliveryStatus.DELIVERED,
@@ -1100,6 +1212,11 @@ def mark_subscription_delivery_delivered(*, delivery, performed_by=None, receive
         receiver_name=receiver_name,
         receiver_phone=receiver_phone,
         notes=notes,
+        van_number=van_number,
+        transport_boy_name=transport_boy_name,
+        transport_boy_phone=transport_boy_phone,
+        van_fare=van_fare,
+        transport_notes=transport_notes,
     )
 
 

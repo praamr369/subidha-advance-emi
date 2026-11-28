@@ -164,6 +164,11 @@ export default function AdminDeliveriesPage() {
   const [createReceiverPhone, setCreateReceiverPhone] = useState("");
   const [createAddress, setCreateAddress] = useState("");
   const [createNotes, setCreateNotes] = useState("");
+  const [createVanNumber, setCreateVanNumber] = useState("");
+  const [createTransportBoyName, setCreateTransportBoyName] = useState("");
+  const [createTransportBoyPhone, setCreateTransportBoyPhone] = useState("");
+  const [createVanFare, setCreateVanFare] = useState("");
+  const [createTransportNotes, setCreateTransportNotes] = useState("");
   const [creating, setCreating] = useState(false);
   const [adminOverride, setAdminOverride] = useState(false);
   const [adminOverrideReason, setAdminOverrideReason] = useState("");
@@ -302,6 +307,11 @@ export default function AdminDeliveriesPage() {
       setCreateReceiverPhone(payload.defaults.receiver_phone || "");
       setCreateAddress(payload.defaults.delivery_address_snapshot || "");
       setCreateNotes(payload.defaults.notes || "");
+      setCreateVanNumber(payload.defaults.van_number || "");
+      setCreateTransportBoyName(payload.defaults.transport_boy_name || "");
+      setCreateTransportBoyPhone(payload.defaults.transport_boy_phone || "");
+      setCreateVanFare(payload.defaults.van_fare && Number(payload.defaults.van_fare) > 0 ? payload.defaults.van_fare : "");
+      setCreateTransportNotes(payload.defaults.transport_notes || "");
       setCreateBatchNumber(payload.progress?.next_batch_number || 1);
       if (payload.progress?.items) {
         const initialQtys: Record<number, number> = {};
@@ -351,6 +361,11 @@ export default function AdminDeliveriesPage() {
       setCreateReceiverPhone(payload.defaults.receiver_phone || "");
       setCreateAddress(payload.defaults.delivery_address_snapshot || "");
       setCreateNotes(payload.defaults.notes || "");
+      setCreateVanNumber(payload.defaults.van_number || "");
+      setCreateTransportBoyName(payload.defaults.transport_boy_name || "");
+      setCreateTransportBoyPhone(payload.defaults.transport_boy_phone || "");
+      setCreateVanFare(payload.defaults.van_fare && Number(payload.defaults.van_fare) > 0 ? payload.defaults.van_fare : "");
+      setCreateTransportNotes(payload.defaults.transport_notes || "");
     } catch (err) {
       setSelectedDsSource(null);
       setDsSourceError(toErrorMessage(err, "Unable to load direct-sale delivery preview."));
@@ -510,6 +525,11 @@ export default function AdminDeliveriesPage() {
         receiver_phone: createReceiverPhone.trim() || undefined,
         delivery_address_snapshot: createAddress.trim() || undefined,
         notes: createNotes.trim() || undefined,
+        van_number: createVanNumber.trim() || undefined,
+        transport_boy_name: createTransportBoyName.trim() || undefined,
+        transport_boy_phone: createTransportBoyPhone.trim() || undefined,
+        van_fare: createVanFare.trim() ? Number(createVanFare).toFixed(2) : undefined,
+        transport_notes: createTransportNotes.trim() || undefined,
         admin_override: adminOverride || undefined,
         admin_override_reason: adminOverrideReason.trim() || undefined,
         batch_number: createBatchNumber,
@@ -1193,6 +1213,46 @@ export default function AdminDeliveriesPage() {
                         placeholder="Operational notes"
                         className="min-h-[96px] rounded-xl border border-border bg-background px-3 py-2 text-sm"
                       />
+                      <div className="rounded-xl border border-amber-300/60 bg-amber-50/40 p-3 dark:bg-amber-950/15 space-y-2">
+                        <div className="text-xs font-semibold text-foreground">
+                          Delivery Challan Transport &amp; Van Fare (Transport-Only · Off-Ledger)
+                        </div>
+                        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                          <input
+                            value={createVanNumber}
+                            onChange={(event) => setCreateVanNumber(event.target.value.toUpperCase())}
+                            placeholder="Van / Vehicle No"
+                            className="rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                          />
+                          <input
+                            value={createTransportBoyName}
+                            onChange={(event) => setCreateTransportBoyName(event.target.value)}
+                            placeholder="Transport Boy Name"
+                            className="rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                          />
+                          <input
+                            value={createTransportBoyPhone}
+                            onChange={(event) => setCreateTransportBoyPhone(event.target.value)}
+                            placeholder="Transport Boy Phone"
+                            className="rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                          />
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={createVanFare}
+                            onChange={(event) => setCreateVanFare(event.target.value)}
+                            placeholder="Van Fare ₹"
+                            className="rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                          />
+                        </div>
+                        <input
+                          value={createTransportNotes}
+                          onChange={(event) => setCreateTransportNotes(event.target.value)}
+                          placeholder="Transport notes (not posted to company account)"
+                          className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                        />
+                      </div>
                       {eligibilityLoading && (
                         <div className="rounded-xl border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
                           Checking delivery eligibility...

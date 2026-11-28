@@ -177,6 +177,22 @@ export default function DirectSaleDeliveryChallanPrintPage() {
             { label: "Delivered At", value: formatDocumentDateTime(delivery.delivered_at) },
           ]}
         />
+        {(delivery.van_number || delivery.transport_boy_name || delivery.transport_boy_phone || Number(delivery.van_fare || 0) > 0) ? (
+          <div className="document-card mt-4 rounded-xl border border-amber-300/70 bg-amber-50/60 p-4 text-sm text-[#4a3720]">
+            <div className="text-xs font-black uppercase tracking-[0.12em] text-[#6f4e27]">
+              Transport &amp; Van Memo (Transport-Only Finance · Not posted to company account)
+            </div>
+            <div className="mt-2 grid gap-2 sm:grid-cols-4">
+              <div><span className="text-xs text-[#6f5c46]">Van / Vehicle No:</span> <strong className="ml-1">{delivery.van_number || "—"}</strong></div>
+              <div><span className="text-xs text-[#6f5c46]">Transport Boy:</span> <strong className="ml-1">{delivery.transport_boy_name || "—"}</strong></div>
+              <div><span className="text-xs text-[#6f5c46]">Transport Boy Phone:</span> <strong className="ml-1">{delivery.transport_boy_phone || "—"}</strong></div>
+              <div><span className="text-xs text-[#6f5c46]">Van Fare (Off-Ledger):</span> <strong className="ml-1">₹{Number(delivery.van_fare || 0).toFixed(2)}</strong></div>
+            </div>
+            {delivery.transport_notes ? (
+              <div className="mt-2 text-xs text-[#6f5c46]">Notes: {delivery.transport_notes}</div>
+            ) : null}
+          </div>
+        ) : null}
         {hasOutstanding ? (
           <div className="document-card mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm font-semibold text-amber-900">
             Outstanding balance remains collectible: {delivery.balance_total}. This delivery challan does not settle payment or alter receivables.
